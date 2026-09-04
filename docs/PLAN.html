@@ -1,0 +1,909 @@
+<title>임대주택 공고지도 설계서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#f4f6f6;
+  --surface:#ffffff;
+  --surface-2:#eceff0;
+  --ink:#0f1618;
+  --body:#39454b;
+  --muted:#6b7b81;
+  --faint:#8d9ba0;
+  --line:#dbe2e3;
+  --line-soft:#e9eded;
+  --rule:#0f1618;
+  --accent:#0c5b56;
+  --accent-soft:#e2efed;
+  --accent-line:#a9cdc9;
+  --ok:#1b6a44;
+  --ok-bg:#e3f0e9;
+  --warn:#87611a;
+  --warn-bg:#f4ecdb;
+  --gap:#98392c;
+  --gap-bg:#f6e5e2;
+  --shadow:0 1px 2px rgba(15,22,24,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0d1214;
+    --surface:#141b1d;
+    --surface-2:#1b2427;
+    --ink:#e6edee;
+    --body:#b3c1c5;
+    --muted:#8a9a9f;
+    --faint:#6e7f84;
+    --line:#283437;
+    --line-soft:#1f2a2d;
+    --rule:#54696d;
+    --accent:#59b8b0;
+    --accent-soft:#14302e;
+    --accent-line:#2b5b56;
+    --ok:#67c294;
+    --ok-bg:#15301f;
+    --warn:#d8ab5c;
+    --warn-bg:#332711;
+    --gap:#e08a7c;
+    --gap-bg:#361d19;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0d1214;
+  --surface:#141b1d;
+  --surface-2:#1b2427;
+  --ink:#e6edee;
+  --body:#b3c1c5;
+  --muted:#8a9a9f;
+  --faint:#6e7f84;
+  --line:#283437;
+  --line-soft:#1f2a2d;
+  --rule:#54696d;
+  --accent:#59b8b0;
+  --accent-soft:#14302e;
+  --accent-line:#2b5b56;
+  --ok:#67c294;
+  --ok-bg:#15301f;
+  --warn:#d8ab5c;
+  --warn-bg:#332711;
+  --gap:#e08a7c;
+  --gap-bg:#361d19;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--body);
+  font-family:'IBM Plex Sans KR','Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;
+  font-size:15px;
+  line-height:1.72;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-line)}
+a:hover{border-bottom-color:var(--accent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+.page{max-width:1080px;margin:0 auto;padding:0 32px 120px}
+
+/* ── masthead ─────────────────────────── */
+.mast{padding:64px 0 0}
+.mast .kicker{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);
+}
+.mast h1{
+  font-family:'Noto Serif KR','Batang',serif;
+  font-weight:900;font-size:40px;line-height:1.28;letter-spacing:-.02em;
+  color:var(--ink);margin:14px 0 0;text-wrap:balance;
+}
+.mast .sub{margin:14px 0 0;font-size:16px;color:var(--muted);max-width:62ch}
+.meta{
+  display:flex;flex-wrap:wrap;gap:0;margin-top:34px;
+  border-top:2px solid var(--rule);border-bottom:1px solid var(--line);
+}
+.meta div{flex:1 1 190px;padding:16px 22px 18px}
+.meta div+div{border-left:1px solid var(--line-soft)}
+.meta div:first-child{padding-left:0}
+.meta .k{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.meta .v{color:var(--ink);font-weight:600;font-size:14.5px;margin-top:5px}
+
+/* ── sections ─────────────────────────── */
+section{padding:62px 0 0}
+.sec-head{display:flex;align-items:baseline;gap:16px;border-bottom:2px solid var(--rule);padding-bottom:12px}
+.sec-num{
+  font-family:'IBM Plex Mono',monospace;font-weight:600;
+  font-size:13px;color:var(--accent);letter-spacing:.04em;
+  padding-top:6px;flex:none;
+}
+h2{
+  font-family:'Noto Serif KR','Batang',serif;
+  font-weight:700;font-size:25px;letter-spacing:-.02em;color:var(--ink);
+  margin:0;line-height:1.4;text-wrap:balance;
+}
+h3{
+  font-family:'IBM Plex Sans KR',sans-serif;
+  font-weight:700;font-size:15.5px;color:var(--ink);
+  margin:40px 0 12px;letter-spacing:-.01em;
+}
+h3:first-of-type{margin-top:34px}
+.lede{margin:18px 0 0;max-width:70ch}
+p{margin:14px 0 0}
+p:first-child{margin-top:0}
+
+/* ── tables ───────────────────────────── */
+.scroll{overflow-x:auto;margin-top:20px;border-bottom:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:13.5px}
+thead th{
+  text-align:left;font-weight:600;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:10px 14px 10px 0;border-bottom:1px solid var(--rule);
+  white-space:nowrap;vertical-align:bottom;
+}
+tbody td{padding:12px 14px 12px 0;border-bottom:1px solid var(--line-soft);vertical-align:top;line-height:1.6}
+tbody tr:last-child td{border-bottom:none}
+th:last-child,td:last-child{padding-right:0}
+td strong{color:var(--ink);font-weight:600}
+td code,p code,li code{
+  font-family:'IBM Plex Mono',monospace;font-size:12.2px;
+  background:var(--surface-2);padding:1px 5px;border-radius:3px;color:var(--ink);
+  white-space:nowrap;
+}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.nowrap{white-space:nowrap}
+
+/* ── badges ───────────────────────────── */
+.b{
+  display:inline-block;font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;font-weight:600;letter-spacing:.03em;
+  padding:2px 7px;border-radius:3px;white-space:nowrap;
+}
+.b-ok{background:var(--ok-bg);color:var(--ok)}
+.b-part{background:var(--warn-bg);color:var(--warn)}
+.b-no{background:var(--gap-bg);color:var(--gap)}
+.b-hi{background:var(--gap-bg);color:var(--gap)}
+.b-mid{background:var(--warn-bg);color:var(--warn)}
+.b-lo{background:var(--ok-bg);color:var(--ok)}
+
+/* ── flow ─────────────────────────────── */
+.flow{margin-top:24px;display:grid;gap:1px;background:var(--line);border:1px solid var(--line)}
+.step{background:var(--surface);padding:16px 20px;display:grid;grid-template-columns:34px 1fr;gap:16px;align-items:start}
+.step .n{
+  font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;
+  color:var(--accent);padding-top:2px;
+}
+.step .t{font-weight:600;color:var(--ink);font-size:14.5px}
+.step .d{font-size:13.5px;color:var(--body);margin-top:3px}
+.step .tools{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--faint);margin-top:6px}
+.step.human{background:var(--accent-soft)}
+.step.human .t::after{content:' · 사람 개입';font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--accent);letter-spacing:.03em;font-weight:600}
+
+/* ── callout ──────────────────────────── */
+.note{
+  margin-top:24px;padding:18px 22px;background:var(--surface);
+  border-left:3px solid var(--accent);font-size:14px;box-shadow:var(--shadow);
+}
+.note.risk{border-left-color:var(--gap)}
+.note .lb{
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:600;display:block;margin-bottom:6px;
+}
+.note.risk .lb{color:var(--gap)}
+
+ul{margin:14px 0 0;padding-left:20px}
+li{margin:6px 0}
+ol.q{margin:20px 0 0;padding-left:0;list-style:none;counter-reset:q}
+ol.q li{
+  counter-increment:q;position:relative;padding:14px 0 14px 44px;
+  border-bottom:1px solid var(--line-soft);margin:0;
+}
+ol.q li:last-child{border-bottom:none}
+ol.q li::before{
+  content:counter(q,decimal-leading-zero);position:absolute;left:0;top:14px;
+  font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:var(--accent);
+}
+ol.q b{color:var(--ink);font-weight:600}
+
+footer{margin-top:76px;padding-top:20px;border-top:1px solid var(--line);font-size:12.5px;color:var(--faint)}
+
+@media (max-width:640px){
+  .page{padding:0 20px 80px}
+  .mast{padding-top:44px}
+  .mast h1{font-size:30px}
+  .meta div{flex-basis:140px;padding:14px 16px}
+  .meta div:first-child{padding-left:0}
+  .sec-head{gap:10px}
+}
+</style>
+
+<div class="page">
+
+<header class="mast">
+  <div class="kicker">기획·설계서 / v0.4 / 스택 확정</div>
+  <h1>집공고</h1>
+  <p class="sub">공공임대 입주자모집공고를 호실 단위로 분해해 지도와 개별 페이지로 재구성하는 프로그래매틱 SEO 서비스. ayounghome.com 구조 벤치마킹, 데이터 자동화·전국 커버·마감 정보로 차별화.</p>
+  <div class="meta">
+    <div><div class="k">조사일</div><div class="v">2026-09-04</div></div>
+    <div><div class="k">벤치마크</div><div class="v">아영이네 행복주택</div></div>
+    <div><div class="k">프로젝트 경로</div><div class="v" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px">C:\Users\cware\projects\zipgonggo\</div></div>
+    <div><div class="k">이번 단계 산출물</div><div class="v">설계 문서 (코드 없음)</div></div>
+  </div>
+</header>
+
+<!-- ══════════ 0 ══════════ -->
+<section>
+  <div class="sec-head"><span class="sec-num">00</span><h2>데이터 소스 실사 결과</h2></div>
+  <p class="lede">아래는 2026-09-04에 직접 열람해 확인한 내용이다. 열람하지 못한 항목은 <span class="b b-no">미확인·추정</span>으로 표기했고, 엔드포인트·필드명은 확인된 것만 적었다.</p>
+
+  <h3>공고·단지 메타데이터</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr>
+      <th>기관/소스</th><th>제공 형태</th><th>자동 수집</th><th>갱신</th><th>제약</th><th>판정</th><th>출처(확인일)</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>국토부 마이홈포털<br>공공주택 모집공고 조회</strong></td>
+        <td>OpenAPI · REST/JSON</td>
+        <td>가능 — <strong>1순위 소스</strong></td>
+        <td class="nowrap">미확인</td>
+        <td>인증키 필요. 응답 필드는 첨부 <code>요청 파라미터 코드.xlsx</code>에만 기재</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://www.data.go.kr/data/15108420/openapi.do">data.go.kr 15108420</a><br>(09-04)</td>
+      </tr>
+      <tr>
+        <td><strong>국토부 마이홈포털<br>공공임대 단지정보 조회</strong></td>
+        <td>OpenAPI · REST/JSON</td>
+        <td>가능</td>
+        <td class="nowrap">미확인</td>
+        <td>무료. 개발계정 <span class="num">1,000</span>건/일. 개발 자동승인 · <strong>운영 심의승인</strong>. 이용허락범위 제한 없음</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://www.data.go.kr/data/15110581/openapi.do">15110581</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td><strong>국토부 마이홈포털<br>예비입주자 대기현황</strong></td>
+        <td>OpenAPI · REST/JSON</td>
+        <td>가능 — <strong>차별화 핵심</strong></td>
+        <td class="nowrap">미확인</td>
+        <td>개발계정 <span class="num">1,000</span>건/일. 활용사례 등록 시 증량 가능. 이용허락범위 제한 없음</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://www.data.go.kr/data/15108378/openapi.do">15108378</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td>LH 공공임대주택<br>단지정보 조회</td>
+        <td>OpenAPI</td><td>가능</td><td class="nowrap">미확인</td>
+        <td>광역시도·시군구 코드로 조회. 상세 스펙 미열람</td>
+        <td><span class="b b-part">부분확인</span></td>
+        <td><a href="https://www.data.go.kr/data/15058476/openapi.do">15058476</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td>LH 전국 아파트<br>단지정보</td>
+        <td>파일 (CSV)</td><td>가능(수동 다운로드)</td><td class="nowrap">비정기</td>
+        <td>필드 확인됨: 지역본부·단지코드·단지명·세대수·동수·임대유형·주택유형·주소·준공일·입주지정시작/종료일</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://www.data.go.kr/data/15080989/fileData.do">15080989</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td>LH 마이홈포털<br>임대주택 입주자모집공고</td>
+        <td>파일</td><td>가능(수동)</td><td class="nowrap">비정기</td>
+        <td>과거 공고 백필용. 최신본 날짜 미확인</td>
+        <td><span class="b b-part">부분확인</span></td>
+        <td><a href="https://www.data.go.kr/data/15088707/fileData.do">15088707</a> (09-04)</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>호실 단위 원본 — 자동화의 병목</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr>
+      <th>기관/소스</th><th>제공 형태</th><th>자동 수집</th><th>갱신</th><th>제약</th><th>판정</th><th>출처(확인일)</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>LH청약플러스<br>임대주택 공고문</strong></td>
+        <td>웹 목록 + 첨부파일</td>
+        <td>목록 O / 호실표 △</td>
+        <td class="nowrap">수시</td>
+        <td>목록 컬럼 확인됨: 번호·유형·공고명·지역·첨부파일·게시일·<strong>마감일</strong>·상태(공고중/접수중/접수마감/정정공고중)·조회수. 필터: 유형·입주자격·지역·상태·기간. 페이징 15/30/50/100. 상세 <code>selectWrtancInfo.do?panId=…&amp;uppAisTpCd=…&amp;aisTpCd=…</code>. 호실 표는 첨부 HWP/PDF 내부</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancList.do?mi=1026">apply.lh.or.kr</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td><strong>SH 청년매입임대주택<br>공개 주택목록</strong></td>
+        <td>파일</td>
+        <td>가능(수동)</td>
+        <td class="nowrap">공고별</td>
+        <td>필드 확인됨: 주택번호·주택유형·자치구·거주형태·성별제한·전용면적·입주자유형·보증금·월임대료. <strong>호실 단위가 파일로 이미 정형화됨</strong> — 매입임대 파싱의 정답지로 사용 가능. 게시본은 2021년 기준</td>
+        <td><span class="b b-part">부분확인</span></td>
+        <td><a href="https://www.data.go.kr/data/15102880/fileData.do">15102880</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td>SH 공고 일반</td>
+        <td>웹 게시판 + 첨부</td><td>스크래핑 필요</td><td class="nowrap">수시</td>
+        <td>i-sh.co.kr에 공공데이터 개방 페이지 존재. 공고 단위 OpenAPI는 미발견</td>
+        <td><span class="b b-part">부분확인</span></td>
+        <td><a href="https://www.i-sh.co.kr/app/lay2/S1T367C437/sublink.do">i-sh.co.kr</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td>GH 경기주택도시공사</td>
+        <td>파일 (data.go.kr / 경기데이터드림)</td>
+        <td>가능(수동)</td><td class="nowrap">비정기</td>
+        <td>확인된 셋: GH주택청약 주택유형정보(15119422), 공공주택분양 현황(15016337), 경기데이터드림 「아파트 분양(임대) 공고 현황」. <strong>호실 단위 아님</strong></td>
+        <td><span class="b b-part">부분확인</span></td>
+        <td><a href="https://www.data.go.kr/data/15119422/fileData.do">15119422</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td>HUG 든든전세주택</td>
+        <td>미확인</td><td>미확인</td><td class="nowrap">미확인</td>
+        <td>공공데이터포털에서 HUG 공고 데이터셋 미발견. 자사 공고 페이지 스크래핑 여부 확인 필요</td>
+        <td><span class="b b-no">미확인·추정</span></td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>서울시 청년안심주택<br>(공공지원민간임대)</td>
+        <td>웹 게시판</td><td>스크래핑</td><td class="nowrap">수시</td>
+        <td>OpenAPI 미발견. 민간임대 축의 주 소스</td>
+        <td><span class="b b-part">부분확인</span></td>
+        <td><a href="https://soco.seoul.go.kr/youth/bbs/BMSR00015/list.do?menuNo=400008">soco.seoul.go.kr</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td><strong>서울주거포털<br>SH 공공임대 목록</strong></td>
+        <td>웹 목록</td><td>스크래핑</td><td class="nowrap">수시</td>
+        <td>컬럼 확인됨: 번호·청약유형·공고명·공고게시일·<strong>발표일</strong>·모집상태·담당부서·링크. 필터: 기간·청약유형(10종 이상)·모집상태·공고명. 상세는 <code>i-sh.co.kr</code> 새창. 첨부 다운로드는 없음(상세로 이동). <strong>발표일은 LH 목록에 없는 필드</strong></td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://housing.seoul.go.kr/site/main/sh/publicLease/02/list">housing.seoul.go.kr</a> (09-04)</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>좌표 확보 — API가 아니라 데이터셋으로</h3>
+  <p class="lede">지오코딩 API 3종은 모두 결과 좌표의 DB 저장을 금지한다. 반면 좌표를 <strong>파일 데이터셋</strong>으로 받으면 저장·재배포가 허용된다. 같은 위경도라도 취득 경로가 권리를 정한다.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr>
+      <th>후보</th><th>취득 방식</th><th>쿼터</th><th>좌표 DB 저장</th><th>이용 조건</th><th>판정</th><th>출처(확인일)</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>행안부 도로명주소<br>위치정보 요약DB</strong></td>
+        <td><strong>파일 데이터셋</strong></td>
+        <td>없음 (오프라인 조인)</td>
+        <td><strong>가능</strong></td>
+        <td>무료 · <strong>공공저작물 제1유형(출처표시)</strong> · 도로명주소 + 주출입구 X,Y(GRS80 UTM-K) · juso.go.kr 신청서 + 이용목적 심사 필요</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://www.data.go.kr/data/15050410/fileData.do">15050410</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td>국토부 지오코더 API</td>
+        <td>실시간 API</td>
+        <td class="num">40,000건/일</td>
+        <td><strong>불가</strong></td>
+        <td>무료 · "실시간 사용만 가능" 명시 · 운영단계 심의승인 · 응답 XML</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://www.data.go.kr/data/15101106/openapi.do">15101106</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td>VWorld Geocoder</td>
+        <td>실시간 API</td>
+        <td class="num">40,000건/일</td>
+        <td><strong>불가</strong></td>
+        <td>원문: "API 요청은 실시간으로 사용하셔야 하며 별도의 저장장치나 데이터베이스에 저장할 수 없습니다"</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://www.vworld.kr/dev/v4dv_geocoderguide_s002.do">vworld.kr</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td>카카오 로컬 (주소→좌표)</td>
+        <td>실시간 API</td>
+        <td class="num">100,000건/일</td>
+        <td><strong>불가</strong></td>
+        <td>FAQ 안내: "응답받은 결과 데이터를 별도로 저장하여 사용하는 것은 허용하지 않으며, 실시간 호출만 가능"</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://devtalk.kakao.com/t/api/140197">devtalk.kakao.com</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td>네이버 클라우드 Maps</td>
+        <td>실시간 API</td><td>—</td><td>—</td>
+        <td><strong>유료</strong> · 결제수단 등록 필수</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://api.ncloud-docs.com/docs/application-maps-overview">ncloud-docs</a> (09-04)</td>
+      </tr>
+      <tr>
+        <td><strong>카카오맵 JS SDK</strong><br>(지도 표출·로드뷰)</td>
+        <td>클라이언트 SDK</td>
+        <td>—</td>
+        <td>해당 없음 — 마커 좌표는 자체 보유분을 넘김</td>
+        <td>지도 렌더링만 사용. 로컬 API는 사용하지 않음</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><a href="https://apis.map.kakao.com/web/">apis.map.kakao.com</a> (09-04)</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <span class="lb">결론 — 저장 문제는 해소됨</span>
+    주소 문자열 자체를 저장하는 데는 아무 제약이 없다(공고문에 실린 공공 정보다). 제약은 <strong>지오코딩 API 응답</strong>에만 걸린다. 따라서 좌표를 API로 조회하지 않고 <strong>위치정보 요약DB를 내려받아 자체 좌표 테이블로 보유</strong>하고, 공고 주소와 오프라인으로 조인한다. 쿼터도 저장 제약도 사라진다.
+    <br><br>
+    실시간 API 방식은 애초에 성립하지 않는다. 공고 지도 한 장에 마커가 <span class="num">476</span>개이므로 페이지 1회 열람에 <span class="num">476</span>콜, 일 방문 <span class="num">84</span>명이면 <span class="num">40,000</span>건 쿼터가 소진된다.
+  </div>
+
+  <h3>확인 필요 항목</h3>
+  <ul>
+    <li><strong>마이홈포털 3종 API의 실제 응답 필드</strong> — 각 데이터셋의 <code>붙임1. 요청 파라미터 코드.xlsx</code> 및 상세기능명세 다운로드. 응답에 호실 단위 주소나 좌표가 포함되면 파이프라인이 통째로 짧아지므로 <strong>착수 순서상 최우선</strong>.</li>
+    <li><strong>위치정보 요약DB 신청 승인 소요기간</strong> — juso.go.kr 신청서 제출 후 소관 자치단체·행안부 이용목적 심사. 소요일수가 확인되지 않았고 Phase 1 일정의 선행 조건이므로 <strong>즉시 신청부터 걸어 둘 것</strong>.</li>
+    <li><strong>공고문 첨부파일(HWP/PDF)의 재가공·재배포 허용 범위</strong> — LH·SH 각 사이트 이용약관, <code>robots.txt</code>, 저작물 이용 안내 확인.</li>
+    <li><strong>마이홈포털 API 운영계정 심의 통과 조건</strong> — 심의 기준·소요기간. 개발계정 <span class="num">1,000</span>건/일로는 전국 백필 불가.</li>
+    <li><strong>HUG 든든전세주택 데이터 제공 형태</strong> — HUG 공고 페이지 구조 및 공공데이터 개방 목록 확인.</li>
+    <li><strong>LH·SH 단지정보 API의 좌표 포함 여부</strong> — 포함되어 있으면 단지 단위는 요약DB 조인 없이 바로 지도에 올릴 수 있다.</li>
+  </ul>
+</section>
+
+<!-- ══════════ 1 ══════════ -->
+<section>
+  <div class="sec-head"><span class="sec-num">01</span><h2>데이터 파이프라인 설계</h2></div>
+  <p class="lede">공고 메타는 API로, 호실 목록은 첨부파일 파싱으로 얻는 이중 경로. 파싱은 결정적으로 실패할 수 있으므로 <strong>실패를 정상 상태로 취급</strong>하고 사람이 개입할 지점을 파이프라인 안에 못박는다.</p>
+
+  <div class="flow">
+    <div class="step"><div class="n">S1</div><div>
+      <div class="t">공고 목록 수집</div>
+      <div class="d">마이홈포털 모집공고 API를 1차 소스로, LH청약플러스 목록 스크래핑을 보조로 사용. 공고 지문(기관+공고명+게시일 해시)으로 중복 제거.</div>
+      <div class="tools">httpx · selectolax · 6시간 주기 크론</div>
+    </div></div>
+    <div class="step"><div class="n">S2</div><div>
+      <div class="t">상태·마감 추적</div>
+      <div class="d">LH 목록의 <code>상태</code>·<code>마감일</code> 컬럼을 매 수집마다 대조. 신규/정정공고중/접수마감을 이벤트로 기록해 D-day와 "정정됨" 배지의 근거로 삼는다.</div>
+      <div class="tools">공고 스냅샷 테이블 + diff</div>
+    </div></div>
+    <div class="step"><div class="n">S3</div><div>
+      <div class="t">첨부파일 수집·형식 분기</div>
+      <div class="d">XLSX·CSV는 그대로 표로, PDF는 텍스트 레이어 유무 판정 후 표 추출, HWP/HWPX는 XML 변환 경유. 원본 파일은 해시와 함께 보관해 재파싱 가능하게 둔다.</div>
+      <div class="tools">pdfplumber(표) · pypdf(텍스트 레이어 판정) · hwp5/hwpx→XML · openpyxl</div>
+    </div></div>
+    <div class="step"><div class="n">S4</div><div>
+      <div class="t">호실 레코드 파싱</div>
+      <div class="d">추출 대상: 주소 · 단지명 · 동 · 호 · 전용면적(㎡) · 보증금/임대료(기본·전세전환·월세전환) · 층 · 방구조 · 승강기 · 비고. 기관·공고유형별 파서를 분리하고, SH 청년매입임대 공개 목록(15102880)을 <strong>정답지</strong>로 삼아 회귀 테스트한다. 원본 PDF는 <strong>해시와 함께 보관</strong>해 정정공고로 교체되면 자동 감지한다 — 이것이 "정정됨" 배지의 근거가 된다. PDF 자체는 재배포하지 않고 기관 원문 링크만 건다.</div>
+      <div class="tools">기관별 파서 모듈 · 골든 데이터셋 회귀 테스트</div>
+    </div></div>
+    <div class="step"><div class="n">S4b</div><div>
+      <div class="t">자격요건 추출</div>
+      <div class="d">공고문 PDF에는 호실 표만 있는 게 아니다. <strong>입주 자격 · 소득·자산 기준 · 순위 · 가점 · 신청 절차</strong>가 함께 실려 있고, 검색 수요는 이쪽이 더 크다("매입임대 소득기준", "행복주택 순위"). 표가 아닌 서술형이라 호실 파서와 별도 경로로 처리하고, 공고 페이지의 자격요건 섹션으로 발행한다.</div>
+      <div class="tools">섹션 헤딩 기반 분할 · 소득분위·자산 기준 수치 추출 · 요약은 검수 큐 경유 필수</div>
+    </div></div>
+    <div class="step"><div class="n">S5</div><div>
+      <div class="t">정규화</div>
+      <div class="d">주소는 도로명 우선·지번 병기로 통일, 금액은 정수 원 단위, 면적은 소수 2자리. 유형은 자체 코드로 매핑(행복주택·국민임대·매입임대·장기전세·통합공공임대·전세임대·든든전세).</div>
+      <div class="tools">정규식 + 유형 매핑 테이블</div>
+    </div></div>
+    <div class="step"><div class="n">S6</div><div>
+      <div class="t">좌표 매칭 (오프라인)</div>
+      <div class="d">지오코딩 API를 호출하지 않는다. 자체 보유한 위치정보 요약DB 좌표 테이블에 정규화된 도로명주소를 조인한다. UTM-K를 WGS84로 변환해 저장. 매칭 실패 주소는 건물명·지번 보조키로 재시도하고, 그래도 실패하면 읍면동 중심 좌표로 강등한 뒤 <code>geo_precision</code>에 등급을 남긴다.</div>
+      <div class="tools">주소 정규화 → 좌표 테이블 조인 · UTM-K→WGS84 변환 · 정확도 등급(건물/도로/동)</div>
+    </div></div>
+    <div class="step human"><div class="n">S7</div><div>
+      <div class="t">검수 큐</div>
+      <div class="d">파싱 신뢰도 미달 레코드는 자동 발행하지 않고 큐로 보낸다. 트리거: 표 컬럼 수 불일치, 보증금 0원 또는 <span class="num">10억</span>원 초과, 전용면적 <span class="num">9㎡</span> 미만·<span class="num">200㎡</span> 초과, 지오코딩 정확도가 건물 미만, 동일 공고 내 호실 수가 직전 회차 대비 ±50% 변동.</div>
+      <div class="tools">관리자 화면 · 승인/반려 · 반려 사유를 파서 개선에 환류</div>
+    </div></div>
+    <div class="step"><div class="n">S8</div><div>
+      <div class="t">발행</div>
+      <div class="d">검수 통과분만 <code>published</code>로 전환해 페이지 생성. 마감된 공고는 삭제하지 않고 <code>closed</code>로 두어 URL을 유지하고, 상단에 마감 배너와 후속 공고 링크를 붙인다.</div>
+      <div class="tools">on-demand revalidate · 사이트맵 갱신</div>
+    </div></div>
+  </div>
+
+  <div class="note">
+    <span class="lb">설계 원칙</span>
+    URL은 한 번 만들면 죽이지 않는다. 마감 공고 페이지도 살려 두는 편이 검색 자산 축적에 유리하고, 벤치마크가 하지 못하는 <strong>연도별 공고 아카이브</strong>가 그 자체로 새로운 롱테일이 된다.
+  </div>
+</section>
+
+<!-- ══════════ 2 ══════════ -->
+<section>
+  <div class="sec-head"><span class="sec-num">02</span><h2>URL · 페이지 구조 설계</h2></div>
+  <p class="lede">공고 · 호실 · 단지 · 지역 · 조건, 그리고 지역×유형 조합까지 5+1개 축. 필터 상태는 전부 쿼리스트링에 두고 색인하지 않는다.</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr>
+      <th style="min-width:96px">페이지 타입</th><th style="min-width:210px">URL 패턴</th><th>예상 수</th><th style="min-width:190px">롱테일 키워드 예시</th><th style="min-width:200px">고유 콘텐츠</th><th style="min-width:220px">title / meta 템플릿</th><th>JSON-LD</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>호실 상세</strong></td>
+        <td><code>/notice/{공고}/{호실}</code></td>
+        <td class="num">30,000+</td>
+        <td>서도휴빌 3차 202호 보증금 · 천호동 매입임대 43㎡ 월세 · 장안동 투룸 임대주택</td>
+        <td>보증금 3종·임대료·전용면적·층·동호·지하철 도보시간·건물 좌표</td>
+        <td>{단지명} {동}{호} 전용 {면적}㎡ 보증금·임대료 | {공고명}<br><small>{자치구} {법정동}, {유형}. 보증금 {기본}원 / 월 {임대료}원. 지하철 {역} 도보 {분}분.</small></td>
+        <td>Apartment + Offer</td>
+      </tr>
+      <tr>
+        <td><strong>공고 지도</strong></td>
+        <td><code>/notice/{기관}-{연도}-{차수}-{유형}</code></td>
+        <td class="num">300+</td>
+        <td>2026 2차 매입임대 공고 지도 · SH 장기전세 51차 위치</td>
+        <td>공고 전체 호실 지도·필터·접수일정·<strong>D-day</strong>·발표일·정정 이력·<strong>자격요건/소득기준 요약</strong>·원문 PDF 링크</td>
+        <td>{공고명} 지도 — 전체 {n}호실 위치·보증금 한눈에<br><small>{기관} {공고명}. 접수 {시작}~{마감}(D-{n}). {지역} {n}호실 지도.</small></td>
+        <td>ItemList + Event</td>
+      </tr>
+      <tr>
+        <td><strong>단지</strong></td>
+        <td><code>/complex/{단지명}-{단지코드}</code></td>
+        <td class="num">4,000+</td>
+        <td>번동 5단지 국민임대 대기 · 서도휴빌 3차 임대료</td>
+        <td>단지 제원(세대수·동수·준공일)·<strong>예비입주자 대기현황</strong>·역대 공고 이력</td>
+        <td>{단지명} {유형} 임대료·대기현황·역대 공고<br><small>{주소}. {세대수}세대, {준공}년 준공. 최근 공고 {n}건, 대기 {n}번.</small></td>
+        <td>ApartmentComplex</td>
+      </tr>
+      <tr>
+        <td><strong>지역</strong></td>
+        <td><code>/area/{시도}/{시군구}/{읍면동}</code></td>
+        <td class="num">3,500</td>
+        <td>강동구 천호동 임대주택 · 성남시 분당구 공공임대 모집</td>
+        <td>해당 동 전체 매물 지도·보증금 중앙값·유형 분포·진행중 공고</td>
+        <td>{동} 임대주택 {n}곳 — 보증금·모집공고 지도<br><small>{시군구} {동} 공공임대 {n}곳. 보증금 중앙 {금액}원. 모집중 {n}건.</small></td>
+        <td>CollectionPage</td>
+      </tr>
+      <tr>
+        <td><strong>지역 × 유형</strong></td>
+        <td><code>/area/{시군구}/{유형}</code></td>
+        <td class="num">2,000</td>
+        <td>강동구 매입임대 · 수원시 행복주택 모집공고</td>
+        <td>유형 한정 매물·해당 유형 자격요건·경쟁 강도</td>
+        <td>{시군구} {유형} 모집공고·매물 {n}곳<br><small>{시군구} {유형} 현황. 진행중 {n}건, 평균 보증금 {금액}원.</small></td>
+        <td>CollectionPage</td>
+      </tr>
+      <tr>
+        <td>유형 허브</td>
+        <td><code>/type/{유형}</code></td>
+        <td class="num">12</td>
+        <td>매입임대주택이란 · 통합공공임대 자격</td>
+        <td>제도 설명·자격 요건·전국 공고 현황 — <strong>직접 작성</strong></td>
+        <td>{유형} 자격·보증금·전국 모집공고 총정리</td>
+        <td>Article + FAQPage</td>
+      </tr>
+      <tr>
+        <td>필터 결과</td>
+        <td><code>?area=&amp;deposit=&amp;type=</code></td>
+        <td>—</td>
+        <td>— (색인 대상 아님)</td>
+        <td>없음 — 상위 페이지의 부분집합</td>
+        <td>canonical → 파라미터 없는 URL</td>
+        <td><span class="b b-no">noindex</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>얇은 페이지 방지 규칙</h3>
+  <ul>
+    <li><strong>호실 상세</strong> — 고유 데이터 필드 <span class="num">8개</span> 이상(주소·단지명·동·호·전용면적·보증금·임대료 + 1) &amp; 지오코딩 정확도 건물 단위. 미달 시 <code>noindex</code>하고 공고 지도 페이지의 앵커로만 노출.</li>
+    <li><strong>지역 페이지</strong> — 매물 <span class="num">3건</span> 이상. 미달 시 페이지를 만들지 않고 상위 시군구 페이지로 <code>301</code>.</li>
+    <li><strong>지역 × 유형</strong> — 매물 <span class="num">5건</span> 이상. 미달 시 지역 페이지로 canonical.</li>
+    <li><strong>단지 페이지</strong> — 공고 이력 <span class="num">1건</span> 이상 &amp; 세대수 확보. 대기현황이 없어도 생성하되 해당 섹션은 표시하지 않는다.</li>
+    <li><strong>자동 생성 문장 비율</strong> — 페이지 본문에서 템플릿 문장이 <span class="num">60%</span>를 넘지 않게 한다. 초과분은 표·지도 등 데이터 블록으로 대체한다.</li>
+    <li><strong>출처 배지 승계</strong> — 기존 <code>childcare-sample.html</code>의 4종 배지(API 원본 / 계산값 / 자동생성 문장 / 직접 작성)를 그대로 쓴다. 계산값과 자동생성 문장을 시각적으로 구분해야 신뢰도와 심사 방어력이 함께 올라간다.</li>
+  </ul>
+</section>
+
+<!-- ══════════ 3 ══════════ -->
+<section>
+  <div class="sec-head"><span class="sec-num">03</span><h2>기술 스택 결정</h2></div>
+
+  <div class="scroll">
+  <table>
+    <thead><tr>
+      <th>영역</th><th>후보</th><th>확장성</th><th>빌드시간</th><th>크롤러 노출</th><th>비용</th><th>숙련도</th><th>추천</th>
+    </tr></thead>
+    <tbody>
+      <tr><td rowspan="3"><strong>렌더링</strong></td>
+        <td>Next.js 15 App Router + ISR</td><td>상</td><td>초기 정적 소수 + 나머지 온디맨드</td><td>상 (완전 SSR HTML)</td><td>중</td><td>중 (React 기반)</td><td><strong>채택</strong></td></tr>
+      <tr><td>Astro SSG 전량</td><td>중</td><td><span class="num">3만</span> 페이지 전량 빌드 = 수십 분, 매 배포마다 반복</td><td>상</td><td>하</td><td>중</td><td>—</td></tr>
+      <tr><td>Vite SPA + CSR</td><td>상</td><td>즉시</td><td><strong>하</strong> — pSEO 목적과 정면 충돌</td><td>하</td><td>상</td><td>배제</td></tr>
+
+      <tr><td rowspan="3"><strong>지도 SDK</strong></td>
+        <td>네이버 지도<br>(Web Dynamic Map)</td><td>상</td><td>—</td><td>—</td><td><strong>대표계정 무료 이용량 제공</strong> (API별 월 3,000 ~ 1억 건). 지도 로딩 시에만 카운트, 로딩 후 zoom·marker는 미포함</td><td><strong>상 — 이미 사용 중</strong></td><td><strong>채택</strong></td></tr>
+      <tr><td>카카오맵 JS SDK</td><td>상</td><td>—</td><td>—</td><td>지도 30만 호출/일, 통합 300만/월. 단 <strong>개발자 계정 첫 활성화 앱에만</strong> 적용, 2026-07-21 정책 변경</td><td>중</td><td>예비</td></tr>
+      <tr><td>MapLibre + VWorld 타일</td><td>상</td><td>—</td><td>—</td><td>무료</td><td>하</td><td>—</td></tr>
+
+      <tr><td rowspan="3"><strong>DB</strong></td>
+        <td>Neon Postgres + PostGIS</td><td>상</td><td>—</td><td>—</td><td>무료 0.5GB × 100 프로젝트</td><td>중</td><td><strong>채택</strong></td></tr>
+      <tr><td>Supabase Postgres + PostGIS</td><td>상</td><td>—</td><td>—</td><td>무료 500MB · <strong>프로젝트 2개 제한</strong></td><td>중</td><td>— 계정 무료 한도 소진으로 사용 불가</td></tr>
+      <tr><td>SQLite 파일 배포 동봉</td><td>중</td><td>빠름</td><td>—</td><td>0</td><td>상</td><td>배제 — 데이터 갱신마다 재배포가 필요해 6시간 주기 수집과 충돌</td></tr>
+
+      <tr><td rowspan="2"><strong>파이프라인</strong></td>
+        <td>Python 별도 레포 + 스케줄러</td><td>상</td><td>—</td><td>—</td><td>낮음</td><td>중</td><td><strong>채택</strong> — PDF/HWP 파싱 생태계가 Python에만 있음</td></tr>
+      <tr><td>Node 단일 레포 통합</td><td>중</td><td>—</td><td>—</td><td>낮음</td><td>상</td><td>— HWP 파싱 수단 부족</td></tr>
+
+      <tr><td><strong>배포</strong></td>
+        <td>Vercel</td><td>상</td><td>—</td><td>상</td><td>Pro 필요 가능성</td><td>상</td><td><strong>채택</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>최종 추천 스택</h3>
+  <ul>
+    <li><strong>Next.js 15 App Router + ISR</strong> — 지역·유형·공고 페이지는 정적 생성, 호실 상세 <span class="num">3만</span> 페이지는 <code>generateStaticParams</code> 없이 온디맨드 ISR(<code>revalidate: 86400</code>). 전량 SSG는 배포마다 수십 분을 태우므로 배제.</li>
+    <li><strong>네이버 지도 (Web Dynamic Map)</strong> — 대표계정에 무료 이용량이 제공되고(API별 월 3,000~1억 건), 지도 데이터 최신성이 카카오보다 낫다고 알려져 있다. 신축 매입임대 비중이 큰 이 도메인에서 실질적인 차이가 된다. 거리뷰는 <code>naver.maps.Panorama</code>로 지원되므로 로드뷰 기능에서도 손해가 없다. 지도 표출은 클라이언트, <strong>마커 좌표는 서버 렌더 HTML에 포함</strong>시켜 크롤러가 데이터를 보게 한다.</li>
+    <li><strong>Neon Postgres + PostGIS</strong> — 무료 프로젝트 100개라 계정 한도에 걸리지 않는다. "이 지점 반경 1km" 조회를 위해 PostGIS를 켠다.</li>
+    <li><strong>좌표 원본은 DB 밖에 둔다</strong> — 도로명주소 요약DB 전국본은 수백만 행이라 무료 티어를 넘긴다. 파이프라인 로컬(SQLite/Parquet)에 두고 배치 조인만 수행하고, <strong>매칭에 성공한 좌표만</strong> DB에 적재한다. 호실 <span class="num">3만</span> 행이면 수 MB 규모.</li>
+    <li><strong>Python 파이프라인 레포 분리</strong> — <code>C:\Users\cware\projects\zipgonggo\pipeline\</code>. 프론트와 배포 주기가 다르므로 분리한다.</li>
+    <li><strong>사이트맵</strong> — <code>sitemap-index.xml</code> + 타입별 분할, 파일당 <span class="num">40,000</span> URL 상한. 진행중 공고는 <code>priority 0.9</code>, 마감 공고는 <code>0.3</code>.</li>
+  </ul>
+
+  <div class="note risk">
+    <span class="lb">확인 필요</span>
+    네이버 Maps 무료 이용량은 <strong>대표계정</strong>(Maps를 처음 사용한 계정)에만 적용되고 API별로 한도가 다르다. 이 서비스는 지도가 모든 페이지에 뜨므로 <strong>지도 로드 수가 곧 페이지뷰</strong>다 — 착수 시 콘솔에서 Web Dynamic Map의 실제 월 무료 한도를 확인하고, 월 페이지뷰 목표(<span class="num">30,000</span>)와 대조할 것.
+  </div>
+</section>
+
+<!-- ══════════ 4 ══════════ -->
+<section>
+  <div class="sec-head"><span class="sec-num">04</span><h2>차별화 포인트</h2></div>
+
+  <div class="scroll">
+  <table>
+    <thead><tr>
+      <th>벤치마크 약점</th><th>대응 기능</th><th>필요 데이터</th><th>데이터 확보</th><th>난이도</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>공고 마감일·접수일정 없음</td>
+        <td><strong>D-day 카운터 + 접수 캘린더</strong>. 공고 카드와 호실 페이지 상단 고정</td>
+        <td>LH 목록 <code>마감일</code>·<code>상태</code> 컬럼</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><span class="b b-lo">하</span></td>
+      </tr>
+      <tr>
+        <td>경쟁률·대기 정보 없음</td>
+        <td><strong>단지별 예비입주자 대기 번호</strong> — "이 단지 지금 몇 번까지 빠졌나"</td>
+        <td>마이홈포털 예비입주자 대기현황 API</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><span class="b b-mid">중</span></td>
+      </tr>
+      <tr>
+        <td>서울·수도권 편중</td>
+        <td><strong>전국 17개 시도 커버</strong>. 지방 검색어는 경쟁이 거의 없어 초기 색인에 유리</td>
+        <td>마이홈포털 모집공고 API(전국) + LH 단지정보</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><span class="b b-mid">중</span></td>
+      </tr>
+      <tr>
+        <td>데이터 수집 수동 (27건 규모)</td>
+        <td><strong>6시간 주기 자동 수집 + 검수 큐</strong>. 공고 게시 당일 페이지 발행</td>
+        <td>API + 첨부 파싱 파이프라인</td>
+        <td><span class="b b-part">부분확인</span> — 첨부 파싱이 관건</td>
+        <td><span class="b b-hi">상</span></td>
+      </tr>
+      <tr>
+        <td>낡은 SEO 구조 (그누보드)</td>
+        <td>호실·지역·단지 축 <strong>3만+ 색인 페이지</strong>, JSON-LD, 사이트맵 분할</td>
+        <td>파싱 결과 전량</td>
+        <td><span class="b b-part">부분확인</span></td>
+        <td><span class="b b-mid">중</span></td>
+      </tr>
+      <tr>
+        <td>공고 정정 이력 추적 없음</td>
+        <td><strong>"정정공고중" 배지 + 변경 이력 타임라인</strong></td>
+        <td>공고 스냅샷 diff</td>
+        <td><span class="b b-ok">확인됨</span></td>
+        <td><span class="b b-lo">하</span></td>
+      </tr>
+      <tr>
+        <td>과거 공고 아카이브 없음</td>
+        <td><strong>연도별 공고 아카이브</strong> — "작년 이맘때 어디 나왔나" 재방문 수요</td>
+        <td>LH 마이홈포털 모집공고 파일데이터(백필)</td>
+        <td><span class="b b-part">부분확인</span></td>
+        <td><span class="b b-mid">중</span></td>
+      </tr>
+      <tr>
+        <td>실내 사진 (벤치마크 강점)</td>
+        <td><strong>대응 불가.</strong> 벤치마크는 유튜브 촬영으로 자체 확보한 자산. 복제하지 않는다</td>
+        <td>—</td>
+        <td><span class="b b-no">데이터 없음</span></td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>수익 모델과 법적 리스크</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr><th style="min-width:150px">모델</th><th>수익성</th><th>법적 리스크</th><th>필요한 조치</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>공고 알림 구독</strong><br>(지역·유형·보증금 조건 매칭)</td>
+        <td>중</td>
+        <td>낮음</td>
+        <td><strong>1순위.</strong> 정보통신망법상 광고성 정보 수신 동의, 개인정보 처리방침. 유료 전환 시 전자상거래법 표기</td>
+      </tr>
+      <tr>
+        <td>디스플레이 광고<br>(애드센스 등)</td>
+        <td>하~중</td>
+        <td>낮음</td>
+        <td>자동 생성 페이지 비중이 높으면 심사에서 불리. §2의 얇은 페이지 규칙이 곧 심사 대비책</td>
+      </tr>
+      <tr>
+        <td>이사·인테리어 제휴</td>
+        <td>중</td>
+        <td>중 — 공인중개 행위에 해당하지 않도록 <strong>거래 알선 기능은 두지 않는다</strong></td>
+        <td>제휴 링크에 "광고" 명시</td>
+      </tr>
+      <tr>
+        <td style="color:var(--muted)"><s>대출 상담 중개</s><br>(벤치마크의 주 수익원)</td>
+        <td style="color:var(--muted)">—</td>
+        <td><span class="b b-no">채택 안 함</span> 사용자 결정. 참고로 대출성 상품 광고·권유는 금융소비자보호법 규율 대상이고, 대출모집인 등록 없는 수수료 수취는 무등록 영업 소지가 있어 리스크도 컸다</td>
+        <td>해당 없음 — 화면·데이터 모델에서 제외</td>
+      </tr>
+      <tr>
+        <td colspan="4" style="color:var(--muted)">공통 — 공공데이터 재가공물 표기 의무(출처 표시), 공고문 원문 저작권·첨부파일 재배포 범위, 사이트 하단 「본 정보는 참고용이며 최종 확인은 공고문 원문·기관 문의로」 고지.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <span class="lb">확정</span>
+    <strong>대출 중개는 하지 않는다.</strong> 수익은 알림 구독 → 광고 → 제휴 순으로 쌓는다. 벤치마크와 수익 구조가 갈리는 만큼 서비스의 무게중심도 달라진다 — 대출 전환을 유도할 이유가 없으므로 <strong>보증금·임대료를 감추거나 상담으로 유도하지 않고 전부 지면에 노출</strong>한다. 이쪽이 검색 노출에도 유리하다.
+  </div>
+</section>
+
+<!-- ══════════ 5 ══════════ -->
+<section>
+  <div class="sec-head"><span class="sec-num">05</span><h2>실행 로드맵</h2></div>
+  <p class="lede"><strong>지역이나 기관으로 좁히지 않는다.</strong> 범위를 <em>깊이</em>로 나눈다 — 1층은 API만으로 전국이 완성되고, 2층은 그 위에 호실 단위를 얹는다. 이렇게 하면 첫 배포부터 전국 서비스가 나오고, 가장 어려운 첨부파일 파싱이 출시를 막지 않는다.</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr>
+      <th>Phase</th><th>목표</th><th style="min-width:180px">범위</th><th style="min-width:180px">산출물</th><th style="min-width:240px">완료 기준 (수치)</th><th>예상 소요</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>0<br>실사·신청</strong></td>
+        <td>선행 조건 해소</td>
+        <td>문서 작업 + 신청 접수</td>
+        <td>API 상세명세 요약, 위치정보 요약DB 신청서 제출, 마이홈 API 운영계정 신청</td>
+        <td>§0 「확인 필요 항목」 6건 전부 <span class="b b-ok">확인됨</span> 또는 대안 확정 · 요약DB 신청 접수 완료</td>
+        <td>2~3일<br><small>(승인 대기는 별도)</small></td>
+      </tr>
+      <tr>
+        <td><strong>1<br>전국 1층</strong></td>
+        <td>API만으로 되는 것 전부 — 첫날부터 전국</td>
+        <td><strong>전국 17개 시도 · LH·SH·GH 전 기관.</strong> 공고 · 단지 · 지역 · 지역×유형 페이지. 마감 D-day, 예비입주자 대기현황, 정정 이력. <em>호실 단위 없음</em></td>
+        <td>수집 스케줄러, 좌표 조인 파이프라인, 4개 페이지 템플릿, 사이트맵, 지도 컴포넌트</td>
+        <td>색인 페이지 <span class="num">5,000</span> 이상 · 좌표 건물 단위 매칭률 <span class="num">95%</span> 이상 · 공고 게시일 대비 발행 지연 <span class="num">24시간</span> 이내 · 첫 롱테일 유입 발생</td>
+        <td>4~6주</td>
+      </tr>
+      <tr>
+        <td><strong>2<br>호실 2층</strong></td>
+        <td>첨부파일 파싱으로 호실 단위 확보</td>
+        <td>기관별 파서를 <strong>SH → LH → GH</strong> 순으로 순차 투입. 전국 커버는 이미 1층에서 확보돼 있으므로 파서 하나가 늦어도 서비스는 돌아간다. <strong>민간임대 스크래퍼를 병행</strong>(청년안심주택 게시판) — 파서와 독립이라 일정이 얽히지 않는다</td>
+        <td>기관별 파서 3종, 민간임대 스크래퍼 1종, 검수 큐 관리 화면, 호실 상세 템플릿, 골든 데이터셋 회귀 테스트</td>
+        <td>파싱 정확도 <span class="num">95%</span> 이상(SH 공개목록 대조) · 검수 큐 유입률 <span class="num">10%</span> 이하 · 색인 페이지 <span class="num">30,000</span> 이상 · 월 세션 <span class="num">5,000</span> 이상</td>
+        <td>6~10주</td>
+      </tr>
+      <tr>
+        <td><strong>3<br>수익화</strong></td>
+        <td>사용자 확보 후 매출</td>
+        <td>알림 구독 → 광고 → 이사·인테리어 제휴. <strong>대출 중개 없음</strong></td>
+        <td>알림 구독 기능, 광고 슬롯, 개인정보 처리방침·수신동의 플로우</td>
+        <td>알림 구독자 <span class="num">1,000</span>명 이상 · 월 세션 <span class="num">30,000</span> 이상 · 재방문율 <span class="num">25%</span> 이상</td>
+        <td>Phase 2 이후</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <span class="lb">깊이로 나누는 이유</span>
+    호실 데이터가 없어도 <strong>공고·단지·지역 페이지는 그 자체로 완결된 상품</strong>이다. 마이홈포털 API 3종만으로 전국 공고 목록, 단지 제원, 예비입주자 대기현황이 나오고, 이 셋은 벤치마크가 제공하지 않는 정보다. 첨부파일 파싱은 난이도가 가장 높고 기관별로 서식이 달라 일정을 예측할 수 없는데, 이것을 출시 조건으로 걸면 전체가 인질이 된다.
+    <br><br>
+    Phase 2의 파서 투입 순서를 SH부터로 잡는 이유는 별개다 — 호실 단위 데이터가 정형 파일로 공개된 유일한 사례가 SH 청년매입임대 공개 목록(<a href="https://www.data.go.kr/data/15102880/fileData.do">15102880</a>)이라, 파서 출력을 대조해 <strong>정확도를 추측이 아니라 숫자로</strong> 확인할 수 있다. 정답지가 있는 기관에서 파서 골격을 검증한 뒤 나머지로 확장한다.
+  </div>
+</section>
+
+<!-- ══════════ 6 ══════════ -->
+<section>
+  <div class="sec-head"><span class="sec-num">06</span><h2>가정과 리스크</h2></div>
+  <ul>
+    <li><strong>가정 1 — 위치정보 요약DB 이용 신청이 승인된다.</strong> 공공저작물 제1유형이라 이용 자체는 허용되나, 소관 자치단체·행안부의 이용목적 심사를 거친다. 승인 소요기간이 확인되지 않았다.<br>
+      <em>Plan B</em>: 승인 대기 중에는 <strong>단지·읍면동 단위 좌표</strong>로만 지도를 서비스한다(LH 단지정보 파일의 주소 + 시군구 중심 좌표). 호실 단위 정밀 좌표는 승인 후 소급 적용. <em>Plan C</em>: 카카오 유료앱으로 전환해 실시간 조회 — 다만 마커 수 대비 호출량 때문에 지도 페이지 구조를 클러스터 방식으로 바꿔야 한다.</li>
+    <li><strong>가정 2 — 공고문 첨부(HWP/PDF)에서 호실 표를 기계적으로 뽑을 수 있다.</strong> 표 병합셀·스캔 이미지 PDF·기관별 서식 차이로 실패할 수 있다.<br>
+      <em>Plan B</em>: 기관·유형별로 파서를 좁게 만들고, 실패분은 검수 큐로 넘겨 수기 입력. 커버리지가 낮아도 서비스는 성립한다. <em>Plan C</em>: 표 추출을 LLM 보조로 처리하되 검수 큐를 반드시 경유시킨다.</li>
+    <li><strong>가정 3 — 마이홈포털 API 운영계정 심의를 통과한다.</strong> 개발계정 <span class="num">1,000</span>건/일로는 전국 백필이 불가능하다. Phase 1 전체가 이 API에 얹혀 있으므로 <strong>가장 무거운 단일 의존</strong>이다.<br>
+      <em>Plan B</em>: 파일데이터(15088707, 15080989)로 초기 적재하고 API는 증분 수집에만 사용. <em>Plan C</em>: 개발계정 한도 안에서 시도별로 며칠에 나눠 백필.</li>
+    <li><strong>가정 4 — 공고문 재가공물 게시가 이용약관상 허용된다.</strong> 미확인.<br>
+      <em>Plan B</em>: 원문 첨부파일은 재배포하지 않고 원문 링크만 제공, 사실 데이터(주소·면적·금액)만 재구성해 게시.</li>
+    <li><strong>리스크 — 벤치마크의 실내 사진 자산.</strong> 사진은 유튜브 촬영으로 축적된 것이라 단기간에 따라잡을 수 없다. 사진 대신 <strong>데이터 밀도와 최신성</strong>으로 경쟁한다.</li>
+    <li><strong>리스크 — 자동 생성 페이지의 검색엔진 평가.</strong> 얇은 페이지 규칙(§2)을 지키지 않으면 <span class="num">3만</span> 페이지가 전부 저품질로 묶일 수 있다. 색인 페이지 수보다 <strong>색인 대비 노출률</strong>을 지표로 삼는다.</li>
+  </ul>
+</section>
+
+<!-- ══════════ 승인 ══════════ -->
+<section>
+  <div class="sec-head"><span class="sec-num">→</span><h2>결정 사항 · 남은 질문</h2></div>
+
+  <h3>확정됨</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr><th style="min-width:130px">항목</th><th style="min-width:150px">결정</th><th>설계 반영</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>좌표 저장</td>
+        <td><strong>요약DB 자체 보유</strong></td>
+        <td>지오코딩 API 전면 미사용. 위치정보 요약DB(제1유형)를 내려받아 오프라인 조인 — §0 좌표 표, §1 S6</td>
+      </tr>
+      <tr>
+        <td>Phase 1 범위</td>
+        <td><strong>좁히지 않음</strong></td>
+        <td>지역·기관이 아니라 데이터 깊이로 분할. 1층(API·전국) → 2층(호실) — §5</td>
+      </tr>
+      <tr>
+        <td>대출 중개</td>
+        <td><strong>하지 않음</strong></td>
+        <td>수익 모델에서 제거. 보증금·임대료 전면 노출로 방향 전환 — §4</td>
+      </tr>
+      <tr>
+        <td>민간임대</td>
+        <td><strong>스크래핑으로 포함</strong></td>
+        <td>Phase 2에서 호실 파서와 병행. 소스: 청년안심주택 게시판, 서울주거포털 SH 목록, LH청약플러스 목록 — §0</td>
+      </tr>
+      <tr>
+        <td>지도 SDK</td>
+        <td><strong>네이버 지도</strong></td>
+        <td>대표계정 무료 이용량 존재 · 지도 최신성 우위 · 거리뷰 지원 · 이미 사용 중 — §3</td>
+      </tr>
+      <tr>
+        <td>DB</td>
+        <td><strong>Neon Postgres</strong></td>
+        <td>Supabase는 계정 무료 한도 소진. SQLite 배포 동봉은 6시간 주기 갱신과 충돌해 배제 — §3</td>
+      </tr>
+      <tr>
+        <td>서비스명·도메인</td>
+        <td><strong>집공고 / <code>zipgonggo.kr</code></strong></td>
+        <td>'집'+'공고'. pSEO는 검색 유입이 생명이라 추상 브랜드어보다 키워드가 박힌 이름이 유리하고, 순수 일반명사는 변별력이 없어 조합 신조어를 택함. 대안: 임대맵 <code>imdaemap.kr</code>, 입주지도 <code>ipju.kr</code></td>
+      </tr>
+      <tr>
+        <td>URL</td>
+        <td><strong>타입=영어, 식별자=한글</strong></td>
+        <td>아래 규칙</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>URL 규칙</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr><th style="min-width:110px">페이지</th><th style="min-width:230px">경로</th><th>예시</th></tr></thead>
+    <tbody>
+      <tr><td>공고 지도</td><td><code>/notice/{기관}-{연도}-{차수}-{유형}</code></td><td><code>/notice/sh-2026-02-maeip</code></td></tr>
+      <tr><td>호실 상세</td><td><code>/notice/{공고}/{호실}</code></td><td><code>/notice/sh-2026-02-maeip/1204</code></td></tr>
+      <tr><td>단지</td><td><code>/complex/{단지명}-{단지코드}</code></td><td><code>/complex/서도휴빌3차-11200</code></td></tr>
+      <tr><td>지역</td><td><code>/area/{시도}/{시군구}/{읍면동}</code></td><td><code>/area/서울/강동구/천호동</code></td></tr>
+      <tr><td>지역×유형</td><td><code>/area/{시군구}/{유형}</code></td><td><code>/area/강동구/매입임대</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><strong>타입 세그먼트(<code>notice</code>·<code>complex</code>·<code>area</code>)는 영어, 식별자는 한글.</strong> 타입 세그먼트는 사람이 읽지 않는 구조어라 짧은 영어가 안전하고, 식별자는 검색어와 글자 그대로 일치해야 하므로 한글로 둔다. <code>/gonggo/</code>·<code>/danji/</code> 같은 로마자 표기는 한국어도 영어도 아닌 절충이라 채택하지 않는다. 공고 식별자만은 기관·연도·차수 조합이라 영숫자로 둔다.</p>
+
+  <h3>남은 질문</h3>
+  <p>착수를 막지 않는다. 답을 기다리는 동안 §0의 확인 항목과 요약DB 신청을 진행할 수 있다.</p>
+  <ol class="q">
+    <li><b>도메인 확보</b> — <code>zipgonggo.kr</code> 가용 여부 확인 후 등록. 선점돼 있으면 <code>jibgonggo.kr</code> · <code>imdaemap.kr</code> 순으로.</li>
+    <li><b>요약DB 승인 지연 시 대응</b> — 승인이 2주 이상 걸릴 경우 가정 1의 Plan B(단지·읍면동 단위 좌표로 먼저 출시)로 갈지, 승인까지 출시를 미룰지.</li>
+  </ol>
+</section>
+
+<footer>
+  조사 및 작성 2026-09-04 · 출처 URL은 모두 당일 직접 열람 · <span class="b b-ok">확인됨</span> 직접 확인 <span class="b b-part">부분확인</span> 존재는 확인, 상세 미열람 <span class="b b-no">미확인·추정</span> 확인 못 함
+</footer>
+
+</div>

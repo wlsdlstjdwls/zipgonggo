@@ -1,0 +1,20 @@
+# 집공고 파이프라인 — Python 3.11+
+
+httpx==0.28.1              # API 호출·스크래핑. HTTP/2, 타임아웃 제어
+selectolax==0.3.27         # HTML 파싱. LH청약플러스·서울주거포털 목록
+tenacity==9.0.0            # 지수 백오프 재시도 (최대 3회)
+
+pdfplumber==0.11.4         # 공고문 PDF 표 추출 (S3·S4)
+pypdf==5.1.0               # PDF 텍스트 레이어 유무 판정
+pyhwp==0.1b12              # HWP → XML 변환
+openpyxl==3.1.5            # XLSX 첨부·SH 공개 주택목록 정답지
+
+pandas==2.2.3              # 정규화·대조 (S5)
+pyarrow==18.1.0            # 주소 좌표 원본을 Parquet으로 보관 (DB 밖)
+
+psycopg[binary]==3.2.3     # Neon Postgres 적재
+python-dotenv==1.0.1       # .env 로드
+pyproj==3.7.0              # UTM-K(GRS80) → WGS84 좌표 변환 (S6)
+
+pytest==8.3.4              # 파서 회귀 테스트 (SH 15102880 정답지 대조)
+ruff==0.8.4                # 린트·포맷
