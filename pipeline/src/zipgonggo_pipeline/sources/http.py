@@ -60,6 +60,9 @@ class ThrottledHttp:
                 resp.raise_for_status()
                 return resp
             except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+                # 4xx(404·403 등)는 다시 불러도 같다. 일시 오류·전송 오류만 재시도.
+                if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code not in RETRYABLE_STATUS:
+                    raise
                 if attempt == self.max_retries:
                     raise
                 log.warning("%s 재시도 %d/%d: %s", label or url, attempt, self.max_retries, exc)
