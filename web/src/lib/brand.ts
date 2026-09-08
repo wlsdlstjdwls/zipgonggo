@@ -47,3 +47,15 @@ export function markerSvg(fill = BRAND_ACC): string {
 export function markerHtml(fill = BRAND_ACC): string {
   return `<div class="zg-mk">${markerSvg(fill)}</div>`;
 }
+
+function esc(s: string): string {
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+/**
+ * 선택 마커 — 잉크색 핀 + 그 위에 꼬리 달린 말풍선(이름 + 보조 글자).
+ * 앵커는 평소 핀과 같은 (MARKER_W/2, MARKER_H-1)이라 선택해도 위치가 튀지 않는다. 모양은 globals.css .zg-sel/.zg-bub.
+ */
+export function bubbleMarkerHtml(title: string, sub: string): string {
+  return `<div class="zg-sel"><div class="zg-bub"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ""}</div>${markerSvg(BRAND_INK)}</div>`;
+}

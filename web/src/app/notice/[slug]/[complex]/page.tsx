@@ -70,6 +70,10 @@ export default async function ComplexPage({ params }: Params) {
   const prev = i > 0 ? siblings[i - 1] : null;
   const next = i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : null;
   const hasMoney = c.min_deposit != null || c.min_rent != null;
+  // 지도 말풍선 보조 글자 — 금액이 있으면 금액, 없으면 면적, 그것도 없으면 자치구
+  const mapSub = c.min_rent != null ? `월 ${wonKo(c.min_rent)}`
+    : c.min_deposit != null ? `보증금 ${wonKo(c.min_deposit)}`
+    : area ?? `${sidoShort(c.sido)} ${c.sigungu}`;
 
   return (
     <article className="stage">
@@ -128,8 +132,8 @@ export default async function ComplexPage({ params }: Params) {
 
           <section className="dsec">
             <h2>위치</h2>
-            <div className="d-map"><NaverMap address={full} title={c.name} /></div>
-            <p className="note">지도 위치는 도로명주소 기준 근사치입니다. {full}</p>
+            <div className="d-map"><NaverMap address={full} title={c.name} sub={mapSub} /></div>
+            <p className="note">지도 위치는 도로명주소 기준 근사치입니다. 핀이나 로드뷰 버튼을 누르면 거리뷰가 열립니다. {full}</p>
           </section>
 
           <section className="dsec">

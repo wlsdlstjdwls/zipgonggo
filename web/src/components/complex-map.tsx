@@ -6,8 +6,9 @@
 // 선택 핀은 화면 밖일 때만 panTo, 줌은 건드리지 않는다(휙휙 이동 방지).
 
 import { useEffect, useRef, useState } from "react";
-import { BRAND_INK, MARKER_H, MARKER_W, markerHtml, markerSvg } from "@/lib/brand";
+import { bubbleMarkerHtml, MARKER_H, MARKER_W, markerHtml } from "@/lib/brand";
 import { hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
+import { usePanorama } from "@/lib/use-panorama";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -30,16 +31,6 @@ type Props = {
 
 const SINGLE_ZOOM = 15;
 const PAN = { duration: 420, easing: "easeOutCubic" };
-const PANO_LOOKUP_MS = 4000;
-
-function esc(s: string) {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-}
-
-/** 선택 마커: 잉크색 핀 + 그 위에 꼬리 달린 말풍선. 앵커는 평소 핀과 같아 선택해도 위치가 튀지 않는다 */
-function bubbleHtml(it: MapItem): string {
-  return `<div class="zg-sel"><div class="zg-bub"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span></div>${markerSvg(BRAND_INK)}</div>`;
-}
 
 /** 여백은 컨테이너 크기에 비례 — 300px 지도에 고정값을 쓰면 여백이 화면을 다 먹는다 */
 function inset(w: number, h: number) {
@@ -50,13 +41,11 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
   const el = useRef<HTMLDivElement>(null);
   const panoEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
-  const panoRef = useRef<any>(null);
   const markers = useRef<Map<number, { marker: any; pos: any; selected: boolean }>>(new Map());
   const cb = useRef({ onFocus, onSelect });
   cb.current = { onFocus, onSelect };
   const [failed, setFailed] = useState(false);
   const [mapReady, setMapReady] = useState(false);
-  const [panoState, setPanoState] = useState<"idle" | "loading" | "ok" | "none">("idle");
 
   // 1) 지도 생성 — 마운트 즉시. 지오코딩을 기다리지 않는다
   useEffect(() => {
@@ -82,8 +71,6 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
       cancelled = true;
       markers.current.forEach(({ marker }) => marker.setMap(null));
       markers.current.clear();
-      if (panoRef.current?.destroy) panoRef.current.destroy();
-      panoRef.current = null;
       if (mapRef.current?.destroy) mapRef.current.destroy();
       mapRef.current = null;
       setMapReady(false);
@@ -145,7 +132,7 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
       if (sel !== m.selected) {
         const it = byId.get(id);
         m.marker.setIcon(sel && it
-          ? { content: bubbleHtml(it), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) }
+          ? { content: bubbleMarkerHtml(it.title, it.sub), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) }
           : { content: markerHtml(), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) });
         m.selected = sel;
       }
@@ -160,28 +147,8 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
   }, [items, focusId, selectedId, coords, mapReady]);
 
   // 4) 로드뷰 — 선택 단지 좌표에서 가장 가까운 파노라마(SDK가 반경 300m 탐색). 없으면 "로드뷰 없음"
-  useEffect(() => {
-    if (!roadview || !mapReady || selectedId === null) { setPanoState("idle"); return; }
-    const m = markers.current.get(selectedId);
-    const host = panoEl.current;
-    const maps = window.naver?.maps;
-    if (!m || !host || !maps?.Panorama) { setPanoState("none"); return; }
-    setPanoState("loading");
-    let cancelled = false;
-    let pano = panoRef.current;
-    if (!pano) {
-      pano = new maps.Panorama(host, { position: m.pos, flightSpot: false, aroundControl: true, zoomControl: false, logoControlOptions: { position: maps.Position.BOTTOM_LEFT } });
-      panoRef.current = pano;
-    } else {
-      pano.setPosition(m.pos);
-    }
-    // pano_status: 좌표 근처에 파노라마가 있으면 "OK". 이벤트가 안 오면 시간 초과로 판정
-    const listener = maps.Event.addListener(pano, "pano_status", (status: string) => {
-      if (!cancelled) setPanoState(status === "OK" ? "ok" : "none");
-    });
-    const timer = setTimeout(() => { if (!cancelled) setPanoState((s) => (s === "loading" ? (pano.getPanoId?.() ? "ok" : "none") : s)); }, PANO_LOOKUP_MS);
-    return () => { cancelled = true; clearTimeout(timer); maps.Event.removeListener(listener); };
-  }, [roadview, selectedId, mapReady]);
+  const selAddress = selectedId === null ? null : (items.find((i) => i.id === selectedId)?.address ?? null);
+  const panoState = usePanorama(panoEl, selAddress ? (coords.get(selAddress) ?? null) : null, roadview, mapReady);
 
   if (!hasMapKey()) return <p className="map-note">지도 키가 설정되지 않았습니다.</p>;
   return (

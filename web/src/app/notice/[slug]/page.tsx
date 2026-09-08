@@ -193,8 +193,8 @@ export default async function NoticePage({ params }: Params) {
           {n.address && (
             <section className="dsec">
               <h2>위치</h2>
-              <div className="d-map"><NaverMap address={n.address} title={n.complex_name ?? n.title} /></div>
-              <p className="note">지도 위치는 주소 기준 근사치입니다. {n.address}</p>
+              <div className="d-map"><NaverMap address={n.address} title={n.complex_name ?? n.title} sub={n.housing_type} /></div>
+              <p className="note">지도 위치는 주소 기준 근사치입니다. 핀이나 로드뷰 버튼을 누르면 거리뷰가 열립니다. {n.address}</p>
             </section>
           )}
 
