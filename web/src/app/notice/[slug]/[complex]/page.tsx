@@ -12,7 +12,7 @@ import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
 import { agencyLabels } from "@/lib/agency";
 import { count, dateK, ddayChip, num, wonExact, wonKo } from "@/lib/format";
-import { areaText, commonArea, complexPriceRows, m2 } from "@/lib/notice-view";
+import { areaText, commonArea, complexPriceRange, complexPriceRows, m2 } from "@/lib/notice-view";
 import { getComplexSupply, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
 import { regionShort, sidoShort } from "@/lib/sido";
@@ -76,6 +76,7 @@ export default async function ComplexPage({ params }: Params) {
   const prev = i > 0 ? siblings[i - 1] : null;
   const next = i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : null;
   const hasMoney = c.min_deposit != null || c.min_rent != null;
+  const priceMax = complexPriceRange(c, supply);
   // 지도 말풍선 보조 글자 — 금액이 있으면 금액, 없으면 면적, 그것도 없으면 자치구
   const mapSub = c.min_rent != null ? `월 ${wonKo(c.min_rent)}`
     : c.min_deposit != null ? `보증금 ${wonKo(c.min_deposit)}`
@@ -102,10 +103,15 @@ export default async function ComplexPage({ params }: Params) {
             {hasMoney ? (
               <>
                 <span className="jumbo-label">{c.min_rent != null ? "월 임대료" : hasRent ? "임대보증금" : "전세금"}</span>
-                <b className="jumbo" title={wonExact(c.min_rent ?? c.min_deposit)}>{wonKo(c.min_rent ?? c.min_deposit)}</b>
-                <span className="jumbo-from">부터</span>
+                <b className="jumbo" title={wonExact(c.min_rent ?? c.min_deposit)}>
+                  {priceMax != null ? `${wonKo(c.min_rent ?? c.min_deposit)}~${wonKo(priceMax)}` : wonKo(c.min_rent ?? c.min_deposit)}
+                </b>
+                {priceMax == null && <span className="jumbo-from">부터</span>}
                 {c.min_rent != null && c.min_deposit != null && (
                   <span className="jumbo-sub" title={wonExact(c.min_deposit)}>보증금 {wonKo(c.min_deposit)} 부터, 이 단지 최소값</span>
+                )}
+                {priceMax != null && (
+                  <span className="jumbo-sub">공급유형별 범위입니다. 아래 「보증금과 임대료」 표를 확인하세요.</span>
                 )}
               </>
             ) : (

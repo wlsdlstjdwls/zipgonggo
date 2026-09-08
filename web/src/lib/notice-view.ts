@@ -60,6 +60,17 @@ export function priceRows(n: Notice): PriceRow[] {
   return rows;
 }
 
+/** 단지 헤드라인 금액의 최소~최대 범위. notice_complex.min_*는 이미 이 단지 안 최소값이고,
+    최대는 공급현황(supply)의 같은 항목 중 가장 큰 값이다 — 범위가 없으면(전부 같으면) null */
+export function complexPriceRange(c: NoticeComplex, supply: NoticeSupply[]): number | null {
+  const min = c.min_rent ?? c.min_deposit;
+  if (min == null) return null;
+  const field = c.min_rent != null ? "rent" : "deposit";
+  const values = supply.map((s) => s[field]).filter((v): v is number => v != null);
+  const max = values.length ? Math.max(...values) : null;
+  return max != null && max > min ? max : null;
+}
+
 /** 단지 상세 「보증금과 임대료」 — 이 단지의 공급현황이 있으면 공급대상 × 공급유형별로 쪼갠다.
     공고 단위 priceRows와 달리 계약금/중도금/잔금 개념이 없어 그룹은 항상 "base"(평범한 한 줄)다. */
 export function complexPriceRows(supply: NoticeSupply[]): PriceRow[] {
