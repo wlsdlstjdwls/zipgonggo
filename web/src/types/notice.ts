@@ -40,6 +40,11 @@ export type NoticeListItem = {
 
 export type Notice = NoticeListItem & {
   source_key: string | null;
+  /** 공고 내 최대 보증금·월임대료(원). SH 첨부 공급현황 표(0009). API 공고는 NULL */
+  max_deposit: number | null;
+  max_rent: number | null;
+  /** 접수 일정 출처. 'attachment'면 SH 첨부 공고문에서 읽은 값 */
+  schedule_source: string | null;
   pnu: string | null;
   heating: string | null;
   total_household: number | null;

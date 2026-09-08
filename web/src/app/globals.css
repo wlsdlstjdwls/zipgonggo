@@ -183,13 +183,6 @@ small { font-size: 12px; }
 
 /* ── 탐색기: 좌 목록 / 우 지도 ───────────────────────────── */
 .ex-list { min-width: 0; }
-.map-chips { position: absolute; z-index: 5; left: 14px; top: 14px; display: flex; gap: 7px; flex-wrap: wrap; pointer-events: none; }
-.map-chips span { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: var(--r-chip); background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow-overlay); font-weight: 700; font-size: 12.5px; color: var(--mut); }
-.map-chips span.strong { font-weight: 800; color: var(--ink); }
-.map-chips b { color: var(--acc); }
-.map-capsule { position: absolute; z-index: 5; left: 14px; bottom: 14px; padding: 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, 0.94); border: 1px solid var(--line); pointer-events: none; }
-.map-capsule span { display: block; font-weight: 800; font-size: 10px; line-height: 1; letter-spacing: 0.14em; color: var(--dim); margin-bottom: 7px; }
-.map-capsule b { font-weight: 900; font-size: 24px; line-height: 1; letter-spacing: -0.05em; color: var(--ink); }
 .map-note { position: absolute; z-index: 5; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; font-weight: 600; font-size: 13px; color: var(--dim); pointer-events: none; }
 
 /* 지도 핀 — 네이버 Marker의 icon.content HTML. 금액 + D-day 2줄, 흰 배경, 앵커는 하단 중앙 */
@@ -209,11 +202,23 @@ small { font-size: 12px; }
 .zg-pin.is-dot.is-focus > * { display: inline; }
 /* 브랜드 마커(lib/brand markerHtml). 앵커가 핀 끝이라 확대 기준점은 하단 중앙 */
 .zg-mk { display: block; transform-origin: 50% 100%; transition: transform 220ms var(--sp); }
-.zg-mk:hover { transform: scale(1.1); }
+.zg-mk:hover, .zg-mk.is-focus { transform: scale(1.12); }
+/* 로드뷰 패널 — 지도 프레임 위를 덮는다 */
+.pano { position: absolute; inset: 0; z-index: 6; background: var(--sub); }
+.pano-close { position: absolute; z-index: 7; top: 12px; right: 12px; height: 36px; padding: 0 14px; border-radius: var(--r-chip); border: 1px solid var(--line); background: #fff; box-shadow: var(--shadow-overlay); font: inherit; font-weight: 800; font-size: 12.5px; color: var(--ink); cursor: pointer; }
+.cx-rv { display: block; width: 100%; padding: 8px 12px 10px 15px; border: 0; border-left: 3px solid var(--acc); background: var(--acc-soft); text-align: left; font: inherit; font-weight: 800; font-size: 12px; color: var(--acc); cursor: pointer; }
+.cx-rv::before { content: "▶ "; font-size: 9px; }
+.cx-rv.on::before { content: "◀ "; }
 .zg-pin-more { margin-left: 2px; padding: 1px 5px; border-radius: 999px; font-weight: 800; font-size: 9.5px; line-height: 1.4; background: rgba(0, 0, 0, 0.12); }
 .zg-pin.hot .zg-pin-more, .zg-pin.is-focus /* 브랜드 마커(lib/brand markerHtml). 앵커가 핀 끝이라 확대 기준점은 하단 중앙 */
 .zg-mk { display: block; transform-origin: 50% 100%; transition: transform 220ms var(--sp); }
-.zg-mk:hover { transform: scale(1.1); }
+.zg-mk:hover, .zg-mk.is-focus { transform: scale(1.12); }
+/* 로드뷰 패널 — 지도 프레임 위를 덮는다 */
+.pano { position: absolute; inset: 0; z-index: 6; background: var(--sub); }
+.pano-close { position: absolute; z-index: 7; top: 12px; right: 12px; height: 36px; padding: 0 14px; border-radius: var(--r-chip); border: 1px solid var(--line); background: #fff; box-shadow: var(--shadow-overlay); font: inherit; font-weight: 800; font-size: 12.5px; color: var(--ink); cursor: pointer; }
+.cx-rv { display: block; width: 100%; padding: 8px 12px 10px 15px; border: 0; border-left: 3px solid var(--acc); background: var(--acc-soft); text-align: left; font: inherit; font-weight: 800; font-size: 12px; color: var(--acc); cursor: pointer; }
+.cx-rv::before { content: "▶ "; font-size: 9px; }
+.cx-rv.on::before { content: "◀ "; }
 .zg-pin-more { background: rgba(255, 255, 255, 0.22); color: #fff; }
 .zg-pin-single { display: inline-flex; align-items: center; gap: 6px; transform: translate(-50%, -100%); padding: 7px 12px; border-radius: 12px; background: var(--ink); color: #fff; box-shadow: var(--shadow-float); white-space: nowrap; }
 .zg-pin-single b { font-weight: 800; font-size: 12.5px; letter-spacing: -0.03em; }
@@ -403,7 +408,6 @@ small { font-size: 12px; }
   .aside-in { position: static; }
   .d-title, .list-hero h1 { font-size: 30px; }
   .jumbo { font-size: 42px; }
-  .map-chips { display: none; }
   .cx { grid-template-columns: 1fr; }
   .cx-map-wrap { position: static; order: -1; }
   .cx-map { height: 320px; }

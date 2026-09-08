@@ -87,3 +87,30 @@ def insert_ingest_log(cur, *, stage: str, source: str, ok: bool, item_count: int
         "INSERT INTO ingest_log (stage, source, ok, item_count, message, started_at) VALUES (%s, %s, %s, %s, %s, %s)",
         (stage, source, ok, item_count, json.dumps(message, ensure_ascii=False), started_at),
     )
+
+
+# S3가 첨부 공고문에서 읽은 공고 단위 사실. 이미 값이 있으면(마이홈 API 등 1차 출처) 덮지 않는다.
+# 일정은 셋 다 왔을 때만 schedule_source를 attachment로 표시한다.
+UPDATE_FACTS_SQL = """
+UPDATE notice SET
+  apply_start_at  = COALESCE(apply_start_at, %(apply_start_at)s),
+  apply_end_at    = COALESCE(apply_end_at, %(apply_end_at)s),
+  announce_at     = COALESCE(announce_at, %(announce_at)s),
+  min_deposit     = COALESCE(min_deposit, %(min_deposit)s),
+  max_deposit     = COALESCE(max_deposit, %(max_deposit)s),
+  supply_count    = COALESCE(supply_count, %(supply_count)s),
+  schedule_source = CASE
+    WHEN schedule_source IS NOT NULL THEN schedule_source
+    WHEN apply_start_at IS NOT NULL OR apply_end_at IS NOT NULL THEN 'api'
+    WHEN %(apply_start_at)s IS NOT NULL OR %(apply_end_at)s IS NOT NULL THEN 'attachment'
+    ELSE NULL END,
+  updated_at = now()
+WHERE id = %(id)s
+"""
+
+
+def update_notice_facts(cur, notice_id: int, **facts: Any) -> None:
+    """첨부 공고문에서 읽은 값으로 빈 칸만 채운다. 값이 전부 None이면 아무것도 안 한다."""
+    if not any(v is not None for v in facts.values()):
+        return
+    cur.execute(UPDATE_FACTS_SQL, {"id": notice_id, **facts})

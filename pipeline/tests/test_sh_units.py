@@ -62,6 +62,7 @@ def test_complex_aggregation(units):
 
 
 def test_dispatcher_picks_unit_list():
-    kind, rows, units = parse_attachment(PAGES)
+    facts = parse_attachment(PAGES)
+    kind, rows, units = facts.kind, facts.complexes, facts.units
     assert kind == "unit_list" and len(rows) == 33 and len(units) == 75
     assert rows[0]["complex_code"] == "0001J" and rows[0]["unit_count"] == 1 and rows[0]["min_deposit"] == 15_620_000

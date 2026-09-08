@@ -412,3 +412,13 @@ ALTER TABLE notice_complex
   ADD COLUMN area_max     numeric(6,2);
 
 COMMENT ON COLUMN notice_complex.unit_count IS 'SH 별첨 주택목록의 호실 수. 장기전세 「주택 위치 안내」 표에는 없어 NULL';
+
+-- 0009 — notice 금액 상한·일정 출처 (SH 첨부 공고문 공급현황·일정 흐름도, S3)
+ALTER TABLE notice
+  ADD COLUMN max_deposit bigint,     -- 최대 임대보증금(원). 공고 내 최대값
+  ADD COLUMN max_rent    bigint,     -- 최대 월임대료(원)
+  ADD COLUMN schedule_source text;   -- 접수 일정 출처: 'api'(마이홈) · 'attachment'(SH 첨부 파싱) · NULL(없음)
+
+COMMENT ON COLUMN notice.max_deposit IS '공고 내 최대 임대보증금(원). SH 첨부 공급현황 표(S3)에서 채움. 마이홈 API에는 없어 NULL';
+COMMENT ON COLUMN notice.max_rent IS '공고 내 최대 월임대료(원). SH 첨부 표에서 채움';
+COMMENT ON COLUMN notice.schedule_source IS '접수 일정 출처. attachment면 SH 첨부 공고문 일정 흐름도에서 좌표 기반으로 읽은 값';

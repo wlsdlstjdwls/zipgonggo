@@ -1,15 +1,15 @@
 "use client";
 
-// 공급 단지 탐색기 — 왼쪽 목록(검색·자치구·건수) + 오른쪽 라벨 핀 지도(LabelPinMap). 벤치마크 docs/references/공고지도2.png.
+// 공급 단지 탐색기 — 왼쪽 목록(검색·자치구·건수) + 오른쪽 브랜드 핀 지도(ComplexMap). 벤치마크 docs/references/공고지도2.png.
 // 지도는 먼저 뜨고, 좌표는 브라우저 지오코딩이 끝나면 한 번에 얹는다(탭 메모리만, 저장 금지 — CLAUDE.md 하지 말 것 1).
-// 행 호버 ↔ 핀 강조, 행·핀 클릭 → 선택(목록 스크롤, 화면 밖이면 지도 pan). 지도 좌상단 칩·좌하단 캡슐은 홈 지도(2026-09-08 제거)에서 옮겨 왔다.
+// 행 호버 ↔ 핀 강조, 행·핀 클릭 → 선택(핀이 이름 라벨로 바뀜, 목록 스크롤, 화면 밖이면 지도 pan). 선택 단지는 로드뷰를 열 수 있다.
 // 클라이언트 컴포넌트지만 목록은 서버에서 HTML로 렌더되므로 크롤러도 단지명·주소를 본다.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { geocodeAll, hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
-import { count, num, wonExact, wonShort } from "@/lib/format";
+import { num, wonExact, wonShort } from "@/lib/format";
 import type { NoticeComplex } from "@/types/notice";
-import { LabelPinMap, type PinItem } from "./label-pin-map";
+import { ComplexMap, type MapItem } from "./complex-map";
 
 type Props = { items: NoticeComplex[]; hasUnits: boolean };
 type Phase = "loading" | "ready" | "failed" | "no-key";
@@ -26,13 +26,13 @@ function guLabel(c: NoticeComplex): string {
   return c.sido === "서울특별시" ? c.sigungu : `${c.sido} ${c.sigungu}`;
 }
 
-/** 핀 라벨: 굵게 단지명, 보조로 금액(호실 목록) → 호수 → 자치구. 신규 단지는 잉크 배경 */
-function toPin(c: NoticeComplex, hasUnits: boolean): PinItem {
-  const sub = hasUnits && c.min_rent != null ? `월 ${wonShort(c.min_rent)}`
-    : hasUnits && c.min_deposit != null ? wonShort(c.min_deposit)
+/** 선택 라벨: 굵게 단지명, 보조로 금액 → 호수 → 자치구 */
+function toItem(c: NoticeComplex): MapItem {
+  const sub = c.min_rent != null ? `월 ${wonShort(c.min_rent)}`
+    : c.min_deposit != null ? `보증금 ${wonShort(c.min_deposit)}`
     : c.unit_count != null ? num(c.unit_count, "호")
     : guLabel(c);
-  return { id: c.id, address: fullAddress(c), title: c.name, main: c.name, sub, hot: c.is_new };
+  return { id: c.id, address: fullAddress(c), title: c.name, sub };
 }
 
 export function ComplexExplorer({ items, hasUnits }: Props) {
@@ -41,7 +41,7 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
   const [progress, setProgress] = useState(0);
   const [coords, setCoords] = useState<Map<string, LatLng | null>>(new Map());
   const [focus, setFocus] = useState<number | null>(null);
-  const [inView, setInView] = useState<number | null>(null);
+  const [roadview, setRoadview] = useState(false);
   const [gu, setGu] = useState("");
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
@@ -70,7 +70,7 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
     return () => { cancelled = true; };
   }, [items]);
 
-  const pins = useMemo(() => visible.map((c) => toPin(c, hasUnits)), [visible, hasUnits]);
+  const mapItems = useMemo(() => visible.map(toItem), [visible]);
 
   // 2) 선택 → 목록 스크롤. 지도 이동은 LabelPinMap이 화면 밖일 때만 한다
   useEffect(() => {
@@ -83,6 +83,8 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
       list.scrollTop = Math.max(0, row.offsetTop - (list.clientHeight - row.offsetHeight) / 2);
     }
   }, [selected]);
+
+  useEffect(() => { if (selected === null) setRoadview(false); }, [selected]);
 
   // 필터·검색으로 선택 항목이 빠지면 선택 해제
   useEffect(() => {
@@ -104,8 +106,7 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
 
   const onPick = useCallback((id: number) => setSelected((cur) => (cur === id ? null : id)), []);
   const onPinFocus = useCallback((id: number | null) => setFocus(id), []);
-  const onInView = useCallback((n: number) => setInView(n), []);
-  const selectedItem = selected === null ? null : (items.find((c) => c.id === selected) ?? null);
+  const closeRoadview = useCallback(() => setRoadview(false), []);
 
   const found = visible.filter((c) => coords.get(fullAddress(c))).length;
 
@@ -139,6 +140,11 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
                     {hasUnits && c.min_rent != null && <span className="cx-money">월 {wonExact(c.min_rent)}~</span>}
                   </span>
                 </button>
+                {on && coords.get(fullAddress(c)) && (
+                  <button type="button" className={`cx-rv${roadview ? " on" : ""}`} onClick={() => setRoadview((v) => !v)} aria-pressed={roadview}>
+                    {roadview ? "지도로" : "로드뷰"}
+                  </button>
+                )}
               </li>
             );
           })}
@@ -147,33 +153,26 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
       </div>
       <div className="cx-map-wrap">
         <div className="cx-map">
-          <LabelPinMap
-            pins={pins}
+          <ComplexMap
+            items={mapItems}
             coords={coords}
             focusId={focus}
             selectedId={selected}
             onFocus={onPinFocus}
             onSelect={onPick}
-            onVisible={onInView}
+            roadview={roadview}
+            onRoadviewClose={closeRoadview}
             center={SEOUL_CENTER}
             zoom={SEOUL_ZOOM}
             ariaLabel="공급 단지 위치 지도"
           />
           {phase === "failed" && <p className="map-note">주소를 찾지 못해 핀을 표시하지 못했습니다.</p>}
-          <div className="map-chips" aria-hidden="true">
-            <span className="strong">{gu || "자치구 전체"}<b>{visible.length}</b></span>
-            {phase === "loading" && <span>주소 찾는 중 {progress}/{items.length}</span>}
-          </div>
-          <div className="map-capsule" aria-live="polite">
-            <span>{selectedItem ? "선택한 단지" : "이 화면 안 단지"}</span>
-            <b>{selectedItem ? selectedItem.name : inView === null ? "—" : count(inView, "곳")}</b>
-          </div>
         </div>
         <p className="cx-status">
           {phase === "loading"
             ? `주소 찾는 중 ${progress}/${items.length}`
             : phase === "ready"
-              ? `${found}/${visible.length}곳 표시 · 위치는 도로명주소 기준 근사치. 목록이나 핀을 누르면 선택됩니다.`
+              ? `${found}/${visible.length}곳 표시 · 위치는 도로명주소 기준 근사치. 목록이나 핀을 누르면 이름이 보이고, 로드뷰를 열 수 있습니다.`
               : "위치는 도로명주소 기준 근사치입니다."}
         </p>
       </div>

@@ -1,4 +1,4 @@
-// 네이버 지도 SDK(+geocoder 서브모듈) 1회 로드. 브라우저 전용.
+// 네이버 지도 SDK(+geocoder·panorama 서브모듈) 1회 로드. 브라우저 전용.
 // NaverMap(주소 1건)·ComplexMap(단지 여러 건)이 같은 스크립트를 공유한다.
 // 지오코딩 결과는 이 탭의 메모리에만 둔다 — 서버·DB·localStorage 어디에도 저장하지 않는다 (CLAUDE.md 하지 말 것 1).
 import { NAVER_MAP_CLIENT_ID, NAVER_MAP_GEOCODER_TIMEOUT_MS, NAVER_MAP_SDK_URL } from "./constants";
@@ -20,7 +20,7 @@ export function hasMapKey(): boolean {
 export function loadNaverMaps(): Promise<any> {
   if (typeof window === "undefined") return Promise.reject(new Error("browser only"));
   if (!NAVER_MAP_CLIENT_ID) return Promise.reject(new Error("no map key"));
-  if (window.naver?.maps?.Service?.geocode) return Promise.resolve(window.naver.maps);
+  if (window.naver?.maps?.Service?.geocode && window.naver.maps.Panorama) return Promise.resolve(window.naver.maps);
   if (loading) return loading;
   loading = new Promise((resolve, reject) => {
     const fail = (e: unknown) => { loading = null; reject(e instanceof Error ? e : new Error("naver maps load failed")); };
@@ -35,7 +35,7 @@ export function loadNaverMaps(): Promise<any> {
     const started = Date.now();
     const tick = () => {
       const maps = window.naver?.maps;
-      if (maps?.Service?.geocode) return resolve(maps);
+      if (maps?.Service?.geocode && maps.Panorama) return resolve(maps);
       if (Date.now() - started > NAVER_MAP_GEOCODER_TIMEOUT_MS) return fail(new Error("geocoder timeout"));
       setTimeout(tick, 100);
     };

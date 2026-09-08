@@ -5,6 +5,9 @@
 대상: source='sh_scrape'이고 원문이 i-sh.co.kr인 공고. 첨부 미리보기(Synap 뷰어)의 쪽 XML을 1초 간격으로 받고
 「주택 위치 안내」 표(단지명·소재지)를 파싱한다. 받은 XML은 pipeline/data/ish/{seq}/ 에 캐시(커밋 금지).
 표가 없는 공고(매입임대 등 다른 양식)는 0건으로 기록만 남긴다 — 양식별 파서는 이후 추가.
+
+단지 표와 별개로 공고 단위 사실도 채운다: 「입주자 모집 절차 및 일정」 흐름도의 접수 시작·마감·당첨자 발표,
+「공급현황」 표의 전세금 최소·최대와 총 호수. SH 목록에는 이 값들이 없어 상세 페이지가 비어 있었다(2026-09-08).
 """
 
 from __future__ import annotations
@@ -18,7 +21,7 @@ from pathlib import Path
 from ..config import PIPELINE_ROOT, settings
 from ..db import connect
 from ..parsers.sh_attach import parse_attachment
-from ..repo import replace_notice_complexes
+from ..repo import replace_notice_complexes, update_notice_facts
 from ..sources.ish import IshClient, find_attachments
 from .common import Stats, finish_ingest, stage_main, utc_now
 
@@ -30,7 +33,7 @@ CACHE_ROOT = PIPELINE_ROOT / "data" / "ish"
 SEQ_RE = re.compile(r"[?&]seq=(\d+)")
 
 SELECT_SQL = """
-SELECT id, slug, title, source_url FROM notice
+SELECT id, slug, title, source_url, posted_at FROM notice
 WHERE source = 'sh_scrape' AND source_url LIKE '%%i-sh.co.kr%%'
   AND (%(slug)s::text IS NULL OR slug = %(slug)s)
 ORDER BY posted_at DESC, id DESC
@@ -77,13 +80,25 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                         stats.skip("preview_unresolved")
                         continue
                     pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq))
-                    kind, rows, units = parse_attachment(pages)
+                    facts = parse_attachment(pages, ref_year=n["posted_at"].year if n["posted_at"] else None)
+                    kind, rows, units = facts.kind, facts.complexes, facts.units
                 except Exception as exc:  # noqa: BLE001
                     stats.error("fetch_error", n["slug"], exc)
                     continue
                 stats.groups += 1
-                log.info("%s: %d쪽 · %s · 단지 %d건 · 호실 %d건 (%s)", n["slug"], len(pages), kind, len(rows), len(units), att.name)
-                if not rows:
+                sch, sup = facts.schedule, facts.supply
+                log.info(
+                    "%s: %d쪽 · %s · 단지 %d건 · 호실 %d건 · 일정 %s · 전세금 %s (%s)",
+                    n["slug"], len(pages), kind, len(rows), len(units),
+                    f"{sch.apply_start}~{sch.apply_end}" if sch else "없음",
+                    f"{sup.min_deposit}~{sup.max_deposit}({sup.unit_total}호)" if sup else "없음",
+                    att.name,
+                )
+                if sch:
+                    stats.skip("schedule")
+                if sup:
+                    stats.skip("supply")
+                if not rows and not sch and not sup:
                     stats.skip("no_table")
                     continue
                 stats.skip(f"kind:{kind}")
@@ -92,9 +107,19 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                     continue
                 cur.execute("SAVEPOINT nc")
                 try:
-                    replace_notice_complexes(cur, n["id"], rows)
+                    if rows:
+                        replace_notice_complexes(cur, n["id"], rows)
+                        stats.inserted += len(rows)
+                    update_notice_facts(
+                        cur, n["id"],
+                        apply_start_at=sch.apply_start if sch else None,
+                        apply_end_at=sch.apply_end if sch else None,
+                        announce_at=sch.announce if sch else None,
+                        min_deposit=sup.min_deposit if sup else None,
+                        max_deposit=sup.max_deposit if sup else None,
+                        supply_count=sup.unit_total if sup and sup.unit_total else None,
+                    )
                     cur.execute("RELEASE SAVEPOINT nc")
-                    stats.inserted += len(rows)
                     stats.updated += 1
                     conn.commit()
                 except Exception as exc:  # noqa: BLE001

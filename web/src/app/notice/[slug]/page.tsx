@@ -7,7 +7,7 @@ import { NaverMap } from "@/components/naver-map";
 import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
-import { count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonExact } from "@/lib/format";
+import { count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonExact, wonShort } from "@/lib/format";
 import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
@@ -63,6 +63,9 @@ function priceRows(n: Notice): PriceRow[] {
     rows.push({ kind: "납부 구성 · 계약금 (10% 가정)", deposit: wonExact(Math.round(n.min_deposit * 0.1)), rent: "—" });
     rows.push({ kind: "납부 구성 · 잔금 (90% 가정)", deposit: wonExact(Math.round(n.min_deposit * 0.9)), rent: "—" });
   }
+  if ((n.max_deposit != null && n.max_deposit !== n.min_deposit) || (n.max_rent != null && n.max_rent !== n.min_rent)) {
+    rows.push({ kind: "최대 (공고 최대값)", deposit: wonExact(n.max_deposit ?? n.min_deposit), rent: wonExact(n.max_rent ?? n.min_rent) });
+  }
   return rows;
 }
 
@@ -81,6 +84,11 @@ export default async function NoticePage({ params }: Params) {
   const hasMoney = n.min_deposit != null || n.min_rent != null || pos(n.min_down_payment) != null || pos(n.min_balance) != null;
   const region = regionLabel(n) || "전국";
   const period = n.apply_start_at || n.apply_end_at ? `${dateMD(n.apply_start_at)}–${dateMD(n.apply_end_at)}` : null;
+  // 상한(첨부 공급현황 표)이 하한과 다를 때만 범위 표기. 월임대료 공고는 월임대료 범위, 전세형은 보증금 범위
+  const hi = n.min_rent != null ? n.max_rent : n.max_deposit;
+  const lo = n.min_rent != null ? n.min_rent : n.min_deposit;
+  const range_ = hi != null && lo != null && hi > lo ? wonShort(hi) : null;
+  const hasSchedule = Boolean(n.apply_start_at || n.apply_end_at || n.announce_at);
 
   const steps: { label: string; value: string | null; on?: boolean }[] = [
     { label: "공고일", value: dateK(n.posted_at, true) },
@@ -111,9 +119,10 @@ export default async function NoticePage({ params }: Params) {
             {m ? (
               <>
                 <span className="jumbo-label">{m.label}</span>
-                <b className="jumbo">{m.main}</b>
-                <span className="jumbo-from">부터</span>
+                <b className="jumbo">{range_ ? `${m.main}~${range_}` : m.main}</b>
+                {!range_ && <span className="jumbo-from">부터</span>}
                 {m.sub && <span className="jumbo-sub">{m.sub} 부터 · 공고 최소값</span>}
+                {range_ && <span className="jumbo-sub">단지·면적별 {m.label} 범위 · 첨부 공고문 공급현황 표</span>}
               </>
             ) : (
               <>
@@ -135,32 +144,34 @@ export default async function NoticePage({ params }: Params) {
 
           <section className="dsec">
             <h2>접수 일정</h2>
-            <div className="steps">
-              {steps.map((s) => (
-                <div key={s.label} className={`step${s.on && s.value ? " on" : ""}`}>
-                  <span>{s.label}</span>
-                  <b>{s.value ?? "—"}</b>
-                </div>
-              ))}
-            </div>
-            {n.source_status && <p className="note">모집 상태 {n.source_status}</p>}
-            {!n.apply_end_at && <p className="note">접수 기간은 {L.originalDoc}에서 확인하세요. 목록 데이터에 접수 일정이 없습니다.</p>}
+            {hasSchedule ? (
+              <div className="steps">
+                {steps.map((s) => (
+                  <div key={s.label} className={`step${s.on && s.value ? " on" : ""}`}>
+                    <span>{s.label}</span>
+                    <b>{s.value ?? "—"}</b>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="note" style={{ marginTop: 0 }}>공고일 {dateK(n.posted_at, true)}{n.source_status && ` · 모집 상태 ${n.source_status}`} · 접수 기간은 {L.originalDoc}에서 확인하세요.</p>
+            )}
+            {hasSchedule && n.source_status && <p className="note">모집 상태 {n.source_status}</p>}
+            {hasSchedule && n.schedule_source === "attachment" && <p className="note">일정은 첨부 공고문의 「입주자 모집 절차 및 일정」에서 읽었습니다. 순위별 세부 일정은 원문을 확인하세요.</p>}
           </section>
 
-          <section className="dsec">
-            <h2>보증금 · 임대료</h2>
-            {hasMoney ? (
+          {hasMoney && (
+            <section className="dsec">
+              <h2>보증금 · 임대료</h2>
               <div className="ptable" role="table" aria-label="보증금·임대료">
                 <div className="h" role="row"><span role="columnheader">구분</span><span role="columnheader" style={{ textAlign: "right" }}>보증금</span><span role="columnheader" style={{ textAlign: "right" }}>월임대료</span></div>
                 {priceRows(n).map((r) => (
                   <div key={r.kind} role="row"><span className="k" role="cell">{r.kind}</span><span className="d" role="cell">{r.deposit}</span><span className="r" role="cell">{r.rent}</span></div>
                 ))}
               </div>
-            ) : (
-              <p className="note" style={{ marginTop: 0 }}>이 공고는 목록 데이터에 금액이 없습니다. 호실·형별 보증금과 임대료는 원문 공고문의 표를 확인하세요.</p>
-            )}
-            <p className="note">전세전환·월세전환 금액과 호실별 금액은 첨부 공고문 파싱 후 표로 제공됩니다.</p>
-          </section>
+              <p className="note">단지·호실별 금액은 {L.originalDoc}의 표를 따릅니다.</p>
+            </section>
+          )}
 
           {complexes.length > 0 && (
             <section className="dsec">
