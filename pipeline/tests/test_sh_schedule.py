@@ -111,6 +111,23 @@ def test_supply_real_table_in_same_notice():
     assert s.max_deposit is not None and s.max_deposit < 1_000_000_000
 
 
+def test_supply_ignores_unit_comparison_table():
+    """호실별 「임대보증금(원)」이 두 세트로 나오는 재공급 현황표는 공급현황 표가 아니다.
+    원 단위를 천 원으로 읽어 보증금이 30억으로 나오던 회귀(304925 4쪽)."""
+    s = SupplySummary()
+    parse_supply_page((FIX / "ish_304925" / "p4.xml").read_text(encoding="utf-8"), 4, s)
+    assert s.rows == 0
+
+
+def test_supply_does_not_count_total_households():
+    """「총세대수」는 단지 전체 세대수라 공급호수가 아니다. 금액만 읽고 호수는 세지 않는다(306205 3쪽)."""
+    s = SupplySummary()
+    parse_supply_page((FIX / "ish_306205" / "p3.xml").read_text(encoding="utf-8"), 3, s)
+    assert s.rows > 0
+    assert s.unit_total == 0
+    assert s.min_deposit == 18_710_000
+
+
 def test_merge_supply_into_complexes():
     """공급현황 단지명을 「주택 위치 안내」 단지 행에 붙인다. 짧은 조각 이름은 안 붙는다."""
     s = parse_supply(pages("309467", [13]))

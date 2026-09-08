@@ -19,6 +19,10 @@ from dataclasses import dataclass, field
 from ..sources.ish import group_rows, parse_chars, row_segments
 
 DEPOSIT_HEADER_RE = re.compile(r"^(?:전세금액|임대보증금|보증금)\s*(?:\([^)]*\))?$")
+# 금액 단위. 「(원)」이면 그대로, 그 밖(천원·천 원·표기 없음)은 천 원 단위 — 장기전세 공고 관례
+WON_UNIT_RE = re.compile(r"\(\s*원\s*\)")
+# 「총세대수」는 단지 전체 세대수라 이번 공고 공급호수가 아니다. 이 열이 있으면 호수를 세지 않는다
+TOTAL_UNITS_RE = re.compile(r"총\s*세대\s*수")
 # 표로 인정하려면 헤더 묶음에 호수 열이 있어야 한다. 보증금↔월세 전환표(자치구|단지|면적|임대보증금|월임대료)에는 없다
 UNIT_HEADER_RE = re.compile(r"모집\s*세대수|공급\s*세대수|공급\s*호수|세대\s*수|호수")
 MAX_UNITS_PER_ROW = 2000   # 한 행(단지·면적·유형)의 호수 상한. 넘으면 금액을 호수로 읽은 것
@@ -98,16 +102,29 @@ def _cells_by_row(xml: str) -> list[list[_Cell]]:
     return rows
 
 
-def _find_header(rows: list[list[_Cell]]) -> tuple[int, _Cell] | None:
+@dataclass
+class _Header:
+    idx: int
+    cell: _Cell
+    mult: int          # 표에 적힌 금액 → 원 배수
+    units_trusted: bool
+
+
+def _find_header(rows: list[list[_Cell]]) -> _Header | None:
     """보증금 열 헤더. 라벨 하나만 있는 칸이어야 하고(본문 문장 배제),
-    위아래 HEADER_SPAN줄 안에 호수 열 헤더가 같이 있어야 한다(전환표·안내표 배제)."""
+    위아래 HEADER_SPAN줄 안에 호수 열 헤더가 같이 있어야 한다(전환표·안내표 배제).
+    한 줄에 보증금 헤더가 둘 이상이면 호실별 전/후 비교표라 표로 보지 않는다."""
     for i, cells in enumerate(rows):
-        for c in cells:
-            if not DEPOSIT_HEADER_RE.match(c.text.replace(" ", "")):
-                continue
-            near = [x.text for cs in rows[max(0, i - HEADER_SPAN) : i + HEADER_SPAN] for x in cs]
-            if any(UNIT_HEADER_RE.search(t.replace(" ", "")) for t in near):
-                return i, c
+        hits = [c for c in cells if DEPOSIT_HEADER_RE.match(c.text.replace(" ", ""))]
+        if len(hits) != 1:
+            continue
+        c = hits[0]
+        near = [x.text for cs in rows[max(0, i - HEADER_SPAN) : i + HEADER_SPAN] for x in cs]
+        if not any(UNIT_HEADER_RE.search(t.replace(" ", "")) for t in near):
+            continue
+        mult = 1 if WON_UNIT_RE.search(c.text) else 1000
+        trusted = not any(TOTAL_UNITS_RE.search(t.replace(" ", "")) for t in near)
+        return _Header(i, c, mult, trusted)
     return None
 
 
@@ -121,7 +138,7 @@ def parse_supply_page(xml: str, page: int, summary: SupplySummary) -> int:
     hit = _find_header(rows)
     if hit is None:
         return 0
-    hidx, dep = hit
+    hidx, dep = hit.idx, hit.cell
     # 「전세금액」 헤더 글자는 계·계약금·잔금 세 칸 위 가운데에 걸쳐 있어 열 x범위를 그대로 믿을 수 없다(쪽마다 어긋난다).
     # 대신 행 규칙을 쓴다: 왼쪽부터 첫 「큰 숫자」(천 원 단위 1만 이상)가 전세금 계다.
     # 호수는 수백 이하, 전용면적은 200 이하라 걸러지고, 계약금(10%)·잔금(90%)은 계보다 오른쪽이라 뒤에 온다.
@@ -170,13 +187,14 @@ def parse_supply_page(xml: str, page: int, summary: SupplySummary) -> int:
                 units = nums[0]
         if units is None or units > MAX_UNITS_PER_ROW:
             continue
-        won = deposit_k * 1000
+        won = deposit_k * hit.mult
         read += 1
         summary.rows += 1
-        summary.unit_total += units
+        if hit.units_trusted:
+            summary.unit_total += units
         summary.min_deposit = won if summary.min_deposit is None else min(summary.min_deposit, won)
         summary.max_deposit = won if summary.max_deposit is None else max(summary.max_deposit, won)
-        if per_complex and current is not None:
+        if per_complex and current is not None and hit.units_trusted:
             current.unit_count += units
             current.min_deposit = won if current.min_deposit is None else min(current.min_deposit, won)
             current.max_deposit = won if current.max_deposit is None else max(current.max_deposit, won)
