@@ -13,7 +13,9 @@ const g = globalThis as unknown as { __zipgonggoPool?: Pool };
 function createPool(): Pool {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL 이 없다. web/.env.local 확인");
-  return new Pool({ connectionString, max: 5, idleTimeoutMillis: 30_000 });
+  // Neon(ap-southeast-1)까지 새 커넥션 수립이 ~550ms. 30초 idle로 끊으면 방문마다 다시 낸다.
+  // 실측(2026-09-08): cold pool 4쿼리 782ms → warm 150ms. idle을 10분으로 늘려 재사용한다.
+  return new Pool({ connectionString, max: 5, idleTimeoutMillis: 600_000, keepAlive: true });
 }
 
 export const pool: Pool = g.__zipgonggoPool ?? (g.__zipgonggoPool = createPool());

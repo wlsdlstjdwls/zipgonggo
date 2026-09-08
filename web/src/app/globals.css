@@ -65,7 +65,10 @@
   --shadow-brand: 0 6px 18px -8px rgba(var(--primary-rgb), 0.65);
 
   --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --duration-slow: 420ms;
   --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out-emph: cubic-bezier(0.16, 1, 0.3, 1);
 
   --gutter: 20px;
   --maxw: 980px;
@@ -99,6 +102,7 @@ small { font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  .sk { animation: none; opacity: 0.7; }
 }
 
 .container { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--gutter); }
@@ -169,16 +173,39 @@ small { font-size: 12px; }
 .card-hero.private .region-badge { color: var(--rose-ink); }
 .card-headline { margin: 12px 0 2px; font-size: 21px; font-weight: 900; letter-spacing: -0.03em; line-height: 1.25; }
 .card-headline-sub { margin: 0; font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 9px; flex: 1; }
+.card-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
 .card-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .card-title { font-size: 15px; font-weight: 700; margin: 0; line-height: 1.45; letter-spacing: -0.02em; }
 .card-title a:hover { color: var(--primary-deep); }
-.card-money { display: flex; gap: 14px; font-size: 13px; }
-.card-money span { display: block; color: var(--muted); font-size: 11px; font-weight: 700; }
-.card-money b { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.card-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 2px; }
+.card-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 4px; }
 .card-actions .btn { flex: 1; justify-content: center; height: 40px; }
 .empty { padding: 48px 0; text-align: center; color: var(--muted); }
+
+/* ── 건수 · 정렬 ──────────────────────────────────────── */
+.result-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; }
+.result-row .result-count { margin: 0; }
+.sort { display: flex; gap: 2px; background: var(--surface-sunken); border-radius: var(--radius-pill); padding: 3px; }
+.sort a { padding: 4px 11px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 700; color: var(--muted); transition: background var(--duration-fast), color var(--duration-fast); }
+.sort a.on { background: var(--surface); color: var(--primary-deep); box-shadow: var(--shadow-xs); }
+
+/* ── 무한 스크롤 피드 ──────────────────────────────────── */
+.feed-sentinel { display: flex; justify-content: center; padding: 24px 0 8px; min-height: 72px; }
+.feed-status { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 13px; font-weight: 600; padding: 20px 0 8px; margin: 0; }
+.feed-status.end { color: var(--icon-muted); font-size: 12px; }
+
+/* ── 스켈레톤 (fitin-app common_skeleton: 일부만 shimmer, 나머지 정적) ── */
+.sk { display: block; background: var(--line-strong); background-image: linear-gradient(90deg, var(--line-strong) 0%, var(--surface-sunken) 50%, var(--line-strong) 100%); background-size: 200% 100%; animation: sk-shimmer 1.6s ease-in-out infinite; will-change: background-position; }
+.sk.static { animation: none; background-image: none; opacity: 0.75; }
+.sk-hero .sk { background-color: rgba(255, 255, 255, 0.55); background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.9) 50%, rgba(255, 255, 255, 0.55) 100%); }
+.sk-card { pointer-events: none; animation: fade-in var(--duration-base) var(--ease-standard) both; }
+.sk-card .card-hero { min-height: 104px; }
+.sk-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 18px; }
+@keyframes sk-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ── 모션 (smokespot globals: fade-in · slide-up-fade) ── */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slide-up-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fade-in var(--duration-base) var(--ease-standard) both; }
 
 /* ── 버튼 (smokespot: 14px radius, hover brightness) ── */
 .btn { display: inline-flex; align-items: center; height: 42px; padding: 0 16px; border-radius: var(--radius-lg); border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--ink); font-weight: 700; font-size: 14px; transition: filter var(--duration-fast); }
@@ -237,4 +264,5 @@ small { font-size: 12px; }
 @media (min-width: 980px) {
   .card-grid { grid-template-columns: repeat(3, 1fr); }
   .spec { grid-template-columns: repeat(3, 1fr); }
+  .sk-grid { grid-template-columns: repeat(3, 1fr); }
 }

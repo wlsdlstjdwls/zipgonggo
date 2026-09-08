@@ -15,6 +15,7 @@
 **가져올 것**
 - 카드 그리드. 카드 상단에 지역 배지(`서울`) + 큰 헤드라인(`20년 전세 1,381호` `강남 월 4만원`). 숫자가 먼저 보인다
 - 칩 3개: 기관(`SH`) · 유형(`장기전세주택1`) · 공고일(`26년 08월 31일 공고분`)
+  → 2026-09-08 카드 정보 축소: 지역 배지 · D-day · 헤드라인(금액) · 제목 · 칩 3개 · 버튼 2개만 남김. 별도 금액 2열·공공/민간 칩·발표일은 뺐다(탭·상세가 담당)
 - 카드 하단 버튼 2개. 우리는 `상세` + `원문 ↗`
 - 상단에 총 건수(`5769건`) — 규모를 바로 보여준다
 
@@ -77,5 +78,8 @@
 | 카드 18px · 버튼 14px · 칩 pill · 히어로 밴드 28px · 브레이크포인트 768 한 단계 | smokespot |
 | 상태색 success/warning/error/info 값 | fitin-app `primitives.scss` = fitin-bo `common_Tokens_Foundation.css` |
 | 그림자 스케일, 모션 ease | fitin 공통 |
+| 무한스크롤 sentinel(IntersectionObserver, rootMargin) | smokespot `admin/spots/page.tsx` |
+| 스켈레톤 "일부만 shimmer" 원칙, 페이지 숨김 시 정지 | fitin-app `common_skeleton.tsx` |
+| `fade-in` `slide-up-fade` 키프레임, `--ease-out-emph` | smokespot `globals.css` |
 | **Pretendard 단일 패밀리** | fitin-app이 라틴/한글 2폰트(Space Grotesk+Gothic A1)를 버리고 정착한 결론. smokespot의 Archivo+Gothic A1은 안 따름 |
 | 브랜드 색 SSOT: `--brand-*` 블록만 바꾸면 전 화면 반영 | fitin-app `--Fitin_point_*` 관습 |
