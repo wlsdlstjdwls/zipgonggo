@@ -85,8 +85,10 @@ COMMENT ON COLUMN notice.raw IS '출처 응답 원문. 마이홈 API는 {"items"
 COMMENT ON COLUMN notice.min_deposit IS 'API rentGtn. 공고 내 최소값. 호실별 금액은 unit.deposit';
 COMMENT ON COLUMN notice.publish IS '마감돼도 삭제하지 않고 closed로 둔다. URL을 죽이지 않는다';
 
-CREATE INDEX idx_notice_apply_end   ON notice (apply_end_at DESC NULLS LAST) WHERE publish = 'published';
-CREATE INDEX idx_notice_sido_type   ON notice (sido, housing_type)           WHERE publish = 'published';
+-- publish='published' 조건 없음(0013) — web/lib/queries.ts가 publish 필터를 안 걸어 부분 인덱스가 죽어 있었다.
+-- S8이 발행 게이팅을 도입하면 그때 다시 좁힌다.
+CREATE INDEX idx_notice_apply_end   ON notice (apply_end_at DESC NULLS LAST);
+CREATE INDEX idx_notice_sido_type   ON notice (sido, housing_type);
 CREATE INDEX idx_notice_posted      ON notice (posted_at DESC);
 CREATE INDEX idx_notice_pnu         ON notice (pnu) WHERE pnu IS NOT NULL;
 CREATE INDEX idx_notice_sector_end  ON notice (sector, apply_end_at);
