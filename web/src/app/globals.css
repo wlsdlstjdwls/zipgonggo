@@ -483,3 +483,14 @@ small { font-size: 12px; }
   .cx-card-a .map-btn:only-child { grid-column: 1 / -1; }
   .pager { grid-template-columns: 1fr; }
 }
+
+/* ── 반응형: 스코프·필터 바 ────────────────────────────────
+   .sbar(스코프 바)는 layout.tsx에서 .shell 밖(헤더 바로 아래)에 있어 @container가 안 먹는다 — 일반 @media로.
+   모바일에선 가로 스크롤 대신 줄바꿈으로. 두 바가 겹쳐 쌓이는 sticky(top:120px)도 높이가 가변이라 깨지므로 해제. */
+@media (max-width: 640px) {
+  .sbar, .fbar { flex-wrap: wrap; overflow-x: visible; }
+  .sbar-txt { display: none; } /* 칩·셀렉트의 .on 상태가 이미 현재 스코프를 보여준다 */
+  .fbar .grow { margin-left: 0; }
+  .sbar { position: static; }
+  .fbar.sticky { position: static; background: none; backdrop-filter: none; }
+}
