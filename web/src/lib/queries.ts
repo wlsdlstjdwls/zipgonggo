@@ -124,7 +124,7 @@ async function listNoticesPageRaw(f: NoticeFilters, cursor: string | null, limit
 /** 목록 1페이지. cursor는 이전 페이지의 nextCursor. */
 export const listNoticesPage = unstable_cache(
   (f: NoticeFilters, cursor: string | null = null, limit: number = PAGE_SIZE) => listNoticesPageRaw(f, cursor, limit),
-  ["notice-page-v2"],
+  ["notice-page-v3"],
   CACHE_OPTS,
 );
 
