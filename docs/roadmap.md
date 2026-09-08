@@ -11,7 +11,7 @@
 - [x] 마이홈포털 3종 API 활용신청 + `붙임1` 다운로드 → `docs/api-spec/` — 2026-09-08 완료. 키 발급·실호출 확인, swagger·샘플 저장
 - [ ] 행안부 도로명주소 위치정보 요약DB 신청 접수 (juso.go.kr)
 - [x] 공고문 첨부 재가공·재배포 허용 범위 확인 (LH·SH 이용약관, robots.txt) — [판정](data-sources.md#6-약관저작권-판정)
-- [ ] `zipgonggo.kr` 도메인 ~~가용 확인~~ 후 등록 — **미등록 상태 확인됨** (KISA WHOIS, 2026-09-04). **사용자 결정(09-08): Phase 0 맨 마지막으로 미룸.** 등록 전 재조회
+- [x] 도메인 등록 — **`zipgonggo.com` 등록 완료 (2026-09-08)**. `.kr`은 안 잡음(하나만 쓰기로 결정, 방어 등록 불필요). DNS를 Vercel에 붙이는 건 배포 시점에
 - [ ] 네이버 Cloud 콘솔에서 Web Dynamic Map 실제 월 무료 한도 확인 — Client ID 발급됨(09-08). **한도 숫자는 아직 미확인**
 - [x] Neon 프로젝트 생성 + PostGIS 활성화 — 2026-09-08. Vercel 프로젝트 `zipgonggo` + Marketplace Neon(`zipgonggo-db`, ap-southeast-1, free_v3). PG 18.6 / PostGIS 3.6
 - [ ] LH에 첨부파일 수집 허용 여부 문의 → 회신 전까지 LH 호실 파서 착수 금지
