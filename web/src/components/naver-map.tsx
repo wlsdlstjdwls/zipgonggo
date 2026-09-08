@@ -19,26 +19,44 @@ declare global {
   interface Window { naver?: any }
 }
 
+// maps.js의 onReady 시점엔 서브모듈(maps-geocoder.js)이 아직 안 붙어 있을 수 있다. 붙을 때까지 기다린다.
+function waitForGeocoder(timeoutMs = 8000): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    const tick = () => {
+      const maps = window.naver?.maps;
+      if (maps?.Service?.geocode) return resolve(maps);
+      if (Date.now() - started > timeoutMs) return reject(new Error("geocoder timeout"));
+      setTimeout(tick, 100);
+    };
+    tick();
+  });
+}
+
 export function NaverMap({ address, title }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<State>(CLIENT_ID ? "loading" : "no-key");
   const [sdkReady, setSdkReady] = useState(false);
 
   useEffect(() => {
-    if (!sdkReady || !el.current || !window.naver?.maps) return;
-    const maps = window.naver.maps;
-    if (!maps.Service?.geocode) { setState("failed"); return; }
+    if (!sdkReady || !el.current) return;
     let cancelled = false;
-    maps.Service.geocode({ query: address }, (status: number, res: any) => {
-      if (cancelled) return;
-      const item = res?.v2?.addresses?.[0];
-      if (status !== maps.Service.Status.OK || !item) { setState("failed"); return; }
-      const pos = new maps.LatLng(Number(item.y), Number(item.x));
-      const map = new maps.Map(el.current!, { center: pos, zoom: 16, zoomControl: true, scaleControl: false, mapDataControl: false });
-      new maps.Marker({ position: pos, map, title });
-      setState("ready");
-    });
-    return () => { cancelled = true; };
+    let map: any = null;
+    waitForGeocoder()
+      .then((maps) => {
+        if (cancelled) return;
+        maps.Service.geocode({ query: address }, (status: number, res: any) => {
+          if (cancelled) return;
+          const item = res?.v2?.addresses?.[0];
+          if (status !== maps.Service.Status.OK || !item || !el.current) { setState("failed"); return; }
+          const pos = new maps.LatLng(Number(item.y), Number(item.x));
+          map = new maps.Map(el.current, { center: pos, zoom: 16, zoomControl: true, scaleControl: false, mapDataControl: false });
+          new maps.Marker({ position: pos, map, title });
+          setState("ready");
+        });
+      })
+      .catch(() => { if (!cancelled) setState("failed"); });
+    return () => { cancelled = true; if (map?.destroy) map.destroy(); };
   }, [sdkReady, address, title]);
 
   if (state === "no-key") return <p className="map-fallback">지도 키가 설정되지 않았습니다.</p>;
@@ -47,9 +65,8 @@ export function NaverMap({ address, title }: Props) {
   return (
     <>
       <Script src={SDK} strategy="afterInteractive" onReady={() => setSdkReady(true)} onError={() => setState("failed")} />
-      <div ref={el} className="map" role="img" aria-label={`${title} 위치 지도`}>
-        {state === "loading" && <p className="map-fallback">지도를 불러오는 중…</p>}
-      </div>
+      <div ref={el} className="map" role="img" aria-label={`${title} 위치 지도`} />
+      {state === "loading" && <p className="map-fallback">지도를 불러오는 중…</p>}
     </>
   );
 }
