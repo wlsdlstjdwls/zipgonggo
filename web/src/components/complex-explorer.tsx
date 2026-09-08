@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { geocodeAll, hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
-import { num, wonExact, wonShort } from "@/lib/format";
+import { num, wonExact, wonKo, wonShort } from "@/lib/format";
 import type { NoticeComplex } from "@/types/notice";
 import { ComplexMap, type MapItem } from "./complex-map";
 
@@ -136,8 +136,8 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
                     <span className="chip">{guLabel(c)}</span>
                     {noPin && <span className="cx-nopin">지도 미표시</span>}
                     {hasUnits && c.unit_count != null && <span className="cx-units">{num(c.unit_count, "호")}</span>}
-                    {hasUnits && c.min_deposit != null && <span className="cx-money">보증금 {wonExact(c.min_deposit)}~</span>}
-                    {hasUnits && c.min_rent != null && <span className="cx-money">월 {wonExact(c.min_rent)}~</span>}
+                    {hasUnits && c.min_deposit != null && <span className="cx-money" title={wonExact(c.min_deposit)}>보증금 {wonKo(c.min_deposit)}~</span>}
+                    {hasUnits && c.min_rent != null && <span className="cx-money" title={wonExact(c.min_rent)}>월 {wonKo(c.min_rent)}~</span>}
                   </span>
                 </button>
                 {on && coords.get(fullAddress(c)) && (

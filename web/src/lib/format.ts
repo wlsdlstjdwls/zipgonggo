@@ -70,9 +70,32 @@ export function dateMD(ymd: string | null | undefined): string {
   return ymd.slice(5).replace("-", ".");
 }
 
-/** 정확한 원 단위. 툴팁·표에 쓴다. */
+/** 정확한 원 단위. 툴팁·검증용. 표에는 wonKo를 쓴다. */
 export function wonExact(n: number | null | undefined): string {
   return num(n, "원");
+}
+
+/**
+ * 억·만·원 단위를 붙여 읽기 쉽게. **한 원도 버리지 않는다** — wonShort는 만 단위로 반올림하지만 이건 정확하다.
+ * 109600000 → "1억 960만 원" · 24414000 → "2,441만 4,000원" · 312200 → "31만 2,200원"
+ * 표처럼 금액을 나란히 놓는 자리에 쓴다(사용자 요청 2026-09-08: 109600000원보다 1억 960만 원이 읽힌다).
+ */
+export function wonKo(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
+  if (n === 0) return "0원";
+  const neg = n < 0;
+  let rest = Math.abs(Math.round(n));
+  const eok = Math.floor(rest / 100_000_000);
+  rest -= eok * 100_000_000;
+  const man = Math.floor(rest / 10_000);
+  const one = rest - man * 10_000;
+  const parts: string[] = [];
+  if (eok) parts.push(`${eok.toLocaleString(KO)}억`);
+  if (man) parts.push(`${man.toLocaleString(KO)}만`);
+  // 마지막 토막에만 "원"을 붙인다. 만 단위로 딱 떨어지면 "… 만 원"(단위 명사라 띄어 쓴다)
+  if (one) parts.push(`${one.toLocaleString(KO)}원`);
+  else parts[parts.length - 1] += " 원";
+  return (neg ? "-" : "") + parts.join(" ");
 }
 
 /** 2026-09-07 → 2026.09.07 (일) */

@@ -7,7 +7,7 @@ import { NaverMap } from "@/components/naver-map";
 import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
-import { count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonExact, wonShort } from "@/lib/format";
+import { count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonExact, wonKo, wonShort } from "@/lib/format";
 import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
@@ -50,21 +50,22 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
 // 보증금·임대료 표 — 열린 공고 데이터에서만 계산한다(하드코딩 금지, design/README.md).
 // 납부 구성은 DB 값(계약금·중도금·잔금)이 있으면 그대로, 없고 전세형(월임대료 없음)이면 10%/90% 가정치로 보여 준다.
 // 마이홈 API는 미기재를 0으로 주는 경우가 있어(실측 2026-09-08) 납부 구성은 0을 미기재로 본다.
-type PriceRow = { kind: string; deposit: string; rent: string };
+// exact: 원 단위 원본. 화면은 "1억 960만 원"으로 읽히게 쓰고, 정확한 값은 마우스를 올리면 나온다
+type PriceRow = { kind: string; deposit: string; rent: string; exact: [number | null, number | null] };
 const pos = (v: number | null) => (v != null && v > 0 ? v : null);
 function priceRows(n: Notice): PriceRow[] {
-  const rows: PriceRow[] = [{ kind: "기본 (공고 최소값)", deposit: wonExact(n.min_deposit), rent: wonExact(n.min_rent) }];
+  const rows: PriceRow[] = [{ kind: "기본 (공고 최소값)", deposit: wonKo(n.min_deposit), rent: wonKo(n.min_rent), exact: [n.min_deposit, n.min_rent] }];
   const down = pos(n.min_down_payment), interim = pos(n.min_interim), balance = pos(n.min_balance);
   if (down != null || interim != null || balance != null) {
-    if (down != null) rows.push({ kind: "납부 구성 · 계약금", deposit: wonExact(down), rent: "—" });
-    if (interim != null) rows.push({ kind: "납부 구성 · 중도금", deposit: wonExact(interim), rent: "—" });
-    if (balance != null) rows.push({ kind: "납부 구성 · 잔금", deposit: wonExact(balance), rent: "—" });
+    if (down != null) rows.push({ kind: "납부 구성 · 계약금", deposit: wonKo(down), rent: "—", exact: [down, null] });
+    if (interim != null) rows.push({ kind: "납부 구성 · 중도금", deposit: wonKo(interim), rent: "—", exact: [interim, null] });
+    if (balance != null) rows.push({ kind: "납부 구성 · 잔금", deposit: wonKo(balance), rent: "—", exact: [balance, null] });
   } else if (n.min_rent == null && n.min_deposit != null) {
-    rows.push({ kind: "납부 구성 · 계약금 (10% 가정)", deposit: wonExact(Math.round(n.min_deposit * 0.1)), rent: "—" });
-    rows.push({ kind: "납부 구성 · 잔금 (90% 가정)", deposit: wonExact(Math.round(n.min_deposit * 0.9)), rent: "—" });
+    rows.push({ kind: "납부 구성 · 계약금 (10% 가정)", deposit: wonKo(Math.round(n.min_deposit * 0.1)), rent: "—", exact: [Math.round(n.min_deposit * 0.1), null] });
+    rows.push({ kind: "납부 구성 · 잔금 (90% 가정)", deposit: wonKo(Math.round(n.min_deposit * 0.9)), rent: "—", exact: [Math.round(n.min_deposit * 0.9), null] });
   }
   if ((n.max_deposit != null && n.max_deposit !== n.min_deposit) || (n.max_rent != null && n.max_rent !== n.min_rent)) {
-    rows.push({ kind: "최대 (공고 최대값)", deposit: wonExact(n.max_deposit ?? n.min_deposit), rent: wonExact(n.max_rent ?? n.min_rent) });
+    rows.push({ kind: "최대 (공고 최대값)", deposit: wonKo(n.max_deposit ?? n.min_deposit), rent: wonKo(n.max_rent ?? n.min_rent), exact: [n.max_deposit ?? n.min_deposit, n.max_rent ?? n.min_rent] });
   }
   return rows;
 }
@@ -166,7 +167,11 @@ export default async function NoticePage({ params }: Params) {
               <div className="ptable" role="table" aria-label="보증금·임대료">
                 <div className="h" role="row"><span role="columnheader">구분</span><span role="columnheader" style={{ textAlign: "right" }}>보증금</span><span role="columnheader" style={{ textAlign: "right" }}>월임대료</span></div>
                 {priceRows(n).map((r) => (
-                  <div key={r.kind} role="row"><span className="k" role="cell">{r.kind}</span><span className="d" role="cell">{r.deposit}</span><span className="r" role="cell">{r.rent}</span></div>
+                  <div key={r.kind} role="row">
+                    <span className="k" role="cell">{r.kind}</span>
+                    <span className="d" role="cell" title={r.exact[0] != null ? wonExact(r.exact[0]) : undefined}>{r.deposit}</span>
+                    <span className="r" role="cell" title={r.exact[1] != null ? wonExact(r.exact[1]) : undefined}>{r.rent}</span>
+                  </div>
                 ))}
               </div>
               <p className="note">단지·호실별 금액은 {L.originalDoc}의 표를 따릅니다.</p>
