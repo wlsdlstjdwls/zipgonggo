@@ -183,10 +183,10 @@ export default async function NoticePage({ params }: Params) {
               <h2>공급 단지 {count(complexes.length, "곳")}{hasUnits && ` | ${count(unitTotal, "호")}`}</h2>
               <p className="note" style={{ margin: "0 0 12px" }}>
                 {hasUnits
-                  ? "첨부 공고문의 「주택목록」(호실 단위)을 단지별로 묶은 목록입니다. 보증금과 월임대료는 단지 안 최소값이고, 호별 금액은 원문 표를 확인하세요."
+                  ? "첨부 공고문의 「주택목록」(호실 단위)을 단지별로 묶은 목록입니다. 보증금과 월임대료는 단지 안 최소값이고, 호별 금액은 원문 표를 확인하세요. 단지를 고르면 지도 위에서 로드뷰와 단지 상세로 갈 수 있습니다."
                   : `첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.${newCount > 0 ? ` 이번 공고 신규 단지 ${newCount}곳.` : ""} 단지별 면적과 호수, 금액은 원문 표를 확인하세요.`}
               </p>
-              <ComplexExplorer items={complexes} hasUnits={hasUnits} />
+              <ComplexExplorer items={complexes} hasUnits={hasUnits} noticeSlug={n.slug} />
             </section>
           )}
 

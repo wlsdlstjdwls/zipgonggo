@@ -5,13 +5,15 @@
 // 행 호버 ↔ 핀 강조, 행·핀 클릭 → 선택(핀이 이름 라벨로 바뀜, 목록 스크롤, 화면 밖이면 지도 pan). 선택 단지는 로드뷰를 열 수 있다.
 // 클라이언트 컴포넌트지만 목록은 서버에서 HTML로 렌더되므로 크롤러도 단지명·주소를 본다.
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { noticeComplexPath } from "@/lib/routes";
 import { geocodeAll, hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
 import { num, wonExact, wonKo, wonShort } from "@/lib/format";
 import type { NoticeComplex } from "@/types/notice";
 import { ComplexMap, type MapItem } from "./complex-map";
 
-type Props = { items: NoticeComplex[]; hasUnits: boolean };
+type Props = { items: NoticeComplex[]; hasUnits: boolean; noticeSlug: string };
 type Phase = "loading" | "ready" | "failed" | "no-key";
 
 // 핀이 아직 없을 때 첫 화면 — 서울 전역
@@ -35,7 +37,7 @@ function toItem(c: NoticeComplex): MapItem {
   return { id: c.id, address: fullAddress(c), title: c.name, sub };
 }
 
-export function ComplexExplorer({ items, hasUnits }: Props) {
+export function ComplexExplorer({ items, hasUnits, noticeSlug }: Props) {
   const listEl = useRef<HTMLUListElement>(null);
   const [phase, setPhase] = useState<Phase>(hasMapKey() ? "loading" : "no-key");
   const [progress, setProgress] = useState(0);
@@ -106,19 +108,21 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
 
   const onPick = useCallback((id: number) => setSelected((cur) => (cur === id ? null : id)), []);
   const onPinFocus = useCallback((id: number | null) => setFocus(id), []);
-  const closeRoadview = useCallback(() => setRoadview(false), []);
 
   const found = visible.filter((c) => coords.get(fullAddress(c))).length;
+  // 지도 위 선택 카드 — 로드뷰 토글과 상세 이동을 지도 안에서 끝낸다(사용자 요청 2026-09-08)
+  const picked = selected === null ? null : (visible.find((c) => c.id === selected) ?? null);
+  const pickedPin = picked ? Boolean(coords.get(fullAddress(picked))) : false;
 
   return (
     <div className="cx">
       <div className="cx-panel">
         <div className="cx-tools">
-          <select value={gu} onChange={(e) => { setGu(e.target.value); setSelected(null); }} aria-label="자치구">
+          <select value={gu} onChange={(e) => { setGu(e.target.value); setSelected(null); }} aria-label="자치구" className={`sel${gu ? " on" : ""}`}>
             <option value="">자치구 전체</option>
             {gus.map(([g, n]) => <option key={g} value={g}>{g} ({n})</option>)}
           </select>
-          <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setSelected(null); }} placeholder="단지명, 주소 검색" aria-label="단지명, 주소 검색" />
+          <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setSelected(null); }} placeholder="단지명, 주소 검색" aria-label="단지명, 주소 검색" className="fld" />
         </div>
         <p className="cx-count"><b>{visible.length}</b> / {items.length}{hasUnits ? "단지" : "곳"}</p>
         <ul className="cx-list" ref={listEl} aria-label="공급 단지 목록" onKeyDown={onListKey}>
@@ -140,11 +144,7 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
                     {hasUnits && c.min_rent != null && <span className="cx-money" title={wonExact(c.min_rent)}>월 {wonKo(c.min_rent)}~</span>}
                   </span>
                 </button>
-                {on && coords.get(fullAddress(c)) && (
-                  <button type="button" className={`cx-rv${roadview ? " on" : ""}`} onClick={() => setRoadview((v) => !v)} aria-pressed={roadview}>
-                    {roadview ? "지도로" : "로드뷰"}
-                  </button>
-                )}
+                <Link href={noticeComplexPath(noticeSlug, c)} className="cx-go" aria-label={`${c.name} 상세`} title={`${c.name} 상세`}>→</Link>
               </li>
             );
           })}
@@ -161,12 +161,28 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
             onFocus={onPinFocus}
             onSelect={onPick}
             roadview={roadview}
-            onRoadviewClose={closeRoadview}
             center={SEOUL_CENTER}
             zoom={SEOUL_ZOOM}
             ariaLabel="공급 단지 위치 지도"
           />
           {phase === "failed" && <p className="map-note">주소를 찾지 못해 핀을 표시하지 못했습니다.</p>}
+          {picked && (
+            <div className="cx-card">
+              <div className="cx-card-t">
+                <b>{picked.name}</b>
+                <span>{fullAddress(picked)}</span>
+              </div>
+              <div className="cx-card-a">
+                {pickedPin && (
+                  <button type="button" className={`map-btn${roadview ? " on" : ""}`} onClick={() => setRoadview((v) => !v)} aria-pressed={roadview}>
+                    {roadview ? "지도" : "로드뷰"}
+                  </button>
+                )}
+                <Link href={noticeComplexPath(noticeSlug, picked)} className="map-btn acc">상세 보기 →</Link>
+              </div>
+              <button type="button" className="cx-card-x" onClick={() => setSelected(null)} aria-label="선택 해제">✕</button>
+            </div>
+          )}
         </div>
         <p className="cx-status">
           {phase === "loading"

@@ -35,11 +35,11 @@ export function FilterBar({ f, options, closing7, sticky }: Props) {
         마감 7일 내 <small>{closing7}</small>
       </Link>
 
-      <select value={f.sido ?? ""} onChange={(e) => go({ sido: e.target.value || undefined })} aria-label="시도" className={f.sido ? "on" : undefined}>
+      <select value={f.sido ?? ""} onChange={(e) => go({ sido: e.target.value || undefined })} aria-label="시도" className={`sel${f.sido ? " on" : ""}`}>
         <option value="">전체 지역</option>
         {options.sido.map((o) => <option key={o.value} value={o.value}>{o.value} ({o.count})</option>)}
       </select>
-      <select value={f.type ?? ""} onChange={(e) => go({ type: e.target.value || undefined })} aria-label="공급유형" className={f.type ? "on" : undefined}>
+      <select value={f.type ?? ""} onChange={(e) => go({ type: e.target.value || undefined })} aria-label="공급유형" className={`sel${f.type ? " on" : ""}`}>
         <option value="">전체 유형</option>
         {options.type.map((o) => <option key={o.value} value={o.value}>{o.value} ({o.count})</option>)}
       </select>

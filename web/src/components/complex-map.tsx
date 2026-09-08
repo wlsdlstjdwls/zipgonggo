@@ -6,7 +6,7 @@
 // 선택 핀은 화면 밖일 때만 panTo, 줌은 건드리지 않는다(휙휙 이동 방지).
 
 import { useEffect, useRef, useState } from "react";
-import { MARKER_H, MARKER_W, markerHtml } from "@/lib/brand";
+import { BRAND_INK, MARKER_H, MARKER_W, markerHtml, markerSvg } from "@/lib/brand";
 import { hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -21,9 +21,8 @@ type Props = {
   selectedId: number | null;
   onFocus: (id: number | null) => void;
   onSelect: (id: number) => void;
-  /** 로드뷰 패널 열림 여부(부모가 토글) */
+  /** 로드뷰 패널 열림 여부(부모가 토글). 닫기는 지도 위 선택 카드가 맡는다 */
   roadview: boolean;
-  onRoadviewClose: () => void;
   center: LatLng;
   zoom: number;
   ariaLabel: string;
@@ -37,9 +36,9 @@ function esc(s: string) {
   return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
-/** 선택 라벨: 좌표 위에 이름 + 보조 글자. 앵커는 (0,0)이고 CSS translate가 라벨 밑변 가운데를 좌표에 맞춘다 */
-function labelHtml(it: MapItem): string {
-  return `<div class="zg-pin is-focus"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span></div>`;
+/** 선택 마커: 잉크색 핀 + 그 위에 꼬리 달린 말풍선. 앵커는 평소 핀과 같아 선택해도 위치가 튀지 않는다 */
+function bubbleHtml(it: MapItem): string {
+  return `<div class="zg-sel"><div class="zg-bub"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span></div>${markerSvg(BRAND_INK)}</div>`;
 }
 
 /** 여백은 컨테이너 크기에 비례 — 300px 지도에 고정값을 쓰면 여백이 화면을 다 먹는다 */
@@ -47,7 +46,7 @@ function inset(w: number, h: number) {
   return { left: Math.min(80, w * 0.14), right: Math.min(80, w * 0.14), top: Math.min(90, h * 0.16), bottom: Math.min(70, h * 0.14) };
 }
 
-export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSelect, roadview, onRoadviewClose, center, zoom, ariaLabel }: Props) {
+export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSelect, roadview, center, zoom, ariaLabel }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const panoEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -146,7 +145,7 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
       if (sel !== m.selected) {
         const it = byId.get(id);
         m.marker.setIcon(sel && it
-          ? { content: labelHtml(it), anchor: new maps.Point(0, 0) }
+          ? { content: bubbleHtml(it), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) }
           : { content: markerHtml(), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) });
         m.selected = sel;
       }
@@ -193,7 +192,6 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
         <div ref={panoEl} className="canvas" role="img" aria-label="선택한 단지 로드뷰" />
         {panoState === "loading" && <p className="map-note">로드뷰를 찾는 중…</p>}
         {panoState === "none" && <p className="map-note">이 위치 근처에는 로드뷰가 없습니다.</p>}
-        <button type="button" className="pano-close" onClick={onRoadviewClose}>✕ 지도로</button>
       </div>
     </>
   );

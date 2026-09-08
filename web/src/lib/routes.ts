@@ -14,6 +14,23 @@ export function noticePath(slug: string): string {
   return `${ROUTES.notice}/${encodeURIComponent(slug)}`;
 }
 
+/** 단지 세그먼트. "{단지명}-{단지코드}" — 코드는 공고 안에서만 유일하므로 공고 경로 아래에 둔다. */
+export function complexSegment(c: { name: string; complex_code: string | null; id: number }): string {
+  return `${c.name}-${c.complex_code ?? c.id}`;
+}
+
+/** /notice/{공고}/{단지명}-{단지코드}. docs/url-structure.md 호실 상세 자리 — 지금은 단지가 최소 단위. */
+export function noticeComplexPath(noticeSlug: string, c: { name: string; complex_code: string | null; id: number }): string {
+  return `${noticePath(noticeSlug)}/${encodeURIComponent(complexSegment(c))}`;
+}
+
+/** 단지 세그먼트를 이름과 코드로 되돌린다. 코드는 맨 뒤 하이픈 뒤. */
+export function parseComplexSegment(seg: string): { name: string; code: string } | null {
+  const i = seg.lastIndexOf("-");
+  if (i <= 0 || i === seg.length - 1) return null;
+  return { name: seg.slice(0, i), code: seg.slice(i + 1) };
+}
+
 /** 홈 목록 경로. 필터가 없으면 "/" 그대로. */
 export function homePath(f: NoticeFilters = {}): string {
   const q = noticeFiltersToParams(f).toString();

@@ -68,6 +68,10 @@ export type NoticeComplex = {
   sigungu: string;
   road_address: string;
   is_new: boolean;
+  /** 공고문 안에서만 유일한 단지 코드(0001J). 단지 상세 URL의 뒷자리 */
+  complex_code: string | null;
+  /** 첨부 공고문 쪽번호. 출처 표기용 */
+  source_page: number | null;
   /** 아래는 매입임대 별첨 주택목록(호실 단위)에서만 채워진다. 장기전세 위치 표는 NULL */
   unit_count: number | null;
   min_deposit: number | null;
