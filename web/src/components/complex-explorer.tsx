@@ -16,8 +16,8 @@ import type { NoticeComplex } from "@/types/notice";
 type Props = { items: NoticeComplex[]; hasUnits: boolean };
 type Phase = "loading" | "ready" | "failed" | "no-key";
 
-const BRAND = "#7a67e0"; // --brand-500. 마커는 SDK가 그려서 CSS 변수를 못 쓴다
-const BRAND_DEEP = "#5344b0";
+const BRAND = "#3d5afe"; // --acc. 마커는 SDK가 그려서 CSS 변수를 못 쓴다
+const BRAND_DEEP = "#0f1216"; // --ink. 선택 말풍선
 const PIN_W = 34;
 const PIN_H = 42;
 const PIN_PATH = "M18 43C18 43 3 25 3 16C3 7.716 9.716 1 18 1C26.284 1 33 7.716 33 16C33 25 18 43 18 43Z";
@@ -32,7 +32,7 @@ function esc(s: string) {
 function pinHtml(): string {
   // 100개 넘게 찍히므로 CSS filter·애니메이션은 쓰지 않는다(렌더 부담). 그림자는 SVG 타원 하나
   return `<svg width="${PIN_W}" height="${PIN_H}" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg" style="display:block;">
-    <ellipse cx="18" cy="42" rx="7" ry="2" fill="rgba(33,29,51,.25)"/>
+    <ellipse cx="18" cy="42" rx="7" ry="2" fill="rgba(15,18,22,.25)"/>
     <path d="${PIN_PATH}" fill="${BRAND}" stroke="#fff" stroke-width="1.5"/><circle cx="18" cy="16" r="11" fill="#fff"/>${HOUSE}</svg>`;
 }
 
@@ -40,7 +40,7 @@ function pinHtml(): string {
 function balloonHtml(name: string): string {
   return `<div style="position:relative;width:0;height:0;">
     <div style="position:absolute;bottom:4.5px;left:-4.5px;width:9px;height:9px;background:${BRAND_DEEP};transform:rotate(45deg);"></div>
-    <div class="zg-marker-pop" style="position:absolute;bottom:9px;left:0;transform:translateX(-50%);display:flex;align-items:center;gap:6px;background:${BRAND_DEEP};border-radius:12px;padding:8px 12px;white-space:nowrap;box-shadow:0 8px 20px -8px rgba(83,68,176,.85);transform-origin:50% 100%;">
+    <div class="zg-marker-pop" style="position:absolute;bottom:9px;left:0;transform:translateX(-50%);display:flex;align-items:center;gap:6px;background:${BRAND_DEEP};border-radius:12px;padding:8px 12px;white-space:nowrap;box-shadow:0 8px 20px -8px rgba(15,18,22,.6);transform-origin:50% 100%;">
       <svg width="14" height="14" viewBox="0 0 36 36"><path d="M18 6l12 10.5v13H21.5v-8h-7v8H6v-13z" fill="#fff"/></svg>
       <span style="font-size:12px;font-weight:700;color:#fff;font-family:inherit;">${esc(name)}</span>
     </div></div>`;

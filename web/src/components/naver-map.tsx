@@ -27,7 +27,7 @@ export function NaverMap({ address, title }: Props) {
         if (cancelled) return;
         if (!p || !el.current) { setState("failed"); return; }
         const pos = new maps.LatLng(p.lat, p.lng);
-        map = new maps.Map(el.current, { center: pos, zoom: NAVER_MAP_DEFAULT_ZOOM, zoomControl: true, scaleControl: false, mapDataControl: false });
+        map = new maps.Map(el.current, { center: pos, zoom: NAVER_MAP_DEFAULT_ZOOM, zoomControl: false, scaleControl: true, mapDataControl: false });
         new maps.Marker({ position: pos, map, title });
         setState("ready");
       })

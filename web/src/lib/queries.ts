@@ -3,16 +3,16 @@
 // 목록·옵션은 unstable_cache로 REVALIDATE_SEC 캐시한다. 파이프라인이 DB를 갱신해도 그 안엔 반영된다(page.tsx revalidate와 동일).
 import { unstable_cache } from "next/cache";
 import { query } from "./db";
-import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
+import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC, SH_SIDO } from "./constants";
 import { todayKST } from "./format";
-import type { FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, Sector } from "@/types/notice";
+import type { FilterOption, HomeStats, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, Sector } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
 const LIST_COLS = `
   id, slug, title, agency, housing_type::text AS housing_type, sector::text AS sector, house_type, sido, sigungu, complex_name,
   supply_count, min_deposit, min_rent, posted_at, apply_start_at, apply_end_at, announce_at,
-  status::text AS status, source_status, amends_source_key, source_url`;
+  status::text AS status, source_status, amends_source_key, source_url, address`;
 
 function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
   const where: string[] = [];
@@ -28,8 +28,12 @@ function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
     params.push(f.type);
     where.push(`housing_type::text = $${params.length}`);
   }
+  if (f.closing === "7d") where.push(CLOSING_7D);
   return where;
 }
+
+// 마감 7일 내: 오늘 포함 7일 안에 접수 마감. KPI·칩 카운트·목록 필터가 같은 식을 쓴다
+const CLOSING_7D = `apply_end_at >= CURRENT_DATE AND apply_end_at < CURRENT_DATE + 7`;
 
 function whereSql(where: string[]): string {
   return where.length ? "WHERE " + where.join(" AND ") : "";
@@ -105,7 +109,7 @@ async function listNoticesPageRaw(f: NoticeFilters, cursor: string | null, limit
 /** 목록 1페이지. cursor는 이전 페이지의 nextCursor. */
 export const listNoticesPage = unstable_cache(
   (f: NoticeFilters, cursor: string | null = null, limit: number = PAGE_SIZE) => listNoticesPageRaw(f, cursor, limit),
-  ["notice-page"],
+  ["notice-page-v2"],
   CACHE_OPTS,
 );
 
@@ -126,13 +130,31 @@ export const listFilterOptions = unstable_cache(
     const pick = (k: string) => rows.filter((r) => r.kind === k).map(({ value, count }) => ({ value, count }));
     return { sector: pick("sector").sort((a, b) => a.value.localeCompare(b.value, "ko")), sido: pick("sido"), type: pick("type") };
   },
-  ["notice-filter-options"],
+  ["notice-filter-options-v2"],
+  CACHE_OPTS,
+);
+
+/** 홈 KPI. 전체·서울·7일 내 마감·중위 월임대료(금액 있는 공고 기준). 필터와 무관한 서비스 전체 집계 */
+export const getHomeStats = unstable_cache(
+  async (): Promise<HomeStats> => {
+    const rows = await query<{ total: number; seoul: number; closing7: number; median_rent: number | null }>(
+      `SELECT count(*)::int AS total,
+              count(*) FILTER (WHERE sido = $1)::int AS seoul,
+              count(*) FILTER (WHERE ${CLOSING_7D})::int AS closing7,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY min_rent)::bigint AS median_rent
+       FROM notice`,
+      [SH_SIDO],
+    );
+    const r = rows[0];
+    return { total: r?.total ?? 0, seoul: r?.seoul ?? 0, closing7: r?.closing7 ?? 0, medianRent: r?.median_rent ?? null };
+  },
+  ["notice-home-stats"],
   CACHE_OPTS,
 );
 
 export async function getNoticeBySlug(slug: string): Promise<Notice | null> {
   const rows = await query<Notice>(
-    `SELECT ${LIST_COLS}, source_key, address, pnu, heating, total_household,
+    `SELECT ${LIST_COLS}, source_key, pnu, heating, total_household,
             min_down_payment, min_interim, min_balance, portal_url, contact,
             to_char(updated_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') AS updated_at
      FROM notice WHERE slug = $1`,

@@ -1,22 +1,19 @@
 // 홈 스트리밍 폴백. searchParams 때문에 / 는 동적 렌더라 DB를 기다리는 동안 이 골격이 먼저 뜬다.
-import { Hero } from "@/components/hero";
-import { Box, SkeletonGrid } from "@/components/skeleton";
-import { HERO_STAT_LABELS } from "@/lib/constants";
+import { KpiStripSkeleton } from "@/components/kpi-strip";
+import { Box, SkeletonRows } from "@/components/skeleton";
 
 export default function HomeLoading() {
   return (
-    <>
-      <Hero skeleton stats={HERO_STAT_LABELS.map((k) => <Box key={k} w={48} h={24} r={6} style={{ marginTop: 4 }} />)} />
-      <nav className="tabs" aria-hidden="true">
-        <a className="on">전체</a><a>공공임대</a><a>민간임대</a>
-      </nav>
-      <div className="filters" aria-hidden="true">
-        <Box w={150} h={40} r={14} shimmer={false} />
-        <Box w={150} h={40} r={14} shimmer={false} />
-        <Box w={64} h={40} r={14} shimmer={false} />
+    <div>
+      <KpiStripSkeleton box={<Box w={72} h={32} r={8} />} />
+      <div className="fbar" aria-hidden="true">
+        <Box w={78} h={38} r={11} /><Box w={104} h={38} r={11} /><Box w={104} h={38} r={11} /><Box w={118} h={38} r={11} />
+        <Box w={196} h={30} r={999} style={{ marginLeft: "auto" }} />
       </div>
-      <p className="result-count"><Box w={60} h={14} r={4} /></p>
-      <SkeletonGrid />
-    </>
+      <div className="ex">
+        <div className="ex-list"><SkeletonRows count={5} /></div>
+        <div className="ex-map" aria-hidden="true" />
+      </div>
+    </div>
   );
 }

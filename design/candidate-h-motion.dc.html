@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<style>
+  body { margin:0; background:#0e1013; -webkit-font-smoothing:antialiased; word-break:keep-all; }
+  *, *::before, *::after { box-sizing:border-box; }
+  a { color:inherit; text-decoration:none; }
+  .mo { container-type:inline-size; font-family:"Pretendard Variable",Pretendard,-apple-system,sans-serif;
+    --bg:#ffffff; --sub:#f7f8fa; --line:#e9ebef; --line2:#d8dbe2; --ink:#0f1216; --mut:#4f5661; --dim:#5f6672;
+    --acc:#3d5afe; --acc-soft:#eef1ff; --hot:#c2340f; --hot-soft:#fdeeeb; --warn:#a35c06; --warn-soft:#fff5e6;
+    --sp:cubic-bezier(.25,1.02,.36,1); --ease:cubic-bezier(.25,.8,.25,1); }
+  .mo-row { transition:background 200ms var(--ease), transform 300ms var(--sp); }
+  .mo-row:hover { background:var(--sub); transform:translateX(3px); }
+  .mo-row .mo-arrow { transition:transform 320ms var(--sp), opacity 200ms linear; opacity:0; transform:translateX(-5px); }
+  .mo-row:hover .mo-arrow { opacity:1; transform:translateX(0); }
+  .mo-row .mo-money { transition:color 240ms var(--ease); }
+  .mo-row:hover .mo-money { color:var(--acc); }
+  .mo-btn { transition:transform 220ms var(--sp), background 200ms var(--ease), border-color 200ms var(--ease); cursor:pointer; }
+  .mo-btn:hover { transform:translateY(-1.5px); }
+  .mo-btn:active { transform:translateY(0) scale(.985); }
+  .mo-chip { transition:transform 240ms var(--sp), background 220ms var(--ease), color 220ms var(--ease), border-color 220ms var(--ease); cursor:pointer; }
+  .mo-chip:hover { transform:translateY(-1.5px); }
+  .mo-save { transition:transform 280ms var(--sp), color 220ms linear, background 220ms linear; cursor:pointer; }
+  .mo-save:hover { transform:scale(1.08); }
+  .mo-pop { animation:mo-pop 420ms var(--sp); }
+  @keyframes mo-pop { 0%{transform:scale(1)} 40%{transform:scale(1.16)} 72%{transform:scale(.97)} 100%{transform:scale(1)} }
+  @keyframes mo-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  /* 등장은 타이머가 아니라 CSS 애니메이션으로 — 탭이 백그라운드여도 반드시 보이는 상태로 끝난다.
+     같은 내용의 두 이름을 번갈아 써서 목록이 바뀔 때 애니메이션을 다시 돌린다. */
+  @keyframes mo-in-a { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:none } }
+  @keyframes mo-in-b { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:none } }
+  @keyframes mo-stage-a { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:none } }
+  @keyframes mo-stage-b { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:none } }
+  .mo-sk { background:var(--sub); background-image:linear-gradient(90deg,var(--sub) 0%,#eceef2 50%,var(--sub) 100%);
+    background-size:200% 100%; animation:mo-shimmer 1.5s ease-in-out infinite; border-radius:7px; display:block; }
+  .zg-pin-wrap { background:none !important; border:0 !important; }
+  .zg-pin { display:inline-flex; align-items:center; gap:6px; transform:translate(-50%,-100%); padding:6px 11px; border-radius:12px;
+    background:#fff; border:1px solid #e3e6eb; box-shadow:0 8px 18px -10px rgba(15,18,22,.4); white-space:nowrap;
+    transition:transform 280ms var(--sp), box-shadow 260ms var(--ease), background 220ms linear, border-color 220ms linear; }
+  .zg-pin b { font:800 12.5px/1.1 "Pretendard Variable",sans-serif; letter-spacing:-.03em; color:#0f1216; font-variant-numeric:tabular-nums; }
+  .zg-pin span { font:700 10px/1.2 "Pretendard Variable",sans-serif; color:#5f6672; }
+  .zg-pin.hot { background:#0f1216; border-color:#0f1216; }
+  .zg-pin.hot b { color:#fff; }
+  .zg-pin.hot span { color:rgba(255,255,255,.6); }
+  .zg-pin.is-focus { transform:translate(-50%,-100%) scale(1.08); background:var(--acc); border-color:var(--acc);
+    box-shadow:0 12px 26px -12px rgba(61,90,254,.6); z-index:900; }
+  .zg-pin.is-focus b, .zg-pin.is-focus span { color:#fff; }
+  .leaflet-tile-pane { filter:saturate(.55) brightness(1.03); }
+  .leaflet-control-attribution { font-size:9px !important; background:rgba(255,255,255,.78) !important; }
+  .leaflet-bar a { border-radius:9px !important; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+  @container (max-width: 900px) {
+    .mo-grid { grid-template-columns:1fr !important; }
+    .mo-mapcol { height:300px !important; border-left:0 !important; border-top:1px solid var(--line) !important; }
+    .mo-kpis { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+    .mo-hide { display:none !important; }
+    .mo-only-narrow { display:flex !important; }
+    .mo-rowgrid { grid-template-columns:56px minmax(0,1fr) auto !important; }
+    .mo-detail { grid-template-columns:1fr !important; }
+    .mo-two { grid-template-columns:1fr !important; }
+    .mo-h1 { font-size:30px !important; }
+    .mo-jumbo { font-size:42px !important; }
+  }
+</style>
+</helmet>
+
+<div class="mo" style="min-height:100vh; background:#0e1013; padding:18px;">
+  <div style="max-width:1280px; margin:0 auto; display:flex; flex-direction:column; gap:12px;">
+
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:9px 12px; border-radius:12px; background:#171a1f;">
+      <span style="font:800 10.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.18em; color:#8b93a1; padding:0 4px;">화면</span>
+      <div style="display:flex; gap:3px; padding:3px; border-radius:10px; background:#0f1216;">
+        <sc-for list="{{ screens }}" as="s" hint-placeholder-count="4">
+          <span class="mo-chip" onClick="{{ s.onClick }}" style="padding:7px 13px; border-radius:8px; font:700 12px 'Pretendard Variable',sans-serif; background:{{ s.bg }}; color:{{ s.ink }};">{{ s.label }}</span>
+        </sc-for>
+      </div>
+      <span style="margin-left:auto; font:600 11px 'Pretendard Variable',sans-serif; color:#8b93a1; padding-right:4px;">행 호버 → 지도 핀 강조 · 칩 토글 → 목록 재배치 · ★ 저장 → 토스트 · 더 보기 → 스켈레톤</span>
+    </div>
+
+    <div style="border-radius:18px; overflow:hidden; background:var(--bg); box-shadow:0 30px 70px -44px rgba(0,0,0,.85);">
+      <header style="display:flex; align-items:center; justify-content:space-between; gap:16px; height:60px; padding:0 18px; border-bottom:1px solid var(--line);">
+        <div style="display:flex; align-items:center; gap:24px;">
+          <span style="display:inline-flex; align-items:center; gap:9px; font:900 19px/1 'Pretendard Variable',sans-serif; letter-spacing:-.05em; color:var(--ink);">
+            <span style="width:20px; height:20px; border-radius:7px; background:var(--acc);"></span>집공고
+          </span>
+          <span class="mo-hide" style="display:flex; gap:18px; font:700 13px 'Pretendard Variable',sans-serif; color:var(--dim);">
+            <a href="#" style="color:var(--ink);">지도</a><a href="#">공고</a><a href="#">지역</a><a href="#">유형</a>
+          </span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="mo-hide" style="display:inline-flex; align-items:center; gap:8px; height:38px; padding:0 15px; border-radius:11px; background:var(--sub); font:600 13px 'Pretendard Variable',sans-serif; color:var(--dim);">지역·단지 검색</span>
+          <span class="mo-btn" style="display:inline-flex; align-items:center; height:38px; padding:0 16px; border-radius:11px; background:var(--ink); color:#fff; font:800 12.5px 'Pretendard Variable',sans-serif; white-space:nowrap;">마감 알림 받기</span>
+        </div>
+      </header>
+
+      <div style="animation:{{ stageAnim }} 380ms var(--sp) both;">
+
+        <sc-if value="{{ isMap }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <div class="mo-kpis" style="display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-bottom:1px solid var(--line);">
+              <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+                <div style="padding:18px 20px; border-left:1px solid var(--line);">
+                  <span style="display:block; font:800 10.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.14em; color:var(--dim); margin-bottom:11px;">{{ k.k }}</span>
+                  <span style="display:flex; align-items:baseline; gap:7px;">
+                    <b style="font:900 32px/1 'Pretendard Variable',sans-serif; letter-spacing:-.055em; color:{{ k.color }}; font-variant-numeric:tabular-nums;">{{ k.v }}</b>
+                    <span style="font:700 11.5px 'Pretendard Variable',sans-serif; color:var(--dim);">{{ k.unit }}</span>
+                  </span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px; padding:14px 18px; border-bottom:1px solid var(--line); overflow-x:auto;">
+              <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4">
+                <span class="mo-chip" onClick="{{ c.onClick }}" style="display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 15px; border-radius:11px; background:{{ c.bg }}; border:1px solid {{ c.border }}; color:{{ c.ink }}; font:800 12.5px 'Pretendard Variable',sans-serif; white-space:nowrap;">
+                  {{ c.label }} <small style="font-weight:700; font-size:11px; color:{{ c.countInk }};">{{ c.count }}</small>
+                </span>
+              </sc-for>
+              <span style="margin-left:auto; position:relative; display:flex; padding:3px; border-radius:999px; background:var(--sub); flex:none;">
+                <span style="position:absolute; top:3px; left:3px; width:calc(50% - 3px); height:calc(100% - 6px); border-radius:999px; background:#fff; box-shadow:0 2px 8px -3px rgba(15,18,22,.3); transform:translateX({{ sortShift }}); transition:transform 340ms var(--sp);"></span>
+                <span class="mo-chip" onClick="{{ sortDeadline }}" style="position:relative; padding:6px 14px; border-radius:999px; font:800 12px 'Pretendard Variable',sans-serif; color:{{ sortAInk }}; white-space:nowrap;">마감 임박순</span>
+                <span class="mo-chip" onClick="{{ sortPosted }}" style="position:relative; padding:6px 14px; border-radius:999px; font:800 12px 'Pretendard Variable',sans-serif; color:{{ sortBInk }}; white-space:nowrap;">최신 공고순</span>
+              </span>
+            </div>
+
+            <div class="mo-grid" style="display:grid; grid-template-columns:minmax(0,1.3fr) 1fr;">
+              <div>
+                <sc-for list="{{ rows }}" as="n" hint-placeholder-count="5">
+                  <a href="#" class="mo-row mo-rowgrid" onClick="{{ n.onOpen }}" onMouseEnter="{{ n.onEnter }}" onMouseLeave="{{ n.onLeave }}" style="display:grid; grid-template-columns:56px minmax(0,1fr) 132px auto; gap:14px; align-items:center; padding:16px 18px; border-bottom:1px solid var(--line); animation:{{ n.anim }} 440ms var(--sp) {{ n.delay }} both; transition:background 200ms var(--ease), transform 300ms var(--sp);">
+                    <span style="display:flex; flex-direction:column; align-items:center; justify-content:center; width:56px; height:52px; border-radius:14px; background:{{ n.chipBg }};">
+                      <b style="font:900 16px/1 'Pretendard Variable',sans-serif; letter-spacing:-.05em; color:{{ n.chipInk }}; font-variant-numeric:tabular-nums;">{{ n.ddayNum }}</b>
+                      <span style="font:800 8.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.08em; color:{{ n.chipInk }}; margin-top:4px;">{{ n.ddayUnit }}</span>
+                    </span>
+                    <span style="display:block; min-width:0;">
+                      <span style="display:block; font:700 11px 'Pretendard Variable',sans-serif; letter-spacing:.02em; color:var(--dim);">{{ n.meta }}</span>
+                      <span style="display:block; margin-top:5px; font:800 15px/1.35 'Pretendard Variable',sans-serif; letter-spacing:-.03em; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ n.title }}</span>
+                      <span class="mo-only-narrow" style="display:none; align-items:baseline; gap:8px; margin-top:7px;">
+                        <b style="font:900 17px/1 'Pretendard Variable',sans-serif; letter-spacing:-.045em; color:var(--ink); font-variant-numeric:tabular-nums;">{{ n.money }}</b>
+                        <span style="font:700 10.5px 'Pretendard Variable',sans-serif; color:var(--dim);">{{ n.qty }}</span>
+                      </span>
+                      <span style="display:block; margin-top:7px; font:600 11.5px 'Pretendard Variable',sans-serif; color:var(--dim); font-variant-numeric:tabular-nums;">접수 {{ n.period }}</span>
+                    </span>
+                    <span class="mo-hide" style="display:block; text-align:right;">
+                      <b class="mo-money" style="font:900 18px/1 'Pretendard Variable',sans-serif; letter-spacing:-.045em; color:var(--ink); font-variant-numeric:tabular-nums;">{{ n.money }}</b>
+                      <span style="display:block; margin-top:5px; font:700 10.5px 'Pretendard Variable',sans-serif; color:var(--dim);">{{ n.qty }}</span>
+                    </span>
+                    <span style="display:flex; align-items:center; gap:12px;">
+                      <span class="{{ n.saveCls }}" onClick="{{ n.onSave }}" style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:11px; background:{{ n.saveBg }}; color:{{ n.saveInk }}; font:900 15px/1 sans-serif;">{{ n.saveIcon }}</span>
+                      <span class="mo-arrow" style="font:900 16px/1 sans-serif; color:var(--acc);">→</span>
+                    </span>
+                  </a>
+                </sc-for>
+
+                <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+                  <div>
+                    <sc-for list="{{ skels }}" as="s" hint-placeholder-count="3">
+                      <div style="display:grid; grid-template-columns:56px minmax(0,1fr) 132px; gap:14px; align-items:center; padding:16px 18px; border-bottom:1px solid var(--line);">
+                        <span class="mo-sk" style="width:56px; height:52px; border-radius:14px;"></span>
+                        <span style="display:block;">
+                          <span class="mo-sk" style="width:150px; height:10px;"></span>
+                          <span class="mo-sk" style="width:74%; height:15px; margin-top:9px;"></span>
+                          <span class="mo-sk" style="width:120px; height:10px; margin-top:11px;"></span>
+                        </span>
+                        <span style="display:block;">
+                          <span class="mo-sk" style="width:96px; height:18px; margin-left:auto;"></span>
+                          <span class="mo-sk" style="width:52px; height:10px; margin:8px 0 0 auto;"></span>
+                        </span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 18px;">
+                  <span style="font:700 11.5px 'Pretendard Variable',sans-serif; color:var(--dim); font-variant-numeric:tabular-nums;">{{ total }}건 중 {{ shown }}건 표시</span>
+                  <span class="mo-btn" onClick="{{ loadMore }}" style="display:inline-flex; align-items:center; height:42px; padding:0 20px; border-radius:12px; background:var(--ink); color:#fff; font:800 13px 'Pretendard Variable',sans-serif;">{{ loadLabel }}</span>
+                </div>
+              </div>
+
+              <div class="mo-mapcol" style="position:relative; height:560px; border-left:1px solid var(--line); background:var(--sub);">
+                <x-import component-from-global-scope="zip-map" from="./zip-map.js" lat="37.5" lng="127.02" zoom="10" pins="{{ pinsJson }}" hint-size="100%,100%" style="position:absolute; inset:0;"></x-import>
+                <div style="position:absolute; z-index:700; left:14px; top:14px; display:flex; gap:7px; flex-wrap:wrap;">
+                  <span style="display:inline-flex; align-items:center; gap:7px; height:36px; padding:0 14px; border-radius:11px; background:#fff; border:1px solid var(--line); box-shadow:0 8px 20px -14px rgba(15,18,22,.5); font:800 12.5px 'Pretendard Variable',sans-serif; color:var(--ink);">서울 <b style="color:var(--acc);">68</b></span>
+                  <span style="display:inline-flex; align-items:center; height:36px; padding:0 14px; border-radius:11px; background:#fff; border:1px solid var(--line); box-shadow:0 8px 20px -14px rgba(15,18,22,.5); font:700 12.5px 'Pretendard Variable',sans-serif; color:var(--mut);">전체 유형</span>
+                </div>
+                <div style="position:absolute; z-index:700; left:14px; bottom:14px; padding:14px 16px; border-radius:14px; background:rgba(255,255,255,.94); border:1px solid var(--line);">
+                  <span style="display:block; font:800 10px/1 'Pretendard Variable',sans-serif; letter-spacing:.14em; color:var(--dim); margin-bottom:7px;">{{ focusLabel }}</span>
+                  <b style="font:900 24px/1 'Pretendard Variable',sans-serif; letter-spacing:-.05em; color:var(--ink); font-variant-numeric:tabular-nums;">{{ focusValue }}</b>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="padding:30px 18px 24px; border-bottom:1px solid var(--line);">
+              <p style="margin:0 0 12px; font:800 10.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.2em; color:var(--acc);">공공임대 176 · 공공지원민간임대 6</p>
+              <h1 class="mo-h1" style="margin:0 0 10px; font:900 38px/1.1 'Pretendard Variable',sans-serif; letter-spacing:-.055em; color:var(--ink);">수백 페이지 표를 호실 단위로.</h1>
+              <p style="margin:0; max-width:40em; font:500 14px/1.75 'Pretendard Variable',sans-serif; color:var(--mut);">LH·SH·지방공사 공고를 6시간 주기로 수집합니다. 보증금·월임대료는 공고에 적힌 최소값입니다.</p>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px; padding:14px 18px; border-bottom:1px solid var(--line); overflow-x:auto; position:sticky; top:0; z-index:9; background:rgba(255,255,255,.93);">
+              <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4">
+                <span class="mo-chip" onClick="{{ c.onClick }}" style="display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 15px; border-radius:11px; background:{{ c.bg }}; border:1px solid {{ c.border }}; color:{{ c.ink }}; font:800 12.5px 'Pretendard Variable',sans-serif; white-space:nowrap;">
+                  {{ c.label }} <small style="font-weight:700; font-size:11px; color:{{ c.countInk }};">{{ c.count }}</small>
+                </span>
+              </sc-for>
+              <span style="margin-left:auto; position:relative; display:flex; padding:3px; border-radius:999px; background:var(--sub); flex:none;">
+                <span style="position:absolute; top:3px; left:3px; width:calc(50% - 3px); height:calc(100% - 6px); border-radius:999px; background:#fff; box-shadow:0 2px 8px -3px rgba(15,18,22,.3); transform:translateX({{ sortShift }}); transition:transform 340ms var(--sp);"></span>
+                <span class="mo-chip" onClick="{{ sortDeadline }}" style="position:relative; padding:6px 14px; border-radius:999px; font:800 12px 'Pretendard Variable',sans-serif; color:{{ sortAInk }}; white-space:nowrap;">마감 임박순</span>
+                <span class="mo-chip" onClick="{{ sortPosted }}" style="position:relative; padding:6px 14px; border-radius:999px; font:800 12px 'Pretendard Variable',sans-serif; color:{{ sortBInk }}; white-space:nowrap;">최신 공고순</span>
+              </span>
+            </div>
+
+            <sc-for list="{{ rows }}" as="n" hint-placeholder-count="6">
+              <a href="#" class="mo-row mo-rowgrid" onClick="{{ n.onOpen }}" style="display:grid; grid-template-columns:56px minmax(0,1fr) 170px auto; gap:18px; align-items:center; padding:18px; border-bottom:1px solid var(--line); animation:{{ n.anim }} 440ms var(--sp) {{ n.delay }} both; transition:background 200ms var(--ease), transform 300ms var(--sp);">
+                <span style="display:flex; flex-direction:column; align-items:center; justify-content:center; width:56px; height:52px; border-radius:14px; background:{{ n.chipBg }};">
+                  <b style="font:900 16px/1 'Pretendard Variable',sans-serif; letter-spacing:-.05em; color:{{ n.chipInk }}; font-variant-numeric:tabular-nums;">{{ n.ddayNum }}</b>
+                  <span style="font:800 8.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.08em; color:{{ n.chipInk }}; margin-top:4px;">{{ n.ddayUnit }}</span>
+                </span>
+                <span style="display:block; min-width:0;">
+                  <span style="display:block; font:700 11px 'Pretendard Variable',sans-serif; letter-spacing:.02em; color:var(--dim);">{{ n.meta }} · {{ n.posted }}</span>
+                  <span style="display:block; margin-top:5px; font:800 16px/1.35 'Pretendard Variable',sans-serif; letter-spacing:-.03em; color:var(--ink);">{{ n.title }}</span>
+                  <span class="mo-only-narrow" style="display:none; align-items:baseline; gap:8px; margin-top:7px;">
+                    <b style="font:900 17px/1 'Pretendard Variable',sans-serif; letter-spacing:-.045em; color:var(--ink); font-variant-numeric:tabular-nums;">{{ n.money }}</b>
+                    <span style="font:700 10.5px 'Pretendard Variable',sans-serif; color:var(--dim);">{{ n.qty }}</span>
+                  </span>
+                  <span style="display:block; margin-top:8px; font:600 11.5px 'Pretendard Variable',sans-serif; color:var(--dim); font-variant-numeric:tabular-nums;">접수 {{ n.period }} · 발표 {{ n.announce }}</span>
+                </span>
+                <span class="mo-hide" style="display:block; text-align:right;">
+                  <b class="mo-money" style="font:900 22px/1 'Pretendard Variable',sans-serif; letter-spacing:-.05em; color:var(--ink); font-variant-numeric:tabular-nums;">{{ n.money }}</b>
+                  <span style="display:block; margin-top:6px; font:700 11px 'Pretendard Variable',sans-serif; color:var(--dim);">{{ n.qty }} · {{ n.moneyLabel }}</span>
+                </span>
+                <span style="display:flex; align-items:center; gap:12px;">
+                  <span class="{{ n.saveCls }}" onClick="{{ n.onSave }}" style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:11px; background:{{ n.saveBg }}; color:{{ n.saveInk }}; font:900 15px/1 sans-serif;">{{ n.saveIcon }}</span>
+                  <span class="mo-arrow" style="font:900 16px/1 sans-serif; color:var(--acc);">→</span>
+                </span>
+              </a>
+            </sc-for>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:20px 18px 30px;">
+              <span style="font:700 11.5px 'Pretendard Variable',sans-serif; color:var(--dim); font-variant-numeric:tabular-nums;">{{ total }}건 중 {{ shown }}건 표시</span>
+              <span class="mo-btn" onClick="{{ loadMore }}" style="display:inline-flex; align-items:center; height:46px; padding:0 22px; border-radius:13px; background:var(--ink); color:#fff; font:800 13.5px 'Pretendard Variable',sans-serif;">{{ loadLabel }}</span>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="display:flex; align-items:center; gap:10px; padding:13px 18px; border-bottom:1px solid var(--line); font:600 12px 'Pretendard Variable',sans-serif; color:var(--dim);">
+              <span class="mo-chip" onClick="{{ goMap }}" style="display:inline-flex; align-items:center; height:30px; padding:0 12px; border-radius:9px; background:var(--sub); color:var(--mut); font-weight:700;">← 지도</span>
+              <span>공고 · {{ detail.region }} · {{ detail.type }}</span>
+            </div>
+
+            <div class="mo-detail" style="display:grid; grid-template-columns:minmax(0,1fr) 336px;">
+              <div>
+                <div style="padding:28px 18px 26px; border-bottom:1px solid var(--line);">
+                  <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px;">
+                    <span style="display:inline-flex; align-items:center; height:28px; padding:0 11px; border-radius:9px; background:{{ detail.chipBg }}; color:{{ detail.chipInk }}; font:800 11.5px 'Pretendard Variable',sans-serif;">{{ detail.ddayLabel }}</span>
+                    <span style="display:inline-flex; align-items:center; height:28px; padding:0 11px; border-radius:9px; background:var(--acc-soft); color:var(--acc); font:800 11.5px 'Pretendard Variable',sans-serif;">{{ detail.type }}</span>
+                    <span style="display:inline-flex; align-items:center; height:28px; padding:0 11px; border-radius:9px; background:var(--sub); color:var(--mut); font:800 11.5px 'Pretendard Variable',sans-serif;">{{ detail.agency }}</span>
+                  </div>
+                  <h1 class="mo-h1" style="margin:0 0 24px; font:900 34px/1.22 'Pretendard Variable',sans-serif; letter-spacing:-.05em; color:var(--ink); max-width:24em;">{{ detail.title }}</h1>
+                  <span style="display:block; font:800 10.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.18em; color:var(--dim); margin-bottom:12px;">{{ detail.moneyLabel }}</span>
+                  <b class="mo-jumbo" style="font:900 56px/1 'Pretendard Variable',sans-serif; letter-spacing:-.06em; color:var(--ink); font-variant-numeric:tabular-nums;">{{ detail.money }}</b>
+                  <span style="font:800 15px 'Pretendard Variable',sans-serif; color:var(--mut);"> 부터</span>
+                </div>
+
+                <div style="padding:24px 18px; border-bottom:1px solid var(--line);">
+                  <h2 style="margin:0 0 16px; font:800 10.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.2em; color:var(--dim);">접수 일정</h2>
+                  <div class="mo-two" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px;">
+                    <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+                      <div style="min-width:0; padding:15px 16px; border-radius:14px; background:{{ s.bg }}; border:1px solid {{ s.border }};">
+                        <span style="display:block; font:800 9.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.14em; color:{{ s.labelInk }}; margin-bottom:9px;">{{ s.label }}</span>
+                        <b style="display:block; white-space:nowrap; font:800 16px/1.2 'Pretendard Variable',sans-serif; letter-spacing:-.035em; color:{{ s.valueInk }}; font-variant-numeric:tabular-nums;">{{ s.value }}</b>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <div style="padding:24px 18px; border-bottom:1px solid var(--line);">
+                  <h2 style="margin:0 0 14px; font:800 10.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.2em; color:var(--dim);">보증금 · 임대료</h2>
+                  <div style="border:1px solid var(--line); border-radius:14px; overflow:hidden;">
+                    <div style="display:grid; grid-template-columns:1.3fr 1fr 1fr; background:var(--sub); border-bottom:1px solid var(--line);">
+                      <span style="padding:11px 15px; font:800 10px 'Pretendard Variable',sans-serif; letter-spacing:.12em; color:var(--dim);">구분</span>
+                      <span style="padding:11px 15px; text-align:right; font:800 10px 'Pretendard Variable',sans-serif; letter-spacing:.12em; color:var(--dim);">보증금</span>
+                      <span style="padding:11px 15px; text-align:right; font:800 10px 'Pretendard Variable',sans-serif; letter-spacing:.12em; color:var(--dim);">월임대료</span>
+                    </div>
+                    <sc-for list="{{ priceRows }}" as="r" hint-placeholder-count="3">
+                      <div style="display:grid; grid-template-columns:1.3fr 1fr 1fr; border-bottom:1px solid var(--line);">
+                        <span style="padding:14px 15px; font:600 13px 'Pretendard Variable',sans-serif; color:var(--mut);">{{ r.kind }}</span>
+                        <span style="padding:14px 15px; text-align:right; font:800 14px 'Pretendard Variable',sans-serif; color:var(--ink); font-variant-numeric:tabular-nums;">{{ r.deposit }}</span>
+                        <span style="padding:14px 15px; text-align:right; font:700 14px 'Pretendard Variable',sans-serif; color:var(--mut); font-variant-numeric:tabular-nums;">{{ r.rent }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <p style="margin:12px 0 0; font:500 11.5px/1.7 'Pretendard Variable',sans-serif; color:var(--dim);">호실별 금액은 첨부 공고문 파싱 후 표로 제공됩니다.</p>
+                </div>
+
+                <div style="padding:24px 18px;">
+                  <h2 style="margin:0 0 14px; font:800 10.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.2em; color:var(--dim);">위치</h2>
+                  <div style="position:relative; height:300px; border-radius:16px; overflow:hidden; border:1px solid var(--line);">
+                    <x-import component-from-global-scope="zip-map" from="./zip-map.js" lat="37.5145" lng="127.106" zoom="14" pins="{{ detailPinJson }}" hint-size="100%,100%" style="position:absolute; inset:0;"></x-import>
+                  </div>
+                  <p style="margin:12px 0 0; font:500 11.5px/1.7 'Pretendard Variable',sans-serif; color:var(--dim);">지도 위치는 주소 기준 근사치입니다. {{ detail.address }}</p>
+                </div>
+              </div>
+
+              <aside style="border-left:1px solid var(--line);">
+                <div style="position:sticky; top:0; padding:22px 18px; display:flex; flex-direction:column; gap:14px;">
+                  <div style="padding:18px; border-radius:16px; background:{{ detail.chipBg }};">
+                    <span style="display:block; font:800 10px/1 'Pretendard Variable',sans-serif; letter-spacing:.16em; color:{{ detail.chipInk }}; margin-bottom:10px;">{{ detail.ddayUnit }}까지</span>
+                    <b style="font:900 40px/1 'Pretendard Variable',sans-serif; letter-spacing:-.06em; color:{{ detail.chipInk }}; font-variant-numeric:tabular-nums;">{{ detail.ddayNum }}</b>
+                    <p style="margin:10px 0 0; font:700 12px 'Pretendard Variable',sans-serif; color:{{ detail.chipInk }};">{{ detail.deadline }} 마감</p>
+                  </div>
+                  <span class="mo-btn" style="display:flex; align-items:center; justify-content:center; height:48px; border-radius:13px; background:var(--acc); color:#fff; font:800 13.5px 'Pretendard Variable',sans-serif;">기관 원문 공고 보기 ↗</span>
+                  <span class="{{ detail.saveCls }}" onClick="{{ detail.onSave }}" style="display:flex; align-items:center; justify-content:center; gap:8px; height:48px; border-radius:13px; background:{{ detail.saveBg }}; border:1px solid var(--line2); color:{{ detail.saveInk }}; font:800 13.5px 'Pretendard Variable',sans-serif;">{{ detail.saveIcon }} 마감 알림 저장</span>
+                  <div style="padding:18px; border-radius:16px; border:1px solid var(--line); display:flex; flex-direction:column; gap:11px;">
+                    <span style="font:800 10px/1 'Pretendard Variable',sans-serif; letter-spacing:.16em; color:var(--dim);">공고 제원</span>
+                    <sc-for list="{{ specs }}" as="s" hint-placeholder-count="6">
+                      <span style="display:flex; justify-content:space-between; gap:12px; padding-bottom:9px; border-bottom:1px solid var(--line);">
+                        <span style="font:600 12px 'Pretendard Variable',sans-serif; color:var(--dim); white-space:nowrap;">{{ s.k }}</span>
+                        <span style="font:700 12.5px 'Pretendard Variable',sans-serif; color:var(--ink); text-align:right;">{{ s.v }}</span>
+                      </span>
+                    </sc-for>
+                    <span style="font:500 11px 'Pretendard Variable',sans-serif; color:var(--dim);">갱신 2026-09-08 07:12</span>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isState }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:24px 18px 32px; display:flex; flex-direction:column; gap:26px;">
+            <div>
+              <p style="margin:0 0 14px; font:800 10.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.2em; color:var(--dim);">로딩</p>
+              <div style="border:1px solid var(--line); border-radius:16px; overflow:hidden;">
+                <sc-for list="{{ skels }}" as="s" hint-placeholder-count="3">
+                  <div style="display:grid; grid-template-columns:56px minmax(0,1fr) 132px; gap:14px; align-items:center; padding:16px 18px; border-bottom:1px solid var(--line);">
+                    <span class="mo-sk" style="width:56px; height:52px; border-radius:14px;"></span>
+                    <span style="display:block;">
+                      <span class="mo-sk" style="width:150px; height:10px;"></span>
+                      <span class="mo-sk" style="width:70%; height:15px; margin-top:9px;"></span>
+                      <span class="mo-sk" style="width:130px; height:10px; margin-top:11px;"></span>
+                    </span>
+                    <span style="display:block;">
+                      <span class="mo-sk" style="width:96px; height:18px; margin-left:auto;"></span>
+                      <span class="mo-sk" style="width:52px; height:10px; margin:8px 0 0 auto;"></span>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div class="mo-two" style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px;">
+              <div>
+                <p style="margin:0 0 14px; font:800 10.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.2em; color:var(--dim);">빈 상태</p>
+                <div style="padding:40px 26px; border-radius:16px; border:1px dashed var(--line2); text-align:center;">
+                  <span style="display:flex; align-items:center; justify-content:center; width:48px; height:48px; margin:0 auto 16px; border-radius:14px; background:var(--acc-soft);">
+                    <span style="width:16px; height:16px; border:2.5px solid var(--acc); border-radius:5px;"></span>
+                  </span>
+                  <h3 style="margin:0 0 8px; font:900 19px 'Pretendard Variable',sans-serif; letter-spacing:-.04em; color:var(--ink);">조건에 맞는 공고가 없습니다</h3>
+                  <p style="margin:0 auto 20px; max-width:24em; font:500 13px/1.7 'Pretendard Variable',sans-serif; color:var(--mut);">민간임대는 청년안심주택 등 수집을 준비 중입니다. 지역이나 유형을 넓혀 보세요.</p>
+                  <span class="mo-btn" onClick="{{ resetFilters }}" style="display:inline-flex; align-items:center; height:42px; padding:0 18px; border-radius:12px; background:var(--ink); color:#fff; font:800 13px 'Pretendard Variable',sans-serif;">필터 초기화</span>
+                </div>
+              </div>
+              <div>
+                <p style="margin:0 0 14px; font:800 10.5px/1 'Pretendard Variable',sans-serif; letter-spacing:.2em; color:var(--dim);">404</p>
+                <div style="padding:40px 26px; border-radius:16px; border:1px solid var(--line); background:var(--sub); text-align:center;">
+                  <b style="display:block; margin-bottom:12px; font:900 52px/1 'Pretendard Variable',sans-serif; letter-spacing:-.07em; color:var(--acc);">404</b>
+                  <h3 style="margin:0 0 8px; font:900 19px 'Pretendard Variable',sans-serif; letter-spacing:-.04em; color:var(--ink);">공고를 찾을 수 없습니다</h3>
+                  <p style="margin:0 auto 20px; max-width:24em; font:500 13px/1.7 'Pretendard Variable',sans-serif; color:var(--mut);">마감된 공고도 삭제하지 않습니다. 주소가 바뀌었거나 아직 발행되지 않은 페이지일 수 있습니다.</p>
+                  <span class="mo-btn" onClick="{{ goList }}" style="display:inline-flex; align-items:center; height:42px; padding:0 18px; border-radius:12px; border:1px solid var(--line2); color:var(--mut); font:800 13px 'Pretendard Variable',sans-serif;">공고 목록으로</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <footer style="padding:20px 18px 26px; border-top:1px solid var(--line); background:var(--sub); font:500 11.5px/1.8 'Pretendard Variable',sans-serif; color:var(--dim);">
+        출처: 국토교통부 마이홈포털 공공주택 모집공고 조회 서비스 · 서울주거포털 SH 공고 목록. 보증금·임대료는 공고에 기재된 최소값입니다.
+      </footer>
+    </div>
+  </div>
+
+  <div style="position:fixed; z-index:50; left:50%; bottom:26px; transform:translate(-50%,{{ toastY }}); opacity:{{ toastOp }}; transition:transform 360ms var(--sp), opacity 240ms var(--ease); pointer-events:none;">
+    <span style="display:inline-flex; align-items:center; gap:10px; height:46px; padding:0 20px; border-radius:14px; background:#0f1216; color:#fff; font:800 13px 'Pretendard Variable',sans-serif; box-shadow:0 20px 40px -18px rgba(0,0,0,.8);">
+      <span style="width:7px; height:7px; border-radius:50%; background:#5ee6a8;"></span>{{ toastText }}
+    </span>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = {
+    screen: "map", sector: "전체", urgentOnly: false, sort: "deadline",
+    shown: 5, loading: false, gen: 0,
+    saved: {}, popped: null, focus: null, openId: 1,
+    counts: { total: 0, seoul: 0, urgent: 0, rent: 0 },
+    toast: null,
+  };
+
+  DATA = [
+    { id: 1, depositWon: 231000000, rentWon: null, dday: 4, kind: "마감", title: "제51차 장기전세주택 입주자 모집공고", meta: "SH · 서울 송파 · 장기전세주택", agency: "SH 서울주택도시공사", region: "서울특별시 송파구", type: "장기전세주택", money: "2억 3,100만", moneyLabel: "보증금", qty: "1,381호", period: "09.07–09.12", announce: "10.23", deadline: "2026.09.12 (토)", posted: "26.08.31 공고", address: "서울특별시 송파구 위례성대로 100", sector: "공공임대", postedNum: 20260831, pin: 0 },
+    { id: 2, depositWon: 43200000, rentWon: 240000, dday: 3, kind: "마감", title: "고양창릉 A-3BL 행복주택 예비입주자 모집공고", meta: "LH · 경기 고양 · 행복주택", agency: "LH 한국토지주택공사", region: "경기도 고양시", type: "행복주택", money: "월 24만", moneyLabel: "월임대료", qty: "218호", period: "09.04–09.11", announce: "10.16", deadline: "2026.09.11 (금)", posted: "26.09.01 공고", address: "경기도 고양시 덕양구 창릉동", sector: "공공임대", postedNum: 20260901, pin: 6 },
+    { id: 3, depositWon: 41800000, rentWon: 178000, dday: 6, kind: "마감", title: "화성동탄2 A-72BL 국민임대주택 입주자 모집공고", meta: "LH · 경기 화성 · 국민임대", agency: "LH 한국토지주택공사", region: "경기도 화성시", type: "국민임대", money: "월 17.8만", moneyLabel: "월임대료", qty: "96호", period: "09.02–09.14", announce: "10.20", deadline: "2026.09.14 (월)", posted: "26.08.28 공고", address: "경기도 화성시 동탄2신도시", sector: "공공임대", postedNum: 20260828, pin: 3 },
+    { id: 4, depositWon: 32000000, rentWon: 210000, dday: 9, kind: "마감", title: "2026년 2차 행복주택 입주자 모집공고", meta: "SH · 서울 강남 · 행복주택", agency: "SH 서울주택도시공사", region: "서울특별시 강남구", type: "행복주택", money: "월 21만", moneyLabel: "월임대료", qty: "44호", period: "09.01–09.17", announce: "10.28", deadline: "2026.09.17 (목)", posted: "26.08.28 공고", address: "서울특별시 강남구 자곡로", sector: "공공임대", postedNum: 20260828, pin: 1 },
+    { id: 5, depositWon: 96000000, rentWon: 380000, dday: 5, kind: "접수 시작", title: "신림역 청년안심주택 임차인 모집공고", meta: "민간사업자 · 서울 관악 · 청년안심주택", agency: "민간사업자", region: "서울특별시 관악구", type: "청년안심주택", money: "월 38만", moneyLabel: "월임대료", qty: "120호", period: "09.13–09.26", announce: "11.06", deadline: "2026.09.26 (토)", posted: "26.09.03 공고", address: "서울특별시 관악구 신림로", sector: "민간임대", postedNum: 20260903, pin: 2 },
+    { id: 6, depositWon: 27600000, rentWon: 190000, dday: 17, kind: "마감", title: "용인언남 A-2BL 행복주택 입주자 모집공고", meta: "LH · 경기 용인 · 행복주택", agency: "LH 한국토지주택공사", region: "경기도 용인시", type: "행복주택", money: "월 19만", moneyLabel: "월임대료", qty: "130호", period: "08.29–09.25", announce: "10.30", deadline: "2026.09.25 (금)", posted: "26.08.25 공고", address: "경기도 용인시 기흥구 언남동", sector: "공공임대", postedNum: 20260825, pin: 7 },
+    { id: 7, depositWon: 18600000, rentWon: 142000, dday: 21, kind: "마감", title: "2026년 영구임대주택 예비입주자 모집공고", meta: "iH · 인천 미추홀 · 영구임대", agency: "iH 인천도시공사", region: "인천광역시 미추홀구", type: "영구임대", money: "월 14.2만", moneyLabel: "월임대료", qty: "32호", period: "08.31–09.29", announce: "11.13", deadline: "2026.09.29 (화)", posted: "26.08.24 공고", address: "인천광역시 미추홀구 주흥길", sector: "공공임대", postedNum: 20260824, pin: 4 },
+    { id: 8, depositWon: 114000000, rentWon: null, dday: 12, kind: "마감", title: "성남수정 기존주택 전세임대 입주자 모집공고", meta: "GH · 경기 성남 · 전세임대", agency: "경기주택도시공사", region: "경기도 성남시", type: "전세임대", money: "1억 1,400만", moneyLabel: "지원한도", qty: "60호", period: "09.03–09.20", announce: "10.31", deadline: "2026.09.20 (일)", posted: "26.09.02 공고", address: "경기도 성남시 수정구", sector: "공공임대", postedNum: 20260902, pin: 5 },
+  ];
+
+  componentDidMount() {
+    // 경과 시간 기준으로 보간하고, 끝에서는 반드시 실제 값으로 스냅한다(탭이 백그라운드여도 숫자가 틀리지 않게)
+    const targets = { total: 182, seoul: 68, urgent: 11, rent: 194 };
+    const t0 = performance.now();
+    const DUR = 800;
+    const snap = () => { clearInterval(this._count); this.setState({ counts: { ...targets } }); };
+    this._count = setInterval(() => {
+      const p = Math.min(1, (performance.now() - t0) / DUR);
+      if (p >= 1) return snap();
+      const e = 1 - Math.pow(1 - p, 3);
+      const c = {};
+      for (const k in targets) c[k] = Math.round(targets[k] * e);
+      this.setState({ counts: c });
+    }, 30);
+    this._countGuard = setTimeout(snap, DUR + 250);
+  }
+
+  componentWillUnmount() {
+    [this._ld, this._toast, this._pop, this._countGuard].forEach(clearTimeout);
+    clearInterval(this._count);
+  }
+
+  // gen 이 바뀌면 CSS 애니메이션 이름이 바뀌어 등장 모션이 다시 돈다 (타이머 의존 없음)
+  restage(patch) {
+    this.setState({ ...patch, gen: this.state.gen + 1 });
+  }
+
+  goScreen(screen, patch) {
+    this.setState({ ...(patch || {}), screen, gen: this.state.gen + 1 });
+  }
+
+  focusPin(i) {
+    document.querySelectorAll(".zg-pin").forEach((el, idx) => el.classList.toggle("is-focus", idx === i));
+  }
+
+  showToast(text) {
+    this.setState({ toast: text });
+    clearTimeout(this._toast);
+    this._toast = setTimeout(() => this.setState({ toast: null }), 2100);
+  }
+
+  toggleSave(n) {
+    const saved = { ...this.state.saved, [n.id]: !this.state.saved[n.id] };
+    this.setState({ saved, popped: n.id });
+    clearTimeout(this._pop);
+    this._pop = setTimeout(() => this.setState({ popped: null }), 460);
+    this.showToast(saved[n.id] ? "저장했습니다 · 마감 하루 전 알림" : "저장을 해제했습니다");
+  }
+
+  loadMore(total) {
+    if (this.state.loading || this.state.shown >= total) return;
+    this.setState({ loading: true });
+    clearTimeout(this._ld);
+    this._ld = setTimeout(() => this.setState({ loading: false, shown: Math.min(total, this.state.shown + 3) }), 700);
+  }
+
+  won(v) {
+    return v == null ? "—" : `${v.toLocaleString("ko-KR")}원`;
+  }
+
+  // 표는 열린 공고의 값에서만 만든다. 납부 구성(계약금·잔금)은 전세형(월임대료 없음)에만 있다.
+  priceRows(d) {
+    const rows = [{ kind: "기본 (공고 최소값)", deposit: this.won(d.depositWon), rent: this.won(d.rentWon) }];
+    if (d.rentWon == null && d.depositWon != null) {
+      rows.push({ kind: "납부 구성 · 계약금 (10%)", deposit: this.won(Math.round(d.depositWon * 0.1)), rent: "—" });
+      rows.push({ kind: "납부 구성 · 잔금 (90%)", deposit: this.won(Math.round(d.depositWon * 0.9)), rent: "—" });
+    }
+    return rows;
+  }
+
+  tone(d) {
+    if (d <= 4) return { bg: "var(--hot-soft)", ink: "var(--hot)" };
+    if (d <= 7) return { bg: "var(--warn-soft)", ink: "var(--warn)" };
+    return { bg: "var(--sub)", ink: "var(--mut)" };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const listMode = s.screen === "list";
+    let list = this.DATA.filter((n) => (s.sector === "전체" || n.sector === s.sector) && (!s.urgentOnly || n.dday <= 7));
+    list = list.slice().sort((a, b) => (s.sort === "deadline" ? a.dday - b.dday : b.postedNum - a.postedNum));
+    const cap = listMode ? Math.max(s.shown, 6) : s.shown;
+    const visible = list.slice(0, cap);
+    // 칩 숫자는 서비스 전체 집계(KPI와 같은 기준). 아래 행은 그중 표본이다.
+    const counts = { 전체: 182, 공공임대: 176, 민간임대: 6, 임박: 11 };
+    const chip = (label, active, onClick, count) => ({
+      label, count, onClick,
+      bg: active ? "var(--ink)" : "#fff",
+      border: active ? "var(--ink)" : "var(--line2)",
+      ink: active ? "#fff" : "var(--mut)",
+      // 반투명으로 흐리면 흰 칩에서 대비가 3.2:1로 떨어진다 — 색으로 구분한다
+      countInk: active ? "rgba(255,255,255,.78)" : "var(--dim)",
+    });
+    const screenBtn = (key, label) => ({
+      label,
+      bg: s.screen === key ? "#2a2f38" : "transparent",
+      ink: s.screen === key ? "#fff" : "#6f7783",
+      onClick: () => this.goScreen(key),
+    });
+    const d = this.DATA.find((n) => n.id === s.openId) || this.DATA[0];
+    const dTone = this.tone(d.dday);
+    const dSaved = !!s.saved[d.id];
+    const on = { bg: "var(--acc-soft)", border: "var(--acc)", labelInk: "var(--acc)", valueInk: "var(--ink)" };
+    const off = { bg: "#fff", border: "var(--line)", labelInk: "var(--dim)", valueInk: "var(--mut)" };
+
+    return {
+      screens: [screenBtn("map", "지도 탐색"), screenBtn("list", "공고 목록"), screenBtn("detail", "공고 상세"), screenBtn("state", "빈 상태·로딩·404")],
+      isMap: s.screen === "map", isList: listMode, isDetail: s.screen === "detail", isState: s.screen === "state",
+      stageAnim: s.gen % 2 ? "mo-stage-b" : "mo-stage-a",
+      kpis: [
+        { k: "전체 공고", v: s.counts.total, unit: "건", color: "var(--ink)" },
+        { k: "서울", v: s.counts.seoul, unit: "건", color: "var(--ink)" },
+        { k: "7일 내 마감", v: s.counts.urgent, unit: "건", color: "var(--hot)" },
+        { k: "중위 월임대료", v: (s.counts.rent / 10).toFixed(1), unit: "만 원", color: "var(--acc)" },
+      ],
+      chips: [
+        chip("전체", s.sector === "전체" && !s.urgentOnly, () => this.restage({ sector: "전체", urgentOnly: false, shown: 5 }), counts.전체),
+        chip("공공임대", s.sector === "공공임대", () => this.restage({ sector: "공공임대", urgentOnly: false, shown: 5 }), counts.공공임대),
+        chip("민간임대", s.sector === "민간임대", () => this.restage({ sector: "민간임대", urgentOnly: false, shown: 5 }), counts.민간임대),
+        chip("마감 7일 내", s.urgentOnly, () => this.restage({ urgentOnly: !s.urgentOnly, sector: "전체", shown: 5 }), counts.임박),
+      ],
+      sortShift: s.sort === "deadline" ? "0%" : "100%",
+      sortAInk: s.sort === "deadline" ? "var(--ink)" : "var(--dim)",
+      sortBInk: s.sort === "posted" ? "var(--ink)" : "var(--dim)",
+      sortDeadline: () => this.restage({ sort: "deadline" }),
+      sortPosted: () => this.restage({ sort: "posted" }),
+      rows: visible.map((n, i) => {
+        const t = this.tone(n.dday);
+        const saved = !!s.saved[n.id];
+        return {
+          ...n,
+          ddayNum: `D-${n.dday}`, ddayUnit: n.kind,
+          chipBg: t.bg, chipInk: t.ink,
+          anim: s.gen % 2 ? "mo-in-b" : "mo-in-a",
+          delay: `${i * 40}ms`,
+          saveIcon: saved ? "★" : "☆",
+          saveBg: saved ? "var(--acc-soft)" : "var(--sub)",
+          saveInk: saved ? "var(--acc)" : "var(--dim)",
+          saveCls: s.popped === n.id ? "mo-save mo-pop" : "mo-save",
+          onSave: (e) => { e.preventDefault(); e.stopPropagation(); this.toggleSave(n); },
+          onOpen: (e) => { e.preventDefault(); this.goScreen("detail", { openId: n.id }); },
+          onEnter: () => { this.focusPin(n.pin); this.setState({ focus: n }); },
+          onLeave: () => { this.focusPin(-1); this.setState({ focus: null }); },
+        };
+      }),
+      loading: s.loading,
+      skels: [1, 2, 3],
+      shown: visible.length,
+      total: 182,
+      loadLabel: s.shown >= list.length ? "모두 표시했습니다" : s.loading ? "불러오는 중…" : "더 보기 +3",
+      loadMore: () => this.loadMore(list.length),
+      focusLabel: s.focus ? "선택한 공고" : "이 화면 안 공고",
+      focusValue: s.focus ? s.focus.money : `${list.length}건`,
+      goMap: () => this.goScreen("map"),
+      goList: () => this.goScreen("list"),
+      resetFilters: () => this.goScreen("list", { sector: "전체", urgentOnly: false, shown: 6 }),
+      detail: {
+        ...d,
+        ddayNum: `D-${d.dday}`, ddayUnit: d.kind, ddayLabel: `D-${d.dday} ${d.kind}`,
+        chipBg: dTone.bg, chipInk: dTone.ink,
+        saveIcon: dSaved ? "★" : "☆",
+        saveBg: dSaved ? "var(--acc-soft)" : "#fff",
+        saveInk: dSaved ? "var(--acc)" : "var(--mut)",
+        saveCls: s.popped === d.id ? "mo-btn mo-pop" : "mo-btn",
+        onSave: (e) => { e.preventDefault(); this.toggleSave(d); },
+      },
+      steps: [
+        { label: "공고일", value: d.posted.replace(" 공고", ""), ...off },
+        { label: "접수 시작", value: `2026.${d.period.split("–")[0]}`, ...off },
+        { label: "접수 마감", value: d.deadline, ...on },
+        { label: "당첨자 발표", value: `2026.${d.announce}`, ...off },
+      ],
+      priceRows: this.priceRows(d),
+      specs: [
+        { k: "공급기관", v: d.agency },
+        { k: "공급유형", v: d.type },
+        { k: "지역", v: d.region },
+        { k: "공급호수", v: d.qty },
+        { k: "접수", v: d.period },
+        { k: "문의처", v: "1600-3456" },
+      ],
+      toastText: s.toast || "",
+      toastY: s.toast ? "0px" : "16px",
+      toastOp: s.toast ? 1 : 0,
+      pinsJson: JSON.stringify([
+        { lat: 37.5145, lng: 127.106, label: "2억 3,100만", sub: "D-4", hot: true },
+        { lat: 37.4979, lng: 127.0276, label: "월 21만", sub: "D-9" },
+        { lat: 37.4783, lng: 126.9516, label: "월 38만", sub: "접수전" },
+        { lat: 37.2003, lng: 127.0733, label: "월 17.8만", sub: "D-6" },
+        { lat: 37.4634, lng: 126.65, label: "월 14.2만", sub: "D-21" },
+        { lat: 37.42, lng: 127.1265, label: "1억 1,400만", sub: "D-12" },
+        { lat: 37.6584, lng: 126.832, label: "월 24만", sub: "D-3", hot: true },
+        { lat: 37.3219, lng: 127.1266, label: "월 19만", sub: "D-17" },
+      ]),
+      detailPinJson: JSON.stringify([{ lat: 37.5145, lng: 127.106, label: d.money, sub: d.qty, hot: true }]),
+    };
+  }
+}
+
+</script>
+</body>
+</html>

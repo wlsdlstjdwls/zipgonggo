@@ -4,14 +4,14 @@ import { notFound } from "next/navigation";
 import { ComplexExplorer } from "@/components/complex-explorer";
 import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
+import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
-import { StatusBadge } from "@/components/status-badge";
 import { agencyLabels } from "@/lib/agency";
-import { count, dateK, daysUntil, ddayBadge, num, won, wonExact } from "@/lib/format";
+import { count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonExact } from "@/lib/format";
 import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
-import type { NoticeListItem } from "@/types/notice";
+import type { Notice, NoticeListItem } from "@/types/notice";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
@@ -41,10 +41,29 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
   return (
     <li>
       <Link href={noticePath(n.slug)}>
-        <span className="chip amend">{label}</span> {n.title} <small style={{ color: "var(--muted)" }}>{dateK(n.posted_at)}</small>
+        <span className="chip amend">{label}</span> {n.title} <small>{dateK(n.posted_at)}</small>
       </Link>
     </li>
   );
+}
+
+// 보증금·임대료 표 — 열린 공고 데이터에서만 계산한다(하드코딩 금지, design/README.md).
+// 납부 구성은 DB 값(계약금·중도금·잔금)이 있으면 그대로, 없고 전세형(월임대료 없음)이면 10%/90% 가정치로 보여 준다.
+// 마이홈 API는 미기재를 0으로 주는 경우가 있어(실측 2026-09-08) 납부 구성은 0을 미기재로 본다.
+type PriceRow = { kind: string; deposit: string; rent: string };
+const pos = (v: number | null) => (v != null && v > 0 ? v : null);
+function priceRows(n: Notice): PriceRow[] {
+  const rows: PriceRow[] = [{ kind: "기본 (공고 최소값)", deposit: wonExact(n.min_deposit), rent: wonExact(n.min_rent) }];
+  const down = pos(n.min_down_payment), interim = pos(n.min_interim), balance = pos(n.min_balance);
+  if (down != null || interim != null || balance != null) {
+    if (down != null) rows.push({ kind: "납부 구성 · 계약금", deposit: wonExact(down), rent: "—" });
+    if (interim != null) rows.push({ kind: "납부 구성 · 중도금", deposit: wonExact(interim), rent: "—" });
+    if (balance != null) rows.push({ kind: "납부 구성 · 잔금", deposit: wonExact(balance), rent: "—" });
+  } else if (n.min_rent == null && n.min_deposit != null) {
+    rows.push({ kind: "납부 구성 · 계약금 (10% 가정)", deposit: wonExact(Math.round(n.min_deposit * 0.1)), rent: "—" });
+    rows.push({ kind: "납부 구성 · 잔금 (90% 가정)", deposit: wonExact(Math.round(n.min_deposit * 0.9)), rent: "—" });
+  }
+  return rows;
 }
 
 export default async function NoticePage({ params }: Params) {
@@ -55,155 +74,178 @@ export default async function NoticePage({ params }: Params) {
   // 매입임대 별첨(호실 단위)이면 호수·면적·금액 열을 더 보여준다
   const hasUnits = complexes.some((c) => c.unit_count != null);
   const unitTotal = complexes.reduce((a, c) => a + (c.unit_count ?? 0), 0);
-  const badge = ddayBadge(n.apply_start_at, n.apply_end_at, n.status);
+  const d = ddayChip(n);
+  const m = moneyOf(n);
   const L = agencyLabels(n);
   const showAreaTable = areas.length > 1 || (areas.length === 1 && areas[0].supply_count != null && !n.address);
-  const hasMoney = n.min_deposit != null || n.min_rent != null || n.min_down_payment != null || n.min_balance != null;
+  const hasMoney = n.min_deposit != null || n.min_rent != null || pos(n.min_down_payment) != null || pos(n.min_balance) != null;
+  const region = regionLabel(n) || "전국";
+  const period = n.apply_start_at || n.apply_end_at ? `${dateMD(n.apply_start_at)}–${dateMD(n.apply_end_at)}` : null;
+
+  const steps: { label: string; value: string | null; on?: boolean }[] = [
+    { label: "공고일", value: dateK(n.posted_at, true) },
+    { label: "접수 시작", value: n.apply_start_at ? dateK(n.apply_start_at, true) : null },
+    { label: "접수 마감", value: n.apply_end_at ? dateK(n.apply_end_at, true) : null, on: true },
+    { label: "당첨자 발표", value: n.announce_at ? dateK(n.announce_at, true) : null },
+  ];
 
   return (
-    <article>
-      {/* 헤더 — 벤치마크(공고지도3): 제목 + 상태 칩. 우리는 D-day와 원문 버튼을 더 올린다 */}
-      <header className="detail-head">
-        <div className="card-top">
-          <StatusBadge badge={badge} />
-          <span className="chip type">{n.housing_type}</span>
-          <span className={`chip sector ${n.sector === "민간임대" ? "private" : ""}`}>{n.sector}</span>
-          {n.house_type && <span className="chip">{n.house_type}</span>}
-          {n.source_status && n.source_status !== badge.label && <span className="chip">{n.source_status}</span>}
-        </div>
-        <h1>{n.title}</h1>
-        {n.min_deposit != null && (
-          <p className="deposit-lead">보증금 <b>{wonExact(n.min_deposit)}</b> <small style={{ color: "var(--muted)" }}>부터</small></p>
-        )}
-        <SpecList>
-          <Spec label="공급기관" value={n.agency} />
-          <Spec label="공급유형" value={n.housing_type} />
-          <Spec label="지역" value={regionLabel(n) || "전국"} />
-          <Spec label="단지명" value={n.complex_name} />
-          <Spec label="공급호수" value={n.supply_count != null ? num(n.supply_count, "호") : null} />
-          <Spec label="총세대수" value={n.total_household != null ? num(n.total_household, "세대") : null} />
-          <Spec label="주택유형" value={n.house_type} />
-          <Spec label="난방" value={n.heating} />
-          <Spec label="주소" value={n.address} wide />
-        </SpecList>
-        <div className="btn-row">
-          <ExternalLink className="btn primary" href={n.source_url}>{L.original}</ExternalLink>
-          {n.portal_url && <ExternalLink className="btn" href={n.portal_url}>{L.portal}</ExternalLink>}
-        </div>
-      </header>
-
-      {(chain.original || chain.amendments.length > 0) && (
-        <section className="section">
-          <h2>정정 이력</h2>
-          <ul className="amend-list">
-            {chain.original && <AmendLink n={chain.original} label="원공고" />}
-            {chain.amendments.map((a) => <AmendLink key={a.id} n={a} label="정정공고" />)}
-          </ul>
-        </section>
-      )}
-
-      <section className="section">
-        <h2>접수 일정</h2>
-        <SpecList>
-          <Spec label="공고일" value={dateK(n.posted_at, true)} />
-          <Spec label="접수 시작" value={n.apply_start_at ? dateK(n.apply_start_at, true) : null} />
-          <Spec label="접수 마감" value={n.apply_end_at ? <>{dateK(n.apply_end_at, true)} <StatusBadge badge={badge} /></> : null} />
-          <Spec label="당첨자 발표" value={n.announce_at ? dateK(n.announce_at, true) : null} />
-          <Spec label="모집 상태" value={n.source_status} />
-        </SpecList>
-        {!n.apply_end_at && (
-          <p className="note">접수 기간은 {L.originalDoc}에서 확인하세요. 목록 데이터에 접수 일정이 없습니다.</p>
-        )}
-      </section>
-
-      {/* 금액 표 — 벤치마크(공고지도3)의 구분/보증금/임대료 3열. 호실 파싱 전엔 공고 최소값 1행 */}
-      <section className="section">
-        <h2>보증금·임대료</h2>
-        {hasMoney ? (
-          <table className="price-table">
-            <thead><tr><th>구분</th><th>보증금</th><th>월임대료</th></tr></thead>
-            <tbody>
-              <tr>
-                <td>기본 (공고 최소값)</td>
-                <td><b>{wonExact(n.min_deposit)}</b><small>{won(n.min_deposit)}</small></td>
-                <td><b>{wonExact(n.min_rent)}</b><small>{won(n.min_rent)}</small></td>
-              </tr>
-              {(n.min_down_payment != null || n.min_interim != null || n.min_balance != null) && (
-                <tr>
-                  <td>납부 구성</td>
-                  <td colSpan={2} style={{ textAlign: "left" }}>
-                    계약금 {wonExact(n.min_down_payment)} · 중도금 {wonExact(n.min_interim)} · 잔금 {wonExact(n.min_balance)}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        ) : (
-          <p className="note" style={{ marginTop: 0 }}>
-            이 공고는 목록 데이터에 금액이 없습니다. 호실·형별 보증금과 임대료는 원문 공고문의 표를 확인하세요.
-          </p>
-        )}
-        <p className="note">전세전환·월세전환 금액과 호실별 금액은 첨부 공고문 파싱 후 표로 제공됩니다.</p>
-      </section>
-
-      {complexes.length > 0 && (
-        <section className="section">
-          <h2>공급 단지 {count(complexes.length, "곳")}{hasUnits && ` · ${count(unitTotal, "호")}`}</h2>
-          <p className="note" style={{ marginTop: 0 }}>
-            {hasUnits
-              ? "첨부 공고문의 「주택목록」(호실 단위)을 단지별로 묶은 목록입니다. 보증금·월임대료는 단지 안 최소값이고, 호별 금액은 원문 표를 확인하세요."
-              : `첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.${newCount > 0 ? ` 이번 공고 신규 단지 ${newCount}곳.` : ""} 단지별 면적·호수·금액은 원문 표를 확인하세요.`}
-          </p>
-          <ComplexExplorer items={complexes} hasUnits={hasUnits} />
-        </section>
-      )}
-
-      {n.address ? (
-        <section className="section">
-          <h2>위치</h2>
-          <NaverMap address={n.address} title={n.complex_name ?? n.title} />
-          <p className="note">지도 위치는 주소 기준 근사치입니다. {n.address}</p>
-        </section>
-      ) : null}
-
-      {showAreaTable && areas.length > 0 && (
-        <section className="section">
-          <h2>{n.address ? "시군구별 공급호수" : "공급 지역"}</h2>
-          {!n.address && <p className="note" style={{ marginTop: 0, marginBottom: 8 }}>주택별 주소는 공고문 첨부에만 있습니다.</p>}
-          <table>
-            <thead><tr><th>시도</th><th>시군구</th><th className="num">공급호수</th></tr></thead>
-            <tbody>
-              {areas.map((a, i) => (
-                <tr key={i}>
-                  <td>{a.sido}</td>
-                  <td>{a.sigungu ?? <span style={{ color: "var(--muted)" }}>미지정</span>}</td>
-                  <td className="num">{num(a.supply_count, "호")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
-
-      <div className="notice-bar">
-        <span className="i">i</span>
-        <span>본 자료는 참고용입니다. 정확한 내용과 최종 조건은 {n.agency}의 공식 공고문을 반드시 확인하세요.</span>
+    <article className="stage">
+      <div className="crumb">
+        <Link href={ROUTES.home} className="back">← 지도</Link>
+        <span>공고 · {region} · {n.housing_type}</span>
       </div>
 
-      <section className="section">
-        <h2>원문·문의</h2>
-        <ul className="link-list">
-          <li><ExternalLink href={n.source_url}>📄 {L.originalListItem} ↗</ExternalLink></li>
-          {n.portal_url && <li><ExternalLink href={n.portal_url}>🔗 {L.portalListItem} ↗</ExternalLink></li>}
-        </ul>
-        <SpecList style={{ marginTop: 12 }}>
-          <Spec label="문의처" value={n.contact} />
-          <Spec label="공급기관" value={n.agency} />
-          <Spec label="갱신" value={`${n.updated_at} (${L.updatedVia})`} />
-        </SpecList>
-      </section>
+      <div className="detail">
+        <div className="detail-main">
+          <header className="d-head">
+            <div className="d-tags">
+              <span className={`tag ${d.tone}`}>{d.num} {d.unit}</span>
+              <span className="tag type">{n.housing_type}</span>
+              <span className="tag">{n.agency}</span>
+              {n.sector === "민간임대" && <span className="tag">{n.sector}</span>}
+              {n.house_type && <span className="tag">{n.house_type}</span>}
+              {n.amends_source_key && <span className="tag acc">정정공고</span>}
+            </div>
+            <h1 className="d-title">{n.title}</h1>
+            {m ? (
+              <>
+                <span className="jumbo-label">{m.label}</span>
+                <b className="jumbo">{m.main}</b>
+                <span className="jumbo-from">부터</span>
+                {m.sub && <span className="jumbo-sub">{m.sub} 부터 · 공고 최소값</span>}
+              </>
+            ) : (
+              <>
+                <span className="jumbo-label">보증금 · 임대료</span>
+                <span className="jumbo-sub" style={{ marginTop: 0 }}>목록 데이터에 금액이 없습니다. {L.originalDoc}의 표를 확인하세요.</span>
+              </>
+            )}
+          </header>
 
-      <Link href={ROUTES.home} className="back">← 공고 목록</Link>
+          {(chain.original || chain.amendments.length > 0) && (
+            <section className="dsec">
+              <h2>정정 이력</h2>
+              <ul className="amend-list">
+                {chain.original && <AmendLink n={chain.original} label="원공고" />}
+                {chain.amendments.map((a) => <AmendLink key={a.id} n={a} label="정정공고" />)}
+              </ul>
+            </section>
+          )}
+
+          <section className="dsec">
+            <h2>접수 일정</h2>
+            <div className="steps">
+              {steps.map((s) => (
+                <div key={s.label} className={`step${s.on && s.value ? " on" : ""}`}>
+                  <span>{s.label}</span>
+                  <b>{s.value ?? "—"}</b>
+                </div>
+              ))}
+            </div>
+            {n.source_status && <p className="note">모집 상태 {n.source_status}</p>}
+            {!n.apply_end_at && <p className="note">접수 기간은 {L.originalDoc}에서 확인하세요. 목록 데이터에 접수 일정이 없습니다.</p>}
+          </section>
+
+          <section className="dsec">
+            <h2>보증금 · 임대료</h2>
+            {hasMoney ? (
+              <div className="ptable" role="table" aria-label="보증금·임대료">
+                <div className="h" role="row"><span role="columnheader">구분</span><span role="columnheader" style={{ textAlign: "right" }}>보증금</span><span role="columnheader" style={{ textAlign: "right" }}>월임대료</span></div>
+                {priceRows(n).map((r) => (
+                  <div key={r.kind} role="row"><span className="k" role="cell">{r.kind}</span><span className="d" role="cell">{r.deposit}</span><span className="r" role="cell">{r.rent}</span></div>
+                ))}
+              </div>
+            ) : (
+              <p className="note" style={{ marginTop: 0 }}>이 공고는 목록 데이터에 금액이 없습니다. 호실·형별 보증금과 임대료는 원문 공고문의 표를 확인하세요.</p>
+            )}
+            <p className="note">전세전환·월세전환 금액과 호실별 금액은 첨부 공고문 파싱 후 표로 제공됩니다.</p>
+          </section>
+
+          {complexes.length > 0 && (
+            <section className="dsec">
+              <h2>공급 단지 {count(complexes.length, "곳")}{hasUnits && ` · ${count(unitTotal, "호")}`}</h2>
+              <p className="note" style={{ margin: "0 0 12px" }}>
+                {hasUnits
+                  ? "첨부 공고문의 「주택목록」(호실 단위)을 단지별로 묶은 목록입니다. 보증금·월임대료는 단지 안 최소값이고, 호별 금액은 원문 표를 확인하세요."
+                  : `첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.${newCount > 0 ? ` 이번 공고 신규 단지 ${newCount}곳.` : ""} 단지별 면적·호수·금액은 원문 표를 확인하세요.`}
+              </p>
+              <ComplexExplorer items={complexes} hasUnits={hasUnits} />
+            </section>
+          )}
+
+          {n.address && (
+            <section className="dsec">
+              <h2>위치</h2>
+              <div className="d-map"><NaverMap address={n.address} title={n.complex_name ?? n.title} /></div>
+              <p className="note">지도 위치는 주소 기준 근사치입니다. {n.address}</p>
+            </section>
+          )}
+
+          {showAreaTable && areas.length > 0 && (
+            <section className="dsec">
+              <h2>{n.address ? "시군구별 공급호수" : "공급 지역"}</h2>
+              {!n.address && <p className="note" style={{ margin: "0 0 12px" }}>주택별 주소는 공고문 첨부에만 있습니다.</p>}
+              <div className="tbl">
+                <table>
+                  <thead><tr><th>시도</th><th>시군구</th><th className="num">공급호수</th></tr></thead>
+                  <tbody>
+                    {areas.map((a, i) => (
+                      <tr key={i}>
+                        <td>{a.sido}</td>
+                        <td>{a.sigungu ?? <span style={{ color: "var(--dim)" }}>미지정</span>}</td>
+                        <td className="num">{num(a.supply_count, "호")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          <section className="dsec">
+            <h2>원문 · 문의</h2>
+            <ul className="link-list">
+              <li><ExternalLink href={n.source_url}>{L.originalListItem} ↗</ExternalLink></li>
+              {n.portal_url && <li><ExternalLink href={n.portal_url}>{L.portalListItem} ↗</ExternalLink></li>}
+            </ul>
+            <SpecList style={{ marginTop: 14 }}>
+              <Spec label="문의처" value={n.contact} />
+              <Spec label="단지명" value={n.complex_name} />
+              <Spec label="총세대수" value={n.total_household != null ? num(n.total_household, "세대") : null} />
+              <Spec label="난방" value={n.heating} />
+              <Spec label="주소" value={n.address} wide />
+            </SpecList>
+            <div className="notice-bar" style={{ margin: "16px 0 0" }}>
+              <span className="i">i</span>
+              <span>본 자료는 참고용입니다. 정확한 내용과 최종 조건은 {n.agency}의 공식 공고문을 반드시 확인하세요.</span>
+            </div>
+          </section>
+        </div>
+
+        <aside className="aside">
+          <div className="aside-in">
+            <div className={`dcard tone-${d.tone}`}>
+              <span>{d.days === null || d.days < 0 ? "접수" : `${d.unit}까지`}</span>
+              <b>{d.num}</b>
+              <p>{n.apply_end_at ? `${dateK(n.apply_end_at, true)} ${d.days !== null && d.days < 0 ? "마감됨" : "마감"}` : (n.source_status ?? "일정 미정")}</p>
+            </div>
+            <ExternalLink className="btn acc lg" href={n.source_url}>{L.original}</ExternalLink>
+            {n.portal_url && <ExternalLink className="btn lg" href={n.portal_url}>{L.portal}</ExternalLink>}
+            <SaveButton id={n.id} variant="panel" />
+            <div className="specs">
+              <span className="t">공고 제원</span>
+              <div className="r"><span>공급기관</span><b>{n.agency}</b></div>
+              <div className="r"><span>공급유형</span><b>{n.housing_type}</b></div>
+              <div className="r"><span>지역</span><b>{region}</b></div>
+              <div className="r"><span>공급호수</span><b>{n.supply_count != null ? num(n.supply_count, "호") : "—"}</b></div>
+              <div className="r"><span>접수</span><b>{period ?? "—"}</b></div>
+              <div className="r"><span>문의처</span><b>{n.contact ?? "—"}</b></div>
+              <span className="u">갱신 {n.updated_at} · {L.updatedVia}</span>
+            </div>
+          </div>
+        </aside>
+      </div>
     </article>
   );
 }

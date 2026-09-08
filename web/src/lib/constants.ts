@@ -4,10 +4,16 @@ export const SITE_NAME = "집공고";
 export const SITE_TITLE = `${SITE_NAME} — 공공임대 모집공고 지도`;
 export const SITE_DESCRIPTION = "LH·SH·지방공사 공공임대 입주자모집공고를 지역·단지 단위로 모아 보증금·임대료·마감일을 한눈에.";
 
-// 홈 히어로 — page.tsx와 loading.tsx가 같은 문구를 그린다(스트리밍 폴백이 본문과 어긋나면 안 됨)
-export const HERO_TITLE = "임대주택 모집공고 지도";
-export const HERO_LEAD = "LH·SH·지방공사 공고를 한곳에. 최신 공고순, 보증금·월임대료는 공고에 적힌 최소값입니다.";
-export const HERO_STAT_LABELS = ["전체", "서울 SH", "민간임대"] as const;
+// 홈 KPI 스트립 라벨 — page.tsx와 loading.tsx가 같은 순서로 그린다(스트리밍 폴백이 본문과 어긋나면 안 됨)
+export const KPI_LABELS = ["전체 공고", "서울", "7일 내 마감", "중위 월임대료"] as const;
+// 목록 뷰(?view=list) 히어로
+export const LIST_HERO_TITLE = "수백 페이지 표를 호실 단위로.";
+export const LIST_HERO_LEAD = "LH·SH·지방공사 공고를 한곳에 모읍니다. 보증금·월임대료는 공고에 적힌 최소값입니다.";
+// KPI 카운트업 길이(ms). 경과 시간 기준 보간, 끝에서 실제 값으로 스냅
+export const KPI_COUNT_MS = 800;
+// 저장(★) 목록 localStorage 키. 서버 저장 없음 — 사용자 식별이 생기면 옮긴다
+export const SAVED_STORAGE_KEY = "zipgonggo.saved.v1";
+export const TOAST_MS = 2100;
 
 // ISR·unstable_cache 갱신 주기. 파이프라인이 DB를 갱신해도 이 시간 안엔 반영된다
 export const REVALIDATE_SEC = 3600;
@@ -19,15 +25,14 @@ export const API_CACHE_CONTROL = `public, s-maxage=${REVALIDATE_SEC}, stale-whil
 export const PAGE_SIZE = 24;
 // 무한스크롤 sentinel이 뷰포트 아래 이만큼 접근하면 다음 페이지 요청 (smokespot admin/spots 패턴)
 export const FEED_ROOT_MARGIN = "320px 0px";
-// 추가 로드된 카드의 순차 페이드 지연(초). 한 배치(PAGE_SIZE) 안에서만 순환한다
-export const FEED_FADE_STEP_SEC = 0.03;
+// 행 등장 스태거(ms). 한 배치(PAGE_SIZE) 안에서만 순환한다
+export const ROW_STAGGER_MS = 40;
 
-// 스켈레톤 카드 수. 격번으로만 shimmer (fitin-app common_skeleton 원칙)
-export const SKELETON_CARD_COUNT = 6;
-export const SKELETON_DELAY_STEP_SEC = 0.12;
+// 스켈레톤 행 수 (design/README.md: 목록 골격 3행)
+export const SKELETON_ROW_COUNT = 3;
 
-// D-day 배지 임계값(일). 마감 3일 이내 urgent, 7일 이내 soon
-export const DDAY_URGENT_DAYS = 3;
+// D-day 칩 임계값(일). 마감 4일 이내 hot, 7일 이내 warn (design/README.md 확정값)
+export const DDAY_URGENT_DAYS = 4;
 export const DDAY_SOON_DAYS = 7;
 
 // 시도 통계 칩에 쓰는 SH 지역
