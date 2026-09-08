@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
+import { ROUTES } from "@/lib/routes";
+import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3100";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE),
-  title: { default: "집공고 — 공공임대 모집공고 지도", template: "%s | 집공고" },
-  description: "LH·SH·지방공사 공공임대 입주자모집공고를 지역·단지 단위로 모아 보증금·임대료·마감일을 한눈에.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: SITE_TITLE, template: `%s | ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -20,9 +21,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <header className="site-header">
           <div className="container">
-            <Link href="/" className="logo"><i aria-hidden="true" />집공고</Link>
+            <Link href={ROUTES.home} className="logo"><i aria-hidden="true" />{SITE_NAME}</Link>
             <nav>
-              <Link href="/">공고</Link>
+              <Link href={ROUTES.home}>공고</Link>
             </nav>
           </div>
         </header>

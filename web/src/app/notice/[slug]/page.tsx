@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
+import { Spec, SpecList } from "@/components/spec-list";
+import { StatusBadge } from "@/components/status-badge";
+import { agencyLabels } from "@/lib/agency";
 import { dateK, daysUntil, ddayBadge, num, won, wonExact } from "@/lib/format";
-import { getAmendChain, getNoticeAreas, getNoticeBySlug, type NoticeListItem } from "@/lib/queries";
+import { getAmendChain, getNoticeAreas, getNoticeBySlug } from "@/lib/queries";
+import { noticePath, ROUTES } from "@/lib/routes";
+import { regionLabel } from "@/lib/sido";
+import type { NoticeListItem } from "@/types/notice";
 
+// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
 
 type Params = { params: Promise<{ slug: string }> };
@@ -20,32 +28,21 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!n) return { title: "공고를 찾을 수 없습니다" };
   const d = daysUntil(n.apply_end_at);
   const dday = d === null ? "" : d < 0 ? "(마감)" : `(D-${d})`;
-  const region = [n.sido, n.sigungu].filter(Boolean).join(" ");
-  const supply = n.supply_count != null ? `${n.supply_count.toLocaleString("ko-KR")}호` : "";
+  const supply = n.supply_count != null ? num(n.supply_count, "호") : "";
   return {
     title: `${n.title} — ${n.housing_type} ${supply} 보증금·임대료·접수일정`.replace(/\s+/g, " "),
-    description: `${n.agency} ${n.title}. 접수 ${dateK(n.apply_start_at)}~${dateK(n.apply_end_at)}${dday}. ${region} ${supply}. 최소 보증금 ${won(n.min_deposit)}, 최소 월임대료 ${won(n.min_rent)}.`,
-    alternates: { canonical: `/notice/${encodeURIComponent(n.slug)}` },
+    description: `${n.agency} ${n.title}. 접수 ${dateK(n.apply_start_at)}~${dateK(n.apply_end_at)}${dday}. ${regionLabel(n)} ${supply}. 최소 보증금 ${won(n.min_deposit)}, 최소 월임대료 ${won(n.min_rent)}.`,
+    alternates: { canonical: noticePath(n.slug) },
   };
 }
 
 function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
   return (
     <li>
-      <Link href={`/notice/${encodeURIComponent(n.slug)}`}>
+      <Link href={noticePath(n.slug)}>
         <span className="chip amend">{label}</span> {n.title} <small style={{ color: "var(--muted)" }}>{dateK(n.posted_at)}</small>
       </Link>
     </li>
-  );
-}
-
-function Spec({ label, value, wide }: { label: string; value: React.ReactNode; wide?: boolean }) {
-  if (value === null || value === undefined || value === "" || value === "—") return null;
-  return (
-    <div className={wide ? "wide" : undefined}>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
   );
 }
 
@@ -54,17 +51,16 @@ export default async function NoticePage({ params }: Params) {
   if (!n) notFound();
   const [areas, chain] = await Promise.all([getNoticeAreas(n.id), getAmendChain(n)]);
   const badge = ddayBadge(n.apply_start_at, n.apply_end_at, n.status);
-  const region = [n.sido, n.sigungu].filter(Boolean).join(" ");
+  const L = agencyLabels(n);
   const showAreaTable = areas.length > 1 || (areas.length === 1 && areas[0].supply_count != null && !n.address);
   const hasMoney = n.min_deposit != null || n.min_rent != null || n.min_down_payment != null || n.min_balance != null;
-  const isSH = n.agency === "SH";
 
   return (
     <article>
       {/* 헤더 — 벤치마크(공고지도3): 제목 + 상태 칩. 우리는 D-day와 원문 버튼을 더 올린다 */}
       <header className="detail-head">
         <div className="card-top">
-          <span className={`badge ${badge.tone}`}>{badge.label}</span>
+          <StatusBadge badge={badge} />
           <span className="chip type">{n.housing_type}</span>
           <span className={`chip sector ${n.sector === "민간임대" ? "private" : ""}`}>{n.sector}</span>
           {n.house_type && <span className="chip">{n.house_type}</span>}
@@ -74,26 +70,20 @@ export default async function NoticePage({ params }: Params) {
         {n.min_deposit != null && (
           <p className="deposit-lead">보증금 <b>{wonExact(n.min_deposit)}</b> <small style={{ color: "var(--muted)" }}>부터</small></p>
         )}
-        <dl className="spec">
+        <SpecList>
           <Spec label="공급기관" value={n.agency} />
           <Spec label="공급유형" value={n.housing_type} />
-          <Spec label="지역" value={region || "전국"} />
+          <Spec label="지역" value={regionLabel(n) || "전국"} />
           <Spec label="단지명" value={n.complex_name} />
           <Spec label="공급호수" value={n.supply_count != null ? num(n.supply_count, "호") : null} />
           <Spec label="총세대수" value={n.total_household != null ? num(n.total_household, "세대") : null} />
           <Spec label="주택유형" value={n.house_type} />
           <Spec label="난방" value={n.heating} />
           <Spec label="주소" value={n.address} wide />
-        </dl>
+        </SpecList>
         <div className="btn-row">
-          <a className="btn primary" href={n.source_url} target="_blank" rel="noopener noreferrer">
-            {isSH ? "SH 원문 공고·첨부 보기 ↗" : "기관 원문 공고 보기 ↗"}
-          </a>
-          {n.portal_url && (
-            <a className="btn" href={n.portal_url} target="_blank" rel="noopener noreferrer">
-              {isSH ? "서울주거포털 ↗" : "마이홈포털 ↗"}
-            </a>
-          )}
+          <ExternalLink className="btn primary" href={n.source_url}>{L.original}</ExternalLink>
+          {n.portal_url && <ExternalLink className="btn" href={n.portal_url}>{L.portal}</ExternalLink>}
         </div>
       </header>
 
@@ -109,15 +99,15 @@ export default async function NoticePage({ params }: Params) {
 
       <section className="section">
         <h2>접수 일정</h2>
-        <dl className="spec">
+        <SpecList>
           <Spec label="공고일" value={dateK(n.posted_at, true)} />
           <Spec label="접수 시작" value={n.apply_start_at ? dateK(n.apply_start_at, true) : null} />
-          <Spec label="접수 마감" value={n.apply_end_at ? <>{dateK(n.apply_end_at, true)} <span className={`badge ${badge.tone}`}>{badge.label}</span></> : null} />
+          <Spec label="접수 마감" value={n.apply_end_at ? <>{dateK(n.apply_end_at, true)} <StatusBadge badge={badge} /></> : null} />
           <Spec label="당첨자 발표" value={n.announce_at ? dateK(n.announce_at, true) : null} />
           <Spec label="모집 상태" value={n.source_status} />
-        </dl>
+        </SpecList>
         {!n.apply_end_at && (
-          <p className="note">접수 기간은 {isSH ? "SH 원문 공고문" : "기관 원문"}에서 확인하세요. 목록 데이터에 접수 일정이 없습니다.</p>
+          <p className="note">접수 기간은 {L.originalDoc}에서 확인하세요. 목록 데이터에 접수 일정이 없습니다.</p>
         )}
       </section>
 
@@ -186,17 +176,17 @@ export default async function NoticePage({ params }: Params) {
       <section className="section">
         <h2>원문·문의</h2>
         <ul className="link-list">
-          <li><a href={n.source_url} target="_blank" rel="noopener noreferrer">📄 {isSH ? "SH 공고 원문 (첨부파일 포함)" : "기관 원문 공고"} ↗</a></li>
-          {n.portal_url && <li><a href={n.portal_url} target="_blank" rel="noopener noreferrer">🔗 {isSH ? "서울주거포털 게시글" : "마이홈포털 상세"} ↗</a></li>}
+          <li><ExternalLink href={n.source_url}>📄 {L.originalListItem} ↗</ExternalLink></li>
+          {n.portal_url && <li><ExternalLink href={n.portal_url}>🔗 {L.portalListItem} ↗</ExternalLink></li>}
         </ul>
-        <dl className="spec" style={{ marginTop: 12 }}>
+        <SpecList style={{ marginTop: 12 }}>
           <Spec label="문의처" value={n.contact} />
           <Spec label="공급기관" value={n.agency} />
-          <Spec label="갱신" value={`${n.updated_at} (${isSH ? "서울주거포털" : "마이홈포털 API"})`} />
-        </dl>
+          <Spec label="갱신" value={`${n.updated_at} (${L.updatedVia})`} />
+        </SpecList>
       </section>
 
-      <Link href="/" className="back">← 공고 목록</Link>
+      <Link href={ROUTES.home} className="back">← 공고 목록</Link>
     </article>
   );
 }

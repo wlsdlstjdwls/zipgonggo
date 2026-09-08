@@ -6,8 +6,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NoticeCard } from "./notice-card";
-import { SkeletonCard } from "./skeleton";
-import type { NoticeListItem, NoticePage } from "@/lib/queries";
+import { SkeletonCards } from "./skeleton";
+import { FEED_FADE_STEP_SEC, FEED_ROOT_MARGIN, PAGE_SIZE } from "@/lib/constants";
+import { count } from "@/lib/format";
+import { apiNoticesPath } from "@/lib/routes";
+import type { NoticeListItem, NoticePage } from "@/types/notice";
 
 type Props = {
   initial: NoticePage;
@@ -40,9 +43,7 @@ export function NoticeFeed({ initial, params }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const u = new URLSearchParams(params);
-      u.set("cursor", cursor);
-      const res = await fetch(`/api/notices?${u.toString()}`, { headers: { accept: "application/json" } });
+      const res = await fetch(apiNoticesPath(params, cursor), { headers: { accept: "application/json" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const page = (await res.json()) as NoticePage;
       setItems((prev) => {
@@ -63,7 +64,7 @@ export function NoticeFeed({ initial, params }: Props) {
     if (!el || !cursor || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver(
       (entries) => { if (entries[0]?.isIntersecting) loadMore(); },
-      { rootMargin: "320px 0px" },
+      { rootMargin: FEED_ROOT_MARGIN },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -75,10 +76,10 @@ export function NoticeFeed({ initial, params }: Props) {
         {items.map((n, i) => {
           const fresh = i >= firstCount.current;
           // 같은 배치 안에서만 순차 지연. 배치 밖 인덱스는 0으로 돌려 첫 카드가 늦게 뜨지 않게 한다
-          const delay = fresh ? `${((i - firstCount.current) % 24) * 0.03}s` : undefined;
+          const delay = fresh ? `${((i - firstCount.current) % PAGE_SIZE) * FEED_FADE_STEP_SEC}s` : undefined;
           return <NoticeCard key={n.id} n={n} style={fresh ? { animation: `slide-up-fade 420ms var(--ease-out-emph) both`, animationDelay: delay } : undefined} />;
         })}
-        {loading && Array.from({ length: 6 }, (_, i) => <SkeletonCard key={`sk-${i}`} shimmer={i % 2 === 0} delay={(i >> 1) * 0.12} />)}
+        {loading && <SkeletonCards />}
       </ul>
 
       {error && (
@@ -93,7 +94,7 @@ export function NoticeFeed({ initial, params }: Props) {
           )}
         </div>
       ) : (
-        items.length > 0 && <p className="feed-status end">모든 공고를 다 봤습니다 · {items.length.toLocaleString("ko-KR")}건</p>
+        items.length > 0 && <p className="feed-status end">모든 공고를 다 봤습니다 · {count(items.length)}</p>
       )}
     </>
   );

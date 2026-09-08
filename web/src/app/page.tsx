@@ -1,71 +1,61 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Hero } from "@/components/hero";
 import { NoticeFeed } from "@/components/notice-feed";
-import { listFilterOptions, listNoticesPage, PAGE_SIZE, type NoticeSort, type Sector } from "@/lib/queries";
+import { PAGE_SIZE, SH_SIDO } from "@/lib/constants";
+import { count } from "@/lib/format";
+import { hasFilter, noticeFiltersToParams, parseNoticeFilters } from "@/lib/notice-filters";
+import { listFilterOptions, listNoticesPage } from "@/lib/queries";
+import { homePath, ROUTES } from "@/lib/routes";
+import { SECTORS, type Sector } from "@/types/notice";
 
+// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-  title: "공공임대·민간임대 모집공고 — 최신 공고순",
-  description: "LH·SH·지방공사 공공임대와 공공지원민간임대 입주자모집공고를 최신 공고순으로. 시도·공급유형별 보증금·월임대료·접수일정.",
-  alternates: { canonical: "/" },
-};
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-const SECTORS: Sector[] = ["공공임대", "민간임대"];
+const HOME_TITLE = "공공임대·민간임대 모집공고 — 최신 공고순";
+const HOME_DESCRIPTION = "LH·SH·지방공사 공공임대와 공공지원민간임대 입주자모집공고를 최신 공고순으로. 시도·공급유형별 보증금·월임대료·접수일정.";
 
-function pick(v: string | string[] | undefined): string | undefined {
-  const s = Array.isArray(v) ? v[0] : v;
-  return s?.trim() || undefined;
-}
-
-function qs(p: Record<string, string | undefined>): string {
-  const u = new URLSearchParams();
-  for (const [k, v] of Object.entries(p)) if (v) u.set(k, v);
-  const s = u.toString();
-  return s ? `/?${s}` : "/";
-}
-
-export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+// 필터 결과(?sector=&sido=&type=&sort=)는 noindex, canonical은 파라미터 없는 "/" — docs/url-structure.md
+export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
   const sp = await searchParams;
-  const sectorRaw = pick(sp.sector);
-  const sector = SECTORS.includes(sectorRaw as Sector) ? (sectorRaw as Sector) : undefined;
-  const sort: NoticeSort = pick(sp.sort) === "deadline" ? "deadline" : "posted";
-  const f = { sector, sido: pick(sp.sido), type: pick(sp.type) };
-  const sortQ = sort === "deadline" ? "deadline" : undefined; // 기본값(posted)은 URL에 안 적는다
-  const [page, options] = await Promise.all([listNoticesPage({ ...f, sort }, null, PAGE_SIZE), listFilterOptions(sector)]);
+  const f = parseNoticeFilters((k) => sp[k]);
+  return {
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+    alternates: { canonical: ROUTES.home },
+    robots: hasFilter(f) ? { index: false, follow: true } : undefined,
+  };
+}
+
+export default async function HomePage({ searchParams }: { searchParams: SearchParams }) {
+  const sp = await searchParams;
+  const f = parseNoticeFilters((k) => sp[k]);
+  const { sector, sort } = f;
+  const [page, options] = await Promise.all([listNoticesPage(f, null, PAGE_SIZE), listFilterOptions(sector)]);
   const total = options.sector.reduce((a, o) => a + o.count, 0);
   const countOf = (s: Sector) => options.sector.find((o) => o.value === s)?.count ?? 0;
+  const shCount = options.sido.find((o) => o.value === SH_SIDO)?.count ?? 0;
   const filtered = Boolean(f.sido || f.type);
-  const feedParams = new URLSearchParams();
-  if (sector) feedParams.set("sector", sector);
-  if (f.sido) feedParams.set("sido", f.sido);
-  if (f.type) feedParams.set("type", f.type);
-  if (sortQ) feedParams.set("sort", sortQ);
+  const feedParams = noticeFiltersToParams(f).toString();
 
   return (
     <>
-      <div className="hero">
-        <h1>임대주택 모집공고 지도</h1>
-        <p>LH·SH·지방공사 공고를 한곳에. 최신 공고순, 보증금·월임대료는 공고에 적힌 최소값입니다.</p>
-        <div className="stat">
-          <div><span>전체</span><b>{total.toLocaleString("ko-KR")}</b></div>
-          <div><span>서울 SH</span><b>{(options.sido.find((o) => o.value === "서울특별시")?.count ?? 0).toLocaleString("ko-KR")}</b></div>
-          <div><span>민간임대</span><b>{countOf("민간임대")}</b></div>
-        </div>
-      </div>
+      <Hero stats={[<b key="all">{count(total, "")}</b>, <b key="sh">{count(shCount, "")}</b>, <b key="private">{countOf("민간임대")}</b>]} />
 
       <nav className="tabs" aria-label="공공/민간 구분">
-        <Link href={qs({ sido: f.sido, type: f.type, sort: sortQ })} className={!sector ? "on" : ""}>전체 <small>{total}</small></Link>
+        <Link href={homePath({ ...f, sector: undefined })} className={!sector ? "on" : ""}>전체 <small>{total}</small></Link>
         {SECTORS.map((s) => (
-          <Link key={s} href={qs({ sector: s, sido: f.sido, type: f.type, sort: sortQ })} className={sector === s ? "on" : ""}>
+          <Link key={s} href={homePath({ ...f, sector: s })} className={sector === s ? "on" : ""}>
             {s} <small>{countOf(s)}</small>
           </Link>
         ))}
       </nav>
 
-      <form className="filters" method="get" action="/">
+      <form className="filters" method="get" action={ROUTES.home}>
         {sector && <input type="hidden" name="sector" value={sector} />}
-        {sortQ && <input type="hidden" name="sort" value={sortQ} />}
+        {sort === "deadline" && <input type="hidden" name="sort" value={sort} />}
         <select name="sido" defaultValue={f.sido ?? ""} aria-label="시도">
           <option value="">전체 지역</option>
           {options.sido.map((o) => (
@@ -79,14 +69,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           ))}
         </select>
         <button type="submit">적용</button>
-        {filtered && <Link className="reset" href={qs({ sector, sort: sortQ })}>초기화</Link>}
+        {filtered && <Link className="reset" href={homePath({ sector, sort })}>초기화</Link>}
       </form>
 
       <div className="result-row">
-        <p className="result-count">{page.total.toLocaleString("ko-KR")}건</p>
+        <p className="result-count">{count(page.total)}</p>
         <nav className="sort" aria-label="정렬">
-          <Link href={qs({ sector, sido: f.sido, type: f.type })} className={sort === "posted" ? "on" : ""} aria-current={sort === "posted" ? "true" : undefined}>최신 공고순</Link>
-          <Link href={qs({ sector, sido: f.sido, type: f.type, sort: "deadline" })} className={sort === "deadline" ? "on" : ""} aria-current={sort === "deadline" ? "true" : undefined}>마감 임박순</Link>
+          <Link href={homePath({ ...f, sort: "posted" })} className={sort === "posted" ? "on" : ""} aria-current={sort === "posted" ? "true" : undefined}>최신 공고순</Link>
+          <Link href={homePath({ ...f, sort: "deadline" })} className={sort === "deadline" ? "on" : ""} aria-current={sort === "deadline" ? "true" : undefined}>마감 임박순</Link>
         </nav>
       </div>
 
@@ -97,7 +87,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             : "조건에 맞는 공고가 없습니다."}
         </p>
       ) : (
-        <NoticeFeed key={feedParams.toString()} initial={page} params={feedParams.toString()} />
+        <NoticeFeed key={feedParams} initial={page} params={feedParams} />
       )}
     </>
   );

@@ -1,58 +1,13 @@
-// notice 조회. 컬럼명은 db/schema.sql 그대로.
+// notice 조회. 컬럼명은 db/schema.sql 그대로. 타입은 types/notice.ts.
 // 발행 상태(publish) 필터는 S8이 생기기 전까지 걸지 않는다 — 지금은 전부 'parsed'.
-// 목록·옵션은 unstable_cache로 1시간 캐시한다. 파이프라인이 DB를 갱신해도 1시간 안엔 반영된다(page.tsx revalidate와 동일).
+// 목록·옵션은 unstable_cache로 REVALIDATE_SEC 캐시한다. 파이프라인이 DB를 갱신해도 그 안엔 반영된다(page.tsx revalidate와 동일).
 import { unstable_cache } from "next/cache";
 import { query } from "./db";
+import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
+import { todayKST } from "./format";
+import type { FilterOption, Notice, NoticeArea, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, Sector } from "@/types/notice";
 
-export type NoticeStatus = "공고중" | "접수중" | "접수마감" | "정정공고중";
-export type Sector = "공공임대" | "민간임대";
-export type NoticeSort = "posted" | "deadline";
-
-export type NoticeListItem = {
-  id: number;
-  slug: string;
-  title: string;
-  agency: string;
-  housing_type: string;
-  sector: Sector;
-  house_type: string | null;
-  sido: string;
-  sigungu: string | null;
-  complex_name: string | null;
-  supply_count: number | null;
-  min_deposit: number | null;
-  min_rent: number | null;
-  posted_at: string;
-  apply_start_at: string | null;
-  apply_end_at: string | null;
-  announce_at: string | null;
-  status: NoticeStatus;
-  source_status: string | null;
-  amends_source_key: string | null;
-  source_url: string;
-};
-
-export type Notice = NoticeListItem & {
-  source_key: string | null;
-  address: string | null;
-  pnu: string | null;
-  heating: string | null;
-  total_household: number | null;
-  min_down_payment: number | null;
-  min_interim: number | null;
-  min_balance: number | null;
-  portal_url: string | null;
-  contact: string | null;
-  updated_at: string;
-};
-
-export type NoticeArea = { sido: string; sigungu: string | null; supply_count: number | null };
-
-export type NoticeFilters = { sido?: string; type?: string; sector?: Sector; sort?: NoticeSort };
-
-export type NoticePage = { items: NoticeListItem[]; nextCursor: string | null; total: number };
-
-export const PAGE_SIZE = 24;
+const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
 const LIST_COLS = `
   id, slug, title, agency, housing_type::text AS housing_type, sector::text AS sector, house_type, sido, sigungu, complex_name,
@@ -76,6 +31,10 @@ function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
   return where;
 }
 
+function whereSql(where: string[]): string {
+  return where.length ? "WHERE " + where.join(" AND ") : "";
+}
+
 // 마감 임박순 정렬키. 아직 안 지난 마감일 오름차순 → 마감 지난 것 → 마감일 없는 것.
 const DEADLINE_RANK = `CASE WHEN apply_end_at IS NULL THEN 2 WHEN apply_end_at >= CURRENT_DATE THEN 0 ELSE 1 END`;
 const DEADLINE_KEY = `CASE WHEN apply_end_at >= CURRENT_DATE THEN apply_end_at END`;
@@ -83,7 +42,7 @@ const DEADLINE_KEY = `CASE WHEN apply_end_at >= CURRENT_DATE THEN apply_end_at E
 // 커서: posted → "posted_at|id". deadline → "rank|apply_end_at|posted_at|id". 정렬키 전체를 담아야 같은 값이 겹쳐도 빠지지 않는다.
 function encodeCursor(n: NoticeListItem, sort: NoticeSort): string {
   if (sort === "posted") return `${n.posted_at}|${n.id}`;
-  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+  const today = todayKST();
   const rank = n.apply_end_at === null ? 2 : n.apply_end_at >= today ? 0 : 1;
   return `${rank}|${n.apply_end_at ?? ""}|${n.posted_at}|${n.id}`;
 }
@@ -95,7 +54,7 @@ async function listNoticesPageRaw(f: NoticeFilters, cursor: string | null, limit
   const params: unknown[] = [];
   const where = buildWhere(f, params);
   const countParams = [...params];
-  const countWhere = where.length ? "WHERE " + where.join(" AND ") : "";
+  const countWhere = whereSql(where);
 
   let order: string;
   if (sort === "posted") {
@@ -134,9 +93,8 @@ async function listNoticesPageRaw(f: NoticeFilters, cursor: string | null, limit
   }
 
   params.push(limit + 1);
-  const whereSql = where.length ? "WHERE " + where.join(" AND ") : "";
   const [rows, cnt] = await Promise.all([
-    query<NoticeListItem>(`SELECT ${LIST_COLS} FROM notice ${whereSql} ORDER BY ${order} LIMIT $${params.length}`, params),
+    query<NoticeListItem>(`SELECT ${LIST_COLS} FROM notice ${whereSql(where)} ORDER BY ${order} LIMIT $${params.length}`, params),
     query<{ c: number }>(`SELECT count(*)::int AS c FROM notice ${countWhere}`, countParams),
   ]);
   const hasMore = rows.length > limit;
@@ -144,21 +102,18 @@ async function listNoticesPageRaw(f: NoticeFilters, cursor: string | null, limit
   return { items, nextCursor: hasMore ? encodeCursor(items[items.length - 1], sort) : null, total: cnt[0]?.c ?? 0 };
 }
 
-/** 목록 1페이지. cursor는 이전 페이지의 nextCursor. 1시간 캐시. */
+/** 목록 1페이지. cursor는 이전 페이지의 nextCursor. */
 export const listNoticesPage = unstable_cache(
   (f: NoticeFilters, cursor: string | null = null, limit: number = PAGE_SIZE) => listNoticesPageRaw(f, cursor, limit),
   ["notice-page"],
-  { revalidate: 3600, tags: ["notice"] },
+  CACHE_OPTS,
 );
 
-export type FilterOption = { value: string; count: number };
-
-/** 탭·셀렉트 옵션. sector가 정해지면 그 안에서의 시도·유형 분포. 왕복 1회로 합친다. 1시간 캐시. */
+/** 탭·셀렉트 옵션. sector가 정해지면 그 안에서의 시도·유형 분포. 왕복 1회로 합친다. */
 export const listFilterOptions = unstable_cache(
   async (sector?: Sector): Promise<{ sector: FilterOption[]; sido: FilterOption[]; type: FilterOption[] }> => {
     const params: unknown[] = [];
-    const w = buildWhere({ sector }, params);
-    const where = w.length ? "WHERE " + w.join(" AND ") : "";
+    const where = whereSql(buildWhere({ sector }, params));
     const rows = await query<{ kind: string; value: string; count: number }>(
       `SELECT 'sector' AS kind, sector::text AS value, count(*)::int AS count FROM notice GROUP BY 2
        UNION ALL
@@ -172,7 +127,7 @@ export const listFilterOptions = unstable_cache(
     return { sector: pick("sector").sort((a, b) => a.value.localeCompare(b.value, "ko")), sido: pick("sido"), type: pick("type") };
   },
   ["notice-filter-options"],
-  { revalidate: 3600, tags: ["notice"] },
+  CACHE_OPTS,
 );
 
 export async function getNoticeBySlug(slug: string): Promise<Notice | null> {
@@ -209,7 +164,17 @@ export async function getAmendChain(n: Pick<Notice, "source_key" | "amends_sourc
   return { original: original[0] ?? null, amendments };
 }
 
-export async function listSlugs(limit = 1000): Promise<string[]> {
-  const rows = await query<{ slug: string }>(`SELECT slug FROM notice ORDER BY posted_at DESC LIMIT $1`, [limit]);
-  return rows.map((r) => r.slug);
-}
+export type SitemapNotice = { slug: string; updated_at: string; closed: boolean };
+
+/** 사이트맵용 전 공고. 마감 여부로 priority를 가른다. */
+export const listSitemapNotices = unstable_cache(
+  async (limit: number): Promise<SitemapNotice[]> =>
+    query<SitemapNotice>(
+      `SELECT slug, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
+              (status = '접수마감' OR (apply_end_at IS NOT NULL AND apply_end_at < CURRENT_DATE)) AS closed
+       FROM notice ORDER BY posted_at DESC, id DESC LIMIT $1`,
+      [limit],
+    ),
+  ["notice-sitemap"],
+  CACHE_OPTS,
+);

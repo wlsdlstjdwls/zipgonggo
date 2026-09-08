@@ -1,4 +1,7 @@
 // 표시용 포맷. 계산은 전부 KST 날짜 기준.
+import { DDAY_SOON_DAYS, DDAY_URGENT_DAYS } from "./constants";
+
+const KO = "ko-KR";
 
 export function todayKST(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }); // YYYY-MM-DD
@@ -17,7 +20,7 @@ export function daysUntil(ymd: string | null): number | null {
 
 export type DdayBadge = { label: string; tone: "urgent" | "soon" | "open" | "upcoming" | "closed" | "none" };
 
-/** 접수 일정 → 배지. 마감 3일 이내 urgent, 7일 이내 soon. */
+/** 접수 일정 → 배지. 마감 DDAY_URGENT_DAYS 이내 urgent, DDAY_SOON_DAYS 이내 soon. */
 export function ddayBadge(start: string | null, end: string | null, status?: string | null): DdayBadge {
   const toEnd = daysUntil(end);
   const toStart = daysUntil(start);
@@ -31,8 +34,8 @@ export function ddayBadge(start: string | null, end: string | null, status?: str
   if (toEnd < 0) return { label: "마감", tone: "closed" };
   if (toStart !== null && toStart > 0) return { label: `접수 D-${toStart}`, tone: "upcoming" };
   if (toEnd === 0) return { label: "오늘 마감", tone: "urgent" };
-  if (toEnd <= 3) return { label: `D-${toEnd}`, tone: "urgent" };
-  if (toEnd <= 7) return { label: `D-${toEnd}`, tone: "soon" };
+  if (toEnd <= DDAY_URGENT_DAYS) return { label: `D-${toEnd}`, tone: "urgent" };
+  if (toEnd <= DDAY_SOON_DAYS) return { label: `D-${toEnd}`, tone: "soon" };
   return { label: `D-${toEnd}`, tone: "open" };
 }
 
@@ -40,19 +43,18 @@ export function ddayBadge(start: string | null, end: string | null, status?: str
 export function won(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
   if (n === 0) return "0원";
-  if (n < 10_000) return `${n.toLocaleString("ko-KR")}원`;
+  if (n < 10_000) return `${n.toLocaleString(KO)}원`;
   const eok = Math.floor(n / 100_000_000);
   const man = Math.round((n % 100_000_000) / 10_000);
   const parts: string[] = [];
   if (eok) parts.push(`${eok}억`);
-  if (man) parts.push(`${man.toLocaleString("ko-KR")}만`);
+  if (man) parts.push(`${man.toLocaleString(KO)}만`);
   return parts.join(" ") + " 원";
 }
 
 /** 정확한 원 단위. 툴팁·표에 쓴다. */
 export function wonExact(n: number | null | undefined): string {
-  if (n === null || n === undefined) return "—";
-  return `${n.toLocaleString("ko-KR")}원`;
+  return num(n, "원");
 }
 
 /** 2026-09-07 → 2026.09.07 (일) */
@@ -64,7 +66,13 @@ export function dateK(ymd: string | null | undefined, withWeekday = false): stri
   return `${base} (${w})`;
 }
 
+/** 1234 → "1,234" (+단위). null은 "—". */
 export function num(n: number | null | undefined, unit = ""): string {
   if (n === null || n === undefined) return "—";
-  return `${n.toLocaleString("ko-KR")}${unit}`;
+  return `${n.toLocaleString(KO)}${unit}`;
+}
+
+/** 건수 표기 "1,234건". 0도 표시한다. */
+export function count(n: number, unit = "건"): string {
+  return `${n.toLocaleString(KO)}${unit}`;
 }

@@ -7,9 +7,7 @@
 
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
-
-const CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ?? "";
-const SDK = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${CLIENT_ID}&submodules=geocoder`;
+import { NAVER_MAP_CLIENT_ID, NAVER_MAP_DEFAULT_ZOOM, NAVER_MAP_GEOCODER_TIMEOUT_MS, NAVER_MAP_SDK_URL } from "@/lib/constants";
 
 type Props = { address: string; title: string };
 type State = "loading" | "ready" | "no-key" | "failed";
@@ -20,7 +18,7 @@ declare global {
 }
 
 // maps.js의 onReady 시점엔 서브모듈(maps-geocoder.js)이 아직 안 붙어 있을 수 있다. 붙을 때까지 기다린다.
-function waitForGeocoder(timeoutMs = 8000): Promise<any> {
+function waitForGeocoder(timeoutMs = NAVER_MAP_GEOCODER_TIMEOUT_MS): Promise<any> {
   return new Promise((resolve, reject) => {
     const started = Date.now();
     const tick = () => {
@@ -35,7 +33,7 @@ function waitForGeocoder(timeoutMs = 8000): Promise<any> {
 
 export function NaverMap({ address, title }: Props) {
   const el = useRef<HTMLDivElement>(null);
-  const [state, setState] = useState<State>(CLIENT_ID ? "loading" : "no-key");
+  const [state, setState] = useState<State>(NAVER_MAP_CLIENT_ID ? "loading" : "no-key");
   const [sdkReady, setSdkReady] = useState(false);
 
   useEffect(() => {
@@ -50,7 +48,7 @@ export function NaverMap({ address, title }: Props) {
           const item = res?.v2?.addresses?.[0];
           if (status !== maps.Service.Status.OK || !item || !el.current) { setState("failed"); return; }
           const pos = new maps.LatLng(Number(item.y), Number(item.x));
-          map = new maps.Map(el.current, { center: pos, zoom: 16, zoomControl: true, scaleControl: false, mapDataControl: false });
+          map = new maps.Map(el.current, { center: pos, zoom: NAVER_MAP_DEFAULT_ZOOM, zoomControl: true, scaleControl: false, mapDataControl: false });
           new maps.Marker({ position: pos, map, title });
           setState("ready");
         });
@@ -64,7 +62,7 @@ export function NaverMap({ address, title }: Props) {
 
   return (
     <>
-      <Script src={SDK} strategy="afterInteractive" onReady={() => setSdkReady(true)} onError={() => setState("failed")} />
+      <Script src={NAVER_MAP_SDK_URL} strategy="afterInteractive" onReady={() => setSdkReady(true)} onError={() => setState("failed")} />
       <div ref={el} className="map" role="img" aria-label={`${title} 위치 지도`} />
       {state === "loading" && <p className="map-fallback">지도를 불러오는 중…</p>}
     </>

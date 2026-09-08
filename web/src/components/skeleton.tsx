@@ -1,13 +1,15 @@
 // 스켈레톤. fitin-app common_skeleton의 "일부만 출렁이게" 원칙을 가져왔다 —
 // 카드 6장 중 격번으로만 shimmer를 주고 나머지는 정적 블록. 전부 출렁이면 거부감이 크다.
 // 높이는 실제 NoticeCard와 맞춰 레이아웃 시프트를 만들지 않는다 (globals.css .sk-card 참조).
+import type { CSSProperties } from "react";
+import { SKELETON_CARD_COUNT, SKELETON_DELAY_STEP_SEC } from "@/lib/constants";
 
-function Box({ w, h, r = 8, shimmer = true, style }: { w?: string | number; h: number; r?: number; shimmer?: boolean; style?: React.CSSProperties }) {
+export function Box({ w, h, r = 8, shimmer = true, style }: { w?: string | number; h: number; r?: number; shimmer?: boolean; style?: CSSProperties }) {
   return <span className={`sk${shimmer ? "" : " static"}`} style={{ width: w ?? "100%", height: h, borderRadius: r, ...style }} aria-hidden="true" />;
 }
 
 export function SkeletonCard({ shimmer = true, delay = 0 }: { shimmer?: boolean; delay?: number }) {
-  const s = { animationDelay: `${delay}s` } as React.CSSProperties;
+  const s = { animationDelay: `${delay}s` } as CSSProperties;
   return (
     <li className="card sk-card" aria-hidden="true">
       <div className="card-hero sk-hero">
@@ -35,12 +37,17 @@ export function SkeletonCard({ shimmer = true, delay = 0 }: { shimmer?: boolean;
   );
 }
 
-export function SkeletonGrid({ count = 6 }: { count?: number }) {
+/** 카드 N장. 격번 shimmer, 두 장씩 같은 지연. <ul> 안에서 쓴다 (NoticeFeed 로딩 꼬리·SkeletonGrid). */
+export function SkeletonCards({ count = SKELETON_CARD_COUNT, keyPrefix = "sk" }: { count?: number; keyPrefix?: string }) {
+  return Array.from({ length: count }, (_, i) => (
+    <SkeletonCard key={`${keyPrefix}-${i}`} shimmer={i % 2 === 0} delay={(i >> 1) * SKELETON_DELAY_STEP_SEC} />
+  ));
+}
+
+export function SkeletonGrid({ count = SKELETON_CARD_COUNT }: { count?: number }) {
   return (
     <ul className="card-grid" aria-busy="true" aria-label="공고를 불러오는 중">
-      {Array.from({ length: count }, (_, i) => (
-        <SkeletonCard key={i} shimmer={i % 2 === 0} delay={(i >> 1) * 0.12} />
-      ))}
+      <SkeletonCards count={count} />
     </ul>
   );
 }

@@ -1,6 +1,11 @@
 import Link from "next/link";
-import type { NoticeListItem } from "@/lib/queries";
-import { dateK, ddayBadge, won } from "@/lib/format";
+import type { CSSProperties } from "react";
+import type { NoticeListItem } from "@/types/notice";
+import { dateK, ddayBadge, num, won } from "@/lib/format";
+import { noticePath } from "@/lib/routes";
+import { regionShort } from "@/lib/sido";
+import { ExternalLink } from "./external-link";
+import { StatusBadge } from "./status-badge";
 
 // 벤치마크(docs/references/공고지도1.png) 카드 구조를 따르되 정보는 6개로 줄였다(2026-09-08 사용자 요청).
 //   지역 배지 · D-day · 헤드라인(금액) · 공고 제목 · 칩 3개(기관·유형·공고일) · 버튼 2개
@@ -16,19 +21,15 @@ function headline(n: NoticeListItem): { main: string; sub: string } {
   } else if (n.min_deposit != null) {
     main = `보증금 ${won(n.min_deposit)}~`;
   } else if (n.supply_count != null) {
-    main = `${n.supply_count.toLocaleString("ko-KR")}호 모집`;
+    main = `${num(n.supply_count)}호 모집`;
   } else {
     main = n.complex_name ?? n.housing_type;
   }
-  if (n.supply_count != null && !main.endsWith("호 모집")) sub.push(`${n.supply_count.toLocaleString("ko-KR")}호`);
+  if (n.supply_count != null && !main.endsWith("호 모집")) sub.push(num(n.supply_count, "호"));
   if (n.complex_name && main !== n.complex_name) sub.push(n.complex_name);
   // SH 목록처럼 금액·호수가 없는 공고: 유형이 헤드라인이므로 보조줄은 발표일 또는 안내문으로 채운다
   if (sub.length === 0) sub.push(n.announce_at ? `발표 ${dateK(n.announce_at)}` : "금액·호수는 원문 공고문 확인");
   return { main, sub: sub.join(" · ") };
-}
-
-function shortSido(s: string): string {
-  return s.replace(/(특별자치시|특별자치도|특별시|광역시|통합특별시)$/u, "").replace(/도$/u, "") || s;
 }
 
 /** 공고일 칩: 2026.08.31 → 26.08.31 공고 (벤치마크 표기) */
@@ -36,16 +37,16 @@ function postedChip(ymd: string): string {
   return `${dateK(ymd).slice(2)} 공고`;
 }
 
-export function NoticeCard({ n, style }: { n: NoticeListItem; style?: React.CSSProperties }) {
+export function NoticeCard({ n, style }: { n: NoticeListItem; style?: CSSProperties }) {
   const badge = ddayBadge(n.apply_start_at, n.apply_end_at, n.status);
-  const href = `/notice/${encodeURIComponent(n.slug)}`;
+  const href = noticePath(n.slug);
   const h = headline(n);
   return (
     <li className="card" style={style}>
       <div className={`card-hero ${n.sector === "민간임대" ? "private" : "public"}`}>
         <div className="card-hero-top">
-          <span className="region-badge">📍 {shortSido(n.sido)}{n.sigungu ? ` ${n.sigungu}` : ""}</span>
-          <span className={`badge ${badge.tone}`}>{badge.label}</span>
+          <span className="region-badge">📍 {regionShort(n)}</span>
+          <StatusBadge badge={badge} />
         </div>
         <p className="card-headline">{h.main}</p>
         <p className="card-headline-sub">{h.sub}</p>
@@ -60,7 +61,7 @@ export function NoticeCard({ n, style }: { n: NoticeListItem; style?: React.CSSP
         <h2 className="card-title"><Link href={href}>{n.title}</Link></h2>
         <div className="card-actions">
           <Link href={href} className="btn primary">상세</Link>
-          <a href={n.source_url} className="btn" target="_blank" rel="noopener noreferrer">원문 ↗</a>
+          <ExternalLink href={n.source_url} className="btn">원문 ↗</ExternalLink>
         </div>
       </div>
     </li>
