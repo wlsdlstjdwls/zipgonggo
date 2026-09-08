@@ -12,7 +12,7 @@
 - [x] 행안부 도로명주소 위치정보 요약DB 신청 접수 (business.juso.go.kr) — **2026-09-08 접수 완료**(「도로명주소 출입구 정보」). 승인 대기. 승인 소요일·다운로드 후 좌표계 확인은 미완
 - [x] 공고문 첨부 재가공·재배포 허용 범위 확인 (LH·SH 이용약관, robots.txt) — [판정](data-sources.md#6-약관저작권-판정)
 - [x] 도메인 등록 — **`zipgonggo.com` 등록 완료 (2026-09-08)**. `.kr`은 안 잡음(하나만 쓰기로 결정, 방어 등록 불필요). **2026-09-08 Vercel 프로덕션 배포·도메인 연결 완료** (`zipgonggo.com`, www→apex 301, Root Directory `web`). CLI 배포는 저장소 루트에서 `vercel --prod`
-- [ ] 네이버 Cloud 콘솔에서 Web Dynamic Map 실제 월 무료 한도 확인 — Client ID 발급됨(09-08). **한도 숫자는 아직 미확인**
+- [x] 네이버 Cloud 콘솔에서 월 무료 한도 확인 — **Geocoding 3,000,000회/월 (2026-09-08 사용자 확인)**. 단지 지도의 브라우저 실시간 지오코딩(공고당 ~140회)은 이 안에서 충분. Web Dynamic Map 로드 한도는 별도 미기록
 - [x] Neon 프로젝트 생성 + PostGIS 활성화 — 2026-09-08. Vercel 프로젝트 `zipgonggo` + Marketplace Neon(`zipgonggo-db`, ap-southeast-1, free_v3). PG 18.6 / PostGIS 3.6
 - [ ] LH에 첨부파일 수집 허용 여부 문의 → 회신 전까지 LH 호실 파서 착수 금지
 - [x] 서울시 공공저작물 관리책임관에게 사전 협의 — **완료 (2026-09-08, 사용자 확인)**
@@ -40,7 +40,7 @@
 
 **산출물**: 수집 스케줄러(S1·S2) · 좌표 조인(S6) · 4개 페이지 템플릿 · 사이트맵 · 지도 컴포넌트
 
-**진행 (2026-09-08)**: S1 수집기 ✅ (마이홈 API 185건 + SH 서울주거포털 79건) · `/` 목록 ✅ (공공/민간 탭, 카드 그리드, 최신 공고순 기본 + 마감 임박순 토글, 24건 커서 페이징 무한스크롤 `/api/notices`, 스켈레톤·페이드, 목록·옵션 1시간 `unstable_cache`) · `/notice/{slug}` 상세 ✅ · 디자인 토큰(라일락, Pretendard) ✅ (지도는 좌표 없이 브라우저 실시간 지오코딩, 요약DB 승인 후 S6로 교체) · **사이트맵·robots·canonical ✅** (`/sitemap.xml` 홈+공고 전량, 진행중 0.9/마감 0.3, 필터 결과 `?sector=…`는 noindex, 프로덕션 오리진은 `lib/site-url.ts`에 고정) · 공통화 ✅ (web `lib/{site-url,routes,constants,sido,agency,notice-filters}` + `types/notice` + `StatusBadge·ExternalLink·SpecList·Hero`; pipeline `sources/http.ThrottledHttp` + `housing·normalize·repo` + `stages/common`) · **S3-SH 첨부 단지 표 ✅** (i-sh Synap 뷰어 XML → `notice_complex`, 51차 장기전세 138단지 적재, 상세 페이지 「공급 단지」 표. 지도 마커는 요약DB 승인 후. Phase 2의 SH 파서를 앞당긴 것 — 면적·호수·금액 표는 다음) · S2 · 단지/지역 페이지 미착수. 로컬 `cd web && npm run dev` → http://localhost:3100
+**진행 (2026-09-08)**: S1 수집기 ✅ (마이홈 API 185건 + SH 서울주거포털 79건) · `/` 목록 ✅ (공공/민간 탭, 카드 그리드, 최신 공고순 기본 + 마감 임박순 토글, 24건 커서 페이징 무한스크롤 `/api/notices`, 스켈레톤·페이드, 목록·옵션 1시간 `unstable_cache`) · `/notice/{slug}` 상세 ✅ · 디자인 토큰(라일락, Pretendard) ✅ (지도는 좌표 없이 브라우저 실시간 지오코딩, 요약DB 승인 후 S6로 교체) · **사이트맵·robots·canonical ✅** (`/sitemap.xml` 홈+공고 전량, 진행중 0.9/마감 0.3, 필터 결과 `?sector=…`는 noindex, 프로덕션 오리진은 `lib/site-url.ts`에 고정) · 공통화 ✅ (web `lib/{site-url,routes,constants,sido,agency,notice-filters}` + `types/notice` + `StatusBadge·ExternalLink·SpecList·Hero`; pipeline `sources/http.ThrottledHttp` + `housing·normalize·repo` + `stages/common`) · **S3-SH 첨부 단지 표 ✅** (i-sh Synap 뷰어 XML → `notice_complex`. 양식 2종: 장기전세 「주택 위치 안내」 138단지 · 매입임대 「별첨1 주택목록」 회전 표 464호/125단지(호수·면적·최소 금액 집계, 0008). 상세 페이지 「공급 단지」 표 + **지도 자동 로드**(브라우저 실시간 지오코딩, 저장 없음, Geocoding 월 300만 확인). 요약DB 승인 후 S6 좌표로 교체. 호실 `unit` 적재는 Phase 2) · S2 · 단지/지역 페이지 미착수. 로컬 `cd web && npm run dev` → http://localhost:3100
 
 **완료 기준(DoD)**
 | 지표 | 기준 |
