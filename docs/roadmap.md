@@ -40,7 +40,7 @@
 
 **산출물**: 수집 스케줄러(S1·S2) · 좌표 조인(S6) · 4개 페이지 템플릿 · 사이트맵 · 지도 컴포넌트
 
-**진행 (2026-09-08)**: S1 수집기 ✅ (마이홈 API 185건 + SH 서울주거포털 79건) · `/` 목록 ✅ (공공/민간 탭, 카드 그리드, 최신 공고순 기본 + 마감 임박순 토글, 24건 커서 페이징 무한스크롤 `/api/notices`, 스켈레톤·페이드, 목록·옵션 1시간 `unstable_cache`) · `/notice/{slug}` 상세 ✅ · 디자인 토큰(라일락, Pretendard) ✅ (지도는 좌표 없이 브라우저 실시간 지오코딩, 요약DB 승인 후 S6로 교체) · S2 · 단지/지역 페이지 · 사이트맵 미착수. 로컬 `cd web && npm run dev` → http://localhost:3100
+**진행 (2026-09-08)**: S1 수집기 ✅ (마이홈 API 185건 + SH 서울주거포털 79건) · `/` 목록 ✅ (공공/민간 탭, 카드 그리드, 최신 공고순 기본 + 마감 임박순 토글, 24건 커서 페이징 무한스크롤 `/api/notices`, 스켈레톤·페이드, 목록·옵션 1시간 `unstable_cache`) · `/notice/{slug}` 상세 ✅ · 디자인 토큰(라일락, Pretendard) ✅ (지도는 좌표 없이 브라우저 실시간 지오코딩, 요약DB 승인 후 S6로 교체) · **사이트맵·robots·canonical ✅** (`/sitemap.xml` 홈+공고 전량, 진행중 0.9/마감 0.3, 필터 결과 `?sector=…`는 noindex, 프로덕션 오리진은 `lib/site-url.ts`에 고정) · 공통화 ✅ (web `lib/{site-url,routes,constants,sido,agency,notice-filters}` + `types/notice` + `StatusBadge·ExternalLink·SpecList·Hero`; pipeline `sources/http.ThrottledHttp` + `housing·normalize·repo` + `stages/common`) · S2 · 단지/지역 페이지 미착수. 로컬 `cd web && npm run dev` → http://localhost:3100
 
 **완료 기준(DoD)**
 | 지표 | 기준 |

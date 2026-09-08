@@ -83,3 +83,22 @@
 | `fade-in` `slide-up-fade` 키프레임, `--ease-out-emph` | smokespot `globals.css` |
 | **Pretendard 단일 패밀리** | fitin-app이 라틴/한글 2폰트(Space Grotesk+Gothic A1)를 버리고 정착한 결론. smokespot의 Archivo+Gothic A1은 안 따름 |
 | 브랜드 색 SSOT: `--brand-*` 블록만 바꾸면 전 화면 반영 | fitin-app `--Fitin_point_*` 관습 |
+
+## 코드 패턴 출처 (2026-09-08, 2차 대조)
+
+같은 세 프로젝트를 **코드 구조** 축으로 다시 봤다. 스택이 같은 smokespot(Next App Router)을 주로 따르고, fitin은 원칙만 가져왔다.
+
+| 축 | fitin-app / fitin-bo | smokespot | 집공고 채택 |
+|---|---|---|---|
+| 공통 유틸 배치 | `common/common_formatting/*` 기능별 파일 분할(날짜·숫자·문자열) | `lib/*.ts` 평면, 파일 = 관심사 1개 | smokespot 방식. `web/src/lib/{format,sido,routes,notice-filters,agency,site-url}` |
+| 상수 중앙화 | `common_constants/` 카테고리 디렉터리 | `lib/constants.ts` 단일 파일 + 각 값에 근거 주석 | `lib/constants.ts` 단일 파일. 값마다 왜 그 숫자인지 주석 |
+| 타입 배치 | `common_API/*/common_api_types.ts` API별 | `types/*.ts` 도메인별 | `types/notice.ts`. 쿼리 파일에서 분리 |
+| 경로 빌더 | — | `lib/routes.ts` `ROUTES` + `xxxUrl()` | `lib/routes.ts` `noticePath` `homePath` `apiNoticesPath` |
+| 사이트 오리진 | — | `lib/site-url.ts` 프로덕션 도메인 하드코딩(env 사고 방지) | 그대로. `VERCEL_ENV=production`이면 `zipgonggo.com` 고정 |
+| sitemap/robots | — | `app/sitemap.ts` + `lib/sitemap-entries.ts`, lastmod는 DB 시각 | `app/sitemap.ts` 직접(타입 1개라 분리 안 함). lastmod = `notice.updated_at` |
+| 시도 통칭 | — | `lib/sido.ts` 테이블 + `sidoShort()` | 그대로. 정규식 폴백 유지 |
+| UI 프리미티브 | 컴포넌트마다 `.config.ts` 분리 | 작은 함수 컴포넌트, 옵션 최소 | `StatusBadge` `ExternalLink` `Spec/SpecList` `Hero` — 각 1파일, props 3개 이하 |
+| 로딩/스켈레톤 | `common_skeleton` "일부만 shimmer" | — | `SkeletonCards` 헬퍼로 격번 shimmer 규칙 1곳 |
+| 안 따른 것 | `common_` 접두사 명명, 디렉터리 깊이 3단계 | i18n 경로(`localePath`), JSON-LD 빌더 | 단일 언어라 불필요. JSON-LD는 단지/지역 페이지 때 smokespot `lib/json-ld.ts` 패턴으로 |
+
+pipeline 쪽은 레퍼런스가 없어(세 프로젝트 모두 Python 없음) 자체 기준: 소스 HTTP(`sources/http.py`) · 어휘(`housing.py`) · 값 정규화(`normalize.py`) · DB 쓰기(`repo.py`) · 스테이지 뼈대(`stages/common.py`)로 나눴다. 스테이지끼리는 import하지 않는다.
