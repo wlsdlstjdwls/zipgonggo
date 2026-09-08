@@ -29,8 +29,11 @@ SPACED_RE = re.compile(rf"(?:(\d{{2}}|\d{{4}})\s+)?(\d{{1,2}})\s+(\d{{1,2}})\s*\
 # 붙은 날짜: 260914(월) · 20260914(월) · 2026928(월) · 0915(화) · 928(월)
 COMPACT_RE = re.compile(rf"(\d{{3,8}})\s*\([{WEEKDAY}]\)")
 YEAR_ONLY_RE = re.compile(r"^(20\d{2})$")
-BELOW_PX = 150   # 라벨 아래 이만큼 안에서 날짜를 찾는다
+BELOW_PX = 150   # 라벨 아래 이만큼 안에서 날짜를 찾는다(매입임대는 마감 날짜가 142px 아래)
 STACK_PX = 26    # 같은 열에서 이만큼 안에 붙은 두 줄은 한 라벨(신청/접수, 당첨자/발표)
+MAX_DATE_W = 220 # 이보다 넓은 칸은 흐름도 날짜가 아니라 본문 문장이다(라벨 폭 비율은 좁은 라벨에서 오작동)
+# 흐름도 아래 주석("※ 입주예정기간은 2026. 1. 16.(월) ~ 2027. 1. 15.(금)입니다") — 날짜가 있어도 접수일이 아니다
+NOTE_RE = re.compile(r"^\s*[※*·▶■□○-]")
 
 
 @dataclass(frozen=True)
@@ -146,8 +149,16 @@ def _stacked_labels(boxes: list[_Box]) -> list[_Box]:
 
 
 def _dates_below(label: _Box, boxes: list[_Box], ref_year: int | None) -> list[date]:
-    """라벨 아래(같은 열)에 붙은 날짜들. 위에서 아래 순. 연도만 있는 줄(2026)은 다음 날짜의 연도로 쓴다."""
-    below = sorted((b for b in boxes if label.t < b.t <= label.t + BELOW_PX and _overlap(label, b) >= 0.4), key=lambda b: (b.t, b.l))
+    """라벨 아래(같은 열)에 붙은 날짜들. 위에서 아래 순. 연도만 있는 줄(2026)은 다음 날짜의 연도로 쓴다.
+    ※로 시작하는 주석과 라벨보다 훨씬 넓은 칸(본문 문장)은 건너뛴다 — 「입주예정기간」을 접수기간으로 읽던 회귀."""
+    below = sorted(
+        (b for b in boxes
+         if label.t < b.t <= label.t + BELOW_PX
+         and _overlap(label, b) >= 0.4
+         and (b.r - b.l) <= MAX_DATE_W
+         and not NOTE_RE.match(b.text)),
+        key=lambda b: (b.t, b.l),
+    )
     found: list[date] = []
     ref: date | None = None
     for b in below:

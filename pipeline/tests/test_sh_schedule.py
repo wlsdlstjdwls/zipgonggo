@@ -38,6 +38,15 @@ def test_schedule_maeip_ranked_absent():
     assert s.announce == date(2026, 12, 28)
 
 
+def test_schedule_ignores_note_line():
+    """흐름도 아래 「※ 입주예정기간은 2026. 1. 16.(월) ~ 2027. 1. 15.(금)」 주석을 접수기간으로 읽던 회귀.
+    실제 신청접수는 09.01(화)~09.03(목)."""
+    s = parse_schedule(pages("308887", [3]), ref_year=2026)
+    assert s is not None
+    assert s.apply_start == date(2026, 9, 1)
+    assert s.apply_end == date(2026, 9, 3)
+
+
 def test_schedule_none_without_flowchart():
     """일정 흐름도가 없는 쪽(주택 위치 안내 표)에서는 None."""
     assert parse_schedule(pages("309467", [49, 50]), ref_year=2026) is None
@@ -81,6 +90,25 @@ def test_supply_whole_notice():
     assert s.unit_total == 1381
     assert s.min_deposit == 244_140_000
     assert s.max_deposit == 1_388_400_000
+
+
+def test_supply_ignores_conversion_table():
+    """보증금↔월세 전환표(자치구|단지|면적|임대보증금|월임대료)는 호수 열이 없어 표로 잡히면 안 된다.
+    이 표를 읽어 공급호수가 41만 호로 나오던 회귀(공공주거환경임대 294206 18·19쪽)."""
+    s = SupplySummary()
+    for page in (18, 19):
+        parse_supply_page((FIX / "ish_294206" / f"p{page}.xml").read_text(encoding="utf-8"), page, s)
+    assert s.rows == 0
+    assert s.unit_total == 0
+
+
+def test_supply_real_table_in_same_notice():
+    """같은 공고의 진짜 공급현황 표(모집세대수|임대보증금)는 읽는다."""
+    s = SupplySummary()
+    parse_supply_page((FIX / "ish_294206" / "p15.xml").read_text(encoding="utf-8"), 15, s)
+    assert s.rows > 0
+    assert 0 < s.unit_total < 2000
+    assert s.max_deposit is not None and s.max_deposit < 1_000_000_000
 
 
 def test_merge_supply_into_complexes():

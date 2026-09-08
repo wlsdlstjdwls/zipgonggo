@@ -18,8 +18,10 @@ from dataclasses import dataclass, field
 
 from ..sources.ish import group_rows, parse_chars, row_segments
 
-DEPOSIT_HEADER_RE = re.compile(r"전세금액|임대보증금|보증금\s*\(")
-UNIT_HEADER_RE = re.compile(r"호수")
+DEPOSIT_HEADER_RE = re.compile(r"^(?:전세금액|임대보증금|보증금)\s*(?:\([^)]*\))?$")
+# 표로 인정하려면 헤더 묶음에 호수 열이 있어야 한다. 보증금↔월세 전환표(자치구|단지|면적|임대보증금|월임대료)에는 없다
+UNIT_HEADER_RE = re.compile(r"모집\s*세대수|공급\s*세대수|공급\s*호수|세대\s*수|호수")
+MAX_UNITS_PER_ROW = 2000   # 한 행(단지·면적·유형)의 호수 상한. 넘으면 금액을 호수로 읽은 것
 NAME_HEADER_RE = re.compile(r"단지\s*(?:이름|명)")
 KIND_RE = re.compile(r"^(일반|주거약자|우선|특별)$")
 NUM_RE = re.compile(r"^[\d,]+$")
@@ -28,6 +30,7 @@ TOTAL_RE = re.compile(r"^계$")
 MIN_DEPOSIT_THOUSAND = 10_000   # 천 원 단위 1만 = 1,000만 원. 이보다 작은 숫자는 전세금이 아니다
 MIN_AREA, MAX_AREA = 15.0, 200.0
 NAME_SLACK = 90.0               # 단지명 칸으로 볼 수 있는 오른쪽 한계(전세금 헤더 왼쪽 끝 기준, px)
+HEADER_SPAN = 6                 # 헤더 판정 시 위아래로 함께 보는 줄 수
 
 
 @dataclass
@@ -96,9 +99,14 @@ def _cells_by_row(xml: str) -> list[list[_Cell]]:
 
 
 def _find_header(rows: list[list[_Cell]]) -> tuple[int, _Cell] | None:
+    """보증금 열 헤더. 라벨 하나만 있는 칸이어야 하고(본문 문장 배제),
+    위아래 HEADER_SPAN줄 안에 호수 열 헤더가 같이 있어야 한다(전환표·안내표 배제)."""
     for i, cells in enumerate(rows):
         for c in cells:
-            if DEPOSIT_HEADER_RE.search(c.text):
+            if not DEPOSIT_HEADER_RE.match(c.text.replace(" ", "")):
+                continue
+            near = [x.text for cs in rows[max(0, i - HEADER_SPAN) : i + HEADER_SPAN] for x in cs]
+            if any(UNIT_HEADER_RE.search(t.replace(" ", "")) for t in near):
                 return i, c
     return None
 
@@ -160,7 +168,7 @@ def parse_supply_page(xml: str, page: int, summary: SupplySummary) -> int:
                 area, units = float(nums[0]), nums[1]
             elif nums:
                 units = nums[0]
-        if units is None:
+        if units is None or units > MAX_UNITS_PER_ROW:
             continue
         won = deposit_k * 1000
         read += 1
