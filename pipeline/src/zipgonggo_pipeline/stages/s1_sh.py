@@ -8,21 +8,22 @@
 
 from __future__ import annotations
 
-import argparse
-import hashlib
-import json
 import logging
 import sys
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import Any
 
 from ..config import settings
 from ..db import connect
+from ..housing import derive_sector, slug_code
+from ..normalize import fingerprint, parse_ymd, today_kst
+from ..repo import queue_unmapped
 from ..sources.sh import SHClient, SHRow
-from .s1_collect import HOUSING_TYPES, Stats, derive_sector, parse_date, queue_unmapped, upsert_notice
+from .common import Stats, finish_ingest, stage_main, upsert_guarded, utc_now
 
 log = logging.getLogger("s1.sh")
 
+STAGE = "S1"
 SOURCE = "sh_scrape"
 AGENCY = "SH"
 SIDO = "서울특별시"
@@ -42,14 +43,7 @@ SH_TYPE_MAP: dict[str, str] = {
     "희망하우징": "공공기숙사",
 }
 # 주택 공급이 아닌 것. 조용히 건너뛴다.
-NOT_HOUSING = {"상가임대", "용지분양", "장기안심주택"}
-
-
-def parse_ymd(s: str) -> date | None:
-    s = (s or "").strip()
-    if len(s) == 10 and s[4] == "-" and s[7] == "-":
-        return date(int(s[:4]), int(s[5:7]), int(s[8:10]))
-    return parse_date(s.replace("-", "").replace(".", ""))
+NOT_HOUSING = frozenset({"상가임대", "용지분양", "장기안심주택"})
 
 
 def derive_status_sh(state: str, title: str, announce: date | None, today: date) -> str:
@@ -77,8 +71,9 @@ def map_sh(row: SHRow, today: date) -> dict[str, Any] | None:
     key = f"ish:{row.ish_seq}" if row.ish_seq else f"portal:{row.portal_seq}"
     ident = row.ish_seq or row.portal_seq
     return {
-        "slug": f"sh-{posted.year}-{ident}-{HOUSING_TYPES[housing_type]}",
-        "fingerprint": hashlib.sha256(f"{AGENCY}|{title}|{posted.isoformat()}||".encode()).hexdigest(),
+        # slug 형식은 불변(URL). 마이홈 make_slug와 세그먼트 수가 다르다 — SH 목록엔 주택일련번호가 없다
+        "slug": f"sh-{posted.year}-{ident}-{slug_code(housing_type)}",
+        "fingerprint": fingerprint(AGENCY, title, posted),
         "source": SOURCE,
         "source_key": key,
         "amends_source_key": None,
@@ -116,8 +111,8 @@ def map_sh(row: SHRow, today: date) -> dict[str, Any] | None:
 def run(*, dry_run: bool, max_pages: int | None) -> Stats:
     cfg = settings()
     client = SHClient(delay_sec=cfg.scrape_delay_sec)
-    today = datetime.now(UTC).astimezone().date()
-    started = datetime.now(UTC)
+    today = today_kst()
+    started = utc_now()
     stats = Stats()
 
     rows = list(client.iter_rows(max_pages=max_pages))
@@ -132,41 +127,21 @@ def run(*, dry_run: bool, max_pages: int | None) -> Stats:
             try:
                 mapped = map_sh(row, today)
             except KeyError:
-                stats.skip("housing_type_unmapped")
-                stats.unmapped_types[row.type_name] = stats.unmapped_types.get(row.type_name, 0) + 1
+                stats.unmapped(row.type_name)
                 if cur:
                     queue_unmapped(cur, f"sh:{row.ish_seq or row.portal_seq}", row.type_name, row.title)
                 continue
             except Exception as exc:  # noqa: BLE001
-                stats.skip("map_error")
-                stats.errors.append(f"{row.no}: {exc}")
+                stats.error("map_error", row.no, exc)
                 continue
             if mapped is None:
                 stats.skip("not_housing")
                 continue
             if cur is None:
                 continue
-            cur.execute("SAVEPOINT row")
-            try:
-                if upsert_notice(cur, mapped, [{"sido": SIDO, "sigungu": None, "supply_count": None}]):
-                    stats.inserted += 1
-                else:
-                    stats.updated += 1
-                cur.execute("RELEASE SAVEPOINT row")
-            except Exception as exc:  # noqa: BLE001
-                cur.execute("ROLLBACK TO SAVEPOINT row")
-                stats.skip("db_error")
-                stats.errors.append(f"{row.no}: {exc}")
+            upsert_guarded(cur, stats, row.no, mapped, [{"sido": SIDO, "sigungu": None, "supply_count": None}])
         if conn and cur:
-            message = json.dumps(
-                {"calls": client.call_count, "rows": stats.fetched_rows, "inserted": stats.inserted, "updated": stats.updated,
-                 "skipped": stats.skipped, "unmapped_types": stats.unmapped_types, "errors": stats.errors[:20]},
-                ensure_ascii=False,
-            )
-            cur.execute(
-                "INSERT INTO ingest_log (stage, source, ok, item_count, message, started_at) VALUES ('S1', %s, %s, %s, %s, %s)",
-                (SOURCE, not stats.errors, stats.inserted + stats.updated, message, started),
-            )
+            finish_ingest(cur, stage=STAGE, source=SOURCE, stats=stats, started=started, calls=client.call_count)
             conn.commit()
     finally:
         if conn:
@@ -175,15 +150,7 @@ def run(*, dry_run: bool, max_pages: int | None) -> Stats:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="S1 SH 서울주거포털 수집")
-    ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--max-pages", type=int, default=None)
-    ap.add_argument("-v", "--verbose", action="store_true")
-    args = ap.parse_args(argv)
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-    stats = run(dry_run=args.dry_run, max_pages=args.max_pages)
-    print(json.dumps(stats.__dict__, ensure_ascii=False, indent=1))
-    return 1 if stats.errors else 0
+    return stage_main("S1 SH 서울주거포털 수집", lambda a: run(dry_run=a.dry_run, max_pages=a.max_pages), argv=argv)
 
 
 if __name__ == "__main__":

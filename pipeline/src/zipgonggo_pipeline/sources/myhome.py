@@ -4,22 +4,20 @@
 - 응답 래핑: {"response": {"header": {resultCode, resultMsg}, "body": {totalCount, numOfRows, pageNo, item}}}
 - resultCode "00" 정상. 결과 없음은 header만 오고 resultMsg "NODATA_ERROR". 필수 파라미터 누락은 "11".
 - numOfRows 상한: 1000까지 통과 확인(2026-09-08). 개발계정 일 1,000건이라 페이지를 크게 잡는다.
-- 순차 호출 + 요청 간격(SCRAPE_DELAY_SEC). 동시 요청 없음.
+- 순차 호출 + 요청 간격은 sources/http.py ThrottledHttp.
 """
 
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Iterator
 from typing import Any
 
 import httpx
 
+from .http import ThrottledHttp
+
 log = logging.getLogger(__name__)
-# httpx가 INFO로 요청 URL(serviceKey 포함)을 찍는다. 키 유출 방지.
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 BASE_URL = "https://apis.data.go.kr/1613000"
 
@@ -28,8 +26,6 @@ NOTICE_LIST = ("HWSPR02", "rsdtRcritNtcList")  # 공공주택 모집공고 (임�
 SALE_NOTICE_LIST = ("HWSPR02", "ltRsdtRcritNtcList")  # 공공분양 공고 — 범위 밖, 참고용
 WAITLIST = ("HWSPR03", "moveWaitStsList")  # 예비입주자 대기현황. brtcCode 필수
 COMPLEX_LIST = ("HWSPR04", "rentalHouseGwList")  # 단지정보. brtcCode·signguCode·numOfRows·pageNo 필수
-
-RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
 class MyHomeApiError(RuntimeError):
@@ -51,22 +47,16 @@ class MyHomeClient:
         http: httpx.Client | None = None,
     ):
         self._key = service_key
-        self.delay_sec = delay_sec
-        self.max_retries = max_retries
         self.page_size = page_size
-        self._http = http or httpx.Client(timeout=timeout_sec, headers={"User-Agent": "zipgonggo-pipeline/0.1"})
-        self.call_count = 0
-        self._last_call_at = 0.0
+        self._http = ThrottledHttp(delay_sec=delay_sec, timeout_sec=timeout_sec, max_retries=max_retries, http=http)
+
+    @property
+    def call_count(self) -> int:
+        return self._http.call_count
 
     # ── 저수준 ────────────────────────────────────────────────
-    def _throttle(self) -> None:
-        wait = self.delay_sec - (time.monotonic() - self._last_call_at)
-        if wait > 0:
-            time.sleep(wait)
-
     def fetch_page(self, service: str, operation: str, page_no: int, **params: Any) -> dict[str, Any]:
         """한 페이지의 body를 돌려준다. 결과 없음이면 item=[]·totalCount=0."""
-        url = f"{BASE_URL}/{service}/{operation}"
         query = {
             "serviceKey": self._key,  # httpx가 urlencode 한다 (디코딩 키를 넣을 것)
             "numOfRows": self.page_size,
@@ -74,26 +64,12 @@ class MyHomeClient:
             "_type": "json",
             **{k: v for k, v in params.items() if v is not None},
         }
-        backoff = 1.0
-        for attempt in range(1, self.max_retries + 1):
-            self._throttle()
-            self._last_call_at = time.monotonic()
-            self.call_count += 1
-            try:
-                resp = self._http.get(url, params=query)
-                if resp.status_code in RETRYABLE_STATUS:
-                    raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
-                resp.raise_for_status()
-                payload = resp.json()
-            except (httpx.TransportError, httpx.HTTPStatusError, ValueError) as exc:
-                if attempt == self.max_retries:
-                    raise
-                log.warning("%s/%s p%s 재시도 %d/%d: %s", service, operation, page_no, attempt, self.max_retries, exc)
-                time.sleep(backoff)
-                backoff *= 2
-                continue
-            return _unwrap(payload)
-        raise AssertionError("unreachable")
+        resp = self._http.get(f"{BASE_URL}/{service}/{operation}", params=query, label=f"{service}/{operation} p{page_no}")
+        try:
+            payload = resp.json()
+        except ValueError as exc:
+            raise MyHomeApiError("BAD_JSON", str(exc)) from exc
+        return _unwrap(payload)
 
     def iter_pages(
         self, service: str, operation: str, *, max_pages: int | None = None, **params: Any

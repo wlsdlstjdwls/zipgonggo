@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 import re
-import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
@@ -22,8 +21,9 @@ from typing import Any
 import httpx
 from selectolax.parser import HTMLParser
 
+from .http import ThrottledHttp
+
 log = logging.getLogger(__name__)
-logging.getLogger("httpx").setLevel(logging.WARNING)
 
 BASE_URL = "https://housing.seoul.go.kr"
 LIST_PATH = "/site/main/sh/publicLease/02/list"
@@ -110,37 +110,17 @@ def last_page(html: str) -> int:
 
 class SHClient:
     def __init__(self, *, delay_sec: float = 1.0, timeout_sec: float = 30.0, max_retries: int = 3, http: httpx.Client | None = None):
-        self.delay_sec = delay_sec
-        self.max_retries = max_retries
-        self._http = http or httpx.Client(
-            timeout=timeout_sec, follow_redirects=True,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; zipgonggo-pipeline/0.1; +https://zipgonggo.kr)"},
+        self._http = ThrottledHttp(
+            delay_sec=delay_sec, timeout_sec=timeout_sec, max_retries=max_retries, follow_redirects=True, http=http
         )
-        self.call_count = 0
-        self._last = 0.0
+
+    @property
+    def call_count(self) -> int:
+        return self._http.call_count
 
     def fetch_list_page(self, cp: int, *, sply_cd: str = "", state: str = "") -> str:
         params = {"cp": cp, "sc": "", "startDate": "", "endDate": "", "splyCd": sply_cd, "recrnotiState": state, "sv": ""}
-        backoff = 1.0
-        for attempt in range(1, self.max_retries + 1):
-            wait = self.delay_sec - (time.monotonic() - self._last)
-            if wait > 0:
-                time.sleep(wait)
-            self._last = time.monotonic()
-            self.call_count += 1
-            try:
-                r = self._http.get(BASE_URL + LIST_PATH, params=params)
-                if r.status_code in (429, 500, 502, 503, 504):
-                    raise httpx.HTTPStatusError(f"HTTP {r.status_code}", request=r.request, response=r)
-                r.raise_for_status()
-                return r.text
-            except (httpx.TransportError, httpx.HTTPStatusError) as exc:
-                if attempt == self.max_retries:
-                    raise
-                log.warning("SH 목록 cp=%s 재시도 %d/%d: %s", cp, attempt, self.max_retries, exc)
-                time.sleep(backoff)
-                backoff *= 2
-        raise AssertionError("unreachable")
+        return self._http.get(BASE_URL + LIST_PATH, params=params, label=f"SH 목록 cp={cp}").text
 
     def iter_rows(self, *, max_pages: int | None = None) -> Iterator[SHRow]:
         cp = 1
