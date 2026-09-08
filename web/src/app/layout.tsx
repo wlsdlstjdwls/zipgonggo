@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { SaveProvider } from "@/components/save-context";
+import { ScopeBar } from "@/components/scope-bar";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
+import { listFilterOptions } from "@/lib/queries";
 import { ROUTES } from "@/lib/routes";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
@@ -17,7 +20,9 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // 시도·부문 분포 — 스코프 바가 매 페이지에 상시 노출되므로 여기서 한 번만 조회한다(unstable_cache 캐시, 6차 설계)
+  const options = await listFilterOptions(undefined);
   return (
     <html lang="ko">
       <head>
@@ -33,6 +38,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </div>
           </header>
+          {/* usePathname·useSearchParams를 쓰는 클라이언트 조각이라 Suspense로 감싸 나머지 트리의 정적 렌더를 지킨다 */}
+          <Suspense fallback={null}>
+            <ScopeBar sidoOptions={options.sido} sectorOptions={options.sector} />
+          </Suspense>
           <main className="shell">{children}</main>
           <footer className="site-footer">
             <div className="bar">

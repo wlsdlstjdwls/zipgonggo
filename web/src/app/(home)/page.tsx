@@ -55,7 +55,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         <p>{LIST_HERO_LEAD}</p>
       </div>
       <KpiStrip stats={stats} />
-      <FilterBar f={f} options={options} closing7={stats.closing7} sticky />
+      <FilterBar f={f} options={{ type: options.type }} closing7={stats.closing7} sticky />
       {body}
     </div>
   );

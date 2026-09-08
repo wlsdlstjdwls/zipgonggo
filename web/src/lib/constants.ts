@@ -38,6 +38,14 @@ export const DDAY_SOON_DAYS = 7;
 // 시도 통계 칩에 쓰는 SH 지역
 export const SH_SIDO = "서울특별시";
 
+// 스코프(부문+시도) 세션 기억 localStorage 키. 서버 렌더(ISR)엔 절대 반영하지 않는다 —
+// "/"의 캐시 한 장을 크롤러·공유 링크 수신자를 포함해 모두가 공유한다(6차 설계).
+export const SCOPE_STORAGE_KEY = "zipgonggo.scope.v1";
+// 스코프 바의 기본 선택 "표시"용(강제 이동 아님). SH 데이터가 압도적이라 서울을 기본 후보로 보여준다.
+export const DEFAULT_SCOPE_SIDO = SH_SIDO;
+// /area/{시도} 발행 최소 공고 수 — 얇은 페이지 방지 규칙(CLAUDE.md 4: 지역은 3건 이상)
+export const AREA_MIN_COUNT = 3;
+
 // 네이버 Web Dynamic Map SDK. 좌표가 없어 geocoder 서브모듈로 브라우저 실시간 변환(저장 안 함 — CLAUDE.md 하지 말 것 1)
 export const NAVER_MAP_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ?? "";
 export const NAVER_MAP_SDK_URL = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAP_CLIENT_ID}&submodules=geocoder,panorama`;

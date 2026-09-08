@@ -5,6 +5,7 @@ import type { NoticeFilters } from "@/types/notice";
 export const ROUTES = {
   home: "/",
   notice: "/notice",
+  area: "/area",
   api: "/api",
   apiNotices: "/api/notices",
 } as const;
@@ -31,6 +32,17 @@ export function noticeComplexPath(noticeSlug: string, c: { name: string; complex
 export function homePath(f: NoticeFilters = {}): string {
   const q = noticeFiltersToParams(f).toString();
   return q ? `${ROUTES.home}?${q}` : ROUTES.home;
+}
+
+/**
+ * /area/{시도} 스코프 착지 경로. 시도는 경로에 있으므로 f.sido는 무시하고 나머지만 쿼리로 붙인다.
+ * docs/url-structure.md 6차 설계 — 스코프(부문+시도)는 경로/쿼리, 필터(유형·마감·정렬)는 쿼리만.
+ */
+export function areaPath(sido: string, f: NoticeFilters = {}): string {
+  const { sido: _drop, ...rest } = f;
+  const q = noticeFiltersToParams(rest).toString();
+  const base = `${ROUTES.area}/${encodeURIComponent(sido)}`;
+  return q ? `${base}?${q}` : base;
 }
 
 /** 다음 페이지 API 경로. */

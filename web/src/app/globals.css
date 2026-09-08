@@ -128,6 +128,16 @@ small { font-size: 12px; }
 .site-footer .bar { max-width: var(--maxw); margin: 0 auto; }
 .site-footer p { margin: 0; }
 
+/* ── 스코프 바(부문+시도) ────────────────────────────────── 헤더 바로 아래 상시 노출, 필터 행보다 상위 범위 */
+.sbar { display: flex; align-items: center; gap: 8px; padding: 10px var(--pad); border-bottom: 1px solid var(--line);
+  position: sticky; top: 60px; z-index: 10; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px);
+  overflow-x: auto; scrollbar-width: none; }
+.sbar::-webkit-scrollbar { display: none; }
+.sbar-txt { flex: none; margin: 0 4px 0 0; font-weight: 700; font-size: 12.5px; color: var(--dim); white-space: nowrap; }
+.sbar-txt b { font-weight: 900; color: var(--ink); }
+.sbar-txt span { color: var(--dim); }
+.sbar .sel { flex: none; }
+
 /* ── 버튼 · 칩 · 세그먼트 ────────────────────────────────── */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 18px; border-radius: var(--r-btn); border: 1px solid var(--line2); background: var(--bg); color: var(--mut); font-weight: 800; font-size: 13px; white-space: nowrap; cursor: pointer;
   transition: transform 220ms var(--sp), background 200ms var(--ease), border-color 200ms var(--ease), color 200ms var(--ease); }
@@ -140,13 +150,15 @@ small { font-size: 12px; }
 .btn.saved { background: var(--acc-soft); border-color: var(--acc); color: var(--acc); }
 .btn.pop { animation: mo-pop 420ms var(--sp); }
 
-.chip-f { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 15px; border-radius: var(--r-chip); background: var(--bg); border: 1px solid var(--line2); color: var(--mut); font-weight: 800; font-size: 12.5px; white-space: nowrap; cursor: pointer;
+.chip-f { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 15px; border-radius: var(--r-chip); background: var(--bg); border: 1px solid var(--line2); color: var(--mut); font-family: inherit; font-weight: 800; font-size: 12.5px; white-space: nowrap; cursor: pointer;
   transition: transform 240ms var(--sp), background 220ms var(--ease), color 220ms var(--ease), border-color 220ms var(--ease); }
 .chip-f small { font-weight: 700; font-size: 11px; color: var(--dim); }
 .chip-f:hover { transform: translateY(-1.5px); }
 .chip-f:active { transform: scale(0.975); }
 .chip-f.on { background: var(--ink); border-color: var(--ink); color: #fff; }
 .chip-f.on small { color: rgba(255, 255, 255, 0.78); } /* 반투명 텍스트는 활성(검정 바탕)에서만 — 흰 칩에선 대비가 깨진다 */
+.chip-f.dis { cursor: default; opacity: 0.55; }
+.chip-f.dis:hover { transform: none; }
 
 /* 셀렉트·검색창 — 칩(.chip-f)과 같은 골격에 화살표만 얹는다. 폼 컨트롤이 칩 옆에서 겉돌지 않게. */
 .sel, .fld { height: 38px; border: 1px solid var(--line2); border-radius: var(--r-chip); background: var(--bg); font: inherit; font-weight: 800; font-size: 12.5px; color: var(--mut); min-width: 0; cursor: pointer;
@@ -192,7 +204,8 @@ small { font-size: 12px; }
 /* ── 필터 행 ─────────────────────────────────────────────── */
 .fbar { display: flex; align-items: center; gap: 8px; padding: 14px var(--pad); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .fbar::-webkit-scrollbar { display: none; }
-.fbar.sticky { position: sticky; top: 60px; z-index: 9; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px); }
+/* top: 120px = 헤더(60) + 스코프 바(60, .sbar와 같은 칩 높이라 고정값으로 겹침 없이 쌓인다) */
+.fbar.sticky { position: sticky; top: 120px; z-index: 9; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px); }
 .fbar .grow { margin-left: auto; }
 .fbar .sel { flex: none; }
 .fbar .reset { display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: var(--r-chip); font-weight: 700; font-size: 12px; color: var(--acc); white-space: nowrap; }
