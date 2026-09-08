@@ -100,5 +100,7 @@
 | UI 프리미티브 | 컴포넌트마다 `.config.ts` 분리 | 작은 함수 컴포넌트, 옵션 최소 | `StatusBadge` `ExternalLink` `Spec/SpecList` `Hero` — 각 1파일, props 3개 이하 |
 | 로딩/스켈레톤 | `common_skeleton` "일부만 shimmer" | — | `SkeletonCards` 헬퍼로 격번 shimmer 규칙 1곳 |
 | 안 따른 것 | `common_` 접두사 명명, 디렉터리 깊이 3단계 | i18n 경로(`localePath`), JSON-LD 빌더 | 단일 언어라 불필요. JSON-LD는 단지/지역 페이지 때 smokespot `lib/json-ld.ts` 패턴으로 |
+| 지도 마커·선택 (3차, 2026-09-08) | — | `components/naver-map.tsx`: 핀 SVG path, 선택 시 width:0 기준 말풍선(이름 길이와 무관하게 정렬), id별 마커 재사용 + signature로 바뀐 것만 setIcon, 콜백 ref, zoomControl:false | `components/complex-explorer.tsx`. 핀은 100개 넘게 찍혀 CSS filter·등장 애니메이션은 뺐다(렌더 부담). 선택 이동은 morph/panTo 대신 setZoom+setCenter(애니메이션 겹침으로 타일 깨짐 실측) |
+| 좌 목록 / 우 지도 | — | `(tabs)/map` 데스크톱 레일 + `SpotList` onSelect | 공고지도2.png 벤치마크대로 좌 검색·자치구·건수·목록, 우 sticky 지도. 목록 스크롤은 smooth 대신 즉시(비활성 탭에서 smooth가 멈춤) |
 
 pipeline 쪽은 레퍼런스가 없어(세 프로젝트 모두 Python 없음) 자체 기준: 소스 HTTP(`sources/http.py`) · 어휘(`housing.py`) · 값 정규화(`normalize.py`) · DB 쓰기(`repo.py`) · 스테이지 뼈대(`stages/common.py`)로 나눴다. 스테이지끼리는 import하지 않는다.

@@ -8,7 +8,7 @@ types.setTypeParser(1082, (v) => v);
 types.setTypeParser(20, (v) => Number(v));
 types.setTypeParser(1700, (v) => Number(v));
 
-const g = globalThis as unknown as { __zipgonggoPool?: Pool };
+const g = globalThis as unknown as { __zipgonggoPool?: Pool; __zipgonggoPoolHandled?: boolean };
 
 function createPool(): Pool {
   const connectionString = process.env.DATABASE_URL;
@@ -19,6 +19,12 @@ function createPool(): Pool {
 }
 
 export const pool: Pool = g.__zipgonggoPool ?? (g.__zipgonggoPool = createPool());
+// Neon이 유휴 커넥션을 서버 쪽에서 끊으면 pg가 idle 클라이언트 'error'를 내고, 핸들러가 없으면 프로세스 uncaughtException.
+// 끊긴 클라이언트는 풀이 알아서 버리므로 기록만 한다 (실측 2026-09-08 dev 로그 "Connection terminated unexpectedly").
+if (!g.__zipgonggoPoolHandled) {
+  g.__zipgonggoPoolHandled = true;
+  pool.on("error", (err) => console.warn("[db] 유휴 커넥션 종료:", err.message));
+}
 
 export async function query<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
   const res = await pool.query(sql, params);
