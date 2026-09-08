@@ -1,0 +1,90 @@
+{
+  "response": {
+    "header": {
+      "resultCode": "00",
+      "resultMsg": "NORMAL SERVICE"
+    },
+    "body": {
+      "totalCount": "379",
+      "numOfRows": "3",
+      "pageNo": "1",
+      "item": [
+        {
+          "hsmpSn": 31846097,
+          "insttNm": "LH서울",
+          "brtcCode": "11",
+          "brtcNm": "서울특별시",
+          "signguCode": "110",
+          "signguNm": "종로구",
+          "hsmpNm": "서울특별시 종로구",
+          "rnAdres": "서울특별시 종로구 평창문화로 67",
+          "pnu": "1111018300101870001",
+          "competDe": "",
+          "hshldCo": 20,
+          "suplyTyNm": "매입임대",
+          "styleNm": "36",
+          "suplyPrvuseAr": 36.66,
+          "suplyCmnuseAr": 10.86,
+          "houseTyNm": "",
+          "heatMthdDetailNm": "",
+          "buldStleNm": "",
+          "elvtrInstlAtNm": "",
+          "parkngCo": 0,
+          "bassRentGtn": 6482000,
+          "bassMtRntchrg": 490140,
+          "bassCnvrsGtnLmt": 0
+        },
+        {
+          "hsmpSn": 31846097,
+          "insttNm": "LH서울",
+          "brtcCode": "11",
+          "brtcNm": "서울특별시",
+          "signguCode": "110",
+          "signguNm": "종로구",
+          "hsmpNm": "서울특별시 종로구",
+          "rnAdres": "서울특별시 종로구 평창문화로 67",
+          "pnu": "1111018300101870001",
+          "competDe": "",
+          "hshldCo": 20,
+          "suplyTyNm": "매입임대",
+          "styleNm": "36",
+          "suplyPrvuseAr": 36.74,
+          "suplyCmnuseAr": 11.87,
+          "houseTyNm": "",
+          "heatMthdDetailNm": "",
+          "buldStleNm": "",
+          "elvtrInstlAtNm": "",
+          "parkngCo": 0,
+          "bassRentGtn": 6620000,
+          "bassMtRntchrg": 471610,
+          "bassCnvrsGtnLmt": 0
+        },
+        {
+          "hsmpSn": 31846097,
+          "insttNm": "LH서울",
+          "brtcCode": "11",
+          "brtcNm": "서울특별시",
+          "signguCode": "110",
+          "signguNm": "종로구",
+          "hsmpNm": "서울특별시 종로구",
+          "rnAdres": "서울특별시 종로구 평창문화로 67",
+          "pnu": "1111018300101870001",
+          "competDe": "",
+          "hshldCo": 20,
+          "suplyTyNm": "매입임대",
+          "styleNm": "36",
+          "suplyPrvuseAr": 36.83,
+          "suplyCmnuseAr": 10.94,
+          "houseTyNm": "",
+          "heatMthdDetailNm": "",
+          "buldStleNm": "",
+          "elvtrInstlAtNm": "",
+          "parkngCo": 0,
+          "bassRentGtn": 6482000,
+          "bassMtRntchrg": 502250,
+          "bassCnvrsGtnLmt": 0
+        }
+      ]
+    }
+  }
+}

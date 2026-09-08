@@ -1,0 +1,57 @@
+{
+  "response": {
+    "header": {
+      "resultCode": "00",
+      "resultMsg": "NORMAL SERVICE"
+    },
+    "body": {
+      "totalCount": "3763",
+      "numOfRows": "3",
+      "pageNo": "1",
+      "item": [
+        {
+          "rtsInsttNm": "LH서울",
+          "brtcNm": "서울특별시",
+          "signguNm": "관악구",
+          "rnAdres": "서울특별시 관악구 난곡로 63",
+          "hsmpSn": 30699540,
+          "hsmpNm": "관악산휴먼시아 3단지",
+          "houseTyNm": "아파트",
+          "suplyTyNm": "50년임대",
+          "styleNm": "39",
+          "drwtUnit": "39",
+          "waitCo": 38,
+          "trmnatCo": 10
+        },
+        {
+          "rtsInsttNm": "LH서울",
+          "brtcNm": "서울특별시",
+          "signguNm": "강북구",
+          "rnAdres": "서울특별시 강북구 한천로105길 24",
+          "hsmpSn": 30699920,
+          "hsmpNm": "서울번동주공2단지",
+          "houseTyNm": "아파트",
+          "suplyTyNm": "영구임대",
+          "styleNm": "26",
+          "drwtUnit": "39.85",
+          "waitCo": 0,
+          "trmnatCo": 23
+        },
+        {
+          "rtsInsttNm": "LH서울",
+          "brtcNm": "서울특별시",
+          "signguNm": "강북구",
+          "rnAdres": "서울특별시 강북구 한천로105길 24",
+          "hsmpSn": 30699920,
+          "hsmpNm": "서울번동주공2단지",
+          "houseTyNm": "아파트",
+          "suplyTyNm": "영구임대",
+          "styleNm": "31",
+          "drwtUnit": "44.15",
+          "waitCo": 0,
+          "trmnatCo": 16
+        }
+      ]
+    }
+  }
+}

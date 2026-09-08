@@ -22,9 +22,11 @@ CREATE TYPE publish_state AS ENUM ('parsed', 'review', 'published', 'closed', 'r
 CREATE TYPE geo_precision AS ENUM ('building', 'road', 'dong');
 
 -- 임대주택 유형. 기관별 표기를 이 코드로 정규화한다(S5).
+-- 마이홈포털 API 공급유형 코드표(docs/api-spec/붙임1)와 1:1. '든든전세'만 HUG 자체 유형.
 CREATE TYPE housing_type AS ENUM (
   '행복주택', '국민임대', '매입임대', '장기전세',
-  '통합공공임대', '전세임대', '든든전세', '영구임대', '공공지원민간임대'
+  '통합공공임대', '전세임대', '든든전세', '영구임대', '공공지원민간임대',
+  '50년임대', '10년임대', '6년임대', '5년임대', '공공기숙사'
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -35,30 +37,53 @@ CREATE TABLE notice (
   id              bigserial PRIMARY KEY,
   slug            text        NOT NULL UNIQUE,  -- URL 식별자. 예: sh-2026-02-maeip
   fingerprint     text        NOT NULL UNIQUE,  -- 기관+공고명+게시일 해시. 중복 수집 방지
+  source          text        NOT NULL,         -- myhome_api · myhome_file · lh_scrape · sh_scrape · youth_scrape
+  source_key      text        UNIQUE,           -- 출처 내 고유키. 마이홈 API는 'pblancId:houseSn'
+  amends_source_key text,                       -- 정정공고가 대체하는 원 공고의 source_key (API beforePblancId)
   agency          text        NOT NULL,         -- LH · SH · GH · HUG
   title           text        NOT NULL,
-  housing_type    housing_type NOT NULL,
+  housing_type    housing_type NOT NULL,        -- 공급유형 (API suplyTyNm)
+  house_type      text,                         -- 주택유형: 아파트·다가구주택·오피스텔… (API houseTyNm)
   sido            text        NOT NULL,
-  posted_at       date        NOT NULL,
-  apply_start_at  date,
-  apply_end_at    date,                         -- 마감일. D-day의 근거
-  announce_at     date,                         -- 발표일. 서울주거포털에만 있는 필드
-  status          notice_status NOT NULL,
+  sigungu         text,                         -- 매입임대 공고는 비어 온다
+  complex_name    text,                         -- 단지형 공고만 (API hsmpNm)
+  address         text,                         -- 공고 대표 주소, 도로명 우선 (API fullAdres). 매입임대는 빈값
+  pnu             char(19),                     -- 필지고유번호. 좌표 조인 보조키
+  heating         text,
+  total_household integer,                      -- 단지 총세대수 (API totHshldCo)
+  supply_count    integer,                      -- 이번 공고 공급호수 (API sumSuplyCo). unit_count는 파서가 센 값
+  min_deposit     bigint,                       -- 최소 임대보증금(원). 범위의 하한이지 호실 금액이 아니다
+  min_rent        bigint,                       -- 최소 월임대료(원)
+  min_down_payment bigint,                      -- 최소 계약금
+  min_interim     bigint,                       -- 최소 중도금
+  min_balance     bigint,                       -- 최소 잔금
+  posted_at       date        NOT NULL,         -- 공고일 (API rcritPblancDe)
+  apply_start_at  date,                         -- API beginDe
+  apply_end_at    date,                         -- 마감일. D-day의 근거 (API endDe)
+  announce_at     date,                         -- 당첨자 발표일 (API przwnerPresnatnDe, SH 목록 발표일)
+  status          notice_status NOT NULL,       -- 일정 기준으로 파이프라인이 도출
+  source_status   text,                         -- 출처 원문 상태값: 일반공고·정정공고·접수중…
   source_url      text        NOT NULL,         -- 기관 원문 링크. 첨부는 재배포하지 않는다
+  portal_url      text,                         -- 마이홈포털 상세 (API pcUrl)
+  contact         text,                         -- 문의처 (API refrnc)
   publish         publish_state NOT NULL DEFAULT 'parsed',
   unit_count      integer     NOT NULL DEFAULT 0,
+  raw             jsonb,                        -- 출처 응답 원문 1건. 재파싱·필드 추가 시 재수집 불필요
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE  notice IS '입주자모집공고 1건. S1에서 수집, S2에서 상태·마감 갱신';
 COMMENT ON COLUMN notice.fingerprint IS '기관+공고명+게시일 해시. 같은 공고를 여러 소스에서 받아도 한 행으로 모은다';
-COMMENT ON COLUMN notice.announce_at IS '당첨자 발표일. 서울주거포털 SH 목록에만 있고 LH 목록에는 없다';
+COMMENT ON COLUMN notice.announce_at IS '당첨자 발표일. 마이홈 API przwnerPresnatnDe 또는 서울주거포털 발표일. LH청약플러스 목록에는 없다';
+COMMENT ON COLUMN notice.raw IS '출처 응답 원문(jsonb). 마이홈 API 1건 약 1KB, 연 수천 건이라 무료 티어에 부담 없다';
+COMMENT ON COLUMN notice.min_deposit IS 'API rentGtn. 공고 내 최소값. 호실별 금액은 unit.deposit';
 COMMENT ON COLUMN notice.publish IS '마감돼도 삭제하지 않고 closed로 둔다. URL을 죽이지 않는다';
 
 CREATE INDEX idx_notice_apply_end   ON notice (apply_end_at DESC NULLS LAST) WHERE publish = 'published';
 CREATE INDEX idx_notice_sido_type   ON notice (sido, housing_type)           WHERE publish = 'published';
 CREATE INDEX idx_notice_posted      ON notice (posted_at DESC);
+CREATE INDEX idx_notice_pnu         ON notice (pnu) WHERE pnu IS NOT NULL;
 
 -- 공고 상태 변경 이력. "정정됨" 배지와 변경 타임라인의 근거
 CREATE TABLE notice_event (
@@ -99,30 +124,63 @@ COMMENT ON COLUMN raw_snapshot.file_hash IS '해시 변경 = 정정공고. notic
 
 CREATE TABLE complex (
   id            bigserial PRIMARY KEY,
-  slug          text        NOT NULL UNIQUE,  -- 서도휴빌3차-11200
-  complex_code  text        NOT NULL UNIQUE,  -- 기관 단지코드
-  name          text        NOT NULL,
-  agency        text        NOT NULL,
+  slug          text        NOT NULL UNIQUE,  -- 서도휴빌3차-30699540
+  complex_code  text        NOT NULL UNIQUE,  -- 마이홈포털 단지 식별자 hsmpSn. 단지정보·대기현황 API 공통 키
+  lh_code       text,                         -- LH 파일데이터 15080989 단지코드 (있을 때만)
+  name          text        NOT NULL,         -- 매입임대는 '서울특별시 종로구'처럼 지역명이 온다
+  agency        text        NOT NULL,         -- API insttNm 그대로: LH서울 · SH …
   housing_type  housing_type,
-  road_address  text,
+  road_address  text,                         -- API rnAdres
   jibun_address text,
+  pnu           char(19),
   sido          text        NOT NULL,
+  sido_code     text,                         -- 광역시도 코드 (API brtcCode)
   sigungu       text        NOT NULL,
-  eupmyeondong  text,
+  sigungu_code  text,                         -- 시군구 코드 (API signguCode)
+  eupmyeondong  text,                         -- S5/S6이 주소에서 도출
   household_cnt integer,
-  building_cnt  integer,
+  building_cnt  integer,                      -- LH 파일데이터 15080989에서만
   completed_on  date,
   geom          geography(Point, 4326),
   geo_precision geo_precision,
   publish       publish_state NOT NULL DEFAULT 'parsed',
+  raw           jsonb,                        -- 단지정보 API 첫 행 원문
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE complex IS '임대주택 단지. 공고와 독립적으로 존재하며 역대 공고 이력을 모은다';
+COMMENT ON TABLE  complex IS '임대주택 단지. 공고와 독립적으로 존재하며 역대 공고 이력을 모은다';
+COMMENT ON COLUMN complex.complex_code IS '마이홈 hsmpSn. 단지정보 API(HWSPR04) 행은 단지×형이라 첫 행에서 단지 속성만 뽑아 넣고 형은 complex_type으로';
 
 CREATE INDEX idx_complex_region ON complex (sido, sigungu, eupmyeondong);
 CREATE INDEX idx_complex_geom   ON complex USING GIST (geom);
+CREATE INDEX idx_complex_pnu    ON complex (pnu) WHERE pnu IS NOT NULL;
+
+-- 단지 × 형(면적 타입). 단지정보 API HWSPR04의 실제 행 단위
+CREATE TABLE complex_type (
+  id              bigserial PRIMARY KEY,
+  complex_id      bigint      NOT NULL REFERENCES complex(id) ON DELETE CASCADE,
+  style_name      text        NOT NULL,        -- 형명 (API styleNm). '36' '39' '59A' …
+  housing_type    housing_type,                -- 같은 단지에 공급유형이 섞일 수 있어 형 단위에 둔다
+  house_type      text,                        -- API houseTyNm. 매입임대는 빈값
+  exclusive_area  numeric(7,2),                -- 공급 전용면적 ㎡ (API suplyPrvuseAr)
+  common_area     numeric(7,2),                -- 공급 공용면적 ㎡ (API suplyCmnuseAr)
+  heating         text,                        -- API heatMthdDetailNm
+  building_style  text,                        -- API buldStleNm
+  has_elevator    boolean,                     -- API elvtrInstlAtNm
+  parking_cnt     integer,                     -- API parkngCo
+  base_deposit    bigint,                      -- 기본 임대보증금(원) (API bassRentGtn)
+  base_rent       bigint,                      -- 기본 월임대료(원) (API bassMtRntchrg)
+  conversion_deposit_limit bigint,             -- 기본 전환보증금 한도 (API bassCnvrsGtnLmt)
+  raw             jsonb,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE NULLS NOT DISTINCT (complex_id, housing_type, style_name)
+);
+
+COMMENT ON TABLE complex_type IS '단지 안의 면적 타입. 호실(unit)이 없어도 단지 페이지에 형별 보증금·임대료 표를 만든다';
+
+CREATE INDEX idx_complex_type_complex ON complex_type (complex_id);
 
 -- ─────────────────────────────────────────────────────────────
 -- S4 — 호실
@@ -214,18 +272,29 @@ CREATE INDEX idx_eligibility_notice ON eligibility (notice_id, rank_order);
 
 CREATE TABLE waitlist (
   id           bigserial PRIMARY KEY,
-  complex_id   bigint      NOT NULL REFERENCES complex(id) ON DELETE CASCADE,
-  housing_type housing_type,
-  area_group   text,                    -- 면적 구간
-  waiting_no   integer,                 -- 현재 대기 번호
-  surveyed_on  date        NOT NULL,    -- 기준일
+  complex_code text        NOT NULL,      -- 마이홈 hsmpSn. 단지정보를 아직 못 받았어도 적재한다
+  complex_id   bigint      REFERENCES complex(id) ON DELETE SET NULL,  -- S5가 complex_code로 뒤에 연결
+  agency       text,                      -- 임대사업자명 (API rtsInsttNm)
+  complex_name text,
+  road_address text,                      -- API rnAdres. 단지 미수집 시 좌표 조인 입력
+  sido         text,
+  sigungu      text,
+  housing_type housing_type,              -- 공급유형 (API suplyTyNm)
+  house_type   text,                      -- API houseTyNm
+  style_name   text        NOT NULL DEFAULT '',  -- 형명 (API styleNm)
+  draw_unit    text        NOT NULL DEFAULT '',  -- 추첨단위 (API drwtUnit)
+  waiting_cnt  integer,                   -- 입주대기자 수 (API waitCo). 대기 번호가 아니다
+  vacated_cnt  integer,                   -- 퇴거 건수 (API trmnatCo)
+  surveyed_on  date        NOT NULL,      -- 수집일 기준. API에 기준일 필드가 없어 수집일을 쓴다
+  raw          jsonb,
   created_at   timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (complex_id, housing_type, area_group, surveyed_on)
+  UNIQUE NULLS NOT DISTINCT (complex_code, housing_type, style_name, draw_unit, surveyed_on)
 );
 
-COMMENT ON TABLE waitlist IS '"이 단지 지금 몇 번까지 빠졌나". 벤치마크에 없는 차별화 데이터';
+COMMENT ON TABLE  waitlist IS '"이 단지 형별로 몇 명이 기다리고 얼마나 빠지나". 벤치마크에 없는 차별화 데이터';
+COMMENT ON COLUMN waitlist.waiting_cnt IS 'API waitCo = 입주대기자 수. 대기순번이 아니므로 화면에서 "N명 대기"로 쓴다';
 
-CREATE INDEX idx_waitlist_complex ON waitlist (complex_id, surveyed_on DESC);
+CREATE INDEX idx_waitlist_complex ON waitlist (complex_code, surveyed_on DESC);
 
 -- ─────────────────────────────────────────────────────────────
 -- S6 — 주소·좌표 매칭 결과
@@ -234,9 +303,10 @@ CREATE INDEX idx_waitlist_complex ON waitlist (complex_id, surveyed_on DESC);
 CREATE TABLE address_match (
   id             bigserial PRIMARY KEY,
   normalized_addr text       NOT NULL UNIQUE,  -- S5가 정규화한 도로명주소
+  pnu            char(19),               -- 도로명 매칭 실패 시 필지 단위 보조키
   geom           geography(Point, 4326) NOT NULL,
   precision      geo_precision NOT NULL,
-  matched_by     text        NOT NULL,   -- road_addr · building_name · jibun · dong_center
+  matched_by     text        NOT NULL,   -- road_addr · building_name · pnu · jibun · dong_center
   created_at     timestamptz NOT NULL DEFAULT now()
 );
 
@@ -244,6 +314,7 @@ COMMENT ON TABLE address_match IS
   '요약DB 오프라인 조인에 성공한 좌표만 담는다. 요약DB 전국 원본(수백만 행)은 pipeline/data/에 두고 여기 넣지 않는다';
 
 CREATE INDEX idx_address_match_geom ON address_match USING GIST (geom);
+CREATE INDEX idx_address_match_pnu  ON address_match (pnu) WHERE pnu IS NOT NULL;
 
 -- ─────────────────────────────────────────────────────────────
 -- S7 — 검수 큐
@@ -275,7 +346,7 @@ CREATE INDEX idx_review_pending ON review_queue (entity_type, created_at) WHERE 
 CREATE TABLE ingest_log (
   id          bigserial PRIMARY KEY,
   stage       text        NOT NULL,   -- S1 ~ S8
-  source      text        NOT NULL,   -- myhome_api · lh_scrape · sh_scrape · youth_scrape
+  source      text        NOT NULL,   -- myhome_api · myhome_file · lh_scrape · sh_scrape · youth_scrape
   ok          boolean     NOT NULL,
   item_count  integer     NOT NULL DEFAULT 0,
   message     text,
