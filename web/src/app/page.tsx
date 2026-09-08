@@ -38,8 +38,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return (
     <>
       <div className="hero">
-        <h1 className="page-title">임대주택 모집공고</h1>
-        <p className="page-sub">진행 중인 공고 <b>{total.toLocaleString("ko-KR")}건</b>. 마감 임박순. 보증금·월임대료는 공고에 적힌 최소값입니다.</p>
+        <h1>임대주택 모집공고 지도</h1>
+        <p>LH·SH·지방공사 공고를 한곳에. 마감 임박순, 보증금·월임대료는 공고에 적힌 최소값입니다.</p>
+        <div className="stat">
+          <div><span>전체</span><b>{total.toLocaleString("ko-KR")}</b></div>
+          <div><span>서울 SH</span><b>{(options.sido.find((o) => o.value === "서울특별시")?.count ?? 0).toLocaleString("ko-KR")}</b></div>
+          <div><span>민간임대</span><b>{countOf("민간임대")}</b></div>
+        </div>
       </div>
 
       <nav className="tabs" aria-label="공공/민간 구분">

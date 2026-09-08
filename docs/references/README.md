@@ -66,3 +66,16 @@
 ## SH가 벤치마크의 주력이다
 
 스크린샷의 카드 전부 SH. 마이홈포털 API에는 SH·GH가 없으므로(data-sources.md) **서울주거포털 스크래퍼가 다음 우선순위**다.
+
+## 디자인 토큰 출처 (2026-09-08)
+
+사용자 프로젝트 3개(fitin-app · fitin-bo · smokespot)를 대조해 `web/src/app/globals.css`를 정했다.
+
+| 가져온 것 | 출처 |
+|---|---|
+| 라일락 팔레트·텍스트 대비값(`#6E698A` `#645F80`은 AA 통과값, 밝게 바꾸지 말 것) | smokespot `design/README.md`, `globals.css` |
+| 카드 18px · 버튼 14px · 칩 pill · 히어로 밴드 28px · 브레이크포인트 768 한 단계 | smokespot |
+| 상태색 success/warning/error/info 값 | fitin-app `primitives.scss` = fitin-bo `common_Tokens_Foundation.css` |
+| 그림자 스케일, 모션 ease | fitin 공통 |
+| **Pretendard 단일 패밀리** | fitin-app이 라틴/한글 2폰트(Space Grotesk+Gothic A1)를 버리고 정착한 결론. smokespot의 Archivo+Gothic A1은 안 따름 |
+| 브랜드 색 SSOT: `--brand-*` 블록만 바꾸면 전 화면 반영 | fitin-app `--Fitin_point_*` 관습 |

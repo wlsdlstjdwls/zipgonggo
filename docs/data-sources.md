@@ -96,6 +96,13 @@
 `https://housing.seoul.go.kr/site/main/sh/publicLease/02/list` — **확인됨**
 
 > `robots.txt`는 `User-agent: *` / `Allow: /` — 크롤링 제약 없음 (확인됨).
+>
+> **실측 구조 (2026-09-08, 스크래퍼 구현 완료 `pipeline/src/zipgonggo_pipeline/sources/sh.py`)**
+> - 정적 HTML, UTF-8. `<table>` 1개, thead 8열. 10행/페이지, 페이지네이션 링크 `?cp=N`으로 마지막 페이지 판정(현재 9)
+> - GET 파라미터 `cp` `sc` `startDate` `endDate` `splyCd` `recrnotiState`(now/suc) `sv`. **기본 화면은 `splyCd=02`(국민공공임대)라 8건만 보인다. 전체는 `splyCd=` 빈값 → 81건**
+> - 청약유형 코드 15종: 02 국민공공임대 · 03 장기전세 · 04 매입임대 · 05 장기안심 · 06 희망하우징 · 07 행복주택 · 08 용지분양 · 10 청년안심 · 11 두레 · 13 도시형생활 · 14 수요자맞춤형 · 20 전세임대 · 21 상가임대 · 23 재개발임대
+> - 공고명 셀의 포털 상세 링크는 **주석 처리**돼 있다(`<!-- <a href="/site/main/sh/publicLease/view?seq=N"> -->`). 링크 셀의 「바로가기」가 i-sh.co.kr 원문(`view.do?seq=309467`) — 이게 `source_key`
+> - 포털 상세(view)는 본문 텍스트만. 첨부는 없고 "SH공사 바로가기로 확인"이라 안내. 접수기간은 본문 자유서술이라 목록 단계에선 미구조화
 
 - 컬럼: 번호 · 청약유형 · 공고명 · 공고게시일 · **발표일** · 모집상태 · 담당부서 · 링크
 - **`발표일`은 LH 목록에 없는 필드.** 당첨자 발표 D-day를 만들 수 있다

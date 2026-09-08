@@ -1,156 +1,240 @@
+/* 집공고 디자인 토큰
+   — smokespot(라일락, WCAG AA 검증값)을 계승하고 fitin 계열의 상태색·그림자 스케일을 가져왔다.
+   — 폰트는 fitin-app의 결론(Pretendard 단일 패밀리)을 따른다. 상세 근거: docs/references/README.md
+   — 브랜드 색을 바꾸려면 아래 --brand-* 블록만 손댄다. */
 :root {
-  --bg: #f6f7f9;
+  /* 브랜드 — 라일락 파스텔 */
+  --brand-50: #f8f6ff;   /* 선택 행·인포 박스 */
+  --brand-100: #eee9ff;  /* 라일락 면: 헤더 밴드·히어로·카드 헤더 */
+  --brand-200: #dcd3fb;  /* 라일락 경계 */
+  --brand-300: #c3b6f6;  /* 카드 헤더 그라데이션 끝·트랙 */
+  --brand-400: #9c8aec;
+  --brand-500: #7a67e0;  /* 기본 액션 */
+  --brand-600: #6553ce;  /* hover */
+  --brand-700: #5344b0;  /* active · 라일락 면 위 텍스트 */
+  --brand-900: #2c2560;
+
+  --primary: var(--brand-500);
+  --primary-hover: var(--brand-600);
+  --primary-deep: var(--brand-700);
+  --primary-rgb: 122, 103, 224;
+  --on-primary: #ffffff;
+
+  /* 표면 */
+  --bg: #ffffff;
   --surface: #ffffff;
-  --text: #16181d;
-  --muted: #6b7280;
-  --line: #e5e7eb;
-  --brand: #1f5eff;
-  --brand-ink: #0b3bb8;
-  --brand-soft: #e8efff;
-  --urgent: #d92d20;
-  --urgent-soft: #fee4e2;
-  --soon: #b54708;
-  --soon-soft: #fef0c7;
-  --open: #067647;
-  --open-soft: #dcfae6;
-  --closed: #6b7280;
-  --closed-soft: #f2f4f7;
-  --radius: 12px;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
-  --maxw: 960px;
-  --font: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --surface-sunken: #f6f5fa;
+  --lilac-surface: var(--brand-100);
+  --lilac-tint: var(--brand-50);
+  --lilac-mid: var(--brand-300);
+
+  /* 텍스트 — #6E698A·#645F80은 AA 통과값. 더 밝게 바꾸지 않는다 */
+  --ink: #211d33;
+  --text: var(--ink);
+  --text-muted: #605b7a;   /* 라일락 면 위 보조 */
+  --muted: #6e698a;        /* 흰 배경 위 메타 (4.6:1) */
+  --fine-print: #645f80;
+  --icon-muted: #8580a8;
+
+  /* 경계 */
+  --line: #f1eff8;
+  --line-strong: #e3e0ee;
+
+  /* 상태색 — fitin-app/fitin-bo 공통값 */
+  --success: #15803d;  --success-bg: rgba(34, 197, 94, 0.14);
+  --warning: #a16207;  --warning-bg: rgba(245, 158, 11, 0.16);
+  --error: #c2410c;    --error-bg: rgba(239, 68, 68, 0.13);
+  --info: #1d4ed8;     --info-bg: rgba(59, 130, 246, 0.13);
+
+  /* 민간임대 구분색 — 라일락과 대비되는 파스텔 로즈 */
+  --rose-surface: #fde9f0;
+  --rose-mid: #f4c6d8;
+  --rose-ink: #8a3a5f;
+
+  /* 형태 — smokespot: 카드 18 · 버튼 14 · 칩 pill */
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-card: 18px;
+  --radius-hero: 28px;
+  --radius-pill: 9999px;
+
+  --shadow-xs: 0 1px 2px rgba(33, 29, 51, 0.05);
+  --shadow-card: 0 4px 12px -5px rgba(33, 29, 51, 0.16);
+  --shadow-float: 0 6px 18px -8px rgba(33, 29, 51, 0.25);
+  --shadow-brand: 0 6px 18px -8px rgba(var(--primary-rgb), 0.65);
+
+  --duration-fast: 150ms;
+  --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --gutter: 20px;
+  --maxw: 980px;
+  --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif;
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
 body {
   margin: 0;
   font-family: var(--font);
   font-size: 15px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--text);
   background: var(--bg);
+  -webkit-font-smoothing: antialiased;
   word-break: keep-all;
+  overflow-wrap: break-word;
 }
 a { color: inherit; text-decoration: none; }
-a:hover { text-decoration: underline; }
-h1, h2, h3 { line-height: 1.3; margin: 0; }
+h1, h2, h3 { line-height: 1.3; margin: 0; letter-spacing: -0.02em; text-wrap: pretty; }
 table { border-collapse: collapse; width: 100%; }
-th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { color: var(--muted); font-weight: 600; font-size: 13px; white-space: nowrap; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line-strong); vertical-align: top; }
+th { color: var(--muted); font-weight: 700; font-size: 12px; letter-spacing: 0.02em; white-space: nowrap; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+small { font-size: 12px; }
 
-.container { max-width: var(--maxw); margin: 0 auto; padding: 0 16px; }
+/* iOS 입력 확대 방지 (smokespot) */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
 
-/* header / footer */
+.container { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--gutter); }
+
+/* ── 헤더 / 푸터 ───────────────────────────────────────── */
 .site-header { background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; }
-.site-header .container { display: flex; align-items: center; justify-content: space-between; height: 52px; }
-.logo { font-weight: 800; font-size: 18px; letter-spacing: -0.02em; color: var(--brand-ink); }
-.logo:hover { text-decoration: none; }
-.site-header nav a { color: var(--muted); font-size: 14px; margin-left: 14px; }
-.site-footer { margin-top: 48px; padding: 24px 0 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.site-header .container { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+.logo { display: inline-flex; align-items: center; gap: 6px; font-weight: 900; font-size: 19px; letter-spacing: -0.04em; color: var(--primary-deep); }
+.logo i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--primary); transform: rotate(45deg); }
+.site-header nav a { color: var(--muted); font-size: 14px; font-weight: 600; margin-left: 16px; }
+.site-header nav a:hover { color: var(--primary-deep); }
+.site-footer { margin-top: 56px; padding: 24px 0 48px; border-top: 1px solid var(--line); color: var(--fine-print); font-size: 12px; }
 .site-footer p { margin: 4px 0; }
 
-/* page */
-.page-title { font-size: 22px; font-weight: 800; margin: 20px 0 6px; }
-.page-sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+/* ── 히어로 밴드 (smokespot 관용구: 라일락 면, 데스크톱에서 카드화) ── */
+.hero { background: var(--lilac-surface); margin: 0 calc(-1 * var(--gutter)); padding: 22px var(--gutter) 18px; }
+.hero h1 { font-size: 25px; font-weight: 900; letter-spacing: -0.035em; color: var(--ink); margin: 0 0 6px; }
+.hero p { margin: 0; color: var(--text-muted); font-size: 14px; }
+.hero p b { color: var(--primary-deep); font-weight: 800; }
+.hero .stat { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.hero .stat div { background: rgba(255, 255, 255, 0.62); border-radius: var(--radius-lg); padding: 8px 14px; min-width: 96px; }
+.hero .stat span { display: block; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; color: var(--text-muted); }
+.hero .stat b { font-size: 21px; font-weight: 900; letter-spacing: -0.03em; color: var(--primary-deep); font-variant-numeric: tabular-nums; }
 
-/* filters */
-.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+/* ── 탭 (smokespot tab variant: border-b-2, 활성만 브랜드) ── */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line-strong); margin: 14px 0 12px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs a { padding: 10px 12px; font-size: 14px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs a small { font-weight: 700; color: var(--icon-muted); margin-left: 3px; font-size: 12px; }
+.tabs a.on { color: var(--primary); font-weight: 800; border-bottom-color: var(--primary); }
+.tabs a.on small { color: var(--primary); }
+
+/* ── 필터 ──────────────────────────────────────────────── */
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
 .filters select, .filters button, .filters a.reset {
-  height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
-  padding: 0 10px; font: inherit; font-size: 14px; color: var(--text);
+  height: 40px; border: 1.5px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface);
+  padding: 0 12px; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink);
 }
-.filters button { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; cursor: pointer; }
+.filters select:focus, .filters button:focus-visible { outline: 3px solid rgba(var(--primary-rgb), 0.35); outline-offset: 1px; }
+.filters button { background: var(--primary); color: var(--on-primary); border-color: var(--primary); font-weight: 700; cursor: pointer; padding: 0 16px; }
+.filters button:hover { filter: brightness(0.95); }
 .filters a.reset { display: inline-flex; align-items: center; color: var(--muted); }
-.filters a.reset:hover { text-decoration: none; background: var(--closed-soft); }
-.result-count { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+.filters a.reset:hover { background: var(--surface-sunken); }
+.result-count { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.02em; margin: 0 0 10px; }
 
-/* hero + tabs */
-.hero { margin-top: 20px; }
-.tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 14px; overflow-x: auto; }
-.tabs a { padding: 10px 12px; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
-.tabs a small { font-weight: 600; color: var(--muted); margin-left: 2px; }
-.tabs a.on { color: var(--brand-ink); border-bottom-color: var(--brand); }
-.tabs a:hover { text-decoration: none; color: var(--text); }
+/* ── 배지 · 칩 (pill) ──────────────────────────────────── */
+.badge { display: inline-block; padding: 3px 9px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 800; line-height: 16px; white-space: nowrap; letter-spacing: 0.01em; }
+.badge.urgent { background: var(--error-bg); color: var(--error); }
+.badge.soon { background: var(--warning-bg); color: var(--warning); }
+.badge.open { background: var(--success-bg); color: var(--success); }
+.badge.upcoming { background: var(--info-bg); color: var(--info); }
+.badge.closed, .badge.none { background: var(--surface-sunken); color: var(--muted); }
+.chip { display: inline-block; padding: 3px 9px; border-radius: var(--radius-pill); background: var(--surface-sunken); color: var(--fine-print); font-size: 11px; font-weight: 700; line-height: 16px; }
+.chip.type { background: var(--lilac-surface); color: var(--primary-deep); }
+.chip.amend { background: var(--warning-bg); color: var(--warning); }
+.chip.sector { background: var(--info-bg); color: var(--info); }
+.chip.sector.private { background: var(--rose-surface); color: var(--rose-ink); }
+.card-top { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 
-/* card grid (benchmark: docs/references/공고지도1.png) */
+/* ── 카드 그리드 (벤치마크 공고지도1 + smokespot 카드 18px) ── */
 .card-grid { display: grid; gap: 14px; list-style: none; padding: 0; margin: 0; grid-template-columns: 1fr; }
-.card-grid .card { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
-.card-hero { padding: 14px 16px 12px; color: #fff; background: linear-gradient(135deg, #1f3a8a 0%, #2563eb 60%, #3b82f6 100%); }
-.card-hero.private { background: linear-gradient(135deg, #4a1d96 0%, #7c3aed 60%, #a855f7 100%); }
+.card { background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-card); box-shadow: var(--shadow-xs); overflow: hidden; display: flex; flex-direction: column; transition: box-shadow var(--duration-fast) var(--ease-standard), border-color var(--duration-fast); }
+.card:hover { border-color: var(--brand-300); box-shadow: var(--shadow-card); }
+.card-hero { padding: 14px 16px 12px; color: var(--ink); background: linear-gradient(135deg, var(--brand-100) 0%, var(--brand-200) 100%); }
+.card-hero.private { background: linear-gradient(135deg, var(--rose-surface) 0%, var(--rose-mid) 100%); }
 .card-hero-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.region-badge { display: inline-flex; align-items: center; gap: 2px; background: rgba(255,255,255,0.18); border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 700; }
-.card-headline { margin: 12px 0 2px; font-size: 22px; font-weight: 900; letter-spacing: -0.01em; text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
-.card-headline-sub { margin: 0; font-size: 13px; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.card-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip.sector { background: #e0f2fe; color: #075985; }
-.chip.sector.private { background: #f3e8ff; color: #6b21a8; }
-.card-grid .card-title { font-size: 15px; margin: 0; line-height: 1.4; }
-.card-grid .card-title a:hover { text-decoration: underline; }
-.card-grid .card-money { margin-top: 2px; }
-.card-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 4px; }
-.card-actions .btn { flex: 1; justify-content: center; height: 36px; }
+.region-badge { display: inline-flex; align-items: center; gap: 3px; background: rgba(255, 255, 255, 0.7); border-radius: var(--radius-pill); padding: 3px 9px; font-size: 11px; font-weight: 800; color: var(--primary-deep); }
+.card-hero.private .region-badge { color: var(--rose-ink); }
+.card-headline { margin: 12px 0 2px; font-size: 21px; font-weight: 900; letter-spacing: -0.03em; line-height: 1.25; }
+.card-headline-sub { margin: 0; font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 9px; flex: 1; }
+.card-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.card-title { font-size: 15px; font-weight: 700; margin: 0; line-height: 1.45; letter-spacing: -0.02em; }
+.card-title a:hover { color: var(--primary-deep); }
+.card-money { display: flex; gap: 14px; font-size: 13px; }
+.card-money span { display: block; color: var(--muted); font-size: 11px; font-weight: 700; }
+.card-money b { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.card-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 2px; }
+.card-actions .btn { flex: 1; justify-content: center; height: 40px; }
+.empty { padding: 48px 0; text-align: center; color: var(--muted); }
 
-/* cards */
-.card-list { display: grid; gap: 10px; list-style: none; padding: 0; margin: 0; }
-.card {
-  display: block; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 14px 16px; box-shadow: var(--shadow);
-}
-.card:hover { text-decoration: none; border-color: #c7d2fe; }
-.card-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
-.card-title { font-size: 16px; font-weight: 700; margin: 0 0 8px; }
-.card-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 13px; }
-.card-money { display: flex; gap: 14px; margin-top: 10px; font-size: 14px; }
-.card-money b { font-variant-numeric: tabular-nums; }
-.card-money span { color: var(--muted); font-size: 12px; margin-right: 4px; }
+/* ── 버튼 (smokespot: 14px radius, hover brightness) ── */
+.btn { display: inline-flex; align-items: center; height: 42px; padding: 0 16px; border-radius: var(--radius-lg); border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--ink); font-weight: 700; font-size: 14px; transition: filter var(--duration-fast); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.btn:hover { filter: brightness(0.95); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 
-/* badges */
-.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 18px; white-space: nowrap; }
-.badge.urgent { background: var(--urgent-soft); color: var(--urgent); }
-.badge.soon { background: var(--soon-soft); color: var(--soon); }
-.badge.open { background: var(--open-soft); color: var(--open); }
-.badge.upcoming { background: var(--brand-soft); color: var(--brand-ink); }
-.badge.closed, .badge.none { background: var(--closed-soft); color: var(--closed); }
-.chip { display: inline-block; padding: 2px 8px; border-radius: 6px; background: var(--closed-soft); color: #374151; font-size: 12px; font-weight: 600; }
-.chip.type { background: var(--brand-soft); color: var(--brand-ink); }
-.chip.amend { background: var(--soon-soft); color: var(--soon); }
+/* ── 상세 ──────────────────────────────────────────────── */
+.detail-head { background: var(--lilac-surface); border-radius: var(--radius-hero); padding: 20px 20px 18px; margin-top: 16px; }
+.detail-head h1 { font-size: 22px; font-weight: 900; letter-spacing: -0.035em; margin: 10px 0 8px; color: var(--ink); }
+.detail-head .spec { margin-top: 10px; }
+.detail-head .spec dt { color: var(--text-muted); }
+.deposit-lead { font-size: 14px; margin: 0 0 6px; color: var(--text-muted); font-weight: 600; }
+.deposit-lead b { color: var(--primary-deep); font-size: 22px; font-weight: 900; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin-right: 2px; }
+.section { background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-card); padding: 16px 18px; margin-top: 12px; box-shadow: var(--shadow-xs); }
+.section h2 { font-size: 15px; font-weight: 800; letter-spacing: -0.015em; margin-bottom: 10px; color: var(--ink); }
+.section h2::before { content: ""; display: inline-block; width: 4px; height: 14px; border-radius: 2px; background: var(--primary); margin-right: 8px; vertical-align: -2px; }
 
-/* detail */
-.detail-head { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 18px 16px; margin-top: 16px; box-shadow: var(--shadow); }
-.detail-head h1 { font-size: 20px; font-weight: 800; margin: 8px 0 10px; }
-.detail-head .card-meta { font-size: 14px; }
-.section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-top: 12px; box-shadow: var(--shadow); }
-.section h2 { font-size: 15px; font-weight: 800; margin-bottom: 10px; color: #111827; }
-.kv { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; margin: 0; font-size: 14px; }
-.kv dt { color: var(--muted); }
-.kv dd { margin: 0; }
-.money-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.money-grid .cell { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-.money-grid .cell span { display: block; color: var(--muted); font-size: 12px; }
-.money-grid .cell b { font-size: 17px; font-variant-numeric: tabular-nums; }
-.money-grid .cell small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
-.note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
-.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-.btn { display: inline-flex; align-items: center; height: 38px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: 14px; }
-.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
-.btn:hover { text-decoration: none; filter: brightness(0.97); }
-.map { width: 100%; height: 300px; border-radius: 10px; background: #eef1f5; overflow: hidden; }
+/* 제원 그리드 (벤치마크 공고지도3: 라벨 : 값, 3열) */
+.spec { display: grid; grid-template-columns: 1fr; gap: 6px 18px; margin: 0; font-size: 14px; }
+.spec div { display: flex; gap: 6px; min-width: 0; }
+.spec dt { color: var(--muted); font-weight: 700; white-space: nowrap; }
+.spec dt::after { content: " :"; }
+.spec dd { margin: 0; color: var(--ink); font-weight: 500; overflow-wrap: anywhere; }
+.spec .wide { grid-column: 1 / -1; }
+
+/* 금액 표 */
+.price-table th { background: var(--lilac-tint); color: var(--primary-deep); text-align: center; padding: 10px; border-bottom: 1px solid var(--line-strong); }
+.price-table td { text-align: center; padding: 12px 10px; font-variant-numeric: tabular-nums; font-size: 15px; }
+.price-table td:first-child { color: var(--muted); font-size: 13px; font-weight: 700; }
+.price-table td b { font-weight: 800; letter-spacing: -0.01em; }
+.price-table td small { display: block; color: var(--muted); font-size: 11px; font-weight: 500; }
+
+.note { color: var(--muted); font-size: 12px; margin: 8px 0 0; line-height: 1.6; }
+.notice-bar { display: flex; gap: 8px; align-items: flex-start; background: var(--lilac-tint); border: 1px solid var(--brand-200); color: var(--primary-deep); border-radius: var(--radius-lg); padding: 10px 12px; font-size: 13px; font-weight: 600; margin-top: 12px; }
+.notice-bar .i { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 11px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; margin-top: 1px; }
+.link-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.link-list a { display: inline-block; background: var(--lilac-surface); color: var(--primary-deep); border-radius: var(--radius-md); padding: 8px 12px; font-size: 13px; font-weight: 700; }
+.link-list a:hover { filter: brightness(0.96); }
+.map { width: 100%; height: 300px; border-radius: var(--radius-lg); background: var(--surface-sunken); overflow: hidden; }
 .map-fallback { color: var(--muted); font-size: 13px; padding: 14px; text-align: center; }
 .amend-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
-.amend-list a { display: block; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
-.back { display: inline-block; margin-top: 14px; color: var(--muted); font-size: 14px; }
-.empty { padding: 40px 0; text-align: center; color: var(--muted); }
+.amend-list a { display: block; padding: 9px 12px; border: 1.5px solid var(--line-strong); border-radius: var(--radius-md); font-size: 14px; font-weight: 600; }
+.amend-list a:hover { border-color: var(--brand-300); background: var(--lilac-tint); }
+.back { display: inline-block; margin-top: 16px; color: var(--muted); font-size: 14px; font-weight: 600; }
+.back:hover { color: var(--primary-deep); }
 
-@media (min-width: 640px) {
+/* smokespot 규칙: 브레이크포인트는 768 한 단계. 카드 3열만 980에서 */
+@media (min-width: 768px) {
+  .hero { margin: 16px 0 0; border-radius: var(--radius-hero); padding: 26px 28px 22px; }
   .card-grid { grid-template-columns: repeat(2, 1fr); }
-  .money-grid { grid-template-columns: repeat(4, 1fr); }
+  .spec { grid-template-columns: repeat(2, 1fr); }
   .map { height: 380px; }
-  .kv { grid-template-columns: 120px 1fr; }
+  .detail-head { padding: 26px 28px 22px; }
 }
-
-@media (min-width: 960px) {
+@media (min-width: 980px) {
   .card-grid { grid-template-columns: repeat(3, 1fr); }
+  .spec { grid-template-columns: repeat(3, 1fr); }
 }

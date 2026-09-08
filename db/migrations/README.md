@@ -38,3 +38,4 @@ python db\migrate.py --status   # 적용 현황
 | `0003_fingerprint_comment.sql` | fingerprint 정의에 원공고키 포함 (주석) | Neon 2026-09-08 |
 | `0004_sector.sql` | `rental_sector` enum + `notice.sector` — 공공/민간 구분 | Neon 2026-09-08 |
 | `0005_fingerprint_not_unique.sql` | fingerprint UNIQUE 해제 — 2차 정정공고가 1차와 지문이 같음 | Neon 2026-09-08 |
+| `0006_housing_type_sh.sql` | `housing_type`에 재개발임대·청년안심주택 추가 (SH 청약유형) | Neon 2026-09-08 |

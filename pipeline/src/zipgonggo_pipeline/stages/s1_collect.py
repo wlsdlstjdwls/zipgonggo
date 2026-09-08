@@ -42,6 +42,8 @@ HOUSING_TYPES: dict[str, str] = {
     "6년임대": "6nyeon",
     "5년임대": "5nyeon",
     "공공기숙사": "gisuksa",
+    "재개발임대": "jaegaebal",
+    "청년안심주택": "cheongnyeon",
 }
 
 
@@ -234,19 +236,24 @@ class Stats:
         self.skipped[reason] = self.skipped.get(reason, 0) + 1
 
 
-def upsert_group(cur, mapped: Mapped) -> bool:
-    row = dict(mapped.notice)
+def upsert_notice(cur, notice: dict[str, Any], areas: list[dict[str, Any]]) -> bool:
+    """notice 1행 upsert + notice_area 교체. 소스 공통 (마이홈 API · SH 스크래퍼). True면 신규."""
+    row = dict(notice)
     row["raw"] = json.dumps(row["raw"], ensure_ascii=False)
     cur.execute(UPSERT_SQL, row)
     result = cur.fetchone()
     notice_id = result["id"]
     cur.execute("DELETE FROM notice_area WHERE notice_id = %s", (notice_id,))
-    for a in mapped.areas:
+    for a in areas:
         cur.execute(
             "INSERT INTO notice_area (notice_id, sido, sigungu, supply_count) VALUES (%s, %s, %s, %s)",
             (notice_id, a["sido"], a["sigungu"], a["supply_count"]),
         )
     return bool(result["inserted"])
+
+
+def upsert_group(cur, mapped: Mapped) -> bool:
+    return upsert_notice(cur, mapped.notice, mapped.areas)
 
 
 def queue_unmapped(cur, key: str, housing_type: str, title: str) -> None:

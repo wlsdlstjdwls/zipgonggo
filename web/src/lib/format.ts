@@ -18,10 +18,16 @@ export function daysUntil(ymd: string | null): number | null {
 export type DdayBadge = { label: string; tone: "urgent" | "soon" | "open" | "upcoming" | "closed" | "none" };
 
 /** 접수 일정 → 배지. 마감 3일 이내 urgent, 7일 이내 soon. */
-export function ddayBadge(start: string | null, end: string | null): DdayBadge {
+export function ddayBadge(start: string | null, end: string | null, status?: string | null): DdayBadge {
   const toEnd = daysUntil(end);
   const toStart = daysUntil(start);
-  if (toEnd === null) return { label: "일정 미정", tone: "none" };
+  if (toEnd === null) {
+    // SH 목록엔 접수기간이 없다. 모집상태로 대신한다
+    if (status === "접수중") return { label: "모집중", tone: "open" };
+    if (status === "정정공고중") return { label: "정정공고", tone: "soon" };
+    if (status === "접수마감") return { label: "마감", tone: "closed" };
+    return { label: "일정 미정", tone: "none" };
+  }
   if (toEnd < 0) return { label: "마감", tone: "closed" };
   if (toStart !== null && toStart > 0) return { label: `접수 D-${toStart}`, tone: "upcoming" };
   if (toEnd === 0) return { label: "오늘 마감", tone: "urgent" };

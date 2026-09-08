@@ -8,7 +8,8 @@ function headline(n: NoticeListItem): string {
   if (n.supply_count != null) parts.push(`${n.supply_count.toLocaleString("ko-KR")}호`);
   if (n.min_rent != null) parts.push(`월 ${won(n.min_rent)}~`);
   else if (n.min_deposit != null) parts.push(`보증금 ${won(n.min_deposit)}~`);
-  return parts.join(" · ") || n.housing_type;
+  if (parts.length) return parts.join(" · ");
+  return n.complex_name ?? n.housing_type;
 }
 
 function shortSido(s: string): string {
@@ -16,7 +17,7 @@ function shortSido(s: string): string {
 }
 
 export function NoticeCard({ n }: { n: NoticeListItem }) {
-  const badge = ddayBadge(n.apply_start_at, n.apply_end_at);
+  const badge = ddayBadge(n.apply_start_at, n.apply_end_at, n.status);
   const href = `/notice/${encodeURIComponent(n.slug)}`;
   return (
     <li className="card">
@@ -26,7 +27,10 @@ export function NoticeCard({ n }: { n: NoticeListItem }) {
           <span className={`badge ${badge.tone}`}>{badge.label}</span>
         </div>
         <p className="card-headline">{headline(n)}</p>
-        <p className="card-headline-sub">{n.agency} {n.housing_type}{n.complex_name ? ` · ${n.complex_name}` : ""}</p>
+        <p className="card-headline-sub">
+          {n.agency} {n.housing_type}
+          {n.complex_name && n.supply_count != null ? ` · ${n.complex_name}` : n.announce_at ? ` · 발표 ${dateK(n.announce_at)}` : ""}
+        </p>
       </div>
       <div className="card-body">
         <div className="card-chips">
