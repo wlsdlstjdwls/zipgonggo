@@ -50,7 +50,7 @@ const el = h("div", { style: { width: 1200, height: 630, display: "flex", flexDi
       h("div", {}, "공공임대 모집공고,"),
       h("div", { style: { display: "flex" } }, h("span", { style: { color: ACC } }, "호실 단위"), h("span", {}, "로 지도에.")),
     ),
-    h("div", { style: { fontSize: 27, fontWeight: 600, color: MUT, lineHeight: 1.5, letterSpacing: "-0.01em" } }, "LH·SH·지방공사 입주자모집공고를 지역·단지별 보증금·임대료·마감일로 다시 정리합니다."),
+    h("div", { style: { fontSize: 27, fontWeight: 600, color: MUT, lineHeight: 1.5, letterSpacing: "-0.01em" } }, "LH, SH, 지방공사 입주자모집공고를 지역별 단지별 보증금과 임대료, 마감일로 다시 정리합니다."),
   ),
   h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 22, fontWeight: 700, color: DIM, letterSpacing: "0.02em" } },
     h("div", {}, "zipgonggo.com"),

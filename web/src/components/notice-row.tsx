@@ -26,10 +26,10 @@ export function NoticeRow({ n, stagger }: Props) {
   const d = ddayChip(n);
   const m = moneyOf(n);
   const qty = n.supply_count != null ? num(n.supply_count, "호") : null;
-  const meta = [n.agency, regionShort(n), n.housing_type].filter(Boolean).join(" · ");
-  const dates = n.announce_at ? `${periodLabel(n)} · 발표 ${dateMD(n.announce_at)}` : periodLabel(n);
+  const meta = [n.agency, regionShort(n), n.housing_type].filter(Boolean).join(" | ");
+  const dates = n.announce_at ? `${periodLabel(n)}, 발표 ${dateMD(n.announce_at)}` : periodLabel(n);
   const style = stagger === undefined ? undefined : ({ "--stagger": `${stagger}ms` } as CSSProperties);
-  const moneySub = [qty, m?.label ?? null, m?.sub ?? null].filter(Boolean).join(" · ");
+  const moneySub = [qty, m?.label ?? null, m?.sub ?? null].filter(Boolean).join(" | ");
 
   return (
     <li>
@@ -43,7 +43,7 @@ export function NoticeRow({ n, stagger }: Props) {
           <span>{d.unit}</span>
         </span>
         <span className="row-body">
-          <span className="row-meta">{meta} · 공고 {dateK(n.posted_at)}{n.amends_source_key && " · 정정"}</span>
+          <span className="row-meta">{meta} | 공고 {dateK(n.posted_at)}{n.amends_source_key && " | 정정"}</span>
           <span className="row-title">{n.title}</span>
           <span className="row-narrow">
             <b>{m ? m.main : "금액 원문 확인"}</b>

@@ -14,8 +14,8 @@ export const revalidate = 3600;
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-const HOME_TITLE = "공공임대·민간임대 입주자모집공고 목록";
-const HOME_DESCRIPTION = "LH·SH·지방공사 공공임대와 공공지원민간임대 입주자모집공고를 한곳에. 마감 임박순·최신 공고순, 시도·공급유형별 보증금·월임대료·접수일정. 공고별 공급 단지는 지도로.";
+const HOME_TITLE = "공공임대/민간임대 입주자모집공고 목록";
+const HOME_DESCRIPTION = "LH, SH, 지방공사 공공임대와 공공지원민간임대 입주자모집공고를 한곳에. 마감 임박순과 최신 공고순, 시도별 공급유형별 보증금, 월임대료, 접수일정. 공고별 공급 단지는 지도로.";
 
 // 필터 결과(?sector=&sido=&type=&sort=&closing=)는 noindex, canonical은 파라미터 없는 "/" — docs/url-structure.md
 export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
@@ -50,7 +50,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   return (
     <div className="stage">
       <div className="list-hero">
-        <p className="eyebrow">공공임대 {countOf("공공임대")} · 공공지원민간임대 {countOf("민간임대")}</p>
+        <p className="eyebrow">공공임대 {countOf("공공임대")} | 공공지원민간임대 {countOf("민간임대")}</p>
         <h1>{LIST_HERO_TITLE}</h1>
         <p>{LIST_HERO_LEAD}</p>
       </div>

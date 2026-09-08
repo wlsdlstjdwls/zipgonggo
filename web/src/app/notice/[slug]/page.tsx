@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const dday = d === null ? "" : d < 0 ? "(마감)" : `(D-${d})`;
   const supply = n.supply_count != null ? num(n.supply_count, "호") : "";
   return {
-    title: `${n.title} — ${n.housing_type} ${supply} 보증금·임대료·접수일정`.replace(/\s+/g, " "),
+    title: `${n.title} — ${n.housing_type} ${supply} 보증금/임대료/접수일정`.replace(/\s+/g, " "),
     description: `${n.agency} ${n.title}. 접수 ${dateK(n.apply_start_at)}~${dateK(n.apply_end_at)}${dday}. ${regionLabel(n)} ${supply}. 최소 보증금 ${won(n.min_deposit)}, 최소 월임대료 ${won(n.min_rent)}.`,
     alternates: { canonical: noticePath(n.slug) },
   };
@@ -57,12 +57,12 @@ function priceRows(n: Notice): PriceRow[] {
   const rows: PriceRow[] = [{ kind: "기본 (공고 최소값)", deposit: wonKo(n.min_deposit), rent: wonKo(n.min_rent), exact: [n.min_deposit, n.min_rent] }];
   const down = pos(n.min_down_payment), interim = pos(n.min_interim), balance = pos(n.min_balance);
   if (down != null || interim != null || balance != null) {
-    if (down != null) rows.push({ kind: "납부 구성 · 계약금", deposit: wonKo(down), rent: "—", exact: [down, null] });
-    if (interim != null) rows.push({ kind: "납부 구성 · 중도금", deposit: wonKo(interim), rent: "—", exact: [interim, null] });
-    if (balance != null) rows.push({ kind: "납부 구성 · 잔금", deposit: wonKo(balance), rent: "—", exact: [balance, null] });
+    if (down != null) rows.push({ kind: "납부 구성 계약금", deposit: wonKo(down), rent: "—", exact: [down, null] });
+    if (interim != null) rows.push({ kind: "납부 구성 중도금", deposit: wonKo(interim), rent: "—", exact: [interim, null] });
+    if (balance != null) rows.push({ kind: "납부 구성 잔금", deposit: wonKo(balance), rent: "—", exact: [balance, null] });
   } else if (n.min_rent == null && n.min_deposit != null) {
-    rows.push({ kind: "납부 구성 · 계약금 (10% 가정)", deposit: wonKo(Math.round(n.min_deposit * 0.1)), rent: "—", exact: [Math.round(n.min_deposit * 0.1), null] });
-    rows.push({ kind: "납부 구성 · 잔금 (90% 가정)", deposit: wonKo(Math.round(n.min_deposit * 0.9)), rent: "—", exact: [Math.round(n.min_deposit * 0.9), null] });
+    rows.push({ kind: "납부 구성 계약금 (10% 가정)", deposit: wonKo(Math.round(n.min_deposit * 0.1)), rent: "—", exact: [Math.round(n.min_deposit * 0.1), null] });
+    rows.push({ kind: "납부 구성 잔금 (90% 가정)", deposit: wonKo(Math.round(n.min_deposit * 0.9)), rent: "—", exact: [Math.round(n.min_deposit * 0.9), null] });
   }
   if ((n.max_deposit != null && n.max_deposit !== n.min_deposit) || (n.max_rent != null && n.max_rent !== n.min_rent)) {
     rows.push({ kind: "최대 (공고 최대값)", deposit: wonKo(n.max_deposit ?? n.min_deposit), rent: wonKo(n.max_rent ?? n.min_rent), exact: [n.max_deposit ?? n.min_deposit, n.max_rent ?? n.min_rent] });
@@ -102,7 +102,7 @@ export default async function NoticePage({ params }: Params) {
     <article className="stage">
       <div className="crumb">
         <Link href={ROUTES.home} className="back">← 지도</Link>
-        <span>공고 · {region} · {n.housing_type}</span>
+        <span>공고 | {region} | {n.housing_type}</span>
       </div>
 
       <div className="detail">
@@ -122,12 +122,12 @@ export default async function NoticePage({ params }: Params) {
                 <span className="jumbo-label">{m.label}</span>
                 <b className="jumbo">{range_ ? `${m.main}~${range_}` : m.main}</b>
                 {!range_ && <span className="jumbo-from">부터</span>}
-                {m.sub && <span className="jumbo-sub">{m.sub} 부터 · 공고 최소값</span>}
-                {range_ && <span className="jumbo-sub">단지·면적별 {m.label} 범위 · 첨부 공고문 공급현황 표</span>}
+                {m.sub && <span className="jumbo-sub">{m.sub} 부터, 공고 최소값</span>}
+                {range_ && <span className="jumbo-sub">단지별 면적별 {m.label} 범위, 첨부 공고문 공급현황 표</span>}
               </>
             ) : (
               <>
-                <span className="jumbo-label">보증금 · 임대료</span>
+                <span className="jumbo-label">보증금과 임대료</span>
                 <span className="jumbo-sub" style={{ marginTop: 0 }}>목록 데이터에 금액이 없습니다. {L.originalDoc}의 표를 확인하세요.</span>
               </>
             )}
@@ -155,7 +155,7 @@ export default async function NoticePage({ params }: Params) {
                 ))}
               </div>
             ) : (
-              <p className="note" style={{ marginTop: 0 }}>공고일 {dateK(n.posted_at, true)}{n.source_status && ` · 모집 상태 ${n.source_status}`} · 접수 기간은 {L.originalDoc}에서 확인하세요.</p>
+              <p className="note" style={{ marginTop: 0 }}>공고일 {dateK(n.posted_at, true)}{n.source_status && `, 모집 상태 ${n.source_status}`}. 접수 기간은 {L.originalDoc}에서 확인하세요.</p>
             )}
             {hasSchedule && n.source_status && <p className="note">모집 상태 {n.source_status}</p>}
             {hasSchedule && n.schedule_source === "attachment" && <p className="note">일정은 첨부 공고문의 「입주자 모집 절차 및 일정」에서 읽었습니다. 순위별 세부 일정은 원문을 확인하세요.</p>}
@@ -163,8 +163,8 @@ export default async function NoticePage({ params }: Params) {
 
           {hasMoney && (
             <section className="dsec">
-              <h2>보증금 · 임대료</h2>
-              <div className="ptable" role="table" aria-label="보증금·임대료">
+              <h2>보증금과 임대료</h2>
+              <div className="ptable" role="table" aria-label="보증금과 임대료">
                 <div className="h" role="row"><span role="columnheader">구분</span><span role="columnheader" style={{ textAlign: "right" }}>보증금</span><span role="columnheader" style={{ textAlign: "right" }}>월임대료</span></div>
                 {priceRows(n).map((r) => (
                   <div key={r.kind} role="row">
@@ -174,17 +174,17 @@ export default async function NoticePage({ params }: Params) {
                   </div>
                 ))}
               </div>
-              <p className="note">단지·호실별 금액은 {L.originalDoc}의 표를 따릅니다.</p>
+              <p className="note">단지별 호실별 금액은 {L.originalDoc}의 표를 따릅니다.</p>
             </section>
           )}
 
           {complexes.length > 0 && (
             <section className="dsec">
-              <h2>공급 단지 {count(complexes.length, "곳")}{hasUnits && ` · ${count(unitTotal, "호")}`}</h2>
+              <h2>공급 단지 {count(complexes.length, "곳")}{hasUnits && ` | ${count(unitTotal, "호")}`}</h2>
               <p className="note" style={{ margin: "0 0 12px" }}>
                 {hasUnits
-                  ? "첨부 공고문의 「주택목록」(호실 단위)을 단지별로 묶은 목록입니다. 보증금·월임대료는 단지 안 최소값이고, 호별 금액은 원문 표를 확인하세요."
-                  : `첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.${newCount > 0 ? ` 이번 공고 신규 단지 ${newCount}곳.` : ""} 단지별 면적·호수·금액은 원문 표를 확인하세요.`}
+                  ? "첨부 공고문의 「주택목록」(호실 단위)을 단지별로 묶은 목록입니다. 보증금과 월임대료는 단지 안 최소값이고, 호별 금액은 원문 표를 확인하세요."
+                  : `첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.${newCount > 0 ? ` 이번 공고 신규 단지 ${newCount}곳.` : ""} 단지별 면적과 호수, 금액은 원문 표를 확인하세요.`}
               </p>
               <ComplexExplorer items={complexes} hasUnits={hasUnits} />
             </section>
@@ -220,7 +220,7 @@ export default async function NoticePage({ params }: Params) {
           )}
 
           <section className="dsec">
-            <h2>원문 · 문의</h2>
+            <h2>원문과 문의</h2>
             <ul className="link-list">
               <li><ExternalLink href={n.source_url}>{L.originalListItem} ↗</ExternalLink></li>
               {n.portal_url && <li><ExternalLink href={n.portal_url}>{L.portalListItem} ↗</ExternalLink></li>}
@@ -257,7 +257,7 @@ export default async function NoticePage({ params }: Params) {
               <div className="r"><span>공급호수</span><b>{n.supply_count != null ? num(n.supply_count, "호") : "—"}</b></div>
               <div className="r"><span>접수</span><b>{period ?? "—"}</b></div>
               <div className="r"><span>문의처</span><b>{n.contact ?? "—"}</b></div>
-              <span className="u">갱신 {n.updated_at} · {L.updatedVia}</span>
+              <span className="u">갱신 {n.updated_at} | {L.updatedVia}</span>
             </div>
           </div>
         </aside>

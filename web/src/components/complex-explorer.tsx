@@ -118,7 +118,7 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
             <option value="">자치구 전체</option>
             {gus.map(([g, n]) => <option key={g} value={g}>{g} ({n})</option>)}
           </select>
-          <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setSelected(null); }} placeholder="단지명·주소 검색" aria-label="단지명·주소 검색" />
+          <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setSelected(null); }} placeholder="단지명, 주소 검색" aria-label="단지명, 주소 검색" />
         </div>
         <p className="cx-count"><b>{visible.length}</b> / {items.length}{hasUnits ? "단지" : "곳"}</p>
         <ul className="cx-list" ref={listEl} aria-label="공급 단지 목록" onKeyDown={onListKey}>
@@ -172,7 +172,7 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
           {phase === "loading"
             ? `주소 찾는 중 ${progress}/${items.length}`
             : phase === "ready"
-              ? `${found}/${visible.length}곳 표시 · 위치는 도로명주소 기준 근사치. 목록이나 핀을 누르면 이름이 보이고, 로드뷰를 열 수 있습니다.`
+              ? `${found}/${visible.length}곳 표시. 위치는 도로명주소 기준 근사치입니다. 목록이나 핀을 누르면 이름이 보이고, 로드뷰를 열 수 있습니다.`
               : "위치는 도로명주소 기준 근사치입니다."}
         </p>
       </div>

@@ -18,7 +18,7 @@ export type AgencyLabels = {
 };
 
 const SH: AgencyLabels = {
-  original: "SH 원문 공고·첨부 보기 ↗",
+  original: "SH 원문 공고와 첨부 보기 ↗",
   originalListItem: "SH 공고 원문 (첨부파일 포함)",
   portal: "서울주거포털 ↗",
   portalListItem: "서울주거포털 게시글",
