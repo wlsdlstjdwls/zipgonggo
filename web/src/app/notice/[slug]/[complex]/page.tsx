@@ -4,15 +4,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DetailAside } from "@/components/detail-aside";
 import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
 import { Spec, SpecList } from "@/components/spec-list";
+import { SupplyTable } from "@/components/supply-table";
 import { agencyLabels } from "@/lib/agency";
 import { count, dateK, ddayChip, num, wonExact, wonKo } from "@/lib/format";
+import { areaText, commonArea, m2 } from "@/lib/notice-view";
 import { getComplexSupply, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
-import { complexSegment, noticeComplexPath, noticePath, ROUTES } from "@/lib/routes";
+import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
 import { regionShort, sidoShort } from "@/lib/sido";
-import type { Notice, NoticeComplex, NoticeSupply } from "@/types/notice";
+import type { Notice, NoticeComplex } from "@/types/notice";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
@@ -20,26 +23,6 @@ export const revalidate = 3600;
 type Params = { params: Promise<{ slug: string; complex: string }> };
 
 type Found = { n: Notice; c: NoticeComplex; siblings: NoticeComplex[] };
-
-/** 공급유형 표기 — "39㎡", 주거약자용이면 "39㎡ 주거약자용" */
-function typeLabel(s: NoticeSupply): string {
-  return `${s.supply_type.replace(/[A-Za-z]$/, "")}㎡${s.accessible ? " 주거약자용" : ""}`;
-}
-
-/** 공급대상 표기 — 청년은 소득 조건까지 */
-function classLabel(s: NoticeSupply): string {
-  return s.income_option ? `${s.tenant_class} ${s.income_option}` : s.tenant_class;
-}
-
-function m2(v: number | null): string {
-  return v == null ? "—" : `${v}㎡`;
-}
-
-/** 공용면적 = 주거공용 + 기타공용. 표에는 따로 있지만 읽는 쪽은 합으로 본다 */
-function commonArea(s: NoticeSupply): number | null {
-  if (s.area_common == null && s.area_etc == null) return null;
-  return Math.round(((s.area_common ?? 0) + (s.area_etc ?? 0)) * 100) / 100;
-}
 
 async function load(params: Params["params"]): Promise<Found | null> {
   const { slug, complex } = await params;
@@ -50,15 +33,6 @@ async function load(params: Params["params"]): Promise<Found | null> {
   // 코드까지 맞는 행이 정답. 코드가 붙기 전에 나간 링크(이름만)도 살려 준다(URL을 삭제하지 않는다 — CLAUDE.md 6)
   const c = siblings.find((x) => complexSegment(x) === seg) ?? siblings.find((x) => x.name === seg);
   return c ? { n, c, siblings } : null;
-}
-
-/** 단지 한 곳의 면적 표기. 하나뿐이면 값 하나, 범위면 "24~38㎡" */
-function areaText(c: NoticeComplex): string | null {
-  if (c.area_min == null && c.area_max == null) return null;
-  const lo = c.area_min ?? c.area_max;
-  const hi = c.area_max ?? c.area_min;
-  if (lo == null || hi == null) return null;
-  return lo === hi ? `${lo}㎡` : `${lo}~${hi}㎡`;
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -172,44 +146,7 @@ export default async function ComplexPage({ params }: Params) {
           {supply.length > 0 && (
             <section className="dsec">
               <h2>공급 {count(supply.length, "건")}{unitTotal > 0 && ` | ${num(unitTotal, "호")}`}</h2>
-              <div className="tbl table-scroll">
-                <table className="supply">
-                  <thead>
-                    <tr>
-                      {hasClass && <th>공급대상</th>}
-                      <th>공급유형</th>
-                      <th className="num">공급호수</th>
-                      {hasReserve && <th className="num">공가</th>}
-                      <th className="num">우선</th>
-                      <th className="num">일반</th>
-                      {hasReserve && <th className="num">예비자</th>}
-                      <th className="num">{hasRent ? "임대보증금" : "전세금"}</th>
-                      {hasRent && <th className="num">월임대료</th>}
-                      <th className="num">전용면적</th>
-                      <th className="num">공용면적</th>
-                      <th className="num">계약면적</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {supply.map((s) => (
-                      <tr key={s.id}>
-                        {hasClass && <td>{classLabel(s)}</td>}
-                        <td>{typeLabel(s)}</td>
-                        <td className="num">{s.units_total != null ? num(s.units_total, "호") : "—"}</td>
-                        {hasReserve && <td className="num">{num((s.units_priority ?? 0) + (s.units_general ?? 0), "호")}</td>}
-                        <td className="num">{s.units_priority ?? "—"}</td>
-                        <td className="num">{s.units_general ?? "—"}</td>
-                        {hasReserve && <td className="num">{s.units_reserve ?? "—"}</td>}
-                        <td className="num" title={s.deposit != null ? wonExact(s.deposit) : undefined}>{wonKo(s.deposit)}</td>
-                        {hasRent && <td className="num" title={s.rent != null ? wonExact(s.rent) : undefined}>{wonKo(s.rent)}</td>}
-                        <td className="num">{m2(s.area_exclusive)}</td>
-                        <td className="num">{m2(commonArea(s))}</td>
-                        <td className="num">{m2(s.area_total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <SupplyTable supply={supply} hasReserve={hasReserve} hasRent={hasRent} hasClass={hasClass} />
               <p className="note">
                 {hasReserve && "공급호수는 공가(우선과 일반)와 예비입주자 모집분을 더한 값입니다. "} 계약면적은 주거전용에 주거공용과 기타공용을 더한 세대별 면적입니다.
                 {supply[0]?.source_page != null && ` 원문 ${supply[0].source_page}쪽.`}
@@ -258,27 +195,27 @@ export default async function ComplexPage({ params }: Params) {
           )}
         </div>
 
-        <aside className="aside">
-          <div className="aside-in">
-            <div className={`dcard tone-${d.tone}`}>
-              <span>{d.days === null || d.days < 0 ? "접수" : `${d.unit}까지`}</span>
-              <b>{d.num}</b>
-              <p>{n.apply_end_at ? `${dateK(n.apply_end_at, true)} ${d.days !== null && d.days < 0 ? "마감됨" : "마감"}` : (n.source_status ?? "일정 미정")}</p>
-            </div>
-            <Link className="btn acc lg" href={noticePath(n.slug)}>공고 전체 단지 지도</Link>
-            <ExternalLink className="btn lg" href={n.source_url}>{L.original}</ExternalLink>
-            <div className="specs">
-              <span className="t">공고 제원</span>
-              <div className="r"><span>공급기관</span><b>{n.agency}</b></div>
-              <div className="r"><span>공급유형</span><b>{n.housing_type}</b></div>
-              <div className="r"><span>공고일</span><b>{dateK(n.posted_at)}</b></div>
-              <div className="r"><span>접수 마감</span><b>{n.apply_end_at ? dateK(n.apply_end_at) : "—"}</b></div>
-              <div className="r"><span>문의처</span><b>{n.contact ?? "—"}</b></div>
-              <span className="u">갱신 {n.updated_at} | {L.updatedVia}</span>
-            </div>
-            <p className="note" style={{ margin: "12px 0 0" }}>이 페이지는 공고 지도에서 들어오는 앵커입니다. 검색 색인은 하지 않습니다.</p>
-          </div>
-        </aside>
+        <DetailAside
+          tone={d.tone}
+          ddayLabel={d.days === null || d.days < 0 ? "접수" : `${d.unit}까지`}
+          ddayNum={d.num}
+          ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)} ${d.days !== null && d.days < 0 ? "마감됨" : "마감"}` : (n.source_status ?? "일정 미정")}
+          cta={
+            <>
+              <Link className="btn acc lg" href={noticePath(n.slug)}>공고 전체 단지 지도</Link>
+              <ExternalLink className="btn lg" href={n.source_url}>{L.original}</ExternalLink>
+            </>
+          }
+          rows={[
+            { label: "공급기관", value: n.agency },
+            { label: "공급유형", value: n.housing_type },
+            { label: "공고일", value: dateK(n.posted_at) },
+            { label: "접수 마감", value: n.apply_end_at ? dateK(n.apply_end_at) : null },
+            { label: "문의처", value: n.contact },
+          ]}
+          updatedNote={`갱신 ${n.updated_at} | ${L.updatedVia}`}
+          footNote="이 페이지는 공고 지도에서 들어오는 앵커입니다. 검색 색인은 하지 않습니다."
+        />
       </div>
     </article>
   );

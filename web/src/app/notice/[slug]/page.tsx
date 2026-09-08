@@ -2,16 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ComplexExplorer } from "@/components/complex-explorer";
+import { DetailAside } from "@/components/detail-aside";
 import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
 import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
-import { count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonExact, wonKo, wonShort } from "@/lib/format";
+import { count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonExact, wonShort } from "@/lib/format";
+import { priceRows } from "@/lib/notice-view";
 import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
-import type { Notice, NoticeListItem } from "@/types/notice";
+import type { NoticeListItem } from "@/types/notice";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
@@ -47,29 +49,6 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
   );
 }
 
-// 보증금·임대료 표 — 열린 공고 데이터에서만 계산한다(하드코딩 금지, design/README.md).
-// 납부 구성은 DB 값(계약금·중도금·잔금)이 있으면 그대로, 없고 전세형(월임대료 없음)이면 10%/90% 가정치로 보여 준다.
-// 마이홈 API는 미기재를 0으로 주는 경우가 있어(실측 2026-09-08) 납부 구성은 0을 미기재로 본다.
-// exact: 원 단위 원본. 화면은 "1억 960만 원"으로 읽히게 쓰고, 정확한 값은 마우스를 올리면 나온다
-type PriceRow = { kind: string; deposit: string; rent: string; exact: [number | null, number | null] };
-const pos = (v: number | null) => (v != null && v > 0 ? v : null);
-function priceRows(n: Notice): PriceRow[] {
-  const rows: PriceRow[] = [{ kind: "기본 (공고 최소값)", deposit: wonKo(n.min_deposit), rent: wonKo(n.min_rent), exact: [n.min_deposit, n.min_rent] }];
-  const down = pos(n.min_down_payment), interim = pos(n.min_interim), balance = pos(n.min_balance);
-  if (down != null || interim != null || balance != null) {
-    if (down != null) rows.push({ kind: "납부 구성 계약금", deposit: wonKo(down), rent: "—", exact: [down, null] });
-    if (interim != null) rows.push({ kind: "납부 구성 중도금", deposit: wonKo(interim), rent: "—", exact: [interim, null] });
-    if (balance != null) rows.push({ kind: "납부 구성 잔금", deposit: wonKo(balance), rent: "—", exact: [balance, null] });
-  } else if (n.min_rent == null && n.min_deposit != null) {
-    rows.push({ kind: "납부 구성 계약금 (10% 가정)", deposit: wonKo(Math.round(n.min_deposit * 0.1)), rent: "—", exact: [Math.round(n.min_deposit * 0.1), null] });
-    rows.push({ kind: "납부 구성 잔금 (90% 가정)", deposit: wonKo(Math.round(n.min_deposit * 0.9)), rent: "—", exact: [Math.round(n.min_deposit * 0.9), null] });
-  }
-  if ((n.max_deposit != null && n.max_deposit !== n.min_deposit) || (n.max_rent != null && n.max_rent !== n.min_rent)) {
-    rows.push({ kind: "최대 (공고 최대값)", deposit: wonKo(n.max_deposit ?? n.min_deposit), rent: wonKo(n.max_rent ?? n.min_rent), exact: [n.max_deposit ?? n.min_deposit, n.max_rent ?? n.min_rent] });
-  }
-  return rows;
-}
-
 export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
@@ -82,7 +61,7 @@ export default async function NoticePage({ params }: Params) {
   const m = moneyOf(n);
   const L = agencyLabels(n);
   const showAreaTable = areas.length > 1 || (areas.length === 1 && areas[0].supply_count != null && !n.address);
-  const hasMoney = n.min_deposit != null || n.min_rent != null || pos(n.min_down_payment) != null || pos(n.min_balance) != null;
+  const hasMoney = n.min_deposit != null || n.min_rent != null || (n.min_down_payment ?? 0) > 0 || (n.min_balance ?? 0) > 0;
   const region = regionLabel(n) || "전국";
   const period = n.apply_start_at || n.apply_end_at ? `${dateMD(n.apply_start_at)}–${dateMD(n.apply_end_at)}` : null;
   // 상한(첨부 공급현황 표)이 하한과 다를 때만 범위 표기. 월임대료 공고는 월임대료 범위, 전세형은 보증금 범위
@@ -239,28 +218,28 @@ export default async function NoticePage({ params }: Params) {
           </section>
         </div>
 
-        <aside className="aside">
-          <div className="aside-in">
-            <div className={`dcard tone-${d.tone}`}>
-              <span>{d.days === null || d.days < 0 ? "접수" : `${d.unit}까지`}</span>
-              <b>{d.num}</b>
-              <p>{n.apply_end_at ? `${dateK(n.apply_end_at, true)} ${d.days !== null && d.days < 0 ? "마감됨" : "마감"}` : (n.source_status ?? "일정 미정")}</p>
-            </div>
-            <ExternalLink className="btn acc lg" href={n.source_url}>{L.original}</ExternalLink>
-            {n.portal_url && <ExternalLink className="btn lg" href={n.portal_url}>{L.portal}</ExternalLink>}
-            <SaveButton id={n.id} variant="panel" />
-            <div className="specs">
-              <span className="t">공고 제원</span>
-              <div className="r"><span>공급기관</span><b>{n.agency}</b></div>
-              <div className="r"><span>공급유형</span><b>{n.housing_type}</b></div>
-              <div className="r"><span>지역</span><b>{region}</b></div>
-              <div className="r"><span>공급호수</span><b>{n.supply_count != null ? num(n.supply_count, "호") : "—"}</b></div>
-              <div className="r"><span>접수</span><b>{period ?? "—"}</b></div>
-              <div className="r"><span>문의처</span><b>{n.contact ?? "—"}</b></div>
-              <span className="u">갱신 {n.updated_at} | {L.updatedVia}</span>
-            </div>
-          </div>
-        </aside>
+        <DetailAside
+          tone={d.tone}
+          ddayLabel={d.days === null || d.days < 0 ? "접수" : `${d.unit}까지`}
+          ddayNum={d.num}
+          ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)} ${d.days !== null && d.days < 0 ? "마감됨" : "마감"}` : (n.source_status ?? "일정 미정")}
+          cta={
+            <>
+              <ExternalLink className="btn acc lg" href={n.source_url}>{L.original}</ExternalLink>
+              {n.portal_url && <ExternalLink className="btn lg" href={n.portal_url}>{L.portal}</ExternalLink>}
+              <SaveButton id={n.id} variant="panel" />
+            </>
+          }
+          rows={[
+            { label: "공급기관", value: n.agency },
+            { label: "공급유형", value: n.housing_type },
+            { label: "지역", value: region },
+            { label: "공급호수", value: n.supply_count != null ? num(n.supply_count, "호") : null },
+            { label: "접수", value: period },
+            { label: "문의처", value: n.contact },
+          ]}
+          updatedNote={`갱신 ${n.updated_at} | ${L.updatedVia}`}
+        />
       </div>
     </article>
   );
