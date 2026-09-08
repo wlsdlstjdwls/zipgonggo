@@ -152,7 +152,7 @@ export async function getNoticeAreas(noticeId: number): Promise<NoticeArea[]> {
 /** 공고의 공급 단지 목록. 자치구 → 단지명 순. 0건이면 화면에 섹션을 그리지 않는다. */
 export async function getNoticeComplexes(noticeId: number): Promise<NoticeComplex[]> {
   return query<NoticeComplex>(
-    `SELECT id, name, sido, sigungu, road_address, is_new FROM notice_complex
+    `SELECT id, name, sido, sigungu, road_address, is_new, unit_count, min_deposit, min_rent, area_min, area_max FROM notice_complex
      WHERE notice_id = $1 ORDER BY sido <> '서울특별시', sigungu, name`,
     [noticeId],
   );

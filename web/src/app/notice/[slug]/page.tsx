@@ -58,6 +58,11 @@ export default async function NoticePage({ params }: Params) {
     byGu.set(k, (byGu.get(k) ?? 0) + 1);
   }
   const newCount = complexes.filter((c) => c.is_new).length;
+  // 매입임대 별첨(호실 단위)이면 호수·면적·금액 열을 더 보여준다
+  const hasUnits = complexes.some((c) => c.unit_count != null);
+  const unitTotal = complexes.reduce((a, c) => a + (c.unit_count ?? 0), 0);
+  const areaLabel = (c: (typeof complexes)[number]) =>
+    c.area_min == null ? "—" : c.area_max != null && c.area_max !== c.area_min ? `${c.area_min}~${c.area_max}㎡` : `${c.area_min}㎡`;
   const badge = ddayBadge(n.apply_start_at, n.apply_end_at, n.status);
   const L = agencyLabels(n);
   const showAreaTable = areas.length > 1 || (areas.length === 1 && areas[0].supply_count != null && !n.address);
@@ -151,9 +156,11 @@ export default async function NoticePage({ params }: Params) {
 
       {complexes.length > 0 && (
         <section className="section">
-          <h2>공급 단지 {count(complexes.length, "곳")}</h2>
+          <h2>공급 단지 {count(complexes.length, "곳")}{hasUnits && ` · ${count(unitTotal, "호")}`}</h2>
           <p className="note" style={{ marginTop: 0 }}>
-            첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.{newCount > 0 && ` 이번 공고 신규 단지 ${newCount}곳.`} 단지별 면적·호수·금액은 원문 표를 확인하세요.
+            {hasUnits
+              ? "첨부 공고문의 「주택목록」(호실 단위)을 단지별로 묶은 목록입니다. 보증금·월임대료는 단지 안 최소값이고, 호별 금액은 원문 표를 확인하세요."
+              : `첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.${newCount > 0 ? ` 이번 공고 신규 단지 ${newCount}곳.` : ""} 단지별 면적·호수·금액은 원문 표를 확인하세요.`}
           </p>
           <div className="card-chips" style={{ marginBottom: 10 }}>
             {[...byGu.entries()].map(([gu, cnt]) => (
@@ -162,13 +169,26 @@ export default async function NoticePage({ params }: Params) {
           </div>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>자치구</th><th>단지명</th><th>도로명주소</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>자치구</th><th>단지명</th><th>도로명주소</th>
+                  {hasUnits && <><th className="num">호수</th><th className="num">전용면적</th><th className="num">보증금(최소)</th><th className="num">월임대료(최소)</th></>}
+                </tr>
+              </thead>
               <tbody>
                 {complexes.map((c) => (
                   <tr key={c.id}>
                     <td>{c.sido === "서울특별시" ? c.sigungu : `${c.sido} ${c.sigungu}`}</td>
                     <td>{c.name}{c.is_new && <> <span className="chip new">신규</span></>}</td>
                     <td>{c.road_address}</td>
+                    {hasUnits && (
+                      <>
+                        <td className="num">{num(c.unit_count, "호")}</td>
+                        <td className="num">{areaLabel(c)}</td>
+                        <td className="num">{wonExact(c.min_deposit)}</td>
+                        <td className="num">{wonExact(c.min_rent)}</td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

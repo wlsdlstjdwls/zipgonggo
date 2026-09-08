@@ -40,3 +40,4 @@ python db\migrate.py --status   # 적용 현황
 | `0005_fingerprint_not_unique.sql` | fingerprint UNIQUE 해제 — 2차 정정공고가 1차와 지문이 같음 | Neon 2026-09-08 |
 | `0006_housing_type_sh.sql` | `housing_type`에 재개발임대·청년안심주택 추가 (SH 청약유형) | Neon 2026-09-08 |
 | `0007_notice_complex.sql` | `notice_complex` — 공고별 공급 단지(단지명·자치구·도로명주소·신규). SH 첨부 공고문 표를 S3가 적재. 좌표 없음 | Neon 2026-09-08 |
+| `0008_notice_complex_units.sql` | `notice_complex`에 complex_code·unit_count·min_deposit·min_rent·area_min·area_max — SH 매입임대 별첨 주택목록(호실 단위) 집계 | Neon 2026-09-08 |

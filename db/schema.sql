@@ -401,3 +401,14 @@ CREATE TABLE notice_complex (
 COMMENT ON TABLE notice_complex IS '공고 1건이 공급하는 단지 목록. SH 첨부 공고문 「주택 위치 안내」 표(S3). 좌표 없음 — S6이 road_address로 조인';
 
 CREATE INDEX idx_notice_complex_notice ON notice_complex (notice_id, sigungu, name);
+
+-- 0008 — notice_complex 호실 집계 컬럼 (SH 별첨 주택목록)
+ALTER TABLE notice_complex
+  ADD COLUMN complex_code text,             -- 공고문 내 주택단지 코드 (0001J). 공고 안에서만 유일
+  ADD COLUMN unit_count   integer,          -- 이 공고에서 공급하는 호실 수
+  ADD COLUMN min_deposit  bigint,           -- 기준 임대보증금 최소(원)
+  ADD COLUMN min_rent     bigint,           -- 기준 월임대료 최소(원)
+  ADD COLUMN area_min     numeric(6,2),     -- 전용면적 최소(㎡)
+  ADD COLUMN area_max     numeric(6,2);
+
+COMMENT ON COLUMN notice_complex.unit_count IS 'SH 별첨 주택목록의 호실 수. 장기전세 「주택 위치 안내」 표에는 없어 NULL';

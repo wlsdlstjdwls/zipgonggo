@@ -93,22 +93,60 @@ def parse_chars(xml: str) -> list[Char]:
     ]
 
 
-def group_rows(chars: list[Char]) -> list[list[Char]]:
+def group_rows(chars: list[Char], slack: float = 0.0) -> list[list[Char]]:
     """글자 세로 중심이 줄의 첫 글자 상자 안에 들면 같은 줄.
 
     줄 상자를 늘리지 않는다 — 늘리면 세로 병합 칸(자치구 한 글자씩 세로 배치)이 다음 줄과 겹쳐
     표의 여러 행이 한 줄로 이어 붙는다. 하이픈·괄호처럼 baseline이 어긋난 글자는 중심이 줄 안에 들어 붙는다.
+    slack(상자 높이 비율)은 회전 표처럼 구두점이 상자 밖으로 벗어나는 쪽에만 준다 — 정방향 표는 줄 간격이 좁아 0.
     """
     rows: list[list[Char]] = []
     boxes: list[tuple[float, float]] = []
     for c in sorted(chars, key=lambda c: (c.t, c.l)):
+        if c.w <= 0 and c.h <= 0:
+            continue  # 크기 0 빈 글자(변환기 잔여물)
         mid = c.t + c.h / 2
-        if rows and boxes[-1][0] <= mid < boxes[-1][1]:
-            rows[-1].append(c)
-        else:
-            rows.append([c])
-            boxes.append((c.t, c.b))
+        if rows:
+            top, bottom = boxes[-1]
+            # 여유는 구두점(하이픈·소수점·쉼표)에만. 글자·숫자까지 주면 이웃 행 글자를 훔쳐 온다('강서구'→'강서')
+            is_punct = bool(c.ch.strip()) and not c.ch.strip().isalnum()  # 공백은 제 줄 폭을 갖고 있어 여유 없이 판정
+            pad = (bottom - top) * slack if is_punct else 0.0
+            if top - pad <= mid < bottom + pad:
+                rows[-1].append(c)
+                continue
+        rows.append([c])
+        boxes.append((c.t, c.b))
     return rows
+
+
+ROTATED_SLACK = 0.3  # 회전 표: 하이픈·소수점·쉼표 상자가 글자 상자에서 30%까지 벗어난다(51차·2차 매입 실측)
+
+
+def transpose(chars: list[Char], page_h: float | None = None) -> list[Char]:
+    """90° 회전된 쪽(가로표를 세로로 눕힌 별첨)을 정방향 좌표로. x축이 줄이 되고 줄 안 순서는 위→아래(원본 y 내림)."""
+    H = page_h if page_h is not None else max((c.b for c in chars), default=0.0)
+    return [Char(l=H - c.b, t=c.l, w=c.h, h=c.w, ch=c.ch) for c in chars if c.w > 0 or c.h > 0]
+
+
+def is_rotated(chars: list[Char]) -> bool:
+    """글자 상자가 세로보다 가로로 긴 게 다수면 회전된 쪽. 정방향 한글은 h>w (13×15), 회전하면 w>h (10.7×6)."""
+    boxed = [c for c in chars if c.w > 0 and c.h > 0 and c.ch.strip()]
+    if len(boxed) < 20:
+        return False
+    wide = sum(1 for c in boxed if c.w > c.h * 1.15)
+    return wide > len(boxed) * 0.6
+
+
+def columns_by_x(row: list[Char], bounds: list[float]) -> list[str]:
+    """줄의 글자를 x 경계로 칸에 배정한다(칸 사이 간격이 좁아 gap 분할이 안 되는 표용). bounds는 오름차순 경계, 칸 수 = len(bounds)+1."""
+    cells: list[list[Char]] = [[] for _ in range(len(bounds) + 1)]
+    for c in row:
+        x = c.l + c.w / 2
+        i = 0
+        while i < len(bounds) and x >= bounds[i]:
+            i += 1
+        cells[i].append(c)
+    return [re.sub(r"\s+", " ", "".join(ch.ch for ch in sorted(cell, key=lambda ch: ch.l))).strip() for cell in cells]
 
 
 def row_segments(row: list[Char], gap: float = 14.0) -> list[Segment]:

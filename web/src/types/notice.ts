@@ -51,7 +51,20 @@ export type Notice = NoticeListItem & {
 export type NoticeArea = { sido: string; sigungu: string | null; supply_count: number | null };
 
 /** 공고가 공급하는 단지 (notice_complex, SH 첨부 공고문 표). 좌표 없음 — S6 이후 */
-export type NoticeComplex = { id: number; name: string; sido: string; sigungu: string; road_address: string; is_new: boolean };
+export type NoticeComplex = {
+  id: number;
+  name: string;
+  sido: string;
+  sigungu: string;
+  road_address: string;
+  is_new: boolean;
+  /** 아래는 매입임대 별첨 주택목록(호실 단위)에서만 채워진다. 장기전세 위치 표는 NULL */
+  unit_count: number | null;
+  min_deposit: number | null;
+  min_rent: number | null;
+  area_min: number | null;
+  area_max: number | null;
+};
 
 export type NoticeFilters = { sido?: string; type?: string; sector?: Sector; sort?: NoticeSort };
 

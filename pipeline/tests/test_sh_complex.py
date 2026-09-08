@@ -69,7 +69,7 @@ def test_row_grouping_does_not_chain_merged_cells():
     # 세로 병합 칸(자치구) 글자가 다음 줄과 겹쳐도 표 행이 이어 붙지 않는다
     chars = parse_chars(PAGES[0][1])
     rows = group_rows(chars)
-    assert 60 <= len(rows) <= 120
+    assert 30 <= len(rows) <= 120  # 표 25행 + 본문 줄. 이어 붙으면 한 자리 수로 떨어진다
     texts = [" ".join(s.text for s in r) for r in page_rows(PAGES[0][1])]
     assert any("래미안레벤투스" in t and "도곡로 242" in t for t in texts)
 

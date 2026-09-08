@@ -17,7 +17,7 @@ from pathlib import Path
 
 from ..config import PIPELINE_ROOT, settings
 from ..db import connect
-from ..parsers.sh_complex import parse_location_table
+from ..parsers.sh_attach import parse_attachment
 from ..repo import replace_notice_complexes
 from ..sources.ish import IshClient, find_attachments
 from .common import Stats, finish_ingest, stage_main, utc_now
@@ -77,25 +77,22 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                         stats.skip("preview_unresolved")
                         continue
                     pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq))
-                    rows = parse_location_table(pages)
+                    kind, rows, units = parse_attachment(pages)
                 except Exception as exc:  # noqa: BLE001
                     stats.error("fetch_error", n["slug"], exc)
                     continue
                 stats.groups += 1
-                log.info("%s: %d쪽 · 단지 %d건 (%s)", n["slug"], len(pages), len(rows), att.name)
+                log.info("%s: %d쪽 · %s · 단지 %d건 · 호실 %d건 (%s)", n["slug"], len(pages), kind, len(rows), len(units), att.name)
                 if not rows:
-                    stats.skip("no_location_table")
+                    stats.skip("no_table")
                     continue
+                stats.skip(f"kind:{kind}")
                 if dry_run:
                     stats.updated += 1
                     continue
                 cur.execute("SAVEPOINT nc")
                 try:
-                    replace_notice_complexes(
-                        cur, n["id"],
-                        [{"name": r.name, "sido": r.sido, "sigungu": r.sigungu, "road_address": r.road_address,
-                          "is_new": r.is_new, "source_page": r.page} for r in rows],
-                    )
+                    replace_notice_complexes(cur, n["id"], rows)
                     cur.execute("RELEASE SAVEPOINT nc")
                     stats.inserted += len(rows)
                     stats.updated += 1
