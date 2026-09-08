@@ -6,8 +6,8 @@ import { NaverMap } from "@/components/naver-map";
 import { Spec, SpecList } from "@/components/spec-list";
 import { StatusBadge } from "@/components/status-badge";
 import { agencyLabels } from "@/lib/agency";
-import { dateK, daysUntil, ddayBadge, num, won, wonExact } from "@/lib/format";
-import { getAmendChain, getNoticeAreas, getNoticeBySlug } from "@/lib/queries";
+import { count, dateK, daysUntil, ddayBadge, num, won, wonExact } from "@/lib/format";
+import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
 import type { NoticeListItem } from "@/types/notice";
@@ -49,7 +49,14 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
 export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
-  const [areas, chain] = await Promise.all([getNoticeAreas(n.id), getAmendChain(n)]);
+  const [areas, chain, complexes] = await Promise.all([getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id)]);
+  // 자치구별 단지 수 — 표 위 요약 칩. 서울 외 지역은 "경기도 의정부시"처럼 시도 포함
+  const byGu = new Map<string, number>();
+  for (const c of complexes) {
+    const k = c.sido === "서울특별시" ? c.sigungu : `${c.sido} ${c.sigungu}`;
+    byGu.set(k, (byGu.get(k) ?? 0) + 1);
+  }
+  const newCount = complexes.filter((c) => c.is_new).length;
   const badge = ddayBadge(n.apply_start_at, n.apply_end_at, n.status);
   const L = agencyLabels(n);
   const showAreaTable = areas.length > 1 || (areas.length === 1 && areas[0].supply_count != null && !n.address);
@@ -140,6 +147,35 @@ export default async function NoticePage({ params }: Params) {
         )}
         <p className="note">전세전환·월세전환 금액과 호실별 금액은 첨부 공고문 파싱 후 표로 제공됩니다.</p>
       </section>
+
+      {complexes.length > 0 && (
+        <section className="section">
+          <h2>공급 단지 {count(complexes.length, "곳")}</h2>
+          <p className="note" style={{ marginTop: 0 }}>
+            첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.{newCount > 0 && ` 이번 공고 신규 단지 ${newCount}곳.`} 단지별 면적·호수·금액은 원문 표를 확인하세요.
+          </p>
+          <div className="card-chips" style={{ marginBottom: 10 }}>
+            {[...byGu.entries()].map(([gu, cnt]) => (
+              <span key={gu} className="chip">{gu} {cnt}</span>
+            ))}
+          </div>
+          <div className="table-scroll">
+            <table>
+              <thead><tr><th>자치구</th><th>단지명</th><th>도로명주소</th></tr></thead>
+              <tbody>
+                {complexes.map((c) => (
+                  <tr key={c.id}>
+                    <td>{c.sido === "서울특별시" ? c.sigungu : `${c.sido} ${c.sigungu}`}</td>
+                    <td>{c.name}{c.is_new && <> <span className="chip new">신규</span></>}</td>
+                    <td>{c.road_address}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="note">지도 표시는 행안부 도로명주소 좌표 DB 연동 후 제공됩니다.</p>
+        </section>
+      )}
 
       {n.address ? (
         <section className="section">

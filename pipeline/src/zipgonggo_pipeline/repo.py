@@ -43,6 +43,21 @@ def upsert_notice(cur, notice: dict[str, Any], areas: list[dict[str, Any]]) -> b
     return bool(result["inserted"])
 
 
+def replace_notice_complexes(cur, notice_id: int, rows: list[dict[str, Any]]) -> int:
+    """공고의 공급 단지 목록을 통째로 교체한다(notice_area와 같은 방식). 돌려주는 값은 넣은 행 수."""
+    cur.execute("DELETE FROM notice_complex WHERE notice_id = %s", (notice_id,))
+    for r in rows:
+        cur.execute(
+            """
+            INSERT INTO notice_complex (notice_id, name, sido, sigungu, road_address, zone, is_new, source_page)
+            VALUES (%(notice_id)s, %(name)s, %(sido)s, %(sigungu)s, %(road_address)s, %(zone)s, %(is_new)s, %(source_page)s)
+            ON CONFLICT (notice_id, name, road_address) DO NOTHING
+            """,
+            {"notice_id": notice_id, "zone": None, **r},
+        )
+    return len(rows)
+
+
 def queue_unmapped(cur, key: str, housing_type: str, title: str) -> None:
     """유형 미매핑 공고를 review_queue에 1회만 넣는다(미해결 동일 키 중복 방지)."""
     cur.execute(

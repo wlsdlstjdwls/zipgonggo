@@ -5,7 +5,7 @@ import { unstable_cache } from "next/cache";
 import { query } from "./db";
 import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { todayKST } from "./format";
-import type { FilterOption, Notice, NoticeArea, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, Sector } from "@/types/notice";
+import type { FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, Sector } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
@@ -145,6 +145,15 @@ export async function getNoticeAreas(noticeId: number): Promise<NoticeArea[]> {
   return query<NoticeArea>(
     `SELECT sido, sigungu, supply_count FROM notice_area WHERE notice_id = $1
      ORDER BY sigungu IS NULL, supply_count DESC NULLS LAST, sigungu`,
+    [noticeId],
+  );
+}
+
+/** 공고의 공급 단지 목록. 자치구 → 단지명 순. 0건이면 화면에 섹션을 그리지 않는다. */
+export async function getNoticeComplexes(noticeId: number): Promise<NoticeComplex[]> {
+  return query<NoticeComplex>(
+    `SELECT id, name, sido, sigungu, road_address, is_new FROM notice_complex
+     WHERE notice_id = $1 ORDER BY sido <> '서울특별시', sigungu, name`,
     [noticeId],
   );
 }

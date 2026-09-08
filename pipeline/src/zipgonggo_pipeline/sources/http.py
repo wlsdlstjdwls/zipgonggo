@@ -46,8 +46,13 @@ class ThrottledHttp:
         if wait > 0:
             time.sleep(wait)
 
-    def get(self, url: str, *, params: dict[str, Any] | None = None, label: str = "") -> httpx.Response:
-        """성공 응답(2xx)만 돌려준다. 재시도 소진 시 마지막 예외를 그대로 올린다."""
+    def get(
+        self, url: str, *, params: dict[str, Any] | None = None, label: str = "", accept_redirect: bool = False
+    ) -> httpx.Response:
+        """성공 응답(2xx)만 돌려준다. 재시도 소진 시 마지막 예외를 그대로 올린다.
+
+        accept_redirect=True면 3xx도 그대로 돌려준다(Location을 읽어야 할 때. 클라이언트가 follow_redirects=False일 것).
+        """
         backoff = 1.0
         for attempt in range(1, self.max_retries + 1):
             self._throttle()
@@ -57,6 +62,8 @@ class ThrottledHttp:
                 resp = self._http.get(url, params=params)
                 if resp.status_code in RETRYABLE_STATUS:
                     raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
+                if accept_redirect and resp.is_redirect:
+                    return resp
                 resp.raise_for_status()
                 return resp
             except (httpx.TransportError, httpx.HTTPStatusError) as exc:

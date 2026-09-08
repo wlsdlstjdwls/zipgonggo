@@ -50,6 +50,9 @@ export type Notice = NoticeListItem & {
 
 export type NoticeArea = { sido: string; sigungu: string | null; supply_count: number | null };
 
+/** 공고가 공급하는 단지 (notice_complex, SH 첨부 공고문 표). 좌표 없음 — S6 이후 */
+export type NoticeComplex = { id: number; name: string; sido: string; sigungu: string; road_address: string; is_new: boolean };
+
 export type NoticeFilters = { sido?: string; type?: string; sector?: Sector; sort?: NoticeSort };
 
 export type NoticePage = { items: NoticeListItem[]; nextCursor: string | null; total: number };

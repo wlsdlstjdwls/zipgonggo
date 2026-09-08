@@ -30,3 +30,6 @@ pipeline/data/juso/
 *.log
 .DS_Store
 Thumbs.db
+
+# 공고 첨부 텍스트 캐시(i-sh Synap 뷰어 XML) — 재배포 금지, 재수집 가능
+pipeline/data/ish/

@@ -8,6 +8,7 @@ dependencies = ["httpx>=0.28", "psycopg[binary]>=3.2", "python-dotenv>=1.0", "se
 [project.scripts]
 zipgonggo-s1 = "zipgonggo_pipeline.stages.s1_collect:main"
 zipgonggo-s1-sh = "zipgonggo_pipeline.stages.s1_sh:main"
+zipgonggo-s3-sh = "zipgonggo_pipeline.stages.s3_sh_complex:main"
 
 [build-system]
 requires = ["setuptools>=68"]

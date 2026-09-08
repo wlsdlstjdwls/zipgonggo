@@ -266,3 +266,8 @@ small { font-size: 12px; }
   .spec { grid-template-columns: repeat(3, 1fr); }
   .sk-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* 넓은 표는 컨테이너 안에서만 가로 스크롤 — 본문이 가로로 밀리지 않게 */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll table { min-width: 520px; }
+.chip.new { background: var(--brand-500); color: var(--on-primary); }
