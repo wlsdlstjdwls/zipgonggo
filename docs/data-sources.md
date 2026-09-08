@@ -218,13 +218,14 @@ LH 이용약관(`lh.or.kr/menu.es?mid=a10802000000`) 제1~12조와 부칙을 훑
 | `DATA_GO_KR_KEY` | data.go.kr 활용신청 | 마이홈포털 API 3종 |
 | `NAVER_MAP_CLIENT_ID` | NAVER Cloud Platform | 지도 표출 |
 | `DATABASE_URL` | Neon | Postgres 접속 |
+| `JUSO_SEARCH_API_KEY` | business.juso.go.kr API 신청 (2026-09-08 발급) | 공고 주소 → 표준 도로명주소 정규화. 검색 API만, 좌표 API 안 씀 |
 
 ## 미해결
 
 절차는 [`phase0-신청가이드.md`](phase0-신청가이드.md)에 화면 단위로 정리했다.
 
 - [x] 마이홈포털 3종 API 실제 응답 필드 — 활용신청·키 발급·실호출 완료 (2026-09-08). swagger + 샘플 `docs/api-spec/`
-- [ ] 위치정보 요약DB 신청 승인 소요기간 — Phase 1 선행 조건이므로 즉시 접수
+- [ ] 위치정보 요약DB 신청 승인 소요기간 — 2026-09-08 접수 완료, 승인 대기
 - [ ] 출입구 정보 좌표계(EPSG) — 활용가이드 다운로드로 확인
 - [ ] 15110581 단지정보 운영계정 심의 소요기간 (나머지 2종은 자동승인이라 무관)
 - [ ] Web Dynamic Map 월 무료 건수 실측 — NCP 콘솔
