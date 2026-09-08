@@ -146,6 +146,12 @@ export default async function NoticePage({ params }: Params) {
               <h2>보증금과 임대료</h2>
               <PriceTable rows={priceRows(n)} />
               <p className="note">단지별 호실별 금액은 {L.originalDoc}의 표를 따릅니다.</p>
+              {n.min_rent != null && (
+                <p className="note">
+                  표에 나온 금액은 공고문이 정한 기준(표준)값입니다. 계약 시 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있는 경우가 많습니다(임대금액 상호전환).
+                  정확한 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
+                </p>
+              )}
             </section>
           )}
 

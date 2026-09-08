@@ -127,6 +127,12 @@ export default async function ComplexPage({ params }: Params) {
               <h2>보증금과 임대료</h2>
               <PriceTable rows={priceBreak} />
               <p className="note">공급대상과 공급유형(전용면적)에 따른 값입니다. 세부는 아래 공급현황 표를 확인하세요.</p>
+              {hasRent && (
+                <p className="note">
+                  표에 나온 금액은 공고문이 정한 기준(표준)값입니다. 계약 시 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있는 경우가 많습니다(임대금액 상호전환).
+                  정확한 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
+                </p>
+              )}
             </section>
           )}
 
