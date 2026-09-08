@@ -37,25 +37,41 @@ export function areaText(c: NoticeComplex): string | null {
 // exact: 원 단위 원본. 화면은 "1억 960만 원"으로 읽히게 쓰고, 정확한 값은 마우스를 올리면 나온다
 // group으로 화면이 기본/납부 구성/최대를 시각적으로 묶는다 — "납부 구성 계약금" 같은 긴 라벨을 매 줄 반복하지 않는다
 export type PriceRowGroup = "base" | "pay" | "max";
-export type PriceRow = { group: PriceRowGroup; label: string; note?: string; deposit: string; rent: string; exact: [number | null, number | null] };
+export type PriceRow = { id: string; group: PriceRowGroup; label: string; note?: string; deposit: string; rent: string; exact: [number | null, number | null] };
 
 function pos(v: number | null): number | null {
   return v != null && v > 0 ? v : null;
 }
 
 export function priceRows(n: Notice): PriceRow[] {
-  const rows: PriceRow[] = [{ group: "base", label: "기본", note: "공고 최소값", deposit: wonKo(n.min_deposit), rent: wonKo(n.min_rent), exact: [n.min_deposit, n.min_rent] }];
+  const rows: PriceRow[] = [{ id: "base", group: "base", label: "기본", note: "공고 최소값", deposit: wonKo(n.min_deposit), rent: wonKo(n.min_rent), exact: [n.min_deposit, n.min_rent] }];
   const down = pos(n.min_down_payment), interim = pos(n.min_interim), balance = pos(n.min_balance);
   if (down != null || interim != null || balance != null) {
-    if (down != null) rows.push({ group: "pay", label: "계약금", deposit: wonKo(down), rent: "—", exact: [down, null] });
-    if (interim != null) rows.push({ group: "pay", label: "중도금", deposit: wonKo(interim), rent: "—", exact: [interim, null] });
-    if (balance != null) rows.push({ group: "pay", label: "잔금", deposit: wonKo(balance), rent: "—", exact: [balance, null] });
+    if (down != null) rows.push({ id: "down", group: "pay", label: "계약금", deposit: wonKo(down), rent: "—", exact: [down, null] });
+    if (interim != null) rows.push({ id: "interim", group: "pay", label: "중도금", deposit: wonKo(interim), rent: "—", exact: [interim, null] });
+    if (balance != null) rows.push({ id: "balance", group: "pay", label: "잔금", deposit: wonKo(balance), rent: "—", exact: [balance, null] });
   } else if (n.min_rent == null && n.min_deposit != null) {
-    rows.push({ group: "pay", label: "계약금", note: "10% 가정", deposit: wonKo(Math.round(n.min_deposit * 0.1)), rent: "—", exact: [Math.round(n.min_deposit * 0.1), null] });
-    rows.push({ group: "pay", label: "잔금", note: "90% 가정", deposit: wonKo(Math.round(n.min_deposit * 0.9)), rent: "—", exact: [Math.round(n.min_deposit * 0.9), null] });
+    rows.push({ id: "down-est", group: "pay", label: "계약금", note: "10% 가정", deposit: wonKo(Math.round(n.min_deposit * 0.1)), rent: "—", exact: [Math.round(n.min_deposit * 0.1), null] });
+    rows.push({ id: "balance-est", group: "pay", label: "잔금", note: "90% 가정", deposit: wonKo(Math.round(n.min_deposit * 0.9)), rent: "—", exact: [Math.round(n.min_deposit * 0.9), null] });
   }
   if ((n.max_deposit != null && n.max_deposit !== n.min_deposit) || (n.max_rent != null && n.max_rent !== n.min_rent)) {
-    rows.push({ group: "max", label: "최대", note: "공고 최대값", deposit: wonKo(n.max_deposit ?? n.min_deposit), rent: wonKo(n.max_rent ?? n.min_rent), exact: [n.max_deposit ?? n.min_deposit, n.max_rent ?? n.min_rent] });
+    rows.push({ id: "max", group: "max", label: "최대", note: "공고 최대값", deposit: wonKo(n.max_deposit ?? n.min_deposit), rent: wonKo(n.max_rent ?? n.min_rent), exact: [n.max_deposit ?? n.min_deposit, n.max_rent ?? n.min_rent] });
   }
   return rows;
+}
+
+/** 단지 상세 「보증금과 임대료」 — 이 단지의 공급현황이 있으면 공급대상 × 공급유형별로 쪼갠다.
+    공고 단위 priceRows와 달리 계약금/중도금/잔금 개념이 없어 그룹은 항상 "base"(평범한 한 줄)다. */
+export function complexPriceRows(supply: NoticeSupply[]): PriceRow[] {
+  return supply
+    .filter((s) => s.deposit != null || s.rent != null)
+    .map((s) => ({
+      id: String(s.id),
+      group: "base",
+      label: classLabel(s),
+      note: typeLabel(s),
+      deposit: wonKo(s.deposit),
+      rent: s.rent != null ? wonKo(s.rent) : "—",
+      exact: [s.deposit, s.rent],
+    }));
 }

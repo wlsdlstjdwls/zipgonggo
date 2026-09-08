@@ -5,10 +5,11 @@ import { ComplexExplorer } from "@/components/complex-explorer";
 import { DetailAside } from "@/components/detail-aside";
 import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
+import { PriceTable } from "@/components/price-table";
 import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
-import { count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonExact, wonShort } from "@/lib/format";
+import { count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonShort } from "@/lib/format";
 import { priceRows } from "@/lib/notice-view";
 import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
@@ -143,16 +144,7 @@ export default async function NoticePage({ params }: Params) {
           {hasMoney && (
             <section className="dsec">
               <h2>보증금과 임대료</h2>
-              <div className="ptable" role="table" aria-label="보증금과 임대료">
-                <div className="h" role="row"><span role="columnheader">구분</span><span role="columnheader" style={{ textAlign: "right" }}>보증금</span><span role="columnheader" style={{ textAlign: "right" }}>월임대료</span></div>
-                {priceRows(n).map((r) => (
-                  <div key={`${r.group}-${r.label}`} className={r.group} role="row">
-                    <span className="k" role="cell">{r.label}{r.note && <small>{r.note}</small>}</span>
-                    <span className="d" role="cell" title={r.exact[0] != null ? wonExact(r.exact[0]) : undefined}>{r.deposit}</span>
-                    <span className="r" role="cell" title={r.exact[1] != null ? wonExact(r.exact[1]) : undefined}>{r.rent}</span>
-                  </div>
-                ))}
-              </div>
+              <PriceTable rows={priceRows(n)} />
               <p className="note">단지별 호실별 금액은 {L.originalDoc}의 표를 따릅니다.</p>
             </section>
           )}

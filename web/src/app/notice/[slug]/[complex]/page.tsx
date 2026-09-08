@@ -7,11 +7,12 @@ import { notFound } from "next/navigation";
 import { DetailAside } from "@/components/detail-aside";
 import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
+import { PriceTable } from "@/components/price-table";
 import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
 import { agencyLabels } from "@/lib/agency";
 import { count, dateK, ddayChip, num, wonExact, wonKo } from "@/lib/format";
-import { areaText, commonArea, m2 } from "@/lib/notice-view";
+import { areaText, commonArea, complexPriceRows, m2 } from "@/lib/notice-view";
 import { getComplexSupply, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
 import { regionShort, sidoShort } from "@/lib/sido";
@@ -66,6 +67,7 @@ export default async function ComplexPage({ params }: Params) {
   const hasRent = supply.some((s) => s.rent != null);          // 장기전세는 월임대료가 없다
   const hasClass = new Set(supply.map((s) => s.tenant_class)).size > 1 || supply.some((s) => s.income_option);
   const moveIn = supply.find((s) => s.move_in_from)?.move_in_from ?? null;
+  const priceBreak = complexPriceRows(supply);
   const d = ddayChip(n);
   const L = agencyLabels(n);
   const area = areaText(c);
@@ -113,6 +115,14 @@ export default async function ComplexPage({ params }: Params) {
               </>
             )}
           </header>
+
+          {priceBreak.length > 1 && (
+            <section className="dsec">
+              <h2>보증금과 임대료</h2>
+              <PriceTable rows={priceBreak} />
+              <p className="note">공급대상과 공급유형(전용면적)에 따른 값입니다. 세부는 아래 공급현황 표를 확인하세요.</p>
+            </section>
+          )}
 
           <section className="dsec">
             <h2>단지 제원</h2>
