@@ -51,9 +51,9 @@ def replace_notice_complexes(cur, notice_id: int, rows: list[dict[str, Any]]) ->
             """
             INSERT INTO notice_complex
               (notice_id, name, sido, sigungu, road_address, zone, is_new, source_page,
-               complex_code, unit_count, min_deposit, min_rent, area_min, area_max)
+               complex_code, unit_count, min_deposit, min_rent, area_min, area_max, heating)
             VALUES (%(notice_id)s, %(name)s, %(sido)s, %(sigungu)s, %(road_address)s, %(zone)s, %(is_new)s, %(source_page)s,
-                    %(complex_code)s, %(unit_count)s, %(min_deposit)s, %(min_rent)s, %(area_min)s, %(area_max)s)
+                    %(complex_code)s, %(unit_count)s, %(min_deposit)s, %(min_rent)s, %(area_min)s, %(area_max)s, %(heating)s)
             ON CONFLICT (notice_id, name, road_address) DO UPDATE SET
               unit_count = COALESCE(notice_complex.unit_count, 0) + COALESCE(EXCLUDED.unit_count, 0),
               min_deposit = LEAST(notice_complex.min_deposit, EXCLUDED.min_deposit),
@@ -61,8 +61,33 @@ def replace_notice_complexes(cur, notice_id: int, rows: list[dict[str, Any]]) ->
               area_min = LEAST(notice_complex.area_min, EXCLUDED.area_min),
               area_max = GREATEST(notice_complex.area_max, EXCLUDED.area_max)
             """,
-            {"notice_id": notice_id, "zone": None, "complex_code": None, "unit_count": None,
+            {"notice_id": notice_id, "zone": None, "complex_code": None, "unit_count": None, "heating": None,
              "min_deposit": None, "min_rent": None, "area_min": None, "area_max": None, **r},
+        )
+    return len(rows)
+
+
+def replace_notice_supply(cur, notice_id: int, rows: list[dict[str, Any]]) -> int:
+    """공고의 공급현황 줄을 통째로 교체한다. complex_id는 같은 공고의 notice_complex와 이름으로 이어 붙인다.
+    (표기가 조금씩 달라 못 붙는 줄이 있어도 complex_name은 남긴다 — 화면은 이름으로도 묶을 수 있다)"""
+    cur.execute("DELETE FROM notice_supply WHERE notice_id = %s", (notice_id,))
+    for r in rows:
+        cur.execute(
+            """
+            INSERT INTO notice_supply
+              (notice_id, complex_id, complex_name, supply_type, accessible, tenant_class, income_option, is_new,
+               units_total, units_priority, units_general, units_reserve,
+               deposit, down_payment, balance, rent,
+               area_exclusive, area_common, area_etc, area_total, move_in_from, source_page)
+            VALUES (%(notice_id)s,
+                    (SELECT id FROM notice_complex WHERE notice_id = %(notice_id)s AND name = %(complex_name)s LIMIT 1),
+                    %(complex_name)s, %(supply_type)s, %(accessible)s, %(tenant_class)s, %(income_option)s, %(is_new)s,
+                    %(units_total)s, %(units_priority)s, %(units_general)s, %(units_reserve)s,
+                    %(deposit)s, %(down_payment)s, %(balance)s, %(rent)s,
+                    %(area_exclusive)s, %(area_common)s, %(area_etc)s, %(area_total)s, %(move_in_from)s, %(source_page)s)
+            ON CONFLICT (notice_id, complex_name, supply_type, tenant_class, income_option) DO NOTHING
+            """,
+            {"notice_id": notice_id, **r},
         )
     return len(rows)
 

@@ -5,7 +5,7 @@ import { unstable_cache } from "next/cache";
 import { query } from "./db";
 import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC, SH_SIDO } from "./constants";
 import { todayKST } from "./format";
-import type { FilterOption, HomeStats, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, Sector } from "@/types/notice";
+import type { FilterOption, HomeStats, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, Sector } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
@@ -190,8 +190,38 @@ export async function getNoticeAreas(noticeId: number): Promise<NoticeArea[]> {
 /** 공고의 공급 단지 목록. 자치구 → 단지명 순. 0건이면 화면에 섹션을 그리지 않는다. */
 export async function getNoticeComplexes(noticeId: number): Promise<NoticeComplex[]> {
   return query<NoticeComplex>(
-    `SELECT id, name, sido, sigungu, road_address, is_new, complex_code, source_page, unit_count, min_deposit, min_rent, area_min, area_max FROM notice_complex
+    `SELECT id, name, sido, sigungu, road_address, is_new, complex_code, source_page, heating, unit_count, min_deposit, min_rent, area_min, area_max FROM notice_complex
      WHERE notice_id = $1 ORDER BY sido <> '서울특별시', sigungu, name`,
+    [noticeId],
+  );
+}
+
+const SUPPLY_COLS = `
+  id, complex_name, supply_type, accessible, tenant_class, income_option, is_new,
+  units_total, units_priority, units_general, units_reserve,
+  deposit, down_payment, balance, rent,
+  area_exclusive, area_common, area_etc, area_total, move_in_from, source_page`;
+
+// 공급현황 정렬: 신규 먼저, 그다음 공급유형(면적) 오름차순, 계층은 표에 나온 순서를 흉내낸다
+const SUPPLY_ORDER = `
+  is_new DESC,
+  NULLIF(regexp_replace(supply_type, '[^0-9]', '', 'g'), '')::int NULLS LAST,
+  supply_type, tenant_class, income_option NULLS FIRST, id`;
+
+/** 단지 1곳의 공급현황 줄. 이름으로도 찾는다 — 단지 표기가 조금 달라 complex_id가 안 붙은 줄이 있다. */
+export async function getComplexSupply(noticeId: number, complexId: number, complexName: string): Promise<NoticeSupply[]> {
+  return query<NoticeSupply>(
+    `SELECT ${SUPPLY_COLS} FROM notice_supply
+     WHERE notice_id = $1 AND (complex_id = $2 OR complex_name = $3)
+     ORDER BY ${SUPPLY_ORDER}`,
+    [noticeId, complexId, complexName],
+  );
+}
+
+/** 공고 전체 공급현황 줄. 0건이면 화면에 표를 그리지 않는다. */
+export async function getNoticeSupply(noticeId: number): Promise<NoticeSupply[]> {
+  return query<NoticeSupply>(
+    `SELECT ${SUPPLY_COLS} FROM notice_supply WHERE notice_id = $1 ORDER BY complex_name, ${SUPPLY_ORDER}`,
     [noticeId],
   );
 }

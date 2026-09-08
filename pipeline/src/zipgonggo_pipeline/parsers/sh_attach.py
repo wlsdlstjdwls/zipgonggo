@@ -9,6 +9,8 @@
 공고 단위(양식과 무관하게 항상 시도):
 - 접수 시작·마감·당첨자 발표 — 「입주자 모집 절차 및 일정」 흐름도 (parsers/sh_schedule)
 - 전세금 최소·최대, 총 호수, 신규공급 단지별 호수·금액·면적 — 「공급현황」 표 (parsers/sh_supply)
+- 단지 × 공급유형 × 공급대상 한 줄씩(공가·예비자·계약면적·계층별 금액) — 「공급현황」 표 (parsers/sh_supply_lines).
+  행복주택·국민임대 양식 전용. 단지 목록보다 알갱이가 잘아 단지 행에 호수·금액·면적을 되먹인다.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from .sh_addr_table import parse_addr_table
 from .sh_complex import parse_location_table
 from .sh_schedule import Schedule, parse_schedule
 from .sh_supply import SupplySummary, parse_supply
+from .sh_supply_lines import SupplyLine, parse_supply_lines
 from .sh_units import UnitRow, group_units, parse_unit_pages
 
 log = logging.getLogger(__name__)
@@ -34,6 +37,7 @@ class AttachmentFacts:
     units: list[UnitRow] = field(default_factory=list)
     schedule: Schedule | None = None
     supply: SupplySummary | None = None
+    supply_lines: list[SupplyLine] = field(default_factory=list)
 
 
 def _norm_name(s: str) -> str:
@@ -65,6 +69,37 @@ def merge_supply_into_complexes(rows: list[dict[str, Any]], supply: SupplySummar
     return hit
 
 
+def merge_supply_lines_into_complexes(rows: list[dict[str, Any]], lines: list[SupplyLine]) -> int:
+    """공급현황 줄을 단지 행에 이름으로 묶어 호수·금액·면적을 채운다. 돌려주는 값은 채운 단지 수.
+
+    호수는 (공급유형, 공급대상)마다 한 번만 센다 — 청년은 소득있음/소득없음 두 줄이 같은 호수 칸을 나눠 쓴다.
+    """
+    if not lines:
+        return 0
+    by_name: dict[str, list[SupplyLine]] = {}
+    for l in lines:
+        by_name.setdefault(_norm_name(l.complex_name), []).append(l)
+    hit = 0
+    for r in rows:
+        mine = by_name.get(_norm_name(r["name"]))
+        if not mine:
+            continue
+        counted: dict[tuple[str, str], int] = {}
+        for l in mine:
+            if l.units_total is not None:
+                counted[(l.supply_type, l.tenant_class)] = l.units_total
+        deposits = [l.deposit for l in mine if l.deposit]
+        rents = [l.rent for l in mine if l.rent]
+        areas = [l.area_exclusive for l in mine if l.area_exclusive]
+        r["unit_count"] = sum(counted.values()) or None
+        r["min_deposit"] = min(deposits) if deposits else None
+        r["min_rent"] = min(rents) if rents else None
+        r["area_min"] = min(areas) if areas else None
+        r["area_max"] = max(areas) if areas else None
+        hit += 1
+    return hit
+
+
 def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = None) -> AttachmentFacts:
     rows = parse_location_table(pages)
     facts: AttachmentFacts
@@ -80,7 +115,7 @@ def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = Non
         if addrs:
             facts = AttachmentFacts("addr_table", [
                 {"name": r.name, "sido": r.sido, "sigungu": r.sigungu, "road_address": r.road_address,
-                 "is_new": r.is_new, "source_page": r.page, "complex_code": None,
+                 "is_new": r.is_new, "source_page": r.page, "complex_code": None, "heating": r.heating,
                  "unit_count": None, "min_deposit": None, "min_rent": None, "area_min": None, "area_max": None}
                 for r in addrs
             ])
@@ -89,7 +124,13 @@ def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = Non
                 facts.supply = parse_supply(pages)
             except Exception as exc:  # noqa: BLE001
                 log.warning("supply parse failed: %s", exc)
-            merge_supply_into_complexes(facts.complexes, facts.supply)
+            try:
+                facts.supply_lines = parse_supply_lines(pages, [r.name for r in addrs])
+            except Exception as exc:  # noqa: BLE001
+                log.warning("supply lines parse failed: %s", exc)
+            # 「공급현황」 줄이 있으면 그쪽이 더 정확하다(단지별 호수·계층별 금액). 없을 때만 공고 단위 요약을 쓴다
+            if not merge_supply_lines_into_complexes(facts.complexes, facts.supply_lines):
+                merge_supply_into_complexes(facts.complexes, facts.supply)
             return facts
         units = parse_unit_pages(pages)
         if units:

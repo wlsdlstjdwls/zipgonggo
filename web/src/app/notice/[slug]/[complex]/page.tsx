@@ -8,11 +8,11 @@ import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
-import { dateK, ddayChip, num, wonExact, wonKo } from "@/lib/format";
-import { getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
+import { count, dateK, ddayChip, num, wonExact, wonKo } from "@/lib/format";
+import { getComplexSupply, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { complexSegment, noticeComplexPath, noticePath, ROUTES } from "@/lib/routes";
 import { regionShort, sidoShort } from "@/lib/sido";
-import type { Notice, NoticeComplex } from "@/types/notice";
+import type { Notice, NoticeComplex, NoticeSupply } from "@/types/notice";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
@@ -20,6 +20,26 @@ export const revalidate = 3600;
 type Params = { params: Promise<{ slug: string; complex: string }> };
 
 type Found = { n: Notice; c: NoticeComplex; siblings: NoticeComplex[] };
+
+/** 공급유형 표기 — "39㎡", 주거약자용이면 "39㎡ 주거약자용" */
+function typeLabel(s: NoticeSupply): string {
+  return `${s.supply_type.replace(/[A-Za-z]$/, "")}㎡${s.accessible ? " 주거약자용" : ""}`;
+}
+
+/** 공급대상 표기 — 청년은 소득 조건까지 */
+function classLabel(s: NoticeSupply): string {
+  return s.income_option ? `${s.tenant_class} ${s.income_option}` : s.tenant_class;
+}
+
+function m2(v: number | null): string {
+  return v == null ? "—" : `${v}㎡`;
+}
+
+/** 공용면적 = 주거공용 + 기타공용. 표에는 따로 있지만 읽는 쪽은 합으로 본다 */
+function commonArea(s: NoticeSupply): number | null {
+  if (s.area_common == null && s.area_etc == null) return null;
+  return Math.round(((s.area_common ?? 0) + (s.area_etc ?? 0)) * 100) / 100;
+}
 
 async function load(params: Params["params"]): Promise<Found | null> {
   const { slug, complex } = await params;
@@ -62,6 +82,14 @@ export default async function ComplexPage({ params }: Params) {
   const f = await load(params);
   if (!f) notFound();
   const { n, c, siblings } = f;
+  const supply = await getComplexSupply(n.id, c.id, c.name);
+  // 호수는 (공급유형, 공급대상)마다 한 칸이다 — 청년 소득있음/없음 두 줄이 같은 칸을 나눠 써 두 번 세면 안 된다
+  const counted = new Map(supply.filter((s) => s.units_total != null).map((s) => [`${s.supply_type}|${s.tenant_class}`, s]));
+  const unitTotal = [...counted.values()].reduce((a, s) => a + (s.units_total ?? 0), 0);
+  const vacantTotal = [...counted.values()].reduce((a, s) => a + (s.units_priority ?? 0) + (s.units_general ?? 0), 0);
+  const reserveTotal = [...counted.values()].reduce((a, s) => a + (s.units_reserve ?? 0), 0);
+  const hasReserve = supply.some((s) => s.units_reserve != null);
+  const moveIn = supply.find((s) => s.move_in_from)?.move_in_from ?? null;
   const d = ddayChip(n);
   const L = agencyLabels(n);
   const area = areaText(c);
@@ -116,19 +144,76 @@ export default async function ComplexPage({ params }: Params) {
               <Spec label="단지명" value={c.name} />
               <Spec label="공급 호실" value={c.unit_count != null ? num(c.unit_count, "호") : null} />
               <Spec label="전용면적" value={area} />
+              <Spec label="공용면적" value={supply.length ? m2(commonArea(supply[0])) : null} />
+              <Spec label="계약면적" value={supply[0]?.area_total != null ? m2(supply[0].area_total) : null} />
               <Spec label="임대보증금" value={c.min_deposit != null ? <span title={wonExact(c.min_deposit)}>{wonKo(c.min_deposit)} 부터</span> : null} />
               <Spec label="월 임대료" value={c.min_rent != null ? <span title={wonExact(c.min_rent)}>{wonKo(c.min_rent)} 부터</span> : null} />
               <Spec label="지역" value={`${sidoShort(c.sido)} ${c.sigungu}`} />
+              <Spec label="난방" value={c.heating} />
+              {hasReserve && <Spec label="현재 공가" value={`${num(vacantTotal, "호")}`} />}
+              {hasReserve && <Spec label="예비자 모집" value={`${num(reserveTotal, "호")}`} />}
+              <Spec label="입주 시작" value={moveIn} />
+              <Spec label="주택 유형" value={supply.length ? (supply.some((s) => s.is_new) ? "신규 공급" : "재공급") : null} />
               <Spec label="단지 코드" value={c.complex_code} />
               <Spec label="주소" value={full} wide />
             </SpecList>
             <p className="note">
-              {c.unit_count != null
+              {supply.length > 0
+                ? "첨부 공고문 「공급현황」 표에서 읽은 값입니다. 호수는 공급유형과 공급대상마다 한 칸이라 중복해 세지 않았습니다."
+                : c.unit_count != null
                 ? "첨부 공고문 별첨 「주택목록」의 이 단지 행을 묶은 값입니다. 금액은 단지 안 최소값이고, 호별 금액과 층·동호는 원문 표를 확인하세요."
                 : "첨부 공고문 「주택 위치 안내」 표에서 읽은 값입니다. 면적과 호수, 금액은 원문 표를 확인하세요."}
               {c.source_page != null && ` 원문 ${c.source_page}쪽.`}
             </p>
           </section>
+
+          {supply.length > 0 && (
+            <section className="dsec">
+              <h2>공급 {count(supply.length, "건")}{unitTotal > 0 && ` | ${num(unitTotal, "호")}`}</h2>
+              <div className="tbl table-scroll">
+                <table className="supply">
+                  <thead>
+                    <tr>
+                      <th>공급대상</th>
+                      <th>공급유형</th>
+                      <th className="num">공급호수</th>
+                      {hasReserve && <th className="num">공가</th>}
+                      <th className="num">우선</th>
+                      <th className="num">일반</th>
+                      {hasReserve && <th className="num">예비자</th>}
+                      <th className="num">임대보증금</th>
+                      <th className="num">월임대료</th>
+                      <th className="num">전용면적</th>
+                      <th className="num">공용면적</th>
+                      <th className="num">계약면적</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {supply.map((s) => (
+                      <tr key={s.id}>
+                        <td>{classLabel(s)}</td>
+                        <td>{typeLabel(s)}</td>
+                        <td className="num">{s.units_total != null ? num(s.units_total, "호") : "—"}</td>
+                        {hasReserve && <td className="num">{num((s.units_priority ?? 0) + (s.units_general ?? 0), "호")}</td>}
+                        <td className="num">{s.units_priority ?? "—"}</td>
+                        <td className="num">{s.units_general ?? "—"}</td>
+                        {hasReserve && <td className="num">{s.units_reserve ?? "—"}</td>}
+                        <td className="num" title={s.deposit != null ? wonExact(s.deposit) : undefined}>{wonKo(s.deposit)}</td>
+                        <td className="num" title={s.rent != null ? wonExact(s.rent) : undefined}>{wonKo(s.rent)}</td>
+                        <td className="num">{m2(s.area_exclusive)}</td>
+                        <td className="num">{m2(commonArea(s))}</td>
+                        <td className="num">{m2(s.area_total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="note">
+                공급호수는 공가(우선과 일반)와 예비입주자 모집분을 더한 값입니다. 계약면적은 주거전용에 주거공용과 기타공용을 더한 세대별 면적입니다.
+                {supply[0]?.source_page != null && ` 원문 ${supply[0].source_page}쪽.`}
+              </p>
+            </section>
+          )}
 
           <section className="dsec">
             <h2>위치</h2>

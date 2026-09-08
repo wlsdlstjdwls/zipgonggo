@@ -58,6 +58,31 @@ export type Notice = NoticeListItem & {
   updated_at: string;
 };
 
+/** 공급현황 표 한 줄 (notice_supply). 단지 × 공급유형 × 공급대상 × 소득옵션 */
+export type NoticeSupply = {
+  id: number;
+  complex_name: string;
+  supply_type: string;
+  accessible: boolean;
+  tenant_class: string;
+  income_option: string | null;
+  is_new: boolean;
+  units_total: number | null;
+  units_priority: number | null;
+  units_general: number | null;
+  units_reserve: number | null;
+  deposit: number | null;
+  down_payment: number | null;
+  balance: number | null;
+  rent: number | null;
+  area_exclusive: number | null;
+  area_common: number | null;
+  area_etc: number | null;
+  area_total: number | null;
+  move_in_from: string | null;
+  source_page: number | null;
+};
+
 export type NoticeArea = { sido: string; sigungu: string | null; supply_count: number | null };
 
 /** 공고가 공급하는 단지 (notice_complex, SH 첨부 공고문 표). 좌표 없음 — S6 이후 */
@@ -72,6 +97,8 @@ export type NoticeComplex = {
   complex_code: string | null;
   /** 첨부 공고문 쪽번호. 출처 표기용 */
   source_page: number | null;
+  /** 난방방식(개별난방·지역난방). SH 「단지별 주소」 표에만 있다 */
+  heating: string | null;
   /** 아래는 매입임대 별첨 주택목록(호실 단위)에서만 채워진다. 장기전세 위치 표는 NULL */
   unit_count: number | null;
   min_deposit: number | null;

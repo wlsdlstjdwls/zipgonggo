@@ -17,8 +17,8 @@ def rows():
 
 
 def test_row_count(rows):
-    # 쪽별 36 + 25. 어긋나면 열 경계(헤더 중심 중간점) 또는 주소 열 우선순위가 깨진 것
-    assert len(rows) == 61
+    # 쪽별 36 + 26. 어긋나면 열 경계(헤더 중심 중간점) 또는 주소 열 우선순위가 깨진 것
+    assert len(rows) == 62
     assert len(parse_addr_page(PAGES[0][1], 51)) == 36
 
 
@@ -37,6 +37,9 @@ def test_jibeon_and_road_both_read(rows):
     assert by["강동리엔파크11단지"].road_address.startswith("강동구 고덕로98길 101")
     # 사업주체 칸이 "서울특별시"라 그걸 주소로 잡던 회귀
     assert by["디에이치 아너힐즈"].road_address.startswith("강남구 삼성로 11")
+    # 같은 표 안에서 시도가 줄임말로 온 줄("서울 은평구 …"). 이 줄을 놓쳐 62곳이 61곳이던 회귀
+    assert by["백련산해모로(응암11)"].sido == "서울특별시"
+    assert by["백련산해모로(응암11)"].road_address.startswith("은평구 응암로 30길 15")
 
 
 def test_new_flag(rows):
@@ -47,5 +50,5 @@ def test_dispatcher_picks_addr_table():
     """디스패처가 이 양식을 addr_table로 판정하고 일정도 같이 읽는다."""
     facts = parse_attachment([(1, (FIX / "p1.xml").read_text(encoding="utf-8"))] + PAGES, ref_year=2026)
     assert facts.kind == "addr_table"
-    assert len(facts.complexes) == 61
+    assert len(facts.complexes) == 62
     assert facts.schedule is not None and str(facts.schedule.apply_start) == "2026-09-09"

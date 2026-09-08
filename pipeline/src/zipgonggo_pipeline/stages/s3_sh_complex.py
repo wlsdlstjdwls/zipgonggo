@@ -21,7 +21,7 @@ from pathlib import Path
 from ..config import PIPELINE_ROOT, settings
 from ..db import connect
 from ..parsers.sh_attach import parse_attachment
-from ..repo import replace_notice_complexes, update_notice_facts
+from ..repo import replace_notice_complexes, replace_notice_supply, update_notice_facts
 from ..sources.ish import IshClient, find_attachments
 from .common import Stats, finish_ingest, stage_main, utc_now
 
@@ -48,6 +48,33 @@ def pick_attachment(atts, title: str):
         if "공고" in a.name:
             return a
     return (pdfs or atts or [None])[0]
+
+
+
+def _supply_row(l) -> dict:
+    """SupplyLine → notice_supply 컬럼. 「29S」의 S는 주거약자용 표시라 따로 뽑는다."""
+    return {
+        "complex_name": l.complex_name,
+        "supply_type": l.supply_type,
+        "accessible": l.supply_type[-1:].upper() == "S",
+        "tenant_class": l.tenant_class,
+        "income_option": l.income_option,
+        "is_new": l.is_new,
+        "units_total": l.units_total,
+        "units_priority": l.units_priority,
+        "units_general": l.units_general,
+        "units_reserve": l.units_reserve,
+        "deposit": l.deposit,
+        "down_payment": l.down_payment,
+        "balance": l.balance,
+        "rent": l.rent,
+        "area_exclusive": l.area_exclusive,
+        "area_common": l.area_common,
+        "area_etc": l.area_etc,
+        "area_total": l.area_total,
+        "move_in_from": l.move_in_from,
+        "source_page": l.page,
+    }
 
 
 def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
@@ -82,14 +109,15 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                     pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq))
                     facts = parse_attachment(pages, ref_year=n["posted_at"].year if n["posted_at"] else None)
                     kind, rows, units = facts.kind, facts.complexes, facts.units
+                    supply_rows = [_supply_row(l) for l in facts.supply_lines]
                 except Exception as exc:  # noqa: BLE001
                     stats.error("fetch_error", n["slug"], exc)
                     continue
                 stats.groups += 1
                 sch, sup = facts.schedule, facts.supply
                 log.info(
-                    "%s: %d쪽 · %s · 단지 %d건 · 호실 %d건 · 일정 %s · 전세금 %s (%s)",
-                    n["slug"], len(pages), kind, len(rows), len(units),
+                    "%s: %d쪽 · %s · 단지 %d건 · 호실 %d건 · 공급 %d건 · 일정 %s · 전세금 %s (%s)",
+                    n["slug"], len(pages), kind, len(rows), len(units), len(supply_rows),
                     f"{sch.apply_start}~{sch.apply_end}" if sch else "없음",
                     f"{sup.min_deposit}~{sup.max_deposit}({sup.unit_total}호)" if sup else "없음",
                     att.name,
@@ -98,7 +126,9 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                     stats.skip("schedule")
                 if sup:
                     stats.skip("supply")
-                if not rows and not sch and not sup:
+                if supply_rows:
+                    stats.skip("supply_lines")
+                if not rows and not sch and not sup and not supply_rows:
                     stats.skip("no_table")
                     continue
                 stats.skip(f"kind:{kind}")
@@ -110,6 +140,8 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                     if rows:
                         replace_notice_complexes(cur, n["id"], rows)
                         stats.inserted += len(rows)
+                    # 공급현황 줄은 단지 행 다음에 넣는다 — complex_id를 같은 공고의 단지에서 이름으로 찾는다
+                    replace_notice_supply(cur, n["id"], supply_rows)
                     update_notice_facts(
                         cur, n["id"],
                         apply_start_at=sch.apply_start if sch else None,

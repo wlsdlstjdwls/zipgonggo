@@ -20,7 +20,15 @@ from ..sources.ish import group_rows, parse_chars, row_segments
 
 HEADER_KEYS = ("공급단지", "주소")
 HEADER_ALL = ("공급구분", "공급단지", "사업주체", "주소", "난방방식")
-SIDO_RE = re.compile(r"(서울특별시|경기도|인천광역시|부산광역시|대구광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|강원특별자치도|충청북도|충청남도|전북특별자치도|전라남도|경상북도|경상남도|제주특별자치도)")
+# 정식 명칭과 줄임말 둘 다 받는다 — 같은 표 안에서도 "서울특별시 은평구"와 "서울 은평구"가 섞여 온다(2026년 2차 행복주택 52쪽 백련산해모로)
+SIDO_FULL = ("서울특별시", "경기도", "인천광역시", "부산광역시", "대구광역시", "광주광역시", "대전광역시", "울산광역시",
+             "세종특별자치시", "강원특별자치도", "충청북도", "충청남도", "전북특별자치도", "전라남도", "경상북도", "경상남도", "제주특별자치도")
+SIDO_SHORT = {"서울": "서울특별시", "경기": "경기도", "인천": "인천광역시", "부산": "부산광역시", "대구": "대구광역시",
+              "광주": "광주광역시", "대전": "대전광역시", "울산": "울산광역시", "세종": "세종특별자치시", "강원": "강원특별자치도",
+              "충북": "충청북도", "충남": "충청남도", "전북": "전북특별자치도", "전남": "전라남도", "경북": "경상북도",
+              "경남": "경상남도", "제주": "제주특별자치도"}
+# 줄임말은 뒤에 공백 + 시군구가 와야 시도로 본다("서울 은평구"). "서울대입구" 같은 단지명에 걸리지 않게
+SIDO_RE = re.compile(r"(?:" + "|".join(SIDO_FULL) + r")|(?:(?:" + "|".join(SIDO_SHORT) + r")(?=\s+[가-힣]+(?:시|군|구)))")
 SIGUNGU_RE = re.compile(r"^(?:\S+)\s+([가-힣]+(?:시|군|구))\b")
 NEW_RE = re.compile(r"^\[?\s*신\s*규\s*\]?$")
 # 단지명 뒤에 붙는 사업주체·괄호 지구명을 떼려고 쓴다: "창경궁롯데캐슬시그니처(삼선5)서울리츠2호"
@@ -36,6 +44,7 @@ class AddrRow:
     sigungu: str
     is_new: bool
     page: int
+    heating: str | None = None   # 난방방식 열(개별난방·지역난방·중앙난방)
 
 
 @dataclass
@@ -90,6 +99,18 @@ def _clean_name(text: str) -> str:
     return TRAIL_RE.sub("", t)
 
 
+HEATING_RE = re.compile(r"(개별난방|지역난방|중앙난방|개별|지역|중앙)")
+
+
+def _heating(cells: list[_Cell]) -> str | None:
+    """난방방식 열. 「개별난방」처럼 붙어 오고, 줄이 갈리면 앞 조각만 잡힌다."""
+    m = HEATING_RE.search("".join(c.text for c in cells).replace(" ", ""))
+    if not m:
+        return None
+    v = m.group(1)
+    return v if v.endswith("난방") else v + "난방"
+
+
 def _split_address(text: str) -> str | None:
     """칸에서 주소만. 사업주체가 앞에 붙어 있으면 시도 이름부터 자른다."""
     m = SIDO_RE.search(text)
@@ -139,17 +160,18 @@ def parse_addr_page(xml: str, page: int) -> list[AddrRow]:
         sido_m = SIDO_RE.match(addr)
         if not sido_m:
             continue
-        sido = sido_m.group(1)
+        sido = SIDO_SHORT.get(sido_m.group(0), sido_m.group(0))
         gu_m = SIGUNGU_RE.match(addr)
         if not gu_m:
             continue
         out.append(AddrRow(
             name=name,
-            road_address=addr[len(sido):].strip(),
+            road_address=addr[sido_m.end():].strip(),
             sido=sido,
             sigungu=gu_m.group(1),
             is_new=pending_new or NEW_RE.match(gubun.replace(" ", "")) is not None,
             page=page,
+            heating=_heating(cols.get("난방방식", [])),
         ))
         pending_new = False
     return out
