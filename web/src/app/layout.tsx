@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { SaveProvider } from "@/components/save-context";
-import { SiteNav } from "@/components/site-nav";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
 import { SITE_URL } from "@/lib/site-url";
@@ -32,8 +30,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="bar">
               <div className="left">
                 <Link href={ROUTES.home} className="logo"><BrandMark size={22} />{SITE_NAME}</Link>
-                {/* useSearchParams를 쓰므로 정적 페이지(상세 ISR)에서 Suspense 경계가 필요하다 */}
-                <Suspense fallback={null}><SiteNav /></Suspense>
               </div>
             </div>
           </header>

@@ -1,5 +1,10 @@
 # Handoff: 집공고(zipgonggo) 화면 리디자인 — 모션 중심
 
+> **2026-09-08 변경(사용자 결정):** 홈에는 지도를 두지 않는다. 홈은 아래 「2. 공고 목록」 레이아웃(히어로 + KPI + sticky 필터 + 행 목록)이 기본이고 `?view=` 파라미터는 없어졌다.
+> 「1. 지도 탐색」의 지도 동작(라벨 핀·디클러터·행 호버 ↔ 핀 강조·좌하단 캡슐·좌상단 칩)은 **공고 상세의 공급 단지 탐색기**(`web/src/components/complex-explorer.tsx` + `label-pin-map.tsx`)로 옮겼다.
+> 지도는 지오코딩 전에 먼저 뜨고, 선택 핀은 화면 밖일 때만 pan(줌 유지). 선택 말풍선은 없앴다(등장 애니메이션이 translate를 덮어 위치가 튀던 버그).
+> 브랜드 마크는 `design/brand/`.
+
 ## Overview
 공공임대·공공지원민간임대 입주자모집공고를 **지도 + 목록으로 재구성**하는 pSEO 서비스 「집공고」의 화면 리디자인이다.
 기존 구현(`web/src/app/page.tsx`, `web/src/app/notice/[slug]/page.tsx`, `web/src/app/globals.css`)의 라일락 파스텔 카드 UI를

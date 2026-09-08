@@ -18,11 +18,10 @@ export function parseNoticeFilters(get: (key: string) => string | string[] | nul
     type: firstParam(get("type")),
     sort: firstParam(get("sort")) === "deadline" ? "deadline" : DEFAULT_SORT,
     closing: firstParam(get("closing")) === "7d" ? "7d" : undefined,
-    view: firstParam(get("view")) === "list" ? "list" : undefined,
   };
 }
 
-/** 필터 → 쿼리. 기본 정렬(posted)·기본 뷰(map)는 URL에 적지 않는다. */
+/** 필터 → 쿼리. 기본 정렬(posted)은 URL에 적지 않는다. */
 export function noticeFiltersToParams(f: NoticeFilters): URLSearchParams {
   const u = new URLSearchParams();
   if (f.sector) u.set("sector", f.sector);
@@ -30,7 +29,6 @@ export function noticeFiltersToParams(f: NoticeFilters): URLSearchParams {
   if (f.type) u.set("type", f.type);
   if (f.sort && f.sort !== DEFAULT_SORT) u.set("sort", f.sort);
   if (f.closing) u.set("closing", f.closing);
-  if (f.view === "list") u.set("view", "list");
   return u;
 }
 
@@ -38,7 +36,7 @@ export function hasFilter(f: NoticeFilters): boolean {
   return Boolean(f.sector || f.sido || f.type || f.closing || (f.sort && f.sort !== DEFAULT_SORT));
 }
 
-/** /api/notices 용 쿼리 — view는 뺀다(페이지 API 캐시 키가 갈리지 않게). */
+/** /api/notices 용 쿼리. */
 export function feedParams(f: NoticeFilters): string {
-  return noticeFiltersToParams({ ...f, view: undefined }).toString();
+  return noticeFiltersToParams(f).toString();
 }

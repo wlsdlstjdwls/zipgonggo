@@ -5,8 +5,6 @@ export type Sector = "공공임대" | "민간임대";
 export type NoticeSort = "posted" | "deadline";
 /** 마감 임박 필터. "7d" = 오늘부터 7일 안에 접수 마감 */
 export type NoticeClosing = "7d";
-/** 홈 레이아웃. map = 목록 + 지도(기본), list = 히어로 + 목록만 */
-export type HomeView = "map" | "list";
 
 export const SECTORS: readonly Sector[] = ["공공임대", "민간임대"];
 
@@ -36,7 +34,7 @@ export type NoticeListItem = {
   source_status: string | null;
   amends_source_key: string | null;
   source_url: string;
-  /** 홈 지도 핀용. SH 목록엔 없다(null) */
+  /** 상세 위치 지도용. SH 목록엔 없다(null) */
   address: string | null;
 };
 
@@ -71,8 +69,7 @@ export type NoticeComplex = {
   area_max: number | null;
 };
 
-/** view는 화면 레이아웃일 뿐 SQL엔 안 들어간다. URL 왕복을 한곳에서 다루려고 같이 둔다 */
-export type NoticeFilters = { sido?: string; type?: string; sector?: Sector; sort?: NoticeSort; closing?: NoticeClosing; view?: HomeView };
+export type NoticeFilters = { sido?: string; type?: string; sector?: Sector; sort?: NoticeSort; closing?: NoticeClosing };
 
 /** 홈 KPI 스트립. 전부 서비스 전체 집계(필터 무관) */
 export type HomeStats = { total: number; seoul: number; closing7: number; medianRent: number | null };

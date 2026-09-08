@@ -1,38 +1,22 @@
 "use client";
 
-// 공급 단지 탐색기 — 왼쪽 목록(검색·자치구·건수) + 오른쪽 지도. 벤치마크 docs/references/공고지도2.png.
-// 마커·선택 말풍선·panTo·목록↔마커 동기화는 smokespot components/naver-map.tsx 패턴을 가져왔다
-// (id별 마커 재사용·signature 갱신, 선택 시 zIndex·아이콘 교체, 콜백은 ref로 받아 마커 재생성 방지).
-// 좌표는 페이지 로드 시 브라우저에서 지오코딩해 탭 메모리에만 둔다(저장 금지 — CLAUDE.md 하지 말 것 1).
+// 공급 단지 탐색기 — 왼쪽 목록(검색·자치구·건수) + 오른쪽 라벨 핀 지도(LabelPinMap). 벤치마크 docs/references/공고지도2.png.
+// 지도는 먼저 뜨고, 좌표는 브라우저 지오코딩이 끝나면 한 번에 얹는다(탭 메모리만, 저장 금지 — CLAUDE.md 하지 말 것 1).
+// 행 호버 ↔ 핀 강조, 행·핀 클릭 → 선택(목록 스크롤, 화면 밖이면 지도 pan). 지도 좌상단 칩·좌하단 캡슐은 홈 지도(2026-09-08 제거)에서 옮겨 왔다.
 // 클라이언트 컴포넌트지만 목록은 서버에서 HTML로 렌더되므로 크롤러도 단지명·주소를 본다.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BRAND_INK, MARKER_H, MARKER_W, markGlyph, markerHtml } from "@/lib/brand";
 import { geocodeAll, hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
-import { num, wonExact } from "@/lib/format";
+import { count, num, wonExact, wonShort } from "@/lib/format";
 import type { NoticeComplex } from "@/types/notice";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { LabelPinMap, type PinItem } from "./label-pin-map";
 
 type Props = { items: NoticeComplex[]; hasUnits: boolean };
 type Phase = "loading" | "ready" | "failed" | "no-key";
 
-const PAN = { duration: 420, easing: "easeOutCubic" };
-const SELECT_ZOOM = 15; // 목록에서 고르면 이 줌으로 당겨 본다
-
-function esc(s: string) {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-}
-
-// 선택 마커: 좌표 지점을 width:0 기준점으로 두고 말풍선을 가운데 정렬 — 이름 길이에 따라 핀이 밀리지 않는다 (smokespot)
-function balloonHtml(name: string): string {
-  return `<div style="position:relative;width:0;height:0;">
-    <div style="position:absolute;bottom:4.5px;left:-4.5px;width:9px;height:9px;background:${BRAND_INK};transform:rotate(45deg);"></div>
-    <div class="zg-marker-pop" style="position:absolute;bottom:9px;left:0;transform:translateX(-50%);display:flex;align-items:center;gap:6px;background:${BRAND_INK};border-radius:12px;padding:8px 12px;white-space:nowrap;box-shadow:0 8px 20px -8px rgba(15,18,22,.6);transform-origin:50% 100%;">
-      <svg width="15" height="15" viewBox="0 0 64 64">${markGlyph("#fff", BRAND_INK)}</svg>
-      <span style="font-size:12px;font-weight:700;color:#fff;font-family:inherit;">${esc(name)}</span>
-    </div></div>`;
-}
+// 핀이 아직 없을 때 첫 화면 — 서울 전역
+const SEOUL_CENTER = { lat: 37.5665, lng: 126.978 };
+const SEOUL_ZOOM = 11;
 
 function fullAddress(c: NoticeComplex): string {
   return c.sido === "서울특별시" ? `서울특별시 ${c.road_address}` : c.road_address;
@@ -42,16 +26,22 @@ function guLabel(c: NoticeComplex): string {
   return c.sido === "서울특별시" ? c.sigungu : `${c.sido} ${c.sigungu}`;
 }
 
+/** 핀 라벨: 굵게 단지명, 보조로 금액(호실 목록) → 호수 → 자치구. 신규 단지는 잉크 배경 */
+function toPin(c: NoticeComplex, hasUnits: boolean): PinItem {
+  const sub = hasUnits && c.min_rent != null ? `월 ${wonShort(c.min_rent)}`
+    : hasUnits && c.min_deposit != null ? wonShort(c.min_deposit)
+    : c.unit_count != null ? num(c.unit_count, "호")
+    : guLabel(c);
+  return { id: c.id, address: fullAddress(c), title: c.name, main: c.name, sub, hot: c.is_new };
+}
+
 export function ComplexExplorer({ items, hasUnits }: Props) {
-  const mapEl = useRef<HTMLDivElement>(null);
   const listEl = useRef<HTMLUListElement>(null);
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<Map<number, any>>(new Map());
-  const sigRef = useRef<Map<number, string>>(new Map());
   const [phase, setPhase] = useState<Phase>(hasMapKey() ? "loading" : "no-key");
   const [progress, setProgress] = useState(0);
   const [coords, setCoords] = useState<Map<string, LatLng | null>>(new Map());
-  const [mapReady, setMapReady] = useState(false);
+  const [focus, setFocus] = useState<number | null>(null);
+  const [inView, setInView] = useState<number | null>(null);
   const [gu, setGu] = useState("");
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
@@ -80,94 +70,19 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
     return () => { cancelled = true; };
   }, [items]);
 
-  // 2) 지도 생성 — 줌 바 없음, 축척·네이버 로고는 SDK 기본 노출. 빈 곳 클릭이면 선택 해제
-  useEffect(() => {
-    if (phase !== "ready" || !mapEl.current || mapRef.current) return;
-    const maps = window.naver?.maps;
-    if (!maps) return;
-    const map = new maps.Map(mapEl.current, {
-      zoom: 11,
-      zoomControl: false,
-      scaleControl: true,
-      logoControl: true,
-      mapDataControl: false,
-      logoControlOptions: { position: maps.Position.BOTTOM_LEFT },
-      scaleControlOptions: { position: maps.Position.BOTTOM_RIGHT },
-    });
-    maps.Event.addListener(map, "click", () => setSelected(null));
-    mapRef.current = map;
-    setMapReady(true);
-  }, [phase]);
+  const pins = useMemo(() => visible.map((c) => toPin(c, hasUnits)), [visible, hasUnits]);
 
-  // 3) 마커 동기화 — 보이는 항목만. 바뀐 것만 아이콘 교체(smokespot signature 패턴)
-  useEffect(() => {
-    const map = mapRef.current;
-    const maps = window.naver?.maps;
-    if (!map || !maps || !mapReady) return;
-    const byId = markersRef.current;
-    const sigs = sigRef.current;
-    const next = new Map<number, { c: NoticeComplex; p: LatLng }>();
-    for (const c of visible) {
-      const p = coords.get(fullAddress(c));
-      if (p) next.set(c.id, { c, p });
-    }
-    for (const [id, m] of byId) {
-      if (!next.has(id)) { m.setMap(null); byId.delete(id); sigs.delete(id); }
-    }
-    for (const [id, { c, p }] of next) {
-      const isSel = id === selected;
-      const sig = `${p.lat}:${p.lng}:${isSel}`;
-      const icon = isSel
-        ? { content: balloonHtml(c.name), anchor: new maps.Point(0, 0) }
-        : { content: markerHtml(), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) };
-      const existing = byId.get(id);
-      if (existing) {
-        if (sigs.get(id) !== sig) { existing.setIcon(icon); existing.setZIndex(isSel ? 150 : 100); sigs.set(id, sig); }
-        continue;
-      }
-      const marker = new maps.Marker({ position: new maps.LatLng(p.lat, p.lng), map, title: c.name, icon, zIndex: isSel ? 150 : 100 });
-      maps.Event.addListener(marker, "click", () => setSelected((cur) => (cur === id ? null : id)));
-      byId.set(id, marker);
-      sigs.set(id, sig);
-    }
-  }, [visible, coords, selected, mapReady]);
-
-  // 4) 필터가 바뀌면 보이는 마커 전체가 들어오게 bounds — 선택 변경 때는 안 움직인다
-  useEffect(() => {
-    const map = mapRef.current;
-    const maps = window.naver?.maps;
-    if (!map || !maps || !mapReady) return;
-    const pts = visible.map((c) => coords.get(fullAddress(c))).filter((p): p is LatLng => Boolean(p));
-    if (pts.length === 0) return;
-    if (pts.length === 1) { map.setCenter(new maps.LatLng(pts[0].lat, pts[0].lng)); map.setZoom(15); return; }
-    const b = new maps.LatLngBounds();
-    for (const p of pts) b.extend(new maps.LatLng(p.lat, p.lng));
-    map.fitBounds(b, { top: 48, right: 40, bottom: 40, left: 40 });
-  }, [visible, coords, mapReady]);
-
-  // 5) 선택 → 지도 이동 + 목록 스크롤
+  // 2) 선택 → 목록 스크롤. 지도 이동은 LabelPinMap이 화면 밖일 때만 한다
   useEffect(() => {
     if (selected === null) return;
-    const c = items.find((x) => x.id === selected);
-    const map = mapRef.current;
-    const maps = window.naver?.maps;
-    const p = c && coords.get(fullAddress(c));
-    const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (map && maps && p) {
-      const target = new maps.LatLng(p.lat, p.lng);
-      const zoom = Math.max(map.getZoom(), SELECT_ZOOM);
-      // 줌과 팬을 따로 걸면 애니메이션이 서로 끊어 타일·마커가 어긋난다. morph가 둘을 한 번에 한다
-      if (reduce || zoom !== map.getZoom()) { map.setZoom(zoom); map.setCenter(target); }
-      else map.panTo(target, PAN);
-    }
-    // scrollIntoView는 창 스크롤까지 건드리고 지도 이동과 겹치면 중간에 끊긴다 — 목록 컨테이너만 직접 옮긴다
+    // scrollIntoView는 창 스크롤까지 건드린다 — 목록 컨테이너만 직접 옮긴다
     const list = listEl.current;
     const row = list?.querySelector<HTMLElement>(`[data-id="${selected}"]`);
     if (list && row) {
       // .cx-list가 position:relative라 offsetTop은 목록 내용 기준. 행을 목록 가운데에. smooth는 탭이 비활성이면 멈추므로 즉시 이동
       list.scrollTop = Math.max(0, row.offsetTop - (list.clientHeight - row.offsetHeight) / 2);
     }
-  }, [selected, items, coords]);
+  }, [selected]);
 
   // 필터·검색으로 선택 항목이 빠지면 선택 해제
   useEffect(() => {
@@ -188,6 +103,9 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
   }, [visible, selected]);
 
   const onPick = useCallback((id: number) => setSelected((cur) => (cur === id ? null : id)), []);
+  const onPinFocus = useCallback((id: number | null) => setFocus(id), []);
+  const onInView = useCallback((n: number) => setInView(n), []);
+  const selectedItem = selected === null ? null : (items.find((c) => c.id === selected) ?? null);
 
   const found = visible.filter((c) => coords.get(fullAddress(c))).length;
 
@@ -207,8 +125,8 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
             const on = c.id === selected;
             const noPin = phase === "ready" && !coords.get(fullAddress(c));
             return (
-              <li key={c.id} data-id={c.id} className={on ? "on" : undefined}>
-                <button type="button" onClick={() => onPick(c.id)} aria-pressed={on}>
+              <li key={c.id} data-id={c.id} className={`${on ? "on" : ""}${focus === c.id ? " is-focus" : ""}`.trim() || undefined}>
+                <button type="button" onClick={() => onPick(c.id)} aria-pressed={on} onMouseEnter={() => setFocus(c.id)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(c.id)} onBlur={() => setFocus(null)}>
                   <span className="cx-row-main">
                     <span className="cx-name">{c.name}{c.is_new && <span className="chip new">신규</span>}</span>
                     <span className="cx-addr">{fullAddress(c)}</span>
@@ -228,18 +146,36 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
         </ul>
       </div>
       <div className="cx-map-wrap">
-        {phase === "no-key" && <p className="map-fallback">지도 키가 설정되지 않았습니다.</p>}
-        {phase === "failed" && <p className="map-fallback">지도를 불러오지 못했습니다. 잠시 후 다시 시도하세요.</p>}
-        {(phase === "loading" || phase === "ready") && (
-          <>
-            <div ref={mapEl} className="cx-map" role="img" aria-label="공급 단지 위치 지도" />
-            <p className="cx-status">
-              {phase === "loading"
-                ? `주소 찾는 중 ${progress}/${items.length}`
-                : `${found}/${visible.length}곳 표시 · 위치는 도로명주소 기준 근사치. 목록이나 마커를 누르면 선택됩니다.`}
-            </p>
-          </>
-        )}
+        <div className="cx-map">
+          <LabelPinMap
+            pins={pins}
+            coords={coords}
+            focusId={focus}
+            selectedId={selected}
+            onFocus={onPinFocus}
+            onSelect={onPick}
+            onVisible={onInView}
+            center={SEOUL_CENTER}
+            zoom={SEOUL_ZOOM}
+            ariaLabel="공급 단지 위치 지도"
+          />
+          {phase === "failed" && <p className="map-note">주소를 찾지 못해 핀을 표시하지 못했습니다.</p>}
+          <div className="map-chips" aria-hidden="true">
+            <span className="strong">{gu || "자치구 전체"}<b>{visible.length}</b></span>
+            {phase === "loading" && <span>주소 찾는 중 {progress}/{items.length}</span>}
+          </div>
+          <div className="map-capsule" aria-live="polite">
+            <span>{selectedItem ? "선택한 단지" : "이 화면 안 단지"}</span>
+            <b>{selectedItem ? selectedItem.name : inView === null ? "—" : count(inView, "곳")}</b>
+          </div>
+        </div>
+        <p className="cx-status">
+          {phase === "loading"
+            ? `주소 찾는 중 ${progress}/${items.length}`
+            : phase === "ready"
+              ? `${found}/${visible.length}곳 표시 · 위치는 도로명주소 기준 근사치. 목록이나 핀을 누르면 선택됩니다.`
+              : "위치는 도로명주소 기준 근사치입니다."}
+        </p>
       </div>
     </div>
   );

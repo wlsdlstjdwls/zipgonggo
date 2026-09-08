@@ -182,10 +182,7 @@ small { font-size: 12px; }
 .fbar .reset { display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: var(--r-chip); font-weight: 700; font-size: 12px; color: var(--acc); white-space: nowrap; }
 
 /* ── 탐색기: 좌 목록 / 우 지도 ───────────────────────────── */
-.ex { display: grid; grid-template-columns: minmax(0, 1.3fr) 1fr; }
 .ex-list { min-width: 0; }
-.ex-map { position: sticky; top: 60px; align-self: start; height: 560px; border-left: 1px solid var(--line); background: var(--sub); overflow: hidden; }
-.ex-map .canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; } /* SDK가 position을 relative로 덮어써도 크기가 남게 width/height 명시 */
 .map-chips { position: absolute; z-index: 5; left: 14px; top: 14px; display: flex; gap: 7px; flex-wrap: wrap; pointer-events: none; }
 .map-chips span { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: var(--r-chip); background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow-overlay); font-weight: 700; font-size: 12.5px; color: var(--mut); }
 .map-chips span.strong { font-weight: 800; color: var(--ink); }
@@ -198,7 +195,7 @@ small { font-size: 12px; }
 /* 지도 핀 — 네이버 Marker의 icon.content HTML. 금액 + D-day 2줄, 흰 배경, 앵커는 하단 중앙 */
 .zg-pin { display: inline-flex; align-items: center; gap: 6px; transform: translate(-50%, -100%); padding: 6px 11px; border-radius: 12px; background: #fff; border: 1px solid #e3e6eb; box-shadow: var(--shadow-float); white-space: nowrap; cursor: pointer;
   transition: transform 280ms var(--sp), box-shadow 260ms var(--ease), background 220ms linear, border-color 220ms linear; }
-.zg-pin b { font-weight: 800; font-size: 12.5px; line-height: 1.1; letter-spacing: -0.03em; color: var(--ink); }
+.zg-pin b { font-weight: 800; font-size: 12.5px; line-height: 1.1; letter-spacing: -0.03em; color: var(--ink); max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
 .zg-pin span { font-weight: 700; font-size: 10px; line-height: 1.2; color: var(--dim); }
 .zg-pin.hot { background: var(--ink); border-color: var(--ink); }
 .zg-pin.hot b { color: #fff; }
@@ -224,11 +221,11 @@ small { font-size: 12px; }
 
 /* ── 결과 행 ─────────────────────────────────────────────── */
 .rows { list-style: none; margin: 0; padding: 0; }
-.row { display: grid; grid-template-columns: 56px minmax(0, 1fr) 132px auto; gap: 14px; align-items: center; padding: 16px var(--pad); border-bottom: 1px solid var(--line); color: var(--ink);
+.row { display: grid; grid-template-columns: 56px minmax(0, 1fr) 170px auto; gap: 18px; align-items: center; padding: 18px var(--pad); border-bottom: 1px solid var(--line); color: var(--ink);
   animation: mo-in 440ms var(--sp) both; animation-delay: var(--stagger, 0ms);
   transition: background 200ms var(--ease), transform 300ms var(--sp); }
 .row.static { animation: none; }
-.row:hover, .row.is-focus { background: var(--sub); transform: translateX(3px); }
+.row:hover { background: var(--sub); transform: translateX(3px); }
 .row-dday { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 56px; height: 52px; border-radius: var(--r-dday); background: var(--sub); color: var(--mut); }
 .row-dday b { font-weight: 900; font-size: 16px; line-height: 1; letter-spacing: -0.05em; }
 .row-dday span { font-weight: 800; font-size: 8.5px; line-height: 1; letter-spacing: 0.08em; margin-top: 4px; }
@@ -238,12 +235,12 @@ small { font-size: 12px; }
 .row-dday.soft, .tone-soft { background: var(--sub); color: var(--mut); }
 .row-body { min-width: 0; }
 .row-meta { display: block; font-weight: 700; font-size: 11px; letter-spacing: 0.02em; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-title { display: block; margin-top: 5px; font-weight: 800; font-size: 15px; line-height: 1.35; letter-spacing: -0.03em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-dates { display: block; margin-top: 7px; font-weight: 600; font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-top: 5px; font-weight: 800; font-size: 16px; line-height: 1.35; letter-spacing: -0.03em; color: var(--ink); overflow: hidden; }
+.row-dates { display: block; margin-top: 8px; font-weight: 600; font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row-money { display: block; text-align: right; }
-.row-money b { display: block; font-weight: 900; font-size: 18px; line-height: 1; letter-spacing: -0.045em; color: var(--ink); transition: color 240ms var(--ease); }
-.row:hover .row-money b, .row.is-focus .row-money b { color: var(--acc); }
-.row-money span { display: block; margin-top: 5px; font-weight: 700; font-size: 10.5px; color: var(--dim); white-space: nowrap; }
+.row-money b { display: block; font-weight: 900; font-size: 22px; line-height: 1; letter-spacing: -0.05em; color: var(--ink); transition: color 240ms var(--ease); }
+.row:hover .row-money b { color: var(--acc); }
+.row-money span { display: block; margin-top: 6px; font-weight: 700; font-size: 11px; color: var(--dim); white-space: nowrap; }
 .row-money.none b { color: var(--dim); font-size: 13px; font-weight: 700; letter-spacing: 0; }
 .row-narrow { display: none; align-items: baseline; gap: 8px; margin-top: 7px; }
 .row-narrow b { font-weight: 900; font-size: 17px; line-height: 1; letter-spacing: -0.045em; color: var(--ink); }
@@ -255,18 +252,12 @@ small { font-size: 12px; }
 .save.on { background: var(--acc-soft); color: var(--acc); }
 .save.pop { animation: mo-pop 420ms var(--sp); }
 .arrow { font-weight: 900; font-size: 16px; line-height: 1; color: var(--acc); opacity: 0; transform: translateX(-5px); transition: transform 320ms var(--sp), opacity 200ms linear; }
-.row:hover .arrow, .row.is-focus .arrow { opacity: 1; transform: translateX(0); }
+.row:hover .arrow { opacity: 1; transform: translateX(0); }
 
 /* 목록 뷰 변형: 넓은 간격, 금액 22px */
-.row.list { grid-template-columns: 56px minmax(0, 1fr) 170px auto; gap: 18px; padding: 18px; }
-.row.list .row-title { font-size: 16px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.row.list .row-dates { margin-top: 8px; }
-.row.list .row-money b { font-size: 22px; letter-spacing: -0.05em; }
-.row.list .row-money span { margin-top: 6px; font-size: 11px; }
 
-.more-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px var(--pad); }
+.more-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px var(--pad) 30px; }
 .more-bar .cnt { font-weight: 700; font-size: 11.5px; color: var(--dim); }
-.more-bar.list { padding: 20px 18px 30px; }
 .feed-sentinel { min-height: 1px; }
 .feed-error { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 16px; font-weight: 600; font-size: 13px; color: var(--hot); }
 
@@ -379,11 +370,12 @@ small { font-size: 12px; }
 .cx-tools input { grid-column: 1 / -1; }
 .cx-count { margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--dim); border-bottom: 1px solid var(--line); }
 .cx-count b { color: var(--ink); }
-.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: 520px; overflow-y: auto; }
+.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: 520px; overflow-y: auto; overflow-x: hidden; }
 .cx-list li { border-bottom: 1px solid var(--line); }
 .cx-list li:last-child { border-bottom: 0; }
 .cx-list button { display: flex; width: 100%; gap: 10px; align-items: flex-start; padding: 11px 12px; background: none; border: 0; border-left: 3px solid transparent; text-align: left; font: inherit; color: var(--ink); cursor: pointer; transition: background 200ms var(--ease), transform 300ms var(--sp); }
 .cx-list button:hover { background: var(--sub); transform: translateX(3px); }
+.cx-list li.is-focus button { background: var(--sub); transform: translateX(3px); }
 .cx-list li.on button { background: var(--acc-soft); border-left-color: var(--acc); }
 .cx-row-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .cx-name { font-weight: 800; font-size: 13.5px; letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -394,22 +386,18 @@ small { font-size: 12px; }
 .cx-empty { padding: 24px 12px; color: var(--dim); font-size: 13px; text-align: center; }
 .cx-map-wrap { position: sticky; top: 72px; }
 .cx-map { width: 100%; height: 600px; border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--sub); overflow: hidden; position: relative; z-index: 0; }
+.cx-map .canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; } /* SDK가 position을 relative로 덮어써도 크기가 남게 width/height 명시 */
 .cx-status { margin: 6px 0 0; font-size: 11.5px; font-weight: 600; color: var(--dim); }
 .cx-nopin { font-size: 11px; color: var(--dim); }
-@keyframes zg-marker-pop { from { opacity: 0; transform: scale(0.55); } to { opacity: 1; transform: scale(1); } }
-.zg-marker-pop { animation: zg-marker-pop 220ms var(--sp); }
 
 /* ── 반응형: 컨테이너 900px 한 단계 ──────────────────────── */
 @container (max-width: 900px) {
-  .ex { grid-template-columns: 1fr; }
-  .ex-map { position: static; order: -1; height: 300px; border-left: 0; border-bottom: 1px solid var(--line); }
   .kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi > div:nth-child(3) { border-left: 0; }
   .kpi > div:nth-child(n + 3) { border-top: 1px solid var(--line); }
-  .row, .row.list { grid-template-columns: 56px minmax(0, 1fr) auto; }
+  .row { grid-template-columns: 56px minmax(0, 1fr) auto; }
   .row-money { display: none; }
   .row-narrow { display: flex; }
-  .row-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .detail { grid-template-columns: 1fr; }
   .aside { border-left: 0; border-top: 1px solid var(--line); }
   .aside-in { position: static; }
