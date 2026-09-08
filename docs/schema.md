@@ -123,6 +123,17 @@ API 필드 ↔ 컬럼 대응은 각 컬럼 주석에 `(API xxx)`로 적어 뒀�
 
 `reject_reason`은 파서 개선 입력으로 되돌린다. 반려가 쌓이면 그 기관 파서를 손봐야 한다는 신호다.
 
+## 후보 컬럼 (벤치마크 대조, 미반영)
+
+[`references/README.md`](references/README.md)의 호실·단지 상세와 대조해 빠진 항목. 파서(S4)가 실제로 뽑을 수 있을 때 넣는다.
+
+| 테이블 | 후보 | 근거 |
+|---|---|---|
+| `unit` | `subway_distance_m` | 벤치마크 "632m, 10분". 도보분만으로는 부족 |
+| `unit` | `common_area_m2` | 아파트형 공고의 공용면적 |
+| `unit` / `complex_type` | `priority_count` `general_count` | 우선공급/일반공급 배분 |
+| `complex_type` | `reserve_count`, `move_in_at` | 예비자모집호수, 입주시작일 |
+
 ## 인덱스
 
 | 인덱스 | 조회 패턴 |
