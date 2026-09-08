@@ -331,15 +331,26 @@ small { font-size: 12px; }
 .step.on { background: var(--acc-soft); border-color: var(--acc); }
 .step.on span { color: var(--acc); }
 .step.on b { color: var(--ink); }
+/* 보증금·임대료 표 — 기본(headline) · pay(납부 구성, 들여쓴 하위 항목) · max(범위 위쪽 끝, 강조색) 세 그룹을 톤으로 구분한다.
+   라벨을 짧게 줄이고(계약금·중도금·잔금) note는 <small>로 옆에 붙여, 예전처럼 길어서 잘려 보이던(nowrap+ellipsis) 문제를 없앤다. */
 .ptable { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
-.ptable > div { display: grid; grid-template-columns: 1.3fr 1fr 1fr; border-bottom: 1px solid var(--line); }
+.ptable > div { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; align-items: baseline; border-bottom: 1px solid var(--line); }
 .ptable > div:last-child { border-bottom: 0; }
 .ptable .h { background: var(--sub); }
 .ptable .h span { padding: 11px 15px; font-weight: 800; font-size: 10px; letter-spacing: 0.12em; color: var(--dim); }
-.ptable span { padding: 14px 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ptable .k { font-weight: 600; font-size: 13px; color: var(--mut); }
-.ptable .d { text-align: right; font-weight: 800; font-size: 14px; color: var(--ink); }
-.ptable .r { text-align: right; font-weight: 700; font-size: 14px; color: var(--mut); }
+.ptable span { padding: 14px 15px; min-width: 0; overflow-wrap: anywhere; }
+.ptable .k { display: flex; align-items: baseline; gap: 6px; font-weight: 700; font-size: 13.5px; color: var(--ink); }
+.ptable .k small { font-weight: 600; font-size: 10.5px; color: var(--dim); white-space: nowrap; }
+.ptable .d, .ptable .r { text-align: right; white-space: nowrap; }
+.ptable .d { font-weight: 800; font-size: 14px; color: var(--ink); }
+.ptable .r { font-weight: 700; font-size: 14px; color: var(--mut); }
+.ptable .pay { background: var(--sub); }
+.ptable .pay .k { padding-left: 28px; font-weight: 600; font-size: 12.5px; color: var(--mut); }
+.ptable .pay .k::before { content: "—"; color: var(--dim); }
+.ptable .pay .d, .ptable .pay .r { font-weight: 700; font-size: 13px; color: var(--mut); }
+.ptable .max { background: var(--acc-soft); }
+.ptable .max .k, .ptable .max .d, .ptable .max .r { color: var(--acc); }
+.ptable .max .k small { color: var(--acc); opacity: 0.75; }
 .d-map { position: relative; height: 300px; border-radius: var(--r-panel); overflow: hidden; border: 1px solid var(--line); background: var(--sub); }
 .d-map .map { height: 100%; border-radius: 0; }
 .d-sub { margin: -14px 0 22px; font-weight: 600; font-size: 13.5px; color: var(--mut); }

@@ -146,8 +146,8 @@ export default async function NoticePage({ params }: Params) {
               <div className="ptable" role="table" aria-label="보증금과 임대료">
                 <div className="h" role="row"><span role="columnheader">구분</span><span role="columnheader" style={{ textAlign: "right" }}>보증금</span><span role="columnheader" style={{ textAlign: "right" }}>월임대료</span></div>
                 {priceRows(n).map((r) => (
-                  <div key={r.kind} role="row">
-                    <span className="k" role="cell">{r.kind}</span>
+                  <div key={`${r.group}-${r.label}`} className={r.group} role="row">
+                    <span className="k" role="cell">{r.label}{r.note && <small>{r.note}</small>}</span>
                     <span className="d" role="cell" title={r.exact[0] != null ? wonExact(r.exact[0]) : undefined}>{r.deposit}</span>
                     <span className="r" role="cell" title={r.exact[1] != null ? wonExact(r.exact[1]) : undefined}>{r.rent}</span>
                   </div>

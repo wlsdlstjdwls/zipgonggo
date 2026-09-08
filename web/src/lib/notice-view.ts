@@ -35,25 +35,27 @@ export function areaText(c: NoticeComplex): string | null {
 // 납부 구성은 DB 값(계약금·중도금·잔금)이 있으면 그대로, 없고 전세형(월임대료 없음)이면 10%/90% 가정치로 보여 준다.
 // 마이홈 API는 미기재를 0으로 주는 경우가 있어(실측 2026-09-08) 납부 구성은 0을 미기재로 본다.
 // exact: 원 단위 원본. 화면은 "1억 960만 원"으로 읽히게 쓰고, 정확한 값은 마우스를 올리면 나온다
-export type PriceRow = { kind: string; deposit: string; rent: string; exact: [number | null, number | null] };
+// group으로 화면이 기본/납부 구성/최대를 시각적으로 묶는다 — "납부 구성 계약금" 같은 긴 라벨을 매 줄 반복하지 않는다
+export type PriceRowGroup = "base" | "pay" | "max";
+export type PriceRow = { group: PriceRowGroup; label: string; note?: string; deposit: string; rent: string; exact: [number | null, number | null] };
 
 function pos(v: number | null): number | null {
   return v != null && v > 0 ? v : null;
 }
 
 export function priceRows(n: Notice): PriceRow[] {
-  const rows: PriceRow[] = [{ kind: "기본 (공고 최소값)", deposit: wonKo(n.min_deposit), rent: wonKo(n.min_rent), exact: [n.min_deposit, n.min_rent] }];
+  const rows: PriceRow[] = [{ group: "base", label: "기본", note: "공고 최소값", deposit: wonKo(n.min_deposit), rent: wonKo(n.min_rent), exact: [n.min_deposit, n.min_rent] }];
   const down = pos(n.min_down_payment), interim = pos(n.min_interim), balance = pos(n.min_balance);
   if (down != null || interim != null || balance != null) {
-    if (down != null) rows.push({ kind: "납부 구성 계약금", deposit: wonKo(down), rent: "—", exact: [down, null] });
-    if (interim != null) rows.push({ kind: "납부 구성 중도금", deposit: wonKo(interim), rent: "—", exact: [interim, null] });
-    if (balance != null) rows.push({ kind: "납부 구성 잔금", deposit: wonKo(balance), rent: "—", exact: [balance, null] });
+    if (down != null) rows.push({ group: "pay", label: "계약금", deposit: wonKo(down), rent: "—", exact: [down, null] });
+    if (interim != null) rows.push({ group: "pay", label: "중도금", deposit: wonKo(interim), rent: "—", exact: [interim, null] });
+    if (balance != null) rows.push({ group: "pay", label: "잔금", deposit: wonKo(balance), rent: "—", exact: [balance, null] });
   } else if (n.min_rent == null && n.min_deposit != null) {
-    rows.push({ kind: "납부 구성 계약금 (10% 가정)", deposit: wonKo(Math.round(n.min_deposit * 0.1)), rent: "—", exact: [Math.round(n.min_deposit * 0.1), null] });
-    rows.push({ kind: "납부 구성 잔금 (90% 가정)", deposit: wonKo(Math.round(n.min_deposit * 0.9)), rent: "—", exact: [Math.round(n.min_deposit * 0.9), null] });
+    rows.push({ group: "pay", label: "계약금", note: "10% 가정", deposit: wonKo(Math.round(n.min_deposit * 0.1)), rent: "—", exact: [Math.round(n.min_deposit * 0.1), null] });
+    rows.push({ group: "pay", label: "잔금", note: "90% 가정", deposit: wonKo(Math.round(n.min_deposit * 0.9)), rent: "—", exact: [Math.round(n.min_deposit * 0.9), null] });
   }
   if ((n.max_deposit != null && n.max_deposit !== n.min_deposit) || (n.max_rent != null && n.max_rent !== n.min_rent)) {
-    rows.push({ kind: "최대 (공고 최대값)", deposit: wonKo(n.max_deposit ?? n.min_deposit), rent: wonKo(n.max_rent ?? n.min_rent), exact: [n.max_deposit ?? n.min_deposit, n.max_rent ?? n.min_rent] });
+    rows.push({ group: "max", label: "최대", note: "공고 최대값", deposit: wonKo(n.max_deposit ?? n.min_deposit), rent: wonKo(n.max_rent ?? n.min_rent), exact: [n.max_deposit ?? n.min_deposit, n.max_rent ?? n.min_rent] });
   }
   return rows;
 }
