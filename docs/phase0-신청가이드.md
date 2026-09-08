@@ -130,9 +130,10 @@ https://business.juso.go.kr
 4. 즉시 승인 → **마이페이지 → 오픈API → 개발계정**에서 인증키 확인
 5. 인증키를 `.env`의 `DATA_GO_KR_KEY`에 넣는다 (`.env.example`에는 플레이스홀더만)
 
-### 붙임 파일 — 이게 진짜 목적이다
+### 붙임 파일 — 요청 코드표다 (2026-09-08 정정)
 
-응답 필드가 페이지에 없고 첨부 xlsx에만 있다. **활용신청 화면 하단 「참고문서」에서 받는다.**
+받아서 열어 보니 **요청 파라미터 코드표**(시도·시군구 코드 258행, 주택유형·공급유형·월임대료구분 코드)뿐이고 응답 필드는 없다.
+응답 스키마는 페이지 소스에 박힌 swagger JSON에 있어 `docs/api-spec/*.swagger.json`으로 뽑아 뒀다. 그래도 코드표는 요청에 필요하니 받는다. **활용신청 화면 하단 「참고문서」.**
 
 ```
 붙임1. 요청 파라미터 코드(공공주택 모집공고)_260701.xlsx
@@ -140,7 +141,7 @@ https://business.juso.go.kr
 붙임1. 요청 파라미터 코드(예비입주자 대기현황)_260701.xlsx
 ```
 
-셋 다 받아서 `docs/api-spec/`에 그대로 넣는다. 이 파일이 들어와야 `db/schema.sql`의 컬럼을 확정할 수 있다.
+셋 다 `docs/api-spec/`에 들어 있다. 컬럼 확정 근거는 xlsx가 아니라 같은 폴더의 swagger JSON과 `samples/`다.
 
 ### 트래픽
 
@@ -223,12 +224,21 @@ LH `robots.txt`가 첨부 다운로드 경로(`/lhapply/lhFile.do`)를 막고 �
 CREATE EXTENSION IF NOT EXISTS postgis;
 ```
 
-- `neon.tech` 가입 → 프로젝트 생성 (리전은 `ap-southeast-1` 등 아시아권)
+- **실제로 간 경로(2026-09-08)**: `neon.tech` 직접 가입이 아니라 Vercel Marketplace 통합.
+  ```
+  cd web
+  vercel project add zipgonggo && vercel link --yes --project zipgonggo
+  vercel integration add neon --name zipgonggo-db -m region=sin1 --plan free_v3
+  vercel env pull <임시파일>   # DATABASE_URL·DATABASE_URL_UNPOOLED 등 19개 주입됨
+  ```
+  플랜 ID는 `free`가 아니라 `free_v3`다. `vercel env pull`은 `.env.local`을 통째로 덮어쓰니 임시 파일로 받아 필요한 키만 옮긴다.
+  Neon CLI가 `web/.agents/` `web/.claude/skills/` `skills-lock.json`을 심는데 전부 지웠다 — 저장소 규칙서는 루트 `CLAUDE.md` 하나다.
+- 접속 문자열 분리: `web`은 pooled(`DATABASE_URL`, pgbouncer), `pipeline`은 direct(`DATABASE_URL_UNPOOLED`). 대량 COPY·마이그레이션은 pooler를 거치면 안 된다.
 - SQL Editor에서 위 구문 실행 → `SELECT postgis_version();`으로 확인
 - Connection string을 `.env`의 `DATABASE_URL`에 넣는다 (`?sslmode=require` 포함)
 - `db/migrations/0001_init.sql` 적용
 
-> Neon의 PostGIS 확장 지원 여부는 이번에 직접 확인하지 않았다. 프로젝트를 만들고 위 구문이 실제로 통과하는지 먼저 보는 게 순서다. 실패하면 Supabase가 대안이다.
+> **확인됨 (2026-09-08)**: `CREATE EXTENSION postgis` 통과. PostgreSQL 18.6 · PostGIS 3.6.0 (GEOS·PROJ 포함). `geography` 거리 계산 검증(서울시청–부산시청 324,915 m). Supabase 대안 불필요.
 
 ---
 
@@ -237,12 +247,12 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 ```
 [ ] 1. juso 출입구 정보 + 동 도형 2종 신청        ← 오늘. 나머지 전부가 여기 얹혀 있다
 [ ] 1-1. 활용가이드 받아 좌표계(EPSG) 확인
-[ ] 2. data.go.kr 3종 활용신청 + 붙임1 xlsx 3개 → docs/api-spec/
-[ ] 3. zipgonggo.kr 등록
+[x] 2. data.go.kr 3종 활용신청 + 붙임1 xlsx 3개 → docs/api-spec/   (2026-09-08 완료, LH 15058476 포함 4종)
+[ ] 3. zipgonggo.kr 등록                              ← 사용자 결정(09-08): 맨 마지막
 [ ] 4-1. LH 첨부 수집 문의 발송
 [ ] 4-2. 서울시 공공저작물 사전 협의 발송
-[ ] 5-1. NCP Maps 앱 등록 + Web Dynamic Map 무료 한도 실측
-[ ] 5-2. Neon 프로젝트 + PostGIS 확장 확인
+[~] 5-1. NCP Maps 앱 등록 + Web Dynamic Map 무료 한도 실측   Client ID 발급됨. 한도 숫자 미확인
+[x] 5-2. Neon 프로젝트 + PostGIS 확장 확인              2026-09-08. Vercel Marketplace 경로
 ```
 
 승인·회신을 기다리는 동안 막히지 않는 일: `db/schema.sql` 초안, `pipeline` 수집 스켈레톤, `web` 라우팅 골격.
