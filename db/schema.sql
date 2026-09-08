@@ -422,3 +422,8 @@ ALTER TABLE notice
 COMMENT ON COLUMN notice.max_deposit IS '공고 내 최대 임대보증금(원). SH 첨부 공급현황 표(S3)에서 채움. 마이홈 API에는 없어 NULL';
 COMMENT ON COLUMN notice.max_rent IS '공고 내 최대 월임대료(원). SH 첨부 표에서 채움';
 COMMENT ON COLUMN notice.schedule_source IS '접수 일정 출처. attachment면 SH 첨부 공고문 일정 흐름도에서 좌표 기반으로 읽은 값';
+
+-- 0010 — 원본 목록 순번 (같은 공고일 안에서 기관 목록 순서 유지)
+ALTER TABLE notice ADD COLUMN source_rank integer;
+COMMENT ON COLUMN notice.source_rank IS '수집 시 원본 목록에서의 순번(1이 맨 위). 같은 posted_at 안 정렬 기준';
+CREATE INDEX idx_notice_posted_rank ON notice (posted_at DESC, source_rank, id DESC);

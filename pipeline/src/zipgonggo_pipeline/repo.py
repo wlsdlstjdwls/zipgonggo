@@ -14,7 +14,7 @@ NOTICE_COLS = [
     "housing_type", "sector", "house_type", "sido", "sigungu", "complex_name", "address", "pnu", "heating",
     "total_household", "supply_count", "min_deposit", "min_rent", "min_down_payment", "min_interim",
     "min_balance", "posted_at", "apply_start_at", "apply_end_at", "announce_at", "status",
-    "source_status", "source_url", "portal_url", "contact", "raw",
+    "source_status", "source_url", "portal_url", "contact", "source_rank", "raw",
 ]
 # 재수집 시 갱신하지 않는 것: slug(URL 불변), source, source_key, publish, created_at
 _UPDATE_COLS = [c for c in NOTICE_COLS if c not in ("slug", "source", "source_key")]

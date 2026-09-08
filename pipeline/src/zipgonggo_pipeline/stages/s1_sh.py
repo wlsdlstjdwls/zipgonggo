@@ -58,8 +58,9 @@ def clean_title(t: str) -> str:
     return t.replace("-->", "").strip()
 
 
-def map_sh(row: SHRow, today: date) -> dict[str, Any] | None:
-    """SHRow → notice dict. 주택 공급이 아니면 None, 유형 미매핑이면 KeyError."""
+def map_sh(row: SHRow, today: date, source_rank: int | None = None) -> dict[str, Any] | None:
+    """SHRow → notice dict. 주택 공급이 아니면 None, 유형 미매핑이면 KeyError.
+    source_rank는 원본 목록에서의 순번(1이 맨 위) — 같은 공고일 안 정렬에 쓴다."""
     if row.type_name in NOT_HOUSING:
         return None
     housing_type = SH_TYPE_MAP[row.type_name]  # KeyError → 호출부가 review_queue
@@ -104,6 +105,7 @@ def map_sh(row: SHRow, today: date) -> dict[str, Any] | None:
         "source_url": row.source_url,
         "portal_url": row.portal_url,
         "contact": f"SH {row.dept}" if row.dept else None,
+        "source_rank": source_rank,
         "raw": {"sh_list_row": row.as_dict(), "sh_type": row.type_name},
     }
 
@@ -123,9 +125,9 @@ def run(*, dry_run: bool, max_pages: int | None) -> Stats:
     conn = None if dry_run else connect()
     try:
         cur = conn.cursor() if conn else None
-        for row in rows:
+        for rank, row in enumerate(rows, 1):
             try:
-                mapped = map_sh(row, today)
+                mapped = map_sh(row, today, rank)
             except KeyError:
                 stats.unmapped(row.type_name)
                 if cur:

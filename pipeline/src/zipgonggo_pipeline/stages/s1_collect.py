@@ -136,6 +136,7 @@ def map_notice(group: list[dict[str, Any]], today: date) -> Mapped:
         "source_url": nz(head.get("url")) or nz(head.get("pcUrl")) or "",
         "portal_url": nz(head.get("pcUrl")),
         "contact": nz(head.get("refrnc")),
+        "source_rank": None,  # 목록 순번은 run()이 채운다(API 응답 순서)
         "raw": {"items": group},
     }
     areas = [{"sido": k[0], "sigungu": k[1], "supply_count": v or None} for k, v in area_sum.items()]
@@ -174,6 +175,7 @@ def run(*, dry_run: bool, max_pages: int | None, page_size: int) -> Stats:
                 continue
             if cur is None:
                 continue
+            mapped.notice["source_rank"] = n
             upsert_guarded(cur, stats, key, mapped.notice, mapped.areas)
             if n % 50 == 0:
                 conn.commit()

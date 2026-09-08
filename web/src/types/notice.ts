@@ -36,6 +36,8 @@ export type NoticeListItem = {
   source_url: string;
   /** 상세 위치 지도용. SH 목록엔 없다(null) */
   address: string | null;
+  /** 기관 원본 목록에서의 순번(1이 맨 위). 같은 공고일 안 정렬·커서에 쓴다 */
+  source_rank: number | null;
 };
 
 export type Notice = NoticeListItem & {

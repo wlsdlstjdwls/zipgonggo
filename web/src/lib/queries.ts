@@ -12,7 +12,7 @@ const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 const LIST_COLS = `
   id, slug, title, agency, housing_type::text AS housing_type, sector::text AS sector, house_type, sido, sigungu, complex_name,
   supply_count, min_deposit, min_rent, posted_at, apply_start_at, apply_end_at, announce_at,
-  status::text AS status, source_status, amends_source_key, source_url, address`;
+  status::text AS status, source_status, amends_source_key, source_url, address, source_rank`;
 
 function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
   const where: string[] = [];
@@ -44,11 +44,19 @@ const DEADLINE_RANK = `CASE WHEN apply_end_at IS NULL THEN 2 WHEN apply_end_at >
 const DEADLINE_KEY = `CASE WHEN apply_end_at >= CURRENT_DATE THEN apply_end_at END`;
 
 // 커서: posted → "posted_at|id". deadline → "rank|apply_end_at|posted_at|id". 정렬키 전체를 담아야 같은 값이 겹쳐도 빠지지 않는다.
+// 커서는 정렬 키를 그대로 담는다. source_rank는 NULL일 수 있어 빈 칸으로 싣고 아래에서 최댓값으로 되돌린다.
 function encodeCursor(n: NoticeListItem, sort: NoticeSort): string {
-  if (sort === "posted") return `${n.posted_at}|${n.id}`;
+  if (sort === "posted") return `${n.posted_at}|${n.source_rank ?? ""}|${n.id}`;
   const today = todayKST();
   const rank = n.apply_end_at === null ? 2 : n.apply_end_at >= today ? 0 : 1;
-  return `${rank}|${n.apply_end_at ?? ""}|${n.posted_at}|${n.id}`;
+  return `${rank}|${n.apply_end_at ?? ""}|${n.posted_at}|${n.source_rank ?? ""}|${n.id}`;
+}
+
+/** NULLS LAST 정렬을 튜플 비교로 쓰려고 NULL을 맨 뒤 값으로 바꾼다. */
+const RANK_LAST = 2_147_483_647;
+function rankOrLast(v: string): number | null {
+  if (v === "") return RANK_LAST;
+  return /^\d+$/.test(v) ? Number(v) : null;
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -62,25 +70,32 @@ async function listNoticesPageRaw(f: NoticeFilters, cursor: string | null, limit
 
   let order: string;
   if (sort === "posted") {
-    order = `posted_at DESC, id DESC`;
+    // 같은 공고일 안에서는 기관 원본 목록 순서(source_rank)를 지킨다 — 사용자 요청 2026-09-08
+    order = `posted_at DESC, source_rank ASC NULLS LAST, id DESC`;
     if (cursor) {
-      const [posted, id] = cursor.split("|");
-      if (DATE_RE.test(posted) && /^\d+$/.test(id)) {
-        params.push(posted, Number(id));
-        where.push(`(posted_at, id) < ($${params.length - 1}::date, $${params.length}::bigint)`);
+      const [posted, rank, id] = cursor.split("|");
+      const r = rankOrLast(rank ?? "");
+      if (DATE_RE.test(posted) && r !== null && /^\d+$/.test(id)) {
+        // (posted DESC, rank ASC, id DESC)의 다음 행. rank만 오름차순이라 부호를 뒤집어 튜플로 비교한다
+        params.push(posted, r, Number(id));
+        const [pp, pr, pi] = [params.length - 2, params.length - 1, params.length];
+        where.push(
+          `(posted_at, -COALESCE(source_rank, ${RANK_LAST}), id) < ($${pp}::date, -$${pr}::int, $${pi}::bigint)`,
+        );
       }
     }
   } else {
-    order = `${DEADLINE_RANK}, ${DEADLINE_KEY} ASC, apply_end_at DESC NULLS LAST, posted_at DESC, id DESC`;
+    order = `${DEADLINE_RANK}, ${DEADLINE_KEY} ASC, apply_end_at DESC NULLS LAST, posted_at DESC, source_rank ASC NULLS LAST, id DESC`;
     if (cursor) {
-      const [rank, end, posted, id] = cursor.split("|");
-      if (/^[012]$/.test(rank) && DATE_RE.test(posted) && /^\d+$/.test(id)) {
+      const [rank, end, posted, srank, id] = cursor.split("|");
+      const sr = rankOrLast(srank ?? "");
+      if (/^[012]$/.test(rank) && DATE_RE.test(posted) && sr !== null && /^\d+$/.test(id)) {
         // 같은 rank 안에서 다음 행. NULL이 섞인 키라 튜플 비교 대신 풀어 쓴다.
         const r = Number(rank);
         params.push(r);
         const pr = params.length;
-        params.push(posted, Number(id));
-        const tail = `(posted_at, id) < ($${params.length - 1}::date, $${params.length}::bigint)`;
+        params.push(posted, sr, Number(id));
+        const tail = `(posted_at, -COALESCE(source_rank, ${RANK_LAST}), id) < ($${params.length - 2}::date, -$${params.length - 1}::int, $${params.length}::bigint)`;
         if ((r === 0 || r === 1) && DATE_RE.test(end)) {
           params.push(end);
           const pe = params.length;
@@ -188,7 +203,7 @@ export async function getAmendChain(n: Pick<Notice, "source_key" | "amends_sourc
       ? query<NoticeListItem>(`SELECT ${LIST_COLS} FROM notice WHERE source_key = $1`, [n.amends_source_key])
       : Promise.resolve([] as NoticeListItem[]),
     n.source_key
-      ? query<NoticeListItem>(`SELECT ${LIST_COLS} FROM notice WHERE amends_source_key = $1 ORDER BY posted_at DESC, id DESC`, [
+      ? query<NoticeListItem>(`SELECT ${LIST_COLS} FROM notice WHERE amends_source_key = $1 ORDER BY posted_at DESC, source_rank ASC NULLS LAST, id DESC`, [
           n.source_key,
         ])
       : Promise.resolve([] as NoticeListItem[]),
