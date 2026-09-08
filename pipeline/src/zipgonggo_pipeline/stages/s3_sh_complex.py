@@ -77,6 +77,32 @@ def _supply_row(l) -> dict:
     }
 
 
+def _jeonse_row(l) -> dict:
+    """JeonseLine → notice_supply 컬럼. 장기전세에는 계층 열이 없어 공급대상은 「일반공급」 한 가지다."""
+    return {
+        "complex_name": l.complex_name,
+        "supply_type": l.area_type,
+        "accessible": False,
+        "tenant_class": "일반공급",
+        "income_option": None,
+        "is_new": l.is_new,
+        "units_total": l.units_total,
+        "units_priority": l.units_priority,
+        "units_general": l.units_general,
+        "units_reserve": None,
+        "deposit": l.deposit,
+        "down_payment": l.down_payment,
+        "balance": l.balance,
+        "rent": None,
+        "area_exclusive": l.area_exclusive,
+        "area_common": l.area_common,
+        "area_etc": l.area_etc,
+        "area_total": l.area_total,
+        "move_in_from": l.move_in_from,
+        "source_page": l.page,
+    }
+
+
 def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
     cfg = settings()
     client = IshClient(delay_sec=cfg.scrape_delay_sec)
@@ -109,7 +135,7 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                     pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq))
                     facts = parse_attachment(pages, ref_year=n["posted_at"].year if n["posted_at"] else None)
                     kind, rows, units = facts.kind, facts.complexes, facts.units
-                    supply_rows = [_supply_row(l) for l in facts.supply_lines]
+                    supply_rows = [_supply_row(l) for l in facts.supply_lines] + [_jeonse_row(l) for l in facts.jeonse_lines]
                 except Exception as exc:  # noqa: BLE001
                     stats.error("fetch_error", n["slug"], exc)
                     continue

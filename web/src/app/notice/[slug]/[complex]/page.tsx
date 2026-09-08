@@ -89,6 +89,8 @@ export default async function ComplexPage({ params }: Params) {
   const vacantTotal = [...counted.values()].reduce((a, s) => a + (s.units_priority ?? 0) + (s.units_general ?? 0), 0);
   const reserveTotal = [...counted.values()].reduce((a, s) => a + (s.units_reserve ?? 0), 0);
   const hasReserve = supply.some((s) => s.units_reserve != null);
+  const hasRent = supply.some((s) => s.rent != null);          // 장기전세는 월임대료가 없다
+  const hasClass = new Set(supply.map((s) => s.tenant_class)).size > 1 || supply.some((s) => s.income_option);
   const moveIn = supply.find((s) => s.move_in_from)?.move_in_from ?? null;
   const d = ddayChip(n);
   const L = agencyLabels(n);
@@ -123,7 +125,7 @@ export default async function ComplexPage({ params }: Params) {
             <p className="d-sub">{full}</p>
             {hasMoney ? (
               <>
-                <span className="jumbo-label">{c.min_rent != null ? "월 임대료" : "임대보증금"}</span>
+                <span className="jumbo-label">{c.min_rent != null ? "월 임대료" : hasRent ? "임대보증금" : "전세금"}</span>
                 <b className="jumbo" title={wonExact(c.min_rent ?? c.min_deposit)}>{wonKo(c.min_rent ?? c.min_deposit)}</b>
                 <span className="jumbo-from">부터</span>
                 {c.min_rent != null && c.min_deposit != null && (
@@ -146,7 +148,7 @@ export default async function ComplexPage({ params }: Params) {
               <Spec label="전용면적" value={area} />
               <Spec label="공용면적" value={supply.length ? m2(commonArea(supply[0])) : null} />
               <Spec label="계약면적" value={supply[0]?.area_total != null ? m2(supply[0].area_total) : null} />
-              <Spec label="임대보증금" value={c.min_deposit != null ? <span title={wonExact(c.min_deposit)}>{wonKo(c.min_deposit)} 부터</span> : null} />
+              <Spec label={hasRent ? "임대보증금" : "전세금"} value={c.min_deposit != null ? <span title={wonExact(c.min_deposit)}>{wonKo(c.min_deposit)} 부터</span> : null} />
               <Spec label="월 임대료" value={c.min_rent != null ? <span title={wonExact(c.min_rent)}>{wonKo(c.min_rent)} 부터</span> : null} />
               <Spec label="지역" value={`${sidoShort(c.sido)} ${c.sigungu}`} />
               <Spec label="난방" value={c.heating} />
@@ -174,15 +176,15 @@ export default async function ComplexPage({ params }: Params) {
                 <table className="supply">
                   <thead>
                     <tr>
-                      <th>공급대상</th>
+                      {hasClass && <th>공급대상</th>}
                       <th>공급유형</th>
                       <th className="num">공급호수</th>
                       {hasReserve && <th className="num">공가</th>}
                       <th className="num">우선</th>
                       <th className="num">일반</th>
                       {hasReserve && <th className="num">예비자</th>}
-                      <th className="num">임대보증금</th>
-                      <th className="num">월임대료</th>
+                      <th className="num">{hasRent ? "임대보증금" : "전세금"}</th>
+                      {hasRent && <th className="num">월임대료</th>}
                       <th className="num">전용면적</th>
                       <th className="num">공용면적</th>
                       <th className="num">계약면적</th>
@@ -191,7 +193,7 @@ export default async function ComplexPage({ params }: Params) {
                   <tbody>
                     {supply.map((s) => (
                       <tr key={s.id}>
-                        <td>{classLabel(s)}</td>
+                        {hasClass && <td>{classLabel(s)}</td>}
                         <td>{typeLabel(s)}</td>
                         <td className="num">{s.units_total != null ? num(s.units_total, "호") : "—"}</td>
                         {hasReserve && <td className="num">{num((s.units_priority ?? 0) + (s.units_general ?? 0), "호")}</td>}
@@ -199,7 +201,7 @@ export default async function ComplexPage({ params }: Params) {
                         <td className="num">{s.units_general ?? "—"}</td>
                         {hasReserve && <td className="num">{s.units_reserve ?? "—"}</td>}
                         <td className="num" title={s.deposit != null ? wonExact(s.deposit) : undefined}>{wonKo(s.deposit)}</td>
-                        <td className="num" title={s.rent != null ? wonExact(s.rent) : undefined}>{wonKo(s.rent)}</td>
+                        {hasRent && <td className="num" title={s.rent != null ? wonExact(s.rent) : undefined}>{wonKo(s.rent)}</td>}
                         <td className="num">{m2(s.area_exclusive)}</td>
                         <td className="num">{m2(commonArea(s))}</td>
                         <td className="num">{m2(s.area_total)}</td>
@@ -209,7 +211,7 @@ export default async function ComplexPage({ params }: Params) {
                 </table>
               </div>
               <p className="note">
-                공급호수는 공가(우선과 일반)와 예비입주자 모집분을 더한 값입니다. 계약면적은 주거전용에 주거공용과 기타공용을 더한 세대별 면적입니다.
+                {hasReserve && "공급호수는 공가(우선과 일반)와 예비입주자 모집분을 더한 값입니다. "} 계약면적은 주거전용에 주거공용과 기타공용을 더한 세대별 면적입니다.
                 {supply[0]?.source_page != null && ` 원문 ${supply[0].source_page}쪽.`}
               </p>
             </section>

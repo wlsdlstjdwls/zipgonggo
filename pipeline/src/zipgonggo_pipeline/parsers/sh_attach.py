@@ -1,7 +1,7 @@
 """SH 첨부 공고문 → notice_complex 행 + 공고 단위 사실(접수 일정·전세금 범위·호수). 양식별 파서를 순서대로 시도한다.
 
 단지 표(순서대로 시도, 먼저 걸리는 양식을 쓴다):
-1. 장기전세: 「주택 위치 안내」 표 (parsers/sh_complex) — 단지명·소재지
+1. 장기전세: 「주택 위치 안내」 표 (parsers/sh_complex) — 단지명·소재지. 신규공급 단지는 「공급현황」 표(parsers/sh_jeonse_supply)에서 호수·전세금·면적·난방까지
 2. 행복주택·국민임대: 「단지별 주소」 표 (parsers/sh_addr_table) — 공급구분·공급단지·사업주체·주소·난방방식
 3. 매입임대: 「[별첨1] 주택목록」 회전 표 (parsers/sh_units) — 호실 단위 → 단지코드로 묶음
 전부 0건이면 빈 목록. 새 양식이 나오면 여기 4번으로 붙인다.
@@ -24,6 +24,7 @@ from .sh_addr_table import parse_addr_table
 from .sh_complex import parse_location_table
 from .sh_schedule import Schedule, parse_schedule
 from .sh_supply import SupplySummary, parse_supply
+from .sh_jeonse_supply import JeonseLine, parse_jeonse_supply
 from .sh_supply_lines import SupplyLine, parse_supply_lines
 from .sh_units import UnitRow, group_units, parse_unit_pages
 
@@ -38,6 +39,7 @@ class AttachmentFacts:
     schedule: Schedule | None = None
     supply: SupplySummary | None = None
     supply_lines: list[SupplyLine] = field(default_factory=list)
+    jeonse_lines: list[JeonseLine] = field(default_factory=list)
 
 
 def _norm_name(s: str) -> str:
@@ -100,16 +102,43 @@ def merge_supply_lines_into_complexes(rows: list[dict[str, Any]], lines: list[Su
     return hit
 
 
+def merge_jeonse_lines_into_complexes(rows: list[dict[str, Any]], lines: list[JeonseLine]) -> int:
+    """장기전세 신규공급 표의 면적별 줄을 단지 행에 묶는다. 돌려주는 값은 채운 단지 수."""
+    if not lines:
+        return 0
+    by_name: dict[str, list[JeonseLine]] = {}
+    for l in lines:
+        by_name.setdefault(_norm_name(l.complex_name), []).append(l)
+    hit = 0
+    for r in rows:
+        mine = by_name.get(_norm_name(r["name"]))
+        if not mine:
+            continue
+        deposits = [l.deposit for l in mine if l.deposit]
+        areas = [l.area_exclusive for l in mine if l.area_exclusive]
+        r["unit_count"] = sum(l.units_total or 0 for l in mine) or None
+        r["min_deposit"] = min(deposits) if deposits else None
+        r["area_min"] = min(areas) if areas else None
+        r["area_max"] = max(areas) if areas else None
+        r["heating"] = next((l.heating for l in mine if l.heating), r.get("heating"))
+        hit += 1
+    return hit
+
+
 def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = None) -> AttachmentFacts:
     rows = parse_location_table(pages)
     facts: AttachmentFacts
     if rows:
         facts = AttachmentFacts("location_table", [
             {"name": r.name, "sido": r.sido, "sigungu": r.sigungu, "road_address": r.road_address,
-             "is_new": r.is_new, "source_page": r.page, "complex_code": None,
+             "is_new": r.is_new, "source_page": r.page, "complex_code": None, "heating": None,
              "unit_count": None, "min_deposit": None, "min_rent": None, "area_min": None, "area_max": None}
             for r in rows
         ])
+        try:
+            facts.jeonse_lines = parse_jeonse_supply(pages, [r.name for r in rows])
+        except Exception as exc:  # noqa: BLE001
+            log.warning("jeonse supply parse failed: %s", exc)
     else:
         addrs = parse_addr_table(pages)
         if addrs:
@@ -153,7 +182,10 @@ def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = Non
     except Exception as exc:  # noqa: BLE001
         log.warning("supply parse failed: %s", exc)
     if facts.kind in ("location_table", "addr_table"):
-        merged = merge_supply_into_complexes(facts.complexes, facts.supply)
+        # 신규공급 단지는 면적별 줄이 더 정확하다. 나머지는 공고 단위 요약으로 채운다
+        merged = merge_jeonse_lines_into_complexes(facts.complexes, facts.jeonse_lines)
+        merged += merge_supply_into_complexes(
+            [r for r in facts.complexes if r.get("unit_count") is None], facts.supply)
         if merged:
             log.info("공급현황 표 → 단지 %d건에 호수·금액 붙임", merged)
     return facts
