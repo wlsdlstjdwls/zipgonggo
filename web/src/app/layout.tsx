@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { BrandMark } from "@/components/brand-mark";
 import { SaveProvider } from "@/components/save-context";
 import { SiteNav } from "@/components/site-nav";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
@@ -12,6 +13,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: SITE_TITLE, template: `%s | ${SITE_NAME}` },
   description: SITE_DESCRIPTION,
+  // 아이콘·OG 이미지는 app/ 파일 규약(icon.svg·favicon.ico·apple-icon.png·opengraph-image.png)이 자동으로 link/meta를 단다.
+  // 여기서는 파일이 못 채우는 값만 — 공유 카드의 사이트명·타입·로케일.
+  openGraph: { type: "website", siteName: SITE_NAME, locale: "ko_KR", title: SITE_TITLE, description: SITE_DESCRIPTION, url: "/" },
+  twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -26,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <header className="site-header">
             <div className="bar">
               <div className="left">
-                <Link href={ROUTES.home} className="logo"><i aria-hidden="true" />{SITE_NAME}</Link>
+                <Link href={ROUTES.home} className="logo"><BrandMark size={22} />{SITE_NAME}</Link>
                 {/* useSearchParams를 쓰므로 정적 페이지(상세 ISR)에서 Suspense 경계가 필요하다 */}
                 <Suspense fallback={null}><SiteNav /></Suspense>
               </div>

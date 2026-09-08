@@ -7,6 +7,7 @@
 // 클라이언트 컴포넌트지만 목록은 서버에서 HTML로 렌더되므로 크롤러도 단지명·주소를 본다.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BRAND_INK, MARKER_H, MARKER_W, markGlyph, markerHtml } from "@/lib/brand";
 import { geocodeAll, hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
 import { num, wonExact } from "@/lib/format";
 import type { NoticeComplex } from "@/types/notice";
@@ -16,12 +17,6 @@ import type { NoticeComplex } from "@/types/notice";
 type Props = { items: NoticeComplex[]; hasUnits: boolean };
 type Phase = "loading" | "ready" | "failed" | "no-key";
 
-const BRAND = "#3d5afe"; // --acc. 마커는 SDK가 그려서 CSS 변수를 못 쓴다
-const BRAND_DEEP = "#0f1216"; // --ink. 선택 말풍선
-const PIN_W = 34;
-const PIN_H = 42;
-const PIN_PATH = "M18 43C18 43 3 25 3 16C3 7.716 9.716 1 18 1C26.284 1 33 7.716 33 16C33 25 18 43 18 43Z";
-const HOUSE = `<path d="M18 9.5l7 6.2v7.3h-4.6v-4.6h-4.8v4.6H11v-7.3z" fill="${BRAND}"/>`;
 const PAN = { duration: 420, easing: "easeOutCubic" };
 const SELECT_ZOOM = 15; // 목록에서 고르면 이 줌으로 당겨 본다
 
@@ -29,19 +24,12 @@ function esc(s: string) {
   return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
-function pinHtml(): string {
-  // 100개 넘게 찍히므로 CSS filter·애니메이션은 쓰지 않는다(렌더 부담). 그림자는 SVG 타원 하나
-  return `<svg width="${PIN_W}" height="${PIN_H}" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg" style="display:block;">
-    <ellipse cx="18" cy="42" rx="7" ry="2" fill="rgba(15,18,22,.25)"/>
-    <path d="${PIN_PATH}" fill="${BRAND}" stroke="#fff" stroke-width="1.5"/><circle cx="18" cy="16" r="11" fill="#fff"/>${HOUSE}</svg>`;
-}
-
 // 선택 마커: 좌표 지점을 width:0 기준점으로 두고 말풍선을 가운데 정렬 — 이름 길이에 따라 핀이 밀리지 않는다 (smokespot)
 function balloonHtml(name: string): string {
   return `<div style="position:relative;width:0;height:0;">
-    <div style="position:absolute;bottom:4.5px;left:-4.5px;width:9px;height:9px;background:${BRAND_DEEP};transform:rotate(45deg);"></div>
-    <div class="zg-marker-pop" style="position:absolute;bottom:9px;left:0;transform:translateX(-50%);display:flex;align-items:center;gap:6px;background:${BRAND_DEEP};border-radius:12px;padding:8px 12px;white-space:nowrap;box-shadow:0 8px 20px -8px rgba(15,18,22,.6);transform-origin:50% 100%;">
-      <svg width="14" height="14" viewBox="0 0 36 36"><path d="M18 6l12 10.5v13H21.5v-8h-7v8H6v-13z" fill="#fff"/></svg>
+    <div style="position:absolute;bottom:4.5px;left:-4.5px;width:9px;height:9px;background:${BRAND_INK};transform:rotate(45deg);"></div>
+    <div class="zg-marker-pop" style="position:absolute;bottom:9px;left:0;transform:translateX(-50%);display:flex;align-items:center;gap:6px;background:${BRAND_INK};border-radius:12px;padding:8px 12px;white-space:nowrap;box-shadow:0 8px 20px -8px rgba(15,18,22,.6);transform-origin:50% 100%;">
+      <svg width="15" height="15" viewBox="0 0 64 64">${markGlyph("#fff", BRAND_INK)}</svg>
       <span style="font-size:12px;font-weight:700;color:#fff;font-family:inherit;">${esc(name)}</span>
     </div></div>`;
 }
@@ -131,7 +119,7 @@ export function ComplexExplorer({ items, hasUnits }: Props) {
       const sig = `${p.lat}:${p.lng}:${isSel}`;
       const icon = isSel
         ? { content: balloonHtml(c.name), anchor: new maps.Point(0, 0) }
-        : { content: pinHtml(), anchor: new maps.Point(PIN_W / 2, PIN_H - 1) };
+        : { content: markerHtml(), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) };
       const existing = byId.get(id);
       if (existing) {
         if (sigs.get(id) !== sig) { existing.setIcon(icon); existing.setZIndex(isSel ? 150 : 100); sigs.set(id, sig); }

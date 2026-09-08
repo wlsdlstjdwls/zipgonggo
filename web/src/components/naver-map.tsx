@@ -5,6 +5,7 @@
 // 변환 결과는 어디에도 저장하지 않는다 — CLAUDE.md "하지 말 것 1". SDK 로드는 lib/naver-maps-loader 공용.
 
 import { useEffect, useRef, useState } from "react";
+import { MARKER_H, MARKER_W, markerHtml } from "@/lib/brand";
 import { NAVER_MAP_DEFAULT_ZOOM } from "@/lib/constants";
 import { geocode, hasMapKey, loadNaverMaps } from "@/lib/naver-maps-loader";
 
@@ -28,7 +29,7 @@ export function NaverMap({ address, title }: Props) {
         if (!p || !el.current) { setState("failed"); return; }
         const pos = new maps.LatLng(p.lat, p.lng);
         map = new maps.Map(el.current, { center: pos, zoom: NAVER_MAP_DEFAULT_ZOOM, zoomControl: false, scaleControl: true, mapDataControl: false });
-        new maps.Marker({ position: pos, map, title });
+        new maps.Marker({ position: pos, map, title, icon: { content: markerHtml(), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) } });
         setState("ready");
       })
       .catch(() => { if (!cancelled) setState("failed"); });

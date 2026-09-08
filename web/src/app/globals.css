@@ -115,7 +115,7 @@ small { font-size: 12px; }
 .site-header .bar { max-width: var(--maxw); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 60px; padding: 0 var(--pad); }
 .site-header .left { display: flex; align-items: center; gap: 24px; min-width: 0; }
 .logo { display: inline-flex; align-items: center; gap: 9px; font-weight: 900; font-size: 19px; line-height: 1; letter-spacing: -0.05em; color: var(--ink); }
-.logo i { display: inline-block; width: 20px; height: 20px; border-radius: 7px; background: var(--acc); }
+.logo svg { display: block; flex: none; }
 .site-nav { display: flex; gap: 18px; font-size: 13px; font-weight: 700; color: var(--dim); }
 .site-nav a { transition: color 200ms var(--ease); }
 .site-nav a:hover, .site-nav a.on { color: var(--ink); }
@@ -210,8 +210,14 @@ small { font-size: 12px; }
 /* 점으로 줄어든 핀도 포커스되면 라벨로 되살린다 */
 .zg-pin.is-dot.is-focus { padding: 6px 11px; width: auto; height: auto; border-radius: 12px; transform: translate(-50%, -100%) scale(1.08); }
 .zg-pin.is-dot.is-focus > * { display: inline; }
+/* 브랜드 마커(lib/brand markerHtml). 앵커가 핀 끝이라 확대 기준점은 하단 중앙 */
+.zg-mk { display: block; transform-origin: 50% 100%; transition: transform 220ms var(--sp); }
+.zg-mk:hover { transform: scale(1.1); }
 .zg-pin-more { margin-left: 2px; padding: 1px 5px; border-radius: 999px; font-weight: 800; font-size: 9.5px; line-height: 1.4; background: rgba(0, 0, 0, 0.12); }
-.zg-pin.hot .zg-pin-more, .zg-pin.is-focus .zg-pin-more { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.zg-pin.hot .zg-pin-more, .zg-pin.is-focus /* 브랜드 마커(lib/brand markerHtml). 앵커가 핀 끝이라 확대 기준점은 하단 중앙 */
+.zg-mk { display: block; transform-origin: 50% 100%; transition: transform 220ms var(--sp); }
+.zg-mk:hover { transform: scale(1.1); }
+.zg-pin-more { background: rgba(255, 255, 255, 0.22); color: #fff; }
 .zg-pin-single { display: inline-flex; align-items: center; gap: 6px; transform: translate(-50%, -100%); padding: 7px 12px; border-radius: 12px; background: var(--ink); color: #fff; box-shadow: var(--shadow-float); white-space: nowrap; }
 .zg-pin-single b { font-weight: 800; font-size: 12.5px; letter-spacing: -0.03em; }
 .zg-pin-single span { font-weight: 700; font-size: 10px; color: rgba(255, 255, 255, 0.6); }
