@@ -70,7 +70,9 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
+/* overscroll-behavior:none을 여기 두면 페이지 맨 위/아래에서 당겨지는 느낌(바운스·풀리프레시)까지 막힌다 — 모바일 버그 리포트로 제거.
+   안쪽 스크롤 영역(지도 옆 단지 목록)만 자기 안에서 끝나게 contain을 개별로 건다. */
+html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   font-family: var(--font);
@@ -381,10 +383,12 @@ small { font-size: 12px; }
 .notice-bar .i { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 11px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; margin-top: 1px; }
 .map { width: 100%; height: 300px; border-radius: var(--r-panel); background: var(--sub); overflow: hidden; }
 .map-fallback { color: var(--dim); font-size: 13px; font-weight: 600; padding: 14px; text-align: center; }
-.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.table-scroll table { min-width: 520px; }
-.tbl { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
+/* 열이 화면보다 넓은 표는 가로 스크롤 — 세로는 그대로 잘라 라운드 모서리를 지킨다.
+   과거 .tbl(overflow:hidden)이 .table-scroll(overflow-x:auto)보다 뒤에 와 가로 스크롤을 덮어썼다(모바일에서 표가 잘려 안 보이던 원인) — 한 규칙으로 합친다. */
+.tbl { border: 1px solid var(--line); border-radius: var(--r-card); overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
 .tbl tr:last-child td { border-bottom: 0; }
+/* 열이 많은 표(공급현황 등)만 최소 폭을 줘 칸이 짜부라지지 않게 한다 */
+.tbl.wide table { min-width: 760px; }
 
 /* ── 공급 단지 탐색기(components/complex-explorer.tsx) — 좌 목록 / 우 지도 ── */
 .cx { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 14px; align-items: start; }
@@ -393,7 +397,7 @@ small { font-size: 12px; }
 .cx-tools .fld { grid-column: 1 / -1; }
 .cx-count { margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--dim); border-bottom: 1px solid var(--line); }
 .cx-count b { color: var(--ink); }
-.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: 520px; overflow-y: auto; overflow-x: hidden; }
+.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: 520px; overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
 .cx-list li { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
 .cx-list li:last-child { border-bottom: 0; }
 .cx-list > li > button { display: flex; flex: 1; min-width: 0; gap: 10px; align-items: flex-start; padding: 11px 12px; background: none; border: 0; border-left: 3px solid transparent; text-align: left; font: inherit; color: var(--ink); cursor: pointer; transition: background 200ms var(--ease), transform 300ms var(--sp); }

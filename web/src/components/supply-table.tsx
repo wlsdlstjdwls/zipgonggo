@@ -7,7 +7,7 @@ type Props = { supply: NoticeSupply[]; hasReserve: boolean; hasRent: boolean; ha
 
 export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
   return (
-    <div className="tbl table-scroll">
+    <div className="tbl wide">
       <table className="supply">
         <thead>
           <tr>
