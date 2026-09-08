@@ -5,7 +5,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { NoticeExplorer } from "@/components/notice-explorer";
 import { AREA_MIN_COUNT, PAGE_SIZE } from "@/lib/constants";
 import { feedParams, parseNoticeFilters } from "@/lib/notice-filters";
-import { listFilterOptions, listNoticesPage } from "@/lib/queries";
+import { getHomeStats, listFilterOptions, listNoticesPage } from "@/lib/queries";
 import { areaPath, ROUTES } from "@/lib/routes";
 import type { NoticeFilters, Sector } from "@/types/notice";
 
@@ -51,11 +51,13 @@ export default async function AreaPage({ params, searchParams }: Params) {
   if (!match) notFound();
   if (match.count < AREA_MIN_COUNT) permanentRedirect(ROUTES.home);
 
-  const [page, options, closing] = await Promise.all([
+  // closing7은 홈과 같은 site-wide 집계를 재사용한다(sido로 좁힌 전용 쿼리를 따로 쏘지 않는다) —
+  // Neon(ap-southeast-1)은 새 커넥션 하나 트는 데 ~550ms라, 병렬 쿼리를 늘릴수록 새 커넥션이 열릴 확률이 커진다.
+  // getHomeStats는 캐시 키가 인자 없이 고정이라 사이트 어디서든 이미 데워져 있을 가능성이 높다.
+  const [page, options, stats] = await Promise.all([
     listNoticesPage(f, null, PAGE_SIZE),
     listFilterOptions(f.sector),
-    // 이 시도·부문 안에서 마감 7일 내인 건수만. 홈 KPI(site-wide)와 달리 스코프 안 숫자라 limit 1로 total만 취한다
-    listNoticesPage({ sido, sector: f.sector, closing: "7d" }, null, 1),
+    getHomeStats(),
   ]);
   const params_ = feedParams(f);
   const countOf = (s: Sector) => sidoOptions.sector.find((o) => o.value === s)?.count ?? 0;
@@ -78,7 +80,7 @@ export default async function AreaPage({ params, searchParams }: Params) {
         <h1>{sido} 입주자모집공고 {match.count}건</h1>
         <p>LH, SH, 지방공사 공고를 모읍니다. 보증금과 월임대료는 공고에 적힌 최소값입니다.</p>
       </div>
-      <FilterBar f={f} options={{ type: options.type }} closing7={closing.total} basePath={{ sido }} sticky />
+      <FilterBar f={f} options={{ type: options.type }} closing7={stats.closing7} basePath={{ sido }} sticky />
       {body}
     </div>
   );
