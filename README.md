@@ -44,18 +44,21 @@ zipgonggo/
 ## 시작하기
 
 ```bash
-# 웹
+# 웹 → http://localhost:3100  (포트 3000은 다른 프로젝트가 쓴다)
 cd web && npm install && npm run dev
 
 # 파이프라인
 cd pipeline && python -m venv .venv && source .venv/Scripts/activate
 pip install -r requirements.txt
+python ../db/migrate.py                              # 스키마 적용
+python -m zipgonggo_pipeline.stages.s1_collect       # 마이홈 공고 수집 → notice
 ```
 
 `.env.example`을 `.env`로 복사하고 키를 채운다. 필요한 키는 [`docs/data-sources.md`](docs/data-sources.md) 참조.
 
 ## 현재 상태
 
-**Phase 0 — 실사·신청 단계.** 아직 구현 코드 없음. 뼈대와 문서만 있다.
+**Phase 1 착수 (2026-09-08).** 마이홈 API 수집기(S1)와 첫 화면 2개(`/` 목록, `/notice/{slug}` 상세)가 돈다. Neon에 공고 182건.
+남은 Phase 0 항목(좌표 요약DB 신청·기관 문의·도메인)은 병행 진행.
 
 착수 전 해소해야 할 것은 [`docs/roadmap.md`](docs/roadmap.md)의 "선행 조건" 참조.

@@ -4,9 +4,9 @@
   "private": true,
   "description": "집공고 — 공공임대 공고지도 프론트엔드",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3100",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3100",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },
