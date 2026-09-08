@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ComplexMap } from "@/components/complex-map";
+import { ComplexExplorer } from "@/components/complex-explorer";
 import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
 import { Spec, SpecList } from "@/components/spec-list";
@@ -51,18 +51,10 @@ export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
   const [areas, chain, complexes] = await Promise.all([getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id)]);
-  // 자치구별 단지 수 — 표 위 요약 칩. 서울 외 지역은 "경기도 의정부시"처럼 시도 포함
-  const byGu = new Map<string, number>();
-  for (const c of complexes) {
-    const k = c.sido === "서울특별시" ? c.sigungu : `${c.sido} ${c.sigungu}`;
-    byGu.set(k, (byGu.get(k) ?? 0) + 1);
-  }
   const newCount = complexes.filter((c) => c.is_new).length;
   // 매입임대 별첨(호실 단위)이면 호수·면적·금액 열을 더 보여준다
   const hasUnits = complexes.some((c) => c.unit_count != null);
   const unitTotal = complexes.reduce((a, c) => a + (c.unit_count ?? 0), 0);
-  const areaLabel = (c: (typeof complexes)[number]) =>
-    c.area_min == null ? "—" : c.area_max != null && c.area_max !== c.area_min ? `${c.area_min}~${c.area_max}㎡` : `${c.area_min}㎡`;
   const badge = ddayBadge(n.apply_start_at, n.apply_end_at, n.status);
   const L = agencyLabels(n);
   const showAreaTable = areas.length > 1 || (areas.length === 1 && areas[0].supply_count != null && !n.address);
@@ -162,41 +154,7 @@ export default async function NoticePage({ params }: Params) {
               ? "첨부 공고문의 「주택목록」(호실 단위)을 단지별로 묶은 목록입니다. 보증금·월임대료는 단지 안 최소값이고, 호별 금액은 원문 표를 확인하세요."
               : `첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.${newCount > 0 ? ` 이번 공고 신규 단지 ${newCount}곳.` : ""} 단지별 면적·호수·금액은 원문 표를 확인하세요.`}
           </p>
-          <div className="card-chips" style={{ marginBottom: 10 }}>
-            {[...byGu.entries()].map(([gu, cnt]) => (
-              <span key={gu} className="chip">{gu} {cnt}</span>
-            ))}
-          </div>
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>자치구</th><th>단지명</th><th>도로명주소</th>
-                  {hasUnits && <><th className="num">호수</th><th className="num">전용면적</th><th className="num">보증금(최소)</th><th className="num">월임대료(최소)</th></>}
-                </tr>
-              </thead>
-              <tbody>
-                {complexes.map((c) => (
-                  <tr key={c.id}>
-                    <td>{c.sido === "서울특별시" ? c.sigungu : `${c.sido} ${c.sigungu}`}</td>
-                    <td>{c.name}{c.is_new && <> <span className="chip new">신규</span></>}</td>
-                    <td>{c.road_address}</td>
-                    {hasUnits && (
-                      <>
-                        <td className="num">{num(c.unit_count, "호")}</td>
-                        <td className="num">{areaLabel(c)}</td>
-                        <td className="num">{wonExact(c.min_deposit)}</td>
-                        <td className="num">{wonExact(c.min_rent)}</td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <ComplexMap items={complexes} />
-          </div>
+          <ComplexExplorer items={complexes} hasUnits={hasUnits} />
         </section>
       )}
 

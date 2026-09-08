@@ -279,3 +279,37 @@ small { font-size: 12px; }
 .map-tools .chip.on { background: var(--brand-500); color: var(--on-primary); }
 .map-info { padding: 8px 10px; border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-float); font-size: 12px; line-height: 1.5; color: var(--ink); white-space: nowrap; }
 .map-panel .map { height: 420px; }
+
+/* ── 공급 단지 탐색기(components/complex-explorer.tsx) — 좌 목록 / 우 지도. 벤치마크 공고지도2 ── */
+.cx { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 14px; align-items: start; }
+.cx-panel { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; }
+.cx-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); }
+.cx-tools select, .cx-tools input { height: 38px; padding: 0 10px; border: 1.5px solid var(--line-strong); border-radius: 12px; background: var(--surface); font: inherit; font-size: 13px; color: var(--ink); min-width: 0; }
+.cx-tools input { grid-column: 1 / -1; }
+.cx-count { margin: 0; padding: 8px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.cx-count b { color: var(--ink); }
+.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: 520px; overflow-y: auto; }
+.cx-list li { border-bottom: 1px solid var(--line); }
+.cx-list li:last-child { border-bottom: 0; }
+.cx-list button { display: flex; width: 100%; gap: 10px; align-items: flex-start; padding: 11px 12px; background: none; border: 0; border-left: 3px solid transparent; text-align: left; font: inherit; color: var(--ink); cursor: pointer; transition: background var(--duration-fast); }
+.cx-list button:hover { background: var(--lilac-tint); }
+.cx-list li.on button { background: var(--lilac-surface); border-left-color: var(--brand-500); }
+.cx-row-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.cx-name { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cx-addr { font-size: 12px; color: var(--muted); }
+.cx-row-side { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.cx-units { font-size: 12px; font-weight: 700; }
+.cx-money { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.cx-empty { padding: 24px 12px; color: var(--muted); font-size: 13px; text-align: center; }
+.cx-map-wrap { position: sticky; top: 72px; }
+.cx-map { width: 100%; height: 600px; border-radius: var(--radius-lg); background: var(--surface-sunken); overflow: hidden; position: relative; z-index: 0; }
+.cx-status { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+@keyframes zg-marker-pop { from { opacity: 0; transform: scale(.55); } to { opacity: 1; transform: scale(1); } }
+.zg-marker-pop { animation: zg-marker-pop 220ms cubic-bezier(.34, 1.56, .64, 1); }
+@media (max-width: 900px) {
+  .cx { grid-template-columns: 1fr; }
+  .cx-map-wrap { position: static; order: -1; }
+  .cx-map { height: 320px; }
+  .cx-list { max-height: 420px; }
+}
+.cx-nopin { font-size: 11px; color: var(--muted); }
