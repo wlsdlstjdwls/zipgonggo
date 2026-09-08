@@ -47,8 +47,8 @@ async function load(params: Params["params"]): Promise<Found | null> {
   if (!n) return null;
   const siblings = await getNoticeComplexes(n.id);
   const seg = decodeURIComponent(complex);
-  // 이름까지 맞는 행이 정답. 이름만 바뀐 옛 링크도 코드가 같으면 살려 준다(URL을 삭제하지 않는다 — CLAUDE.md 6)
-  const c = siblings.find((x) => complexSegment(x) === seg) ?? siblings.find((x) => (x.complex_code ?? String(x.id)) === seg.slice(seg.lastIndexOf("-") + 1));
+  // 코드까지 맞는 행이 정답. 코드가 붙기 전에 나간 링크(이름만)도 살려 준다(URL을 삭제하지 않는다 — CLAUDE.md 6)
+  const c = siblings.find((x) => complexSegment(x) === seg) ?? siblings.find((x) => x.name === seg);
   return c ? { n, c, siblings } : null;
 }
 
