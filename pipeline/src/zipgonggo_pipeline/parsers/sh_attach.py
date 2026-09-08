@@ -1,9 +1,10 @@
 """SH 첨부 공고문 → notice_complex 행 + 공고 단위 사실(접수 일정·전세금 범위·호수). 양식별 파서를 순서대로 시도한다.
 
-단지 표:
-1. 장기전세·행복주택형: 「주택 위치 안내」 표 (parsers/sh_complex) — 단지명·소재지
-2. 매입임대형: 「[별첨1] 주택목록」 회전 표 (parsers/sh_units) — 호실 단위 → 단지코드로 묶음
-둘 다 0건이면 빈 목록. 새 양식이 나오면 여기 3번으로 붙인다.
+단지 표(순서대로 시도, 먼저 걸리는 양식을 쓴다):
+1. 장기전세: 「주택 위치 안내」 표 (parsers/sh_complex) — 단지명·소재지
+2. 행복주택·국민임대: 「단지별 주소」 표 (parsers/sh_addr_table) — 공급구분·공급단지·사업주체·주소·난방방식
+3. 매입임대: 「[별첨1] 주택목록」 회전 표 (parsers/sh_units) — 호실 단위 → 단지코드로 묶음
+전부 0건이면 빈 목록. 새 양식이 나오면 여기 4번으로 붙인다.
 
 공고 단위(양식과 무관하게 항상 시도):
 - 접수 시작·마감·당첨자 발표 — 「입주자 모집 절차 및 일정」 흐름도 (parsers/sh_schedule)
@@ -17,6 +18,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from .sh_addr_table import parse_addr_table
 from .sh_complex import parse_location_table
 from .sh_schedule import Schedule, parse_schedule
 from .sh_supply import SupplySummary, parse_supply
@@ -74,6 +76,21 @@ def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = Non
             for r in rows
         ])
     else:
+        addrs = parse_addr_table(pages)
+        if addrs:
+            facts = AttachmentFacts("addr_table", [
+                {"name": r.name, "sido": r.sido, "sigungu": r.sigungu, "road_address": r.road_address,
+                 "is_new": r.is_new, "source_page": r.page, "complex_code": None,
+                 "unit_count": None, "min_deposit": None, "min_rent": None, "area_min": None, "area_max": None}
+                for r in addrs
+            ])
+            facts.schedule = parse_schedule(pages, ref_year)
+            try:
+                facts.supply = parse_supply(pages)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("supply parse failed: %s", exc)
+            merge_supply_into_complexes(facts.complexes, facts.supply)
+            return facts
         units = parse_unit_pages(pages)
         if units:
             complexes = group_units(units)
@@ -94,7 +111,7 @@ def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = Non
         facts.supply = parse_supply(pages)
     except Exception as exc:  # noqa: BLE001
         log.warning("supply parse failed: %s", exc)
-    if facts.kind == "location_table":
+    if facts.kind in ("location_table", "addr_table"):
         merged = merge_supply_into_complexes(facts.complexes, facts.supply)
         if merged:
             log.info("공급현황 표 → 단지 %d건에 호수·금액 붙임", merged)
