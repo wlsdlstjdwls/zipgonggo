@@ -271,3 +271,11 @@ small { font-size: 12px; }
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .table-scroll table { min-width: 520px; }
 .chip.new { background: var(--brand-500); color: var(--on-primary); }
+
+/* 단지 지도 — 클릭 전 CTA, 자치구 칩 토글, 마커 정보창 */
+.map-cta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px; border: 1.5px dashed var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.map-tools { margin-bottom: 8px; }
+.map-tools .chip { cursor: pointer; border: 0; font: inherit; font-size: 11px; font-weight: 700; }
+.map-tools .chip.on { background: var(--brand-500); color: var(--on-primary); }
+.map-info { padding: 8px 10px; border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-float); font-size: 12px; line-height: 1.5; color: var(--ink); white-space: nowrap; }
+.map-panel .map { height: 420px; }

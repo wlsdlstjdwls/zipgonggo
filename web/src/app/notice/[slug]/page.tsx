@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ComplexMap } from "@/components/complex-map";
 import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
 import { Spec, SpecList } from "@/components/spec-list";
@@ -173,7 +174,9 @@ export default async function NoticePage({ params }: Params) {
               </tbody>
             </table>
           </div>
-          <p className="note">지도 표시는 행안부 도로명주소 좌표 DB 연동 후 제공됩니다.</p>
+          <div style={{ marginTop: 12 }}>
+            <ComplexMap items={complexes} />
+          </div>
         </section>
       )}
 
