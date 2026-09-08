@@ -10,6 +10,9 @@ import { ROUTES } from "@/lib/routes";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
+// DB(Neon ap-southeast-1, 싱가포르)와 함수 리전을 맞춘다. 미지정 시 기본 리전(미국)이라 왕복마다 태평양을 건넌다.
+export const preferredRegion = "sin1";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: SITE_TITLE, template: `%s | ${SITE_NAME}` },

@@ -2,6 +2,7 @@
 // 발행 상태(publish) 필터는 S8이 생기기 전까지 걸지 않는다 — 지금은 전부 'parsed'.
 // 목록·옵션은 unstable_cache로 REVALIDATE_SEC 캐시한다. 파이프라인이 DB를 갱신해도 그 안엔 반영된다(page.tsx revalidate와 동일).
 import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC, SH_SIDO } from "./constants";
 import { todayKST } from "./format";
@@ -128,8 +129,9 @@ export const listNoticesPage = unstable_cache(
   CACHE_OPTS,
 );
 
-/** 탭·셀렉트 옵션. sector가 정해지면 그 안에서의 시도·유형 분포. 왕복 1회로 합친다. */
-export const listFilterOptions = unstable_cache(
+/** 탭·셀렉트 옵션. sector가 정해지면 그 안에서의 시도·유형 분포. 왕복 1회로 합친다.
+ * 같은 요청 안(layout + page)에서 같은 sector로 두 번 불려도 react cache()가 한 번만 쏜다. */
+export const listFilterOptions = cache(unstable_cache(
   async (sector?: Sector): Promise<{ sector: FilterOption[]; sido: FilterOption[]; type: FilterOption[] }> => {
     const params: unknown[] = [];
     const where = whereSql(buildWhere({ sector }, params));
@@ -147,7 +149,7 @@ export const listFilterOptions = unstable_cache(
   },
   ["notice-filter-options-v2"],
   CACHE_OPTS,
-);
+));
 
 /** 홈 KPI. 전체·서울·7일 내 마감·중위 월임대료(금액 있는 공고 기준). 필터와 무관한 서비스 전체 집계 */
 export const getHomeStats = unstable_cache(

@@ -13,6 +13,8 @@ import type { NoticeFilters, Sector } from "@/types/notice";
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
 export const dynamicParams = true;
+// DB(싱가포르)와 리전을 맞춘다 — layout.tsx와 같은 값 유지
+export const preferredRegion = "sin1";
 
 type Params = { params: Promise<{ sido: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -46,19 +48,20 @@ export default async function AreaPage({ params, searchParams }: Params) {
   const parsed = parseNoticeFilters((k) => sp[k]);
   const f: NoticeFilters = { ...parsed, sido };
 
-  const sidoOptions = await listFilterOptions(undefined);
-  const match = sidoOptions.sido.find((o) => o.value === sido);
-  if (!match) notFound();
-  if (match.count < AREA_MIN_COUNT) permanentRedirect(ROUTES.home);
-
   // closing7은 홈과 같은 site-wide 집계를 재사용한다(sido로 좁힌 전용 쿼리를 따로 쏘지 않는다) —
   // Neon(ap-southeast-1)은 새 커넥션 하나 트는 데 ~550ms라, 병렬 쿼리를 늘릴수록 새 커넥션이 열릴 확률이 커진다.
   // getHomeStats는 캐시 키가 인자 없이 고정이라 사이트 어디서든 이미 데워져 있을 가능성이 높다.
-  const [page, options, stats] = await Promise.all([
+  // sidoOptions(존재 확인용)를 먼저 기다렸다가 나머지 3개를 쏘면 왕복이 직렬로 쌓인다 — 넷 다 한 번에 쏜다.
+  // sidoOptions는 listFilterOptions(undefined), options는 listFilterOptions(f.sector) — sector가 없으면 react cache()가 같은 호출로 묶어 준다.
+  const [sidoOptions, page, options, stats] = await Promise.all([
+    listFilterOptions(undefined),
     listNoticesPage(f, null, PAGE_SIZE),
     listFilterOptions(f.sector),
     getHomeStats(),
   ]);
+  const match = sidoOptions.sido.find((o) => o.value === sido);
+  if (!match) notFound();
+  if (match.count < AREA_MIN_COUNT) permanentRedirect(ROUTES.home);
   const params_ = feedParams(f);
   const countOf = (s: Sector) => sidoOptions.sector.find((o) => o.value === s)?.count ?? 0;
 
