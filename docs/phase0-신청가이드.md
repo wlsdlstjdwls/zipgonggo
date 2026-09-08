@@ -69,7 +69,22 @@ https://business.juso.go.kr
 6. 우측 하단 장바구니 → **「신청하기」**
 7. 이용목적 심사 → 승인 후 다운로드
 
+> **2026-09-08 접수 완료.** 승인 대기 중. 승인 통보 오면 소요일을 여기 적는다.
+
 > **미확인**: 신청 폼의 구체적 입력 항목(이용목적 서술 분량, 첨부 서류 유무)과 심사 소요기간은 로그인 이후 화면이라 확인하지 못했다. 접수하면서 실제 화면을 보고 이 문서에 적어 넣을 것.
+
+### 참고: 도로명주소 검색 API (즉시 발급, 주소 정규화용)
+
+포털이 SPA로 개편되어 옛 `addrlink/openApi/*.do` 주소는 전부 404다 (2026-09-08 확인). 현재 경로:
+
+| 화면 | URL |
+|---|---|
+| 도로명주소 검색 API 소개·신청 | `https://business.juso.go.kr/jst/jstRoadNmAddrApiSearch` |
+| API 신청서 작성 | `https://business.juso.go.kr/jst/jstAddressApiApplicationWrite` |
+| 내 API 목록(마이페이지) | `https://business.juso.go.kr/jsm/jsmApiList` |
+
+검색 API는 좌표를 주지 않으므로 응답 저장 제약이 없다. 공고 주소 → 표준 도로명·도로명코드·건물본번/부번 정규화에 쓴다.
+좌표제공 API(`jstCoordApiSearch`)는 실시간 호출만 허용 → 「하지 말 것 1」에 따라 쓰지 않는다.
 
 ### 이용목적에 쓸 내용
 
