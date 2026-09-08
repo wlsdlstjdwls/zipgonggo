@@ -56,6 +56,7 @@ API 필드 ↔ 컬럼 대응은 각 컬럼 주석에 `(API xxx)`로 적어 뒀�
 |---|---|
 | `notice_status` | 공고중 · 접수중 · 접수마감 · 정정공고중 *(일정·정정 여부로 파이프라인이 도출. 출처 원문 값은 `notice.source_status`)* |
 | `publish_state` | parsed · review · published · closed · rejected |
+| `rental_sector` | 공공임대 · 민간임대 *(홈 탭 구분. 공공지원민간임대·청년안심주택은 민간)* |
 | `geo_precision` | building · road · dong |
 | `housing_type` | 행복주택 · 국민임대 · 매입임대 · 장기전세 · 통합공공임대 · 전세임대 · 든든전세 · 영구임대 · 공공지원민간임대 · 50년임대 · 10년임대 · 6년임대 · 5년임대 · 공공기숙사 *(마이홈 공급유형 코드표와 1:1, 든든전세만 HUG 자체)* |
 
@@ -66,10 +67,11 @@ API 필드 ↔ 컬럼 대응은 각 컬럼 주석에 `(API xxx)`로 적어 뒀�
 | 컬럼 | 의미 |
 |---|---|
 | `slug` | URL 식별자. `sh-2026-02-maeip` |
-| `fingerprint` | sha256(기관·공고명·게시일·주택일련번호·원공고키). 여러 소스에서 같은 공고를 받아도 한 행으로 모은다. 정정공고는 원공고와 제목·게시일이 같아서 원공고 키가 들어간다 |
+| `fingerprint` | sha256(기관·공고명·게시일·주택일련번호·원공고키). 소스 간 같은 공고 **후보**를 묶는 힌트. **UNIQUE 아님** — 같은 원공고의 2차 정정이 1차와 겹친다(실측). 식별자는 `source_key` |
 | `source` / `source_key` | 출처와 출처 내 키. 마이홈 API는 `pblancId:houseSn` |
 | `amends_source_key` | 정정공고가 대체하는 원 공고. API는 정정공고와 원공고를 **둘 다** 현재 공고로 준다(실측 23쌍). 둘 다 행으로 두고 화면에서 연결한다 |
 | `housing_type` / `house_type` | 공급유형(enum) / 주택유형(아파트·다가구·오피스텔…) |
+| `sector` | 공공임대 / 민간임대. S1이 공급유형에서 도출, 스크래퍼는 소스별 고정 |
 | `supply_count` / `unit_count` | API가 말한 공급호수(= `notice_area` 합) / 파서가 실제로 뽑은 호실 수. 둘이 크게 다르면 검수 큐 |
 | `sigungu` | 시군구가 하나면 값, 여러 시군구에 걸치면 NULL. 내역은 `notice_area` |
 | `min_deposit` / `min_rent` | 공고 내 최소 보증금·월임대료. **호실 금액이 아니다** |

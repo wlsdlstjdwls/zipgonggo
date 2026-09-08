@@ -1,34 +1,58 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { NoticeCard } from "@/components/notice-card";
-import { listFilterOptions, listNotices } from "@/lib/queries";
+import { listFilterOptions, listNotices, type Sector } from "@/lib/queries";
 
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "공공임대 모집공고 — 마감 임박순",
-  description: "진행 중인 LH·지방공사 공공임대 입주자모집공고를 마감 임박순으로. 시도·공급유형별 보증금·월임대료·접수일정.",
+  title: "공공임대·민간임대 모집공고 — 마감 임박순",
+  description: "진행 중인 LH·지방공사 공공임대와 공공지원민간임대 입주자모집공고를 마감 임박순으로. 시도·공급유형별 보증금·월임대료·접수일정.",
   alternates: { canonical: "/" },
 };
 
-type Search = { sido?: string; type?: string };
+const SECTORS: Sector[] = ["공공임대", "민간임대"];
 
 function pick(v: string | string[] | undefined): string | undefined {
   const s = Array.isArray(v) ? v[0] : v;
   return s?.trim() || undefined;
 }
 
+function qs(p: Record<string, string | undefined>): string {
+  const u = new URLSearchParams();
+  for (const [k, v] of Object.entries(p)) if (v) u.set(k, v);
+  const s = u.toString();
+  return s ? `/?${s}` : "/";
+}
+
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
-  const f: Search = { sido: pick(sp.sido), type: pick(sp.type) };
-  const [notices, options] = await Promise.all([listNotices(f), listFilterOptions()]);
+  const sectorRaw = pick(sp.sector);
+  const sector = SECTORS.includes(sectorRaw as Sector) ? (sectorRaw as Sector) : undefined;
+  const f = { sector, sido: pick(sp.sido), type: pick(sp.type) };
+  const [notices, options] = await Promise.all([listNotices(f), listFilterOptions(sector)]);
+  const total = options.sector.reduce((a, o) => a + o.count, 0);
+  const countOf = (s: Sector) => options.sector.find((o) => o.value === s)?.count ?? 0;
   const filtered = Boolean(f.sido || f.type);
 
   return (
     <>
-      <h1 className="page-title">공공임대 모집공고</h1>
-      <p className="page-sub">마감 임박순. 보증금·월임대료는 공고에 적힌 최소값입니다.</p>
+      <div className="hero">
+        <h1 className="page-title">임대주택 모집공고</h1>
+        <p className="page-sub">진행 중인 공고 <b>{total.toLocaleString("ko-KR")}건</b>. 마감 임박순. 보증금·월임대료는 공고에 적힌 최소값입니다.</p>
+      </div>
+
+      <nav className="tabs" aria-label="공공/민간 구분">
+        <Link href={qs({ sido: f.sido, type: f.type })} className={!sector ? "on" : ""}>전체 <small>{total}</small></Link>
+        {SECTORS.map((s) => (
+          <Link key={s} href={qs({ sector: s, sido: f.sido, type: f.type })} className={sector === s ? "on" : ""}>
+            {s} <small>{countOf(s)}</small>
+          </Link>
+        ))}
+      </nav>
 
       <form className="filters" method="get" action="/">
+        {sector && <input type="hidden" name="sector" value={sector} />}
         <select name="sido" defaultValue={f.sido ?? ""} aria-label="시도">
           <option value="">전체 지역</option>
           {options.sido.map((o) => (
@@ -42,14 +66,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           ))}
         </select>
         <button type="submit">적용</button>
-        {filtered && <a className="reset" href="/">초기화</a>}
+        {filtered && <Link className="reset" href={qs({ sector })}>초기화</Link>}
       </form>
 
       <p className="result-count">{notices.length.toLocaleString("ko-KR")}건</p>
       {notices.length === 0 ? (
-        <p className="empty">조건에 맞는 공고가 없습니다.</p>
+        <p className="empty">
+          {sector === "민간임대"
+            ? "민간임대 공고가 아직 없습니다. 청년안심주택 등 민간임대는 수집 준비 중입니다."
+            : "조건에 맞는 공고가 없습니다."}
+        </p>
       ) : (
-        <ul className="card-list">
+        <ul className="card-grid">
           {notices.map((n) => <NoticeCard key={n.id} n={n} />)}
         </ul>
       )}

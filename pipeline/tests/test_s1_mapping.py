@@ -8,6 +8,7 @@ import pytest
 
 from zipgonggo_pipeline.stages.s1_collect import (
     UnmappedHousingType,
+    derive_sector,
     derive_status,
     fingerprint,
     group_items,
@@ -91,6 +92,14 @@ def test_unmapped_housing_type_raises():
 )
 def test_status_rules(src, begin, end, today, expected):
     assert derive_status(src, begin, end, today) == expected
+
+
+def test_sector():
+    assert derive_sector("공공지원민간임대") == "민간임대"
+    assert derive_sector("매입임대") == "공공임대"
+    row = {**load_items()[0], "suplyTyNm": "공공지원민간임대"}
+    assert map_notice([row], TODAY).notice["sector"] == "민간임대"
+    assert map_notice([load_items()[0]], TODAY).notice["sector"] == "공공임대"
 
 
 def test_helpers():

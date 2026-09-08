@@ -66,6 +66,33 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .filters a.reset:hover { text-decoration: none; background: var(--closed-soft); }
 .result-count { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
 
+/* hero + tabs */
+.hero { margin-top: 20px; }
+.tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 14px; overflow-x: auto; }
+.tabs a { padding: 10px 12px; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs a small { font-weight: 600; color: var(--muted); margin-left: 2px; }
+.tabs a.on { color: var(--brand-ink); border-bottom-color: var(--brand); }
+.tabs a:hover { text-decoration: none; color: var(--text); }
+
+/* card grid (benchmark: docs/references/공고지도1.png) */
+.card-grid { display: grid; gap: 14px; list-style: none; padding: 0; margin: 0; grid-template-columns: 1fr; }
+.card-grid .card { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.card-hero { padding: 14px 16px 12px; color: #fff; background: linear-gradient(135deg, #1f3a8a 0%, #2563eb 60%, #3b82f6 100%); }
+.card-hero.private { background: linear-gradient(135deg, #4a1d96 0%, #7c3aed 60%, #a855f7 100%); }
+.card-hero-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.region-badge { display: inline-flex; align-items: center; gap: 2px; background: rgba(255,255,255,0.18); border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 700; }
+.card-headline { margin: 12px 0 2px; font-size: 22px; font-weight: 900; letter-spacing: -0.01em; text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+.card-headline-sub { margin: 0; font-size: 13px; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.card-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip.sector { background: #e0f2fe; color: #075985; }
+.chip.sector.private { background: #f3e8ff; color: #6b21a8; }
+.card-grid .card-title { font-size: 15px; margin: 0; line-height: 1.4; }
+.card-grid .card-title a:hover { text-decoration: underline; }
+.card-grid .card-money { margin-top: 2px; }
+.card-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 4px; }
+.card-actions .btn { flex: 1; justify-content: center; height: 36px; }
+
 /* cards */
 .card-list { display: grid; gap: 10px; list-style: none; padding: 0; margin: 0; }
 .card {
@@ -118,7 +145,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .empty { padding: 40px 0; text-align: center; color: var(--muted); }
 
 @media (min-width: 640px) {
+  .card-grid { grid-template-columns: repeat(2, 1fr); }
   .money-grid { grid-template-columns: repeat(4, 1fr); }
   .map { height: 380px; }
   .kv { grid-template-columns: 120px 1fr; }
+}
+
+@media (min-width: 960px) {
+  .card-grid { grid-template-columns: repeat(3, 1fr); }
 }

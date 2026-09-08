@@ -21,6 +21,9 @@ CREATE TYPE publish_state AS ENUM ('parsed', 'review', 'published', 'closed', 'r
 -- 좌표 정확도. 호실 페이지는 building일 때만 색인한다.
 CREATE TYPE geo_precision AS ENUM ('building', 'road', 'dong');
 
+-- 공공임대 / 민간임대 (0004). 공공지원민간임대(청년안심주택 등)는 민간 사업자 공급이라 규율이 다르다
+CREATE TYPE rental_sector AS ENUM ('공공임대', '민간임대');
+
 -- 임대주택 유형. 기관별 표기를 이 코드로 정규화한다(S5).
 -- 마이홈포털 API 공급유형 코드표(docs/api-spec/붙임1)와 1:1. '든든전세'만 HUG 자체 유형.
 CREATE TYPE housing_type AS ENUM (
@@ -36,13 +39,14 @@ CREATE TYPE housing_type AS ENUM (
 CREATE TABLE notice (
   id              bigserial PRIMARY KEY,
   slug            text        NOT NULL UNIQUE,  -- URL 식별자. 예: sh-2026-02-maeip
-  fingerprint     text        NOT NULL UNIQUE,  -- sha256(기관|공고명|게시일|주택일련번호|원공고키). 소스 간 중복 방지
+  fingerprint     text        NOT NULL,         -- sha256(기관|공고명|게시일|주택일련번호|원공고키). 소스 간 같은 공고 후보 힌트. UNIQUE 아님 (0005)
   source          text        NOT NULL,         -- myhome_api · myhome_file · lh_scrape · sh_scrape · youth_scrape
   source_key      text        UNIQUE,           -- 출처 내 고유키. 마이홈 API는 'pblancId:houseSn'
   amends_source_key text,                       -- 정정공고가 대체하는 원 공고의 source_key (API beforePblancId)
   agency          text        NOT NULL,         -- LH · SH · GH · HUG
   title           text        NOT NULL,
   housing_type    housing_type NOT NULL,        -- 공급유형 (API suplyTyNm)
+  sector          rental_sector NOT NULL DEFAULT '공공임대',  -- S1 도출: 공공지원민간임대 → 민간임대 (0004)
   house_type      text,                         -- 주택유형: 아파트·다가구주택·오피스텔… (API houseTyNm)
   sido            text        NOT NULL,
   sigungu         text,                         -- 매입임대 공고는 비어 온다
@@ -74,7 +78,7 @@ CREATE TABLE notice (
 );
 
 COMMENT ON TABLE  notice IS '입주자모집공고 1건. S1에서 수집, S2에서 상태·마감 갱신';
-COMMENT ON COLUMN notice.fingerprint IS 'sha256(기관|공고명|게시일|주택일련번호|원공고키). 같은 공고를 여러 소스에서 받아도 한 행으로 모은다. 정정공고는 원공고와 제목·게시일이 같아 원공고 키를 섞는다';
+COMMENT ON COLUMN notice.fingerprint IS 'sha256(기관|공고명|게시일|주택일련번호|원공고키). 소스 간 같은 공고 후보를 묶는 힌트. UNIQUE 아님 — 정정공고 체인(2차 정정)에서 겹친다';
 COMMENT ON COLUMN notice.announce_at IS '당첨자 발표일. 마이홈 API przwnerPresnatnDe 또는 서울주거포털 발표일. LH청약플러스 목록에는 없다';
 COMMENT ON COLUMN notice.raw IS '출처 응답 원문. 마이홈 API는 {"items": [...]} — 시군구별로 쪼개진 행을 전부 담는다. 1건 약 1KB';
 COMMENT ON COLUMN notice.min_deposit IS 'API rentGtn. 공고 내 최소값. 호실별 금액은 unit.deposit';
@@ -84,6 +88,8 @@ CREATE INDEX idx_notice_apply_end   ON notice (apply_end_at DESC NULLS LAST) WHE
 CREATE INDEX idx_notice_sido_type   ON notice (sido, housing_type)           WHERE publish = 'published';
 CREATE INDEX idx_notice_posted      ON notice (posted_at DESC);
 CREATE INDEX idx_notice_pnu         ON notice (pnu) WHERE pnu IS NOT NULL;
+CREATE INDEX idx_notice_sector_end  ON notice (sector, apply_end_at);
+CREATE INDEX idx_notice_fingerprint ON notice (fingerprint);
 
 -- 공고 상태 변경 이력. "정정됨" 배지와 변경 타임라인의 근거
 CREATE TABLE notice_event (

@@ -49,6 +49,14 @@ class UnmappedHousingType(ValueError):
     pass
 
 
+PRIVATE_HOUSING_TYPES = {"공공지원민간임대"}
+
+
+def derive_sector(housing_type: str) -> str:
+    """공공임대 / 민간임대. 민간 사업자 공급 유형만 민간. 청년안심주택 스크래퍼는 소스에서 고정."""
+    return "민간임대" if housing_type in PRIVATE_HOUSING_TYPES else "공공임대"
+
+
 # ── 순수 변환 ─────────────────────────────────────────────────
 
 
@@ -162,6 +170,7 @@ def map_notice(group: list[dict[str, Any]], today: date) -> Mapped:
         "agency": agency,
         "title": title,
         "housing_type": housing_type,
+        "sector": derive_sector(housing_type),
         "house_type": nz(head.get("houseTyNm")),
         "sido": nz(head.get("brtcNm")) or "전국",
         "sigungu": sigungu,
@@ -195,7 +204,7 @@ def map_notice(group: list[dict[str, Any]], today: date) -> Mapped:
 
 NOTICE_COLS = [
     "slug", "fingerprint", "source", "source_key", "amends_source_key", "agency", "title",
-    "housing_type", "house_type", "sido", "sigungu", "complex_name", "address", "pnu", "heating",
+    "housing_type", "sector", "house_type", "sido", "sigungu", "complex_name", "address", "pnu", "heating",
     "total_household", "supply_count", "min_deposit", "min_rent", "min_down_payment", "min_interim",
     "min_balance", "posted_at", "apply_start_at", "apply_end_at", "announce_at", "status",
     "source_status", "source_url", "portal_url", "contact", "raw",
