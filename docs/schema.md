@@ -11,6 +11,7 @@ API 필드 ↔ 컬럼 대응은 각 컬럼 주석에 `(API xxx)`로 적어 뒀�
 |---|---|---|
 | `notice` | 입주자모집공고 1건 | S1 |
 | `notice_event` | 공고 상태 변경 이력. "정정됨" 배지의 근거 | S2 |
+| `notice_area` | 공고의 시군구별 공급호수. API가 쪼개 준 행의 합 | S1 |
 | `raw_snapshot` | 첨부파일 메타 + 해시. 파일 자체는 로컬 | S3 |
 | `unit` | 공고 안의 개별 호실. pSEO 페이지의 최소 단위 | S4 |
 | `eligibility` | 자격·소득·자산 기준 | S4b |
@@ -65,11 +66,12 @@ API 필드 ↔ 컬럼 대응은 각 컬럼 주석에 `(API xxx)`로 적어 뒀�
 | 컬럼 | 의미 |
 |---|---|
 | `slug` | URL 식별자. `sh-2026-02-maeip` |
-| `fingerprint` | 기관+공고명+게시일 해시. 여러 소스에서 같은 공고를 받아도 한 행으로 모은다 |
+| `fingerprint` | sha256(기관·공고명·게시일·주택일련번호·원공고키). 여러 소스에서 같은 공고를 받아도 한 행으로 모은다. 정정공고는 원공고와 제목·게시일이 같아서 원공고 키가 들어간다 |
 | `source` / `source_key` | 출처와 출처 내 키. 마이홈 API는 `pblancId:houseSn` |
-| `amends_source_key` | 정정공고가 대체하는 원 공고 |
+| `amends_source_key` | 정정공고가 대체하는 원 공고. API는 정정공고와 원공고를 **둘 다** 현재 공고로 준다(실측 23쌍). 둘 다 행으로 두고 화면에서 연결한다 |
 | `housing_type` / `house_type` | 공급유형(enum) / 주택유형(아파트·다가구·오피스텔…) |
-| `supply_count` / `unit_count` | API가 말한 공급호수 / 파서가 실제로 뽑은 호실 수. 둘이 크게 다르면 검수 큐 |
+| `supply_count` / `unit_count` | API가 말한 공급호수(= `notice_area` 합) / 파서가 실제로 뽑은 호실 수. 둘이 크게 다르면 검수 큐 |
+| `sigungu` | 시군구가 하나면 값, 여러 시군구에 걸치면 NULL. 내역은 `notice_area` |
 | `min_deposit` / `min_rent` | 공고 내 최소 보증금·월임대료. **호실 금액이 아니다** |
 | `apply_end_at` | 마감일. D-day 카운터의 근거 |
 | `announce_at` | 당첨자 발표일 |
@@ -139,4 +141,4 @@ API 필드 ↔ 컬럼 대응은 각 컬럼 주석에 `(API xxx)`로 적어 뒀�
 
 | 환경 | 상태 |
 |---|---|
-| Neon `zipgonggo-db` (ap-southeast-1, PG 18.6, PostGIS 3.6) | `0001_init.sql` 적용 완료 2026-09-08 |
+| Neon `zipgonggo-db` (ap-southeast-1, PG 18.6, PostGIS 3.6) | `0001`~`0003` 적용 완료 2026-09-08. S1 첫 적재 176건 |

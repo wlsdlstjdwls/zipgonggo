@@ -5,13 +5,38 @@
 
 ## 단계
 
-### S1 — 공고 목록 수집
-- **입력**: 마이홈포털 모집공고 API(1차), LH청약플러스 목록 스크래핑(보조)
-- **과거 공고**: API는 현재 공고만 준다(2026-09-08 확인). 연도별 아카이브는 파일데이터 15088707을 `source = myhome_file`로 백필
-- **처리**: 공고 지문(기관 + 공고명 + 게시일 해시)으로 중복 제거
-- **출력**: `notice` 레코드
-- **주기**: 6시간
-- **실패 시**: 직전 스냅샷 유지, 알림. 수집 실패가 기존 페이지를 내리지 않는다
+### S1 — 공고 목록 수집 ✅ 구현됨 (2026-09-08)
+
+- **입력**: 마이홈포털 모집공고 API `HWSPR02/rsdtRcritNtcList` (1차) · LH청약플러스·서울주거포털 스크래핑(보조, 미구현)
+- **코드**: `pipeline/src/zipgonggo_pipeline/sources/myhome.py`(클라이언트) · `stages/s1_collect.py`(적재)
+- **실행**
+  ```
+  cd pipeline
+  python -m zipgonggo_pipeline.stages.s1_collect            # 적재
+  python -m zipgonggo_pipeline.stages.s1_collect --dry-run  # 호출·매핑만
+  python -m pytest                                          # 매핑 단위 테스트 (샘플 JSON, 네트워크·DB 없음)
+  ```
+- **호출량**: `numOfRows=1000`이 통과해 전량(현재 ~360행)이 **호출 1회**. 개발계정 일 1,000건 한도에 무의미. 6시간 주기여도 하루 4회
+- **행 → 공고 묶기**: API는 매입임대·전세임대 공고를 **시군구별 행**으로 쪼개 준다(`pblancId:houseSn` 같고 `signguNm`·`sumSuplyCo`만 다름). `source_key = pblancId:houseSn`으로 묶어 `notice` 1행 + `notice_area` N행. `notice.supply_count`는 합, `sigungu`는 하나일 때만 값
+- **정정공고**: API가 원공고와 정정공고를 **둘 다** 현재 공고로 준다. 둘 다 별도 행·별도 URL. `amends_source_key = beforePblancId:houseSn`으로 연결. fingerprint에 이 키를 섞어야 유니크가 깨지지 않는다(실측 23쌍)
+- **status 도출** (`derive_status`)
+
+  | 조건 | 결과 |
+  |---|---|
+  | `endDe` 지남 | 접수마감 |
+  | 원문 상태에 "정정" | 정정공고중 |
+  | `beginDe` 도달 | 접수중 |
+  | 그 외 | 공고중 |
+
+  원문 값(`일반공고`·`정정공고`)은 `source_status`에 그대로
+- **정규화**: 빈 문자열 → NULL. 보증금·월임대료·총세대수 0 → NULL(매입·전세임대는 전부 0으로 옴 = 미기재). 계약금·중도금·잔금 0은 유지
+- **upsert**: `ON CONFLICT (source_key)`. `slug`·`source`·`publish`·`created_at`은 갱신 안 함(URL 불변). 공고 단위 SAVEPOINT라 1건 실패가 전체를 막지 않는다
+- **미매핑 공급유형**: enum에 없는 `suplyTyNm`은 실패시키지 않고 `review_queue(reason=housing_type_unmapped)`에 넣고 스킵
+- **기록**: 실행마다 `ingest_log(stage='S1')` 1행. 호출수·행수·insert/update/skip·오류 앞 20건
+- **주기**: 6시간 (스케줄러 미구현)
+- **실패 시**: 직전 스냅샷 유지. 수집 실패가 기존 페이지를 내리지 않는다
+- **과거 공고**: API는 현재 공고만 준다. 연도별 아카이브는 파일데이터 15088707을 `source = myhome_file`로 백필(미구현)
+- **API에 없는 기관**: SH·GH. 서울주거포털·GH 스크래퍼가 필요하다(미구현)
 
 ### S2 — 상태·마감 추적
 - **입력**: LH 목록의 `상태`·`마감일`, 서울주거포털의 `발표일`

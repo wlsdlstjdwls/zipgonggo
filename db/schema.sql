@@ -36,7 +36,7 @@ CREATE TYPE housing_type AS ENUM (
 CREATE TABLE notice (
   id              bigserial PRIMARY KEY,
   slug            text        NOT NULL UNIQUE,  -- URL 식별자. 예: sh-2026-02-maeip
-  fingerprint     text        NOT NULL UNIQUE,  -- 기관+공고명+게시일 해시. 중복 수집 방지
+  fingerprint     text        NOT NULL UNIQUE,  -- sha256(기관|공고명|게시일|주택일련번호|원공고키). 소스 간 중복 방지
   source          text        NOT NULL,         -- myhome_api · myhome_file · lh_scrape · sh_scrape · youth_scrape
   source_key      text        UNIQUE,           -- 출처 내 고유키. 마이홈 API는 'pblancId:houseSn'
   amends_source_key text,                       -- 정정공고가 대체하는 원 공고의 source_key (API beforePblancId)
@@ -74,9 +74,9 @@ CREATE TABLE notice (
 );
 
 COMMENT ON TABLE  notice IS '입주자모집공고 1건. S1에서 수집, S2에서 상태·마감 갱신';
-COMMENT ON COLUMN notice.fingerprint IS '기관+공고명+게시일 해시. 같은 공고를 여러 소스에서 받아도 한 행으로 모은다';
+COMMENT ON COLUMN notice.fingerprint IS 'sha256(기관|공고명|게시일|주택일련번호|원공고키). 같은 공고를 여러 소스에서 받아도 한 행으로 모은다. 정정공고는 원공고와 제목·게시일이 같아 원공고 키를 섞는다';
 COMMENT ON COLUMN notice.announce_at IS '당첨자 발표일. 마이홈 API przwnerPresnatnDe 또는 서울주거포털 발표일. LH청약플러스 목록에는 없다';
-COMMENT ON COLUMN notice.raw IS '출처 응답 원문(jsonb). 마이홈 API 1건 약 1KB, 연 수천 건이라 무료 티어에 부담 없다';
+COMMENT ON COLUMN notice.raw IS '출처 응답 원문. 마이홈 API는 {"items": [...]} — 시군구별로 쪼개진 행을 전부 담는다. 1건 약 1KB';
 COMMENT ON COLUMN notice.min_deposit IS 'API rentGtn. 공고 내 최소값. 호실별 금액은 unit.deposit';
 COMMENT ON COLUMN notice.publish IS '마감돼도 삭제하지 않고 closed로 둔다. URL을 죽이지 않는다';
 
@@ -98,6 +98,20 @@ CREATE TABLE notice_event (
 COMMENT ON TABLE notice_event IS 'S2의 스냅샷 diff 결과. 신규/정정공고중/접수마감 전환을 기록';
 
 CREATE INDEX idx_notice_event_notice ON notice_event (notice_id, detected_at DESC);
+
+-- 공고의 시군구별 공급 내역. 마이홈 API가 매입임대·전세임대 공고를 시군구별 행으로 쪼개 준다 (0002)
+CREATE TABLE notice_area (
+  id           bigserial PRIMARY KEY,
+  notice_id    bigint  NOT NULL REFERENCES notice(id) ON DELETE CASCADE,
+  sido         text    NOT NULL,
+  sigungu      text,                 -- 빈값이면 시도 전체 또는 미지정 행
+  supply_count integer,              -- 해당 시군구 공급호수 (API sumSuplyCo)
+  UNIQUE NULLS NOT DISTINCT (notice_id, sido, sigungu)
+);
+
+COMMENT ON TABLE notice_area IS '공고 1건의 시군구별 공급호수. API가 쪼개 준 행을 합산해 넣는다. notice.supply_count는 이 표의 합';
+
+CREATE INDEX idx_notice_area_region ON notice_area (sido, sigungu);
 
 -- ─────────────────────────────────────────────────────────────
 -- S3 — 첨부 원본 스냅샷

@@ -34,3 +34,5 @@ python db\migrate.py --status   # 적용 현황
 | 파일 | 내용 | 적용 |
 |---|---|---|
 | `0001_init.sql` | 초기 스키마 — notice · notice_event · raw_snapshot · complex · complex_type · unit · eligibility · waitlist · address_match · review_queue · ingest_log. 마이홈 API 실호출 필드 반영본 | Neon 2026-09-08 |
+| `0002_notice_area.sql` | `notice_area` — 공고의 시군구별 공급호수. API가 매입·전세임대 공고를 시군구별 행으로 쪼개 줌 | Neon 2026-09-08 |
+| `0003_fingerprint_comment.sql` | fingerprint 정의에 원공고키 포함 (주석) | Neon 2026-09-08 |

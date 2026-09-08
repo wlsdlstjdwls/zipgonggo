@@ -38,6 +38,9 @@
 | 대기현황 15108378 | `apis.data.go.kr/1613000/HWSPR03/moveWaitStsList` | serviceKey, **brtcCode** | 시도별로 17회 호출 |
 | 단지정보 15110581 | `apis.data.go.kr/1613000/HWSPR04/rentalHouseGwList` | serviceKey, **brtcCode, signguCode, numOfRows, pageNo** | 시군구별 ~250회 호출. 행 단위는 단지가 아니라 **단지×형(styleNm)** |
 
+> **모집공고 API에 SH·GH가 없다 (확인됨, 2026-09-08 전량 356행).** 기관 분포: LH 327 · 충남개발공사 9 · 부산도시공사 5 · 경북개발공사 5 · 제주개발공사 4 · 세종시설관리공단 3 · 안산도시공사 2 · 강원개발공사 1.
+> **SH·GH는 서울주거포털·GH 스크래핑이 유일한 경로**다. Phase 1 "전국 1층"의 서울·경기 공공기관분은 API만으로 안 채워진다.
+
 > **모집공고 API는 현재 공고만 준다 (확인됨).** `yearMtBegin/End`로 연도별 totalCount를 재 보니 2020·2022·2024는 `NODATA_ERROR`, 2025년 13건, 2026년 343건.
 > 즉 **과거 공고 아카이브는 이 API로 못 만든다.** 연도별 아카이브(하지 말 것 6)는 파일데이터 15088707 백필이 필수 경로다. 로드맵 가정표 Plan B가 기본 경로로 승격.
 

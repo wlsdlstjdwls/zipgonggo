@@ -13,7 +13,7 @@ import os
 import sys
 from pathlib import Path
 
-import psycopg2
+import psycopg
 
 ROOT = Path(__file__).resolve().parent.parent
 MIGRATIONS = ROOT / "db" / "migrations"
@@ -32,7 +32,7 @@ def database_url() -> str:
 
 def main() -> None:
     status_only = "--status" in sys.argv
-    conn = psycopg2.connect(database_url())
+    conn = psycopg.connect(database_url())
     conn.autocommit = False
     cur = conn.cursor()
     cur.execute(

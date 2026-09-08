@@ -10,13 +10,17 @@
 공고 식별자만은 기관·연도·차수 조합이라 영숫자로 둔다.
 
 ```
-/notice/{기관}-{연도}-{차수}-{유형}      /notice/sh-2026-02-maeip
+/notice/{기관}-{연도}-{공고ID}-{주택번호}-{유형}   /notice/lh-2026-21174-1-gungmin
 /notice/{공고}/{호실}                    /notice/sh-2026-02-maeip/1204
 /complex/{단지명}-{단지코드}              /complex/서도휴빌3차-11200
 /area/{시도}/{시군구}/{읍면동}            /area/서울/강동구/천호동
 /area/{시군구}/{유형}                     /area/강동구/매입임대
 /type/{유형}                              /type/매입임대
 ```
+
+> 식별자 자리는 원래 `{차수}`였으나 마이홈 API에 차수 필드가 없어 **공고ID + 주택일련번호**(API `pblancId`·`houseSn`)로 바꿨다(2026-09-08).
+> 기관 세그먼트는 영문이면 소문자(`lh`), 한글 기관명(`충남개발공사`)은 그대로. 유형은 로마자 약칭(`maeip` `gungmin` `haengbok` `janggi` `tonghap` `jeonse` `deundeun` `yeonggu` `mingan` `50nyeon` `10nyeon` `6nyeon` `5nyeon` `gisuksa`).
+> 정정공고는 별도 공고ID를 받으므로 URL도 따로 생긴다. 원공고 페이지 상단에 "정정공고 있음" 배너로 잇는다.
 
 **URL은 한 번 만들면 죽이지 않는다.** 마감 공고도 `closed` 상태로 살려 두고 상단에 마감 배너와 후속 공고 링크를 붙인다. 연도별 공고 아카이브가 그 자체로 새 롱테일이 된다.
 
