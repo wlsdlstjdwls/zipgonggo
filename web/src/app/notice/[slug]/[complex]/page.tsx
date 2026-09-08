@@ -116,7 +116,7 @@ export default async function ComplexPage({ params }: Params) {
             )}
           </header>
 
-          {priceBreak.length > 1 && (
+          {priceBreak.length > 0 && (
             <section className="dsec">
               <h2>보증금과 임대료</h2>
               <PriceTable rows={priceBreak} />
