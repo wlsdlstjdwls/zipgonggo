@@ -10,6 +10,7 @@ import { noticePath } from "@/lib/routes";
 import { regionShort } from "@/lib/sido";
 import type { NoticeListItem } from "@/types/notice";
 import { SaveButton } from "./save-button";
+import { Trunc } from "./trunc";
 
 type Props = {
   n: NoticeListItem;
@@ -54,10 +55,8 @@ export function NoticeRow({ n, stagger }: Props) {
         </span>
         <span className="row-body">
           {/* 접수 상태는 왼쪽 D-day 칩이 이미 말한다 — 메타 줄에 「접수 중」을 겹쳐 쓰지 않는다(사용자 지적 2026-09-09) */}
-          <span className="row-meta">
-            {meta}{n.amends_source_key && " | 정정"}
-          </span>
-          <span className="row-title">{n.title}</span>
+          <Trunc className="row-meta" text={`${meta}${n.amends_source_key ? " | 정정" : ""}`} />
+          <Trunc className="row-title" text={n.title} />
           <span className="row-dates">
             <Dt k="공고" v={dateK(n.posted_at)} />
             <Dt k="접수" v={periodLabel(n)} />

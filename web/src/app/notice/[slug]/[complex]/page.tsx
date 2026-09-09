@@ -8,12 +8,13 @@ import { CalcDock } from "@/components/calc-dock";
 import { DetailAside } from "@/components/detail-aside";
 import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
+import { ConvertTable } from "@/components/convert-table";
 import { PriceTable } from "@/components/price-table";
 import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
 import { agencyLabels } from "@/lib/agency";
 import { count, dateK, deadlineChip, num, wonKo } from "@/lib/format";
-import { areaText, commonArea, complexPriceRows, m2 } from "@/lib/notice-view";
+import { areaText, commonArea, complexPriceGroups, complexPriceRows, CONVERT_HINT, m2 } from "@/lib/notice-view";
 import { getComplexSupply, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
 import { regionShort, sidoShort } from "@/lib/sido";
@@ -69,6 +70,8 @@ export default async function ComplexPage({ params }: Params) {
   const hasClass = new Set(supply.map((s) => s.tenant_class)).size > 1 || supply.some((s) => s.income_option);
   const moveIn = supply.find((s) => s.move_in_from)?.move_in_from ?? null;
   const priceBreak = complexPriceRows(supply, c);
+  // 월임대료가 있는 줄은 공급대상별로 전세전환/기본/월세전환 세 줄을 만든다(사용자 요청 2026-09-09)
+  const priceGroups = complexPriceGroups(supply);
   // 오른쪽 카드는 언제나 "마감"을 센다 — 접수 시작 D-day를 섞으면 「접수 시작까지 / 오늘 / 09.11 마감」처럼 어긋난다
   const dl = deadlineChip(n);
   const L = agencyLabels(n);
@@ -81,15 +84,12 @@ export default async function ComplexPage({ params }: Params) {
 
   return (
     <article className="stage">
-      {/* 뒤로가기 한 개만 — 「단지 | 지역 | 유형」 줄은 아래 태그와 겹쳐 뺐다(사용자 요청 2026-09-09) */}
-      <div className="crumb">
-        <Link href={noticePath(n.slug)} className="back">← 공고</Link>
-      </div>
-
       <div className="detail">
         <div className="detail-main">
           <header className="d-head">
             <div className="d-tags">
+              {/* 뒤로가기는 이 줄 맨 앞에 — 혼자 한 행을 쓰지 않는다(사용자 요청 2026-09-09) */}
+              <Link href={noticePath(n.slug)} className="d-back">← 공고</Link>
               {/* D-day는 오른쪽 카드가 크게 센다 — 여기서 또 세지 않는다 */}
               <span className="tag type">{n.housing_type}</span>
               <span className="tag">{regionShort(c)}</span>
@@ -98,22 +98,6 @@ export default async function ComplexPage({ params }: Params) {
             <h1 className="d-title">{c.name}</h1>
             <p className="d-sub">{full}</p>
           </header>
-
-          <section className="dsec">
-            <h2>보증금과 임대료</h2>
-            {priceBreak.length > 0 ? (
-              <>
-                <PriceTable rows={priceBreak} />
-                {hasRent && (
-                  <p className="note">
-                    공고문 기준값입니다. 계약 때 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있습니다. 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="note" style={{ marginTop: 0 }}>이 공고 데이터에는 금액이 없습니다. {L.originalDoc}의 표를 확인하세요.</p>
-            )}
-          </section>
 
           {/* 제원과 공급현황은 한 섹션이다 — 같은 표를 세로/가로로 두 번 나눠 보여줄 이유가 없다(사용자 요청 2026-09-09) */}
           <section className="dsec">
@@ -138,23 +122,44 @@ export default async function ComplexPage({ params }: Params) {
             )}
           </section>
 
+          {/* 보증금과 임대료는 공급현황 아래 — 어떤 유형이 있는지 먼저 보고 그 금액을 읽는 순서다(사용자 요청 2026-09-09) */}
+          <section className="dsec">
+            <h2>보증금과 임대료</h2>
+            {priceGroups.length > 0 ? (
+              <>
+                <ConvertTable groups={priceGroups} />
+                <p className="note">
+                  기본은 공고 기준값입니다. 계약 때 월임대료의 {CONVERT_HINT.share}%까지 보증금으로 올리거나(전세전환, 연 {CONVERT_HINT.up}%),
+                  보증금의 {CONVERT_HINT.share}%까지 월임대료로 내릴 수 있습니다(월세전환, 연 {CONVERT_HINT.down}%).
+                  전환 한도와 이율은 공고마다 다르므로 {L.originalDoc}에서 확인하세요.
+                </p>
+              </>
+            ) : priceBreak.length > 0 ? (
+              <>
+                <PriceTable rows={priceBreak} />
+                {hasRent && (
+                  <p className="note">
+                    공고문 기준값입니다. 계약 때 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있습니다. 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="note" style={{ marginTop: 0 }}>이 공고 데이터에는 금액이 없습니다. {L.originalDoc}의 표를 확인하세요.</p>
+            )}
+          </section>
+
           <section className="dsec">
             <h2>위치</h2>
             <div className="d-map"><NaverMap address={full} title={c.name} sub={mapSub} /></div>
           </section>
 
-          {/* 공고와 원문 링크는 오른쪽 카드가 이미 준다 — 고지 한 줄만 남긴다 */}
-          <div className="notice-bar">
-            <span className="i">i</span>
-            <span>본 자료는 참고용입니다. 정확한 내용과 최종 조건은 {n.agency}의 공식 공고문을 반드시 확인하세요.</span>
-          </div>
         </div>
 
         <DetailAside
           tone={dl.tone}
           ddayLabel={dl.unit}
           ddayNum={dl.num}
-          ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)} ${dl.days !== null && dl.days < 0 ? "마감됨" : "마감"}` : (n.source_status ?? "일정 미정")}
+          ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)}${n.apply_end_tm ? ` ${n.apply_end_tm}` : ""} ${dl.days !== null && dl.days < 0 ? "마감됨" : "마감"}` : (n.source_status ?? "일정 미정")}
           cta={
             <>
               <Link className="btn acc lg" href={noticePath(n.slug)}>공고 전체 단지 지도</Link>
@@ -164,11 +169,18 @@ export default async function ComplexPage({ params }: Params) {
           rows={[
             { label: "공급기관", value: n.agency },
             { label: "공고일", value: dateK(n.posted_at) },
-            { label: "접수 마감", value: n.apply_end_at ? dateK(n.apply_end_at) : null },
+            { label: "접수 마감", value: n.apply_end_at ? `${dateK(n.apply_end_at)}${n.apply_end_tm ? ` ${n.apply_end_tm}` : ""}` : null },
             { label: "문의처", value: n.contact },
           ]}
           updatedNote={`갱신 ${n.updated_at} | ${L.updatedVia}`}
         />
+      </div>
+
+      {/* 공고와 원문 링크는 오른쪽 카드가 이미 준다 — 고지 한 줄만, 그리고 푸터 바로 위에.
+          왼쪽 칸 안에 두면 오른쪽 카드 길이만큼 푸터와 벌어진다(사용자 지적 2026-09-09) */}
+      <div className="notice-bar foot">
+        <span className="i">i</span>
+        <span>본 자료는 참고용입니다. 정확한 내용과 최종 조건은 {n.agency}의 공식 공고문을 반드시 확인하세요.</span>
       </div>
 
       {/* 계산기는 이 단지 금액을 씨앗으로 연다(사용자 제안 2026-09-09) */}

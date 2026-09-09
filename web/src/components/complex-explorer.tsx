@@ -13,8 +13,9 @@ import { num, wonExact, wonKo, wonShort } from "@/lib/format";
 import type { NoticeComplex } from "@/types/notice";
 import { ComplexMap, type MapItem } from "./complex-map";
 import { Select } from "./select";
+import { Trunc } from "./trunc";
 
-type Props = { items: NoticeComplex[]; hasUnits: boolean; noticeSlug: string };
+type Props = { items: NoticeComplex[]; hasUnits: boolean; noticeSlug: string; /** 공고 전체 공급 호수. 섹션 제목을 뺀 자리를 이 줄이 대신 센다(사용자 요청 2026-09-09) */ unitTotal?: number };
 type Phase = "loading" | "ready" | "failed" | "no-key";
 
 // 핀이 아직 없을 때 첫 화면 — 서울 전역
@@ -29,6 +30,30 @@ function guLabel(c: NoticeComplex): string {
   return c.sido === "서울특별시" ? c.sigungu : `${c.sido} ${c.sigungu}`;
 }
 
+// 면적 구간 — 단지의 전용면적 범위(area_min~area_max)가 구간과 겹치면 그 구간에 든다.
+// 값이 있는 공고(매입임대 별첨)에서만 쓰이고, 해당 구간에 단지가 없으면 셀렉트에 나오지 않는다.
+const AREA_BANDS: { value: string; lo: number; hi: number }[] = [
+  { value: "20㎡ 이하", lo: 0, hi: 20 },
+  { value: "20~30㎡", lo: 20, hi: 30 },
+  { value: "30~40㎡", lo: 30, hi: 40 },
+  { value: "40~50㎡", lo: 40, hi: 50 },
+  { value: "50㎡ 이상", lo: 50, hi: Infinity },
+];
+
+function inBand(c: NoticeComplex, band: { lo: number; hi: number }): boolean {
+  const lo = c.area_min ?? c.area_max;
+  const hi = c.area_max ?? c.area_min;
+  if (lo == null || hi == null) return false;
+  return lo < band.hi && hi >= band.lo;
+}
+
+/** 값이 있는 항목만 뽑아 (값, 건수)로. 건수 0인 선택지는 아예 만들지 않는다 */
+function tally(items: NoticeComplex[], pick: (c: NoticeComplex) => string[]): [string, number][] {
+  const m = new Map<string, number>();
+  for (const c of items) for (const v of pick(c)) m.set(v, (m.get(v) ?? 0) + 1);
+  return [...m.entries()];
+}
+
 /** 선택 라벨: 굵게 단지명, 보조로 금액 → 호수 → 자치구 */
 function toItem(c: NoticeComplex): MapItem {
   const sub = c.min_rent != null ? `월 ${wonShort(c.min_rent)}`
@@ -38,7 +63,7 @@ function toItem(c: NoticeComplex): MapItem {
   return { id: c.id, address: fullAddress(c), title: c.name, sub };
 }
 
-export function ComplexExplorer({ items, hasUnits, noticeSlug }: Props) {
+export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Props) {
   const listEl = useRef<HTMLUListElement>(null);
   const [phase, setPhase] = useState<Phase>(hasMapKey() ? "loading" : "no-key");
   const [progress, setProgress] = useState(0);
@@ -46,19 +71,36 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug }: Props) {
   const [focus, setFocus] = useState<number | null>(null);
   const [roadview, setRoadview] = useState(false);
   const [gu, setGu] = useState("");
+  const [cls, setCls] = useState("");
+  const [band, setBand] = useState("");
+  const [onlyNew, setOnlyNew] = useState(false);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
 
-  const gus = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const c of items) m.set(guLabel(c), (m.get(guLabel(c)) ?? 0) + 1);
-    return [...m.entries()];
-  }, [items]);
+  const gus = useMemo(() => tally(items, (c) => [guLabel(c)]), [items]);
+  // 아래 셋은 데이터가 있는 공고에서만 나타난다(사용자 요청 2026-09-09: "있는 경우만")
+  const classes = useMemo(() => tally(items, (c) => c.tenant_classes ?? []), [items]);
+  const bands = useMemo(
+    () => AREA_BANDS.map((b) => [b.value, items.filter((c) => inBand(c, b)).length] as [string, number]).filter(([, n]) => n > 0),
+    [items],
+  );
+  const newCount = useMemo(() => items.filter((c) => c.is_new).length, [items]);
+  const showNewChip = newCount > 0 && newCount < items.length;
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return items.filter((c) => (!gu || guLabel(c) === gu) && (!needle || `${c.name} ${c.road_address}`.toLowerCase().includes(needle)));
-  }, [items, gu, q]);
+    const b = AREA_BANDS.find((x) => x.value === band);
+    return items.filter((c) =>
+      (!gu || guLabel(c) === gu) &&
+      (!cls || (c.tenant_classes ?? []).includes(cls)) &&
+      (!b || inBand(c, b)) &&
+      (!onlyNew || c.is_new) &&
+      (!needle || `${c.name} ${c.road_address}`.toLowerCase().includes(needle)),
+    );
+  }, [items, gu, cls, band, onlyNew, q]);
+
+  const clearAll = useCallback(() => { setGu(""); setCls(""); setBand(""); setOnlyNew(false); setQ(""); setSelected(null); }, []);
+  const filtered = Boolean(gu || cls || band || onlyNew || q.trim());
 
   // 1) 지오코딩 — 마운트 즉시
   useEffect(() => {
@@ -125,9 +167,36 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug }: Props) {
             placeholder="자치구 전체"
             ariaLabel="자치구"
           />
+          {/* 공급대상·면적·신규는 그 공고에 값이 있을 때만 나온다 — 빈 셀렉트를 늘어놓지 않는다 */}
+          {classes.length > 1 && (
+            <Select
+              value={cls}
+              options={classes.map(([v, n]) => ({ value: v, label: v, count: n }))}
+              onChange={(v) => { setCls(v); setSelected(null); }}
+              placeholder="공급대상 전체"
+              ariaLabel="공급대상"
+            />
+          )}
+          {bands.length > 1 && (
+            <Select
+              value={band}
+              options={bands.map(([v, n]) => ({ value: v, label: v, count: n }))}
+              onChange={(v) => { setBand(v); setSelected(null); }}
+              placeholder="면적 전체"
+              ariaLabel="전용면적"
+            />
+          )}
+          {showNewChip && (
+            <button type="button" className={`chip-f${onlyNew ? " on" : ""}`} aria-pressed={onlyNew} onClick={() => { setOnlyNew((v) => !v); setSelected(null); }}>
+              신규 공급 <small>{newCount}</small>
+            </button>
+          )}
           <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setSelected(null); }} placeholder="단지명, 주소 검색" aria-label="단지명, 주소 검색" className="fld" />
         </div>
-        <p className="cx-count"><b>{visible.length}</b> / {items.length}{hasUnits ? "단지" : "곳"}</p>
+        <p className="cx-count">
+          <b>{visible.length}</b> / {items.length}{hasUnits ? "단지" : "곳"}{unitTotal ? <em> | {num(unitTotal, "호")}</em> : null}
+          {filtered && <button type="button" className="cx-clear" onClick={clearAll}>필터 초기화</button>}
+        </p>
         <ul className="cx-list" ref={listEl} aria-label="공급 단지 목록" onKeyDown={onListKey}>
           {visible.map((c) => {
             const on = c.id === selected;
@@ -136,8 +205,8 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug }: Props) {
               <li key={c.id} data-id={c.id} className={`${on ? "on" : ""}${focus === c.id ? " is-focus" : ""}`.trim() || undefined}>
                 <button type="button" onClick={() => onPick(c.id)} aria-pressed={on} onMouseEnter={() => setFocus(c.id)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(c.id)} onBlur={() => setFocus(null)}>
                   <span className="cx-row-main">
-                    <span className="cx-name">{c.name}{c.is_new && <span className="chip new">신규</span>}</span>
-                    <span className="cx-addr">{fullAddress(c)}</span>
+                    <span className="cx-name"><Trunc text={c.name} />{c.is_new && <span className="chip new">신규</span>}</span>
+                    <Trunc className="cx-addr" text={fullAddress(c)} />
                   </span>
                   <span className="cx-row-side">
                     <span className="chip">{guLabel(c)}</span>
@@ -182,8 +251,8 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug }: Props) {
           {picked && (
             <div className="cx-card">
               <div className="cx-card-t">
-                <b>{picked.name}</b>
-                <span>{fullAddress(picked)}</span>
+                <Trunc as="span" className="cx-card-n" text={picked.name} />
+                <Trunc text={fullAddress(picked)} />
               </div>
               <div className="cx-card-a">
                 {pickedPin && (

@@ -9,7 +9,7 @@ import { NaverMap } from "@/components/naver-map";
 import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
-import { applyPhase, count, dateK, dateMD, daysUntil, deadlineChip, moneyOf, num, won, wonShort } from "@/lib/format";
+import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, num, won, wonShort } from "@/lib/format";
 import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
@@ -75,35 +75,37 @@ export default async function NoticePage({ params }: Params) {
 
   // 흐름도 나머지 단계(서류심사 대상자 발표·서류 제출·계약 체결)와 당첨자 발표를 날짜순으로 섞는다.
   // 공고문에 있는데 화면에서 빠져 있었다(사용자 지적 2026-09-09) — 서류 제출일은 접수일만큼 급한 날짜다.
+  // 공고문에 시각이 있으면 날짜 뒤에 붙인다(사용자 지적 2026-09-09: "보통 시간까지 명시돼 있는데 안 보인다").
+  // 흐름도에 시각이 없는 양식도 있어 없으면 날짜만 — 없는 시각을 지어내지 않는다.
+  const at = (d: string | null, t?: string | null) => (d ? `${dateK(d, true)}${t ? ` ${t}` : ""}` : null);
+
   const tail = [
     ...(n.schedule_steps ?? []).map((s) => ({
       label: s.label,
-      value: dateK(s.start, true),
-      sub: s.end ? `~ ${dateK(s.end, true)}` : null,
+      value: at(s.start, s.start_time),
+      sub: s.end ? `~ ${at(s.end, s.end_time)}` : null,
       at: s.start,
     })),
     ...(n.announce_at ? [{ label: "당첨자 발표", value: dateK(n.announce_at, true), sub: null, at: n.announce_at }] : []),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
-  const steps: { label: string; value: string | null; sub?: string | null; on?: boolean }[] = [
+  // key = 사람이 달력에 적는 두 날짜. 나머지 단계보다 크게 그린다
+  const steps: { label: string; value: string | null; sub?: string | null; on?: boolean; key?: boolean }[] = [
     { label: "공고일", value: dateK(n.posted_at, true) },
-    { label: "접수 시작", value: n.apply_start_at ? dateK(n.apply_start_at, true) : null },
-    { label: "접수 마감", value: n.apply_end_at ? dateK(n.apply_end_at, true) : null, on: true },
+    { label: "접수 시작", value: at(n.apply_start_at, n.apply_start_tm), key: true },
+    { label: "접수 마감", value: at(n.apply_end_at, n.apply_end_tm), on: true, key: true },
     ...tail,
     ...(n.announce_at ? [] : [{ label: "당첨자 발표", value: null }]),
   ];
 
   return (
     <article className="stage">
-      {/* 뒤로가기 한 개만 — 「공고 | 지역 | 유형」 줄은 아래 태그와 겹쳐 뺐다(사용자 요청 2026-09-09) */}
-      <div className="crumb">
-        <Link href={ROUTES.home} className="back">← 목록</Link>
-      </div>
-
       <div className="detail">
         <div className="detail-main">
           <header className="d-head">
             <div className="d-tags">
+              {/* 뒤로가기는 이 줄 맨 앞에 — 혼자 한 행을 쓰지 않는다(사용자 요청 2026-09-09) */}
+              <Link href={ROUTES.home} className="d-back">← 목록</Link>
               {/* D-day는 오른쪽 카드가 크게 센다 — 여기서 또 세지 않는다 */}
               <span className="tag type">{n.housing_type}</span>
               <span className="tag">{n.agency}</span>
@@ -121,8 +123,10 @@ export default async function NoticePage({ params }: Params) {
 
           {complexes.length > 0 && (
             <section className="dsec lead">
-              <h2>공급 단지 {count(complexes.length, "곳")}{hasUnits && ` | ${count(unitTotal, "호")}`}</h2>
-              <ComplexExplorer items={complexes} hasUnits={hasUnits} noticeSlug={n.slug} />
+              {/* 제목 줄(「공급 단지 62곳 | 1,484호」)은 탐색기 머리의 수량과 같은 말이라 뺐다(사용자 요청 2026-09-09).
+                  호수는 탐색기 안 수량 줄이 이어받는다 */}
+              <h2 className="sr-only">공급 단지</h2>
+              <ComplexExplorer items={complexes} hasUnits={hasUnits} unitTotal={unitTotal} noticeSlug={n.slug} />
             </section>
           )}
 
@@ -144,12 +148,14 @@ export default async function NoticePage({ params }: Params) {
             </section>
           )}
 
-          <section className="dsec">
+          {/* 자리는 원래대로 정정 이력 다음이다(사용자 정정 2026-09-09) — 올리지 않고 lead 톤과
+              접수 시작·마감 강조로만 눈에 띄게 한다 */}
+          <section className="dsec lead">
             <h2>접수 일정</h2>
             {hasSchedule ? (
               <div className="steps">
                 {steps.map((s) => (
-                  <div key={s.label} className={`step${s.on && s.value ? " on" : ""}`}>
+                  <div key={s.label} className={`step${s.key ? " key" : ""}${s.on && s.value ? " on" : ""}`}>
                     <span>{s.label}</span>
                     <b>{s.value ?? "—"}</b>
                     {s.sub && <em>{s.sub}</em>}
@@ -157,9 +163,8 @@ export default async function NoticePage({ params }: Params) {
                 ))}
               </div>
             ) : (
-              <p className="note" style={{ marginTop: 0 }}>공고일 {dateK(n.posted_at, true)}{n.source_status && `, 모집 상태 ${n.source_status}`}. 접수 기간은 {L.originalDoc}에서 확인하세요.</p>
+              <p className="note" style={{ marginTop: 0 }}>공고일 {dateK(n.posted_at, true)}. 접수 기간은 {L.originalDoc}에서 확인하세요.</p>
             )}
-            {hasSchedule && n.source_status && <p className="note">모집 상태 {n.source_status}</p>}
           </section>
 
           {showAreaTable && areas.length > 0 && (
@@ -183,23 +188,16 @@ export default async function NoticePage({ params }: Params) {
             </section>
           )}
 
+          {/* 원문·포털 링크는 오른쪽 카드가 이미 준다 — 같은 링크를 두 번 걸지 않는다(사용자 요청 2026-09-09) */}
           <section className="dsec">
-            <h2>원문과 문의</h2>
-            <ul className="link-list">
-              <li><ExternalLink href={n.source_url}>{L.originalListItem} ↗</ExternalLink></li>
-              {n.portal_url && <li><ExternalLink href={n.portal_url}>{L.portalListItem} ↗</ExternalLink></li>}
-            </ul>
-            <SpecList style={{ marginTop: 14 }}>
+            <h2>공고 정보</h2>
+            <SpecList>
               <Spec label="문의처" value={n.contact} />
               <Spec label="단지명" value={n.complex_name} />
               <Spec label="총세대수" value={n.total_household != null ? num(n.total_household, "세대") : null} />
               <Spec label="난방" value={n.heating} />
               <Spec label="주소" value={n.address} wide />
             </SpecList>
-            <div className="notice-bar" style={{ margin: "16px 0 0" }}>
-              <span className="i">i</span>
-              <span>본 자료는 참고용입니다. 정확한 내용과 최종 조건은 {n.agency}의 공식 공고문을 반드시 확인하세요.</span>
-            </div>
           </section>
         </div>
 
@@ -207,7 +205,7 @@ export default async function NoticePage({ params }: Params) {
           tone={dl.tone}
           ddayLabel={dl.unit}
           ddayNum={dl.num}
-          ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)} 마감` : (n.source_status ?? "일정 미정")}
+          ddayNote={n.apply_end_at ? `${at(n.apply_end_at, n.apply_end_tm)} 마감` : (n.source_status ?? "일정 미정")}
           cta={
             <>
               <ExternalLink className="btn acc lg" href={n.source_url}>{L.original}</ExternalLink>
@@ -218,8 +216,7 @@ export default async function NoticePage({ params }: Params) {
           rows={[
             { label: m ? m.label : "금액", value: moneyRow ?? "원문 확인" },
             ...(m?.sub ? [{ label: "보증금", value: `${m.sub.replace("보증금 ", "")}부터` }] : []),
-            { label: "공급기관", value: n.agency },
-            { label: "공급유형", value: n.housing_type },
+            /* 공급기관·공급유형은 제목 위 태그가 이미 말한다 — 카드에서 뺐다(사용자 지적 2026-09-09) */
             { label: "지역", value: region },
             { label: "공급호수", value: n.supply_count != null ? num(n.supply_count, "호") : null },
             { label: "접수", value: period },
@@ -227,6 +224,12 @@ export default async function NoticePage({ params }: Params) {
           ]}
           updatedNote={`갱신 ${n.updated_at} | ${L.updatedVia}`}
         />
+      </div>
+
+      {/* 고지는 본문 칸이 아니라 페이지 맨 밑 — 왼쪽 칸에 두면 오른쪽 카드 길이에 따라 푸터와 멀어진다(사용자 지적 2026-09-09) */}
+      <div className="notice-bar foot">
+        <span className="i">i</span>
+        <span>본 자료는 참고용입니다. 정확한 내용과 최종 조건은 {n.agency}의 공식 공고문을 반드시 확인하세요.</span>
       </div>
 
       {/* 계산기는 이 공고 최소 금액을 씨앗으로 연다(사용자 제안 2026-09-09) */}

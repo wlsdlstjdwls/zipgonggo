@@ -66,7 +66,7 @@
   --ease-standard: var(--ease);
   --ease-out-emph: var(--sp);
 
-  --maxw: 1120px;
+  --maxw: 1280px;
   --pad: 18px;
   --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif;
 }
@@ -151,14 +151,45 @@ small { font-size: 12px; }
 .legal-sec strong { font-weight: 800; color: var(--ink); }
 .legal-sec a { font-weight: 700; color: var(--acc); text-decoration: underline; text-underline-offset: 3px; }
 
-/* ── 스코프 바(부문+시도) ────────────────────────────────── 헤더 바로 아래 상시 노출, 필터 행보다 상위 범위 */
-.sbar { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line);
-  /* 배경·경계선은 화면 폭 전체, 내용은 .shell(=--maxw)과 같은 선에 맞춘다 — 좌우 패딩으로 가운데 정렬(overflow-x와 공존) */
-  padding: 10px calc(var(--pad) + max(0px, (100% - var(--maxw)) / 2));
-  position: sticky; top: 60px; z-index: 10; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px);
-  /* 가로 스크롤을 쓰지 않는다 — 셀렉트 목록(.selmenu)이 잘린다. 항목이 적어 줄바꿈이면 충분 */
-  flex-wrap: wrap; row-gap: 8px; }
-.sbar .selw { flex: none; }
+/* ── 목록 화면 왼쪽 필터 레일(components/filter-rail.tsx) ──
+   헤더 아래 전폭 스코프 바 + 칩이 늘어난 필터 행을 대신한다(사용자 요청 2026-09-09).
+   상세 화면의 오른쪽 스티키 패널과 같은 골격 — 세로로 세우고 스크롤에 붙는다. */
+.list-stage { display: grid; grid-template-columns: 236px minmax(0, 1fr); align-items: start; }
+.list-col { min-width: 0; }
+.rail { border-right: 1px solid var(--line); }
+.rail-in { position: sticky; top: 60px; display: flex; flex-direction: column; gap: 18px; padding: 18px var(--pad) 24px; }
+.rail-g { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.rail-g > h3 { margin: 0; font-weight: 800; font-size: 10px; line-height: 1; letter-spacing: 0.16em; color: var(--dim); }
+.rail-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rail .selw, .rail .sel { width: 100%; }
+.rail-reset { border: 0; background: none; font-family: inherit; cursor: pointer; align-self: flex-start; display: inline-flex; align-items: center;
+  height: 34px; padding: 0 12px; border-radius: var(--r-chip); font-weight: 700; font-size: 12px; color: var(--acc); white-space: nowrap; }
+.rail-reset:hover { background: var(--acc-soft); }
+
+/* 좁은 화면 전용 필터 줄 + 바텀시트. 넓은 화면에서는 레일이 대신하므로 감춘다 */
+.fsheet-bar { display: none; }
+.fsheet-open { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 15px; border-radius: var(--r-chip);
+  border: 1px solid var(--line2); background: var(--bg); color: var(--ink); font-family: inherit; font-weight: 800; font-size: 12.5px; cursor: pointer; flex: none; }
+.fsheet-open em { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: var(--acc); color: #fff; font-style: normal; font-weight: 800; font-size: 10.5px; }
+.fsheet-sum { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: 12px; color: var(--dim); }
+
+.sheet-wrap { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; justify-content: flex-end; }
+.sheet-scrim { position: absolute; inset: 0; border: 0; padding: 0; background: rgba(15, 18, 22, 0.42); cursor: pointer; animation: fade-in 200ms var(--ease) both; }
+.sheet { position: relative; display: flex; flex-direction: column; max-height: 82vh; border-radius: var(--r-frame) var(--r-frame) 0 0;
+  background: var(--bg); box-shadow: var(--shadow-frame); animation: sheet-up 320ms var(--sp) both; }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+.sheet-h { position: relative; flex: none; display: flex; align-items: center; justify-content: center; height: 52px; border-bottom: 1px solid var(--line); }
+.sheet-h b { font-weight: 900; font-size: 15px; letter-spacing: -0.03em; color: var(--ink); }
+.sheet-grip { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 36px; height: 4px; border-radius: 999px; background: var(--line2); }
+.sheet-x { position: absolute; right: 8px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 10px; background: none; color: var(--dim); font-size: 12px; cursor: pointer; }
+.sheet-x:hover { background: var(--sub); color: var(--ink); }
+.sheet-b { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 18px; padding: 18px var(--pad) 20px; }
+.sheet-b .selw, .sheet-b .sel { width: 100%; }
+.sheet-f { flex: none; display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; padding: 12px var(--pad) calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+.sheet-f .btn { width: 100%; }
+@media (prefers-reduced-motion: reduce) { .sheet, .sheet-scrim { animation: none; } }
 
 /* ── 버튼 · 칩 · 세그먼트 ────────────────────────────────── */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 18px; border-radius: var(--r-btn); border: 1px solid var(--line2); background: var(--bg); color: var(--mut); font-weight: 800; font-size: 13px; white-space: nowrap; cursor: pointer;
@@ -236,9 +267,8 @@ small { font-size: 12px; }
 
 /* ── 필터 행 ─────────────────────────────────────────────── */
 .fbar { display: flex; align-items: center; gap: 8px; row-gap: 8px; flex-wrap: wrap; padding: 14px var(--pad); border-bottom: 1px solid var(--line); }
-/* 헤더(60) + 스코프 바 실측 높이(--sbar-h, components/scope-bar.tsx가 ResizeObserver로 넣는다).
-   상수로 박으면 칩 높이·줄바꿈에 따라 1~2px이 벌어져 그 틈으로 뒷배경이 비친다. 1px 겹쳐 이음매를 지운다. */
-.fbar.sticky { position: sticky; top: calc(59px + var(--sbar-h, 59px)); z-index: 9; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px); }
+/* 스코프 바가 없어져 헤더(60) 바로 밑이다. 1px 겹쳐 이음매를 지운다 */
+.fbar.sticky { position: sticky; top: 59px; z-index: 9; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px); }
 .fbar .grow { margin-left: auto; }
 .fbar .selw { flex: none; }
 .fbar .reset { border: 0; background: none; font-family: inherit; cursor: pointer; display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: var(--r-chip); font-weight: 700; font-size: 12px; color: var(--acc); white-space: nowrap; }
@@ -381,9 +411,11 @@ small { font-size: 12px; }
 .rows.v-card .row-dates { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
 .rows.v-card .row-act { position: absolute; top: 10px; right: 10px; }
 .rows.v-card .row-act .arrow { display: none; }
-.save { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 0; border-radius: var(--r-chip); background: var(--sub); color: var(--dim); font-weight: 900; font-size: 15px; line-height: 1; cursor: pointer;
-  transition: transform 280ms var(--sp), color 220ms linear, background 220ms linear; }
-.save:hover { transform: scale(1.08); }
+/* 호버에 크기·페이드를 걸었더니 별이 흐릿해졌다 진해져 어지럽다(사용자 지적 2026-09-09) —
+   전환 없이 배경과 글자색만 한 단계 또렷해진다 */
+.save { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 0; border-radius: var(--r-chip); background: var(--sub); color: var(--dim); font-weight: 900; font-size: 15px; line-height: 1; cursor: pointer; }
+.save:hover { background: var(--line); color: var(--ink); }
+.save.on:hover { background: var(--acc); color: #fff; }
 .save.on { background: var(--acc-soft); color: var(--acc); }
 .save.pop { animation: mo-pop 420ms var(--sp); }
 .arrow { font-weight: 900; font-size: 16px; line-height: 1; color: var(--acc); opacity: 0; transform: translateX(-5px); transition: transform 320ms var(--sp), opacity 200ms linear; }
@@ -417,6 +449,41 @@ small { font-size: 12px; }
 .nf { margin: 24px var(--pad) 32px; padding: 40px 26px; border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--sub); text-align: center; }
 .nf .code { display: block; margin-bottom: 12px; font-weight: 900; font-size: 52px; line-height: 1; letter-spacing: -0.07em; color: var(--acc); }
 
+/* ── 툴팁 ────────────────────────────────────────────────
+   말줄임(…)으로 잘린 글자를 마우스로 확인한다(사용자 요청 2026-09-09). 브라우저 기본 title은
+   느리고 톤이 안 맞아, 지도 말풍선(.zg-bub)과 같은 어두운 캡슐로 통일한다.
+   [data-tip]만 붙이면 되고, 값이 비면 아무것도 뜨지 않는다. 터치 기기에서는 뜨지 않는다(hover 쿼리). */
+[data-tip] { position: relative; }
+@media (hover: hover) and (pointer: fine) {
+  [data-tip]:not([data-tip=""])::after {
+    content: attr(data-tip);
+    position: absolute; z-index: 60; left: 0; bottom: calc(100% + 7px);
+    max-width: min(320px, 78vw); width: max-content;
+    padding: 7px 10px; border-radius: 9px;
+    background: var(--ink); color: #fff;
+    font-weight: 700; font-size: 11.5px; line-height: 1.45; letter-spacing: -0.01em;
+    white-space: normal; overflow-wrap: anywhere; text-align: left;
+    box-shadow: var(--shadow-overlay);
+    opacity: 0; transform: translateY(3px); pointer-events: none;
+    transition: opacity 140ms var(--ease), transform 180ms var(--sp);
+    transition-delay: 0ms;
+  }
+  [data-tip]:not([data-tip=""])::before {
+    content: ""; position: absolute; z-index: 61; left: 12px; bottom: calc(100% + 3px);
+    width: 8px; height: 8px; border-radius: 2px; background: var(--ink); transform: rotate(45deg) translateY(3px);
+    opacity: 0; pointer-events: none; transition: opacity 140ms var(--ease); transition-delay: 0ms;
+  }
+  [data-tip]:hover::after, [data-tip]:focus-visible::after,
+  [data-tip]:hover::before, [data-tip]:focus-visible::before { opacity: 1; transform: none; transition-delay: 260ms; }
+  [data-tip]:hover::before, [data-tip]:focus-visible::before { transform: rotate(45deg); }
+  /* 오른쪽 끝 요소는 말풍선을 오른쪽에 맞춰 화면 밖으로 나가지 않게 */
+  [data-tip].tip-end::after { left: auto; right: 0; }
+  [data-tip].tip-end::before { left: auto; right: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-tip]::after, [data-tip]::before { transition: none; }
+}
+
 /* ── 토스트 ──────────────────────────────────────────────── */
 .toast { position: fixed; z-index: 50; left: 50%; bottom: 26px; transform: translate(-50%, 16px); opacity: 0; transition: transform 360ms var(--sp), opacity 240ms var(--ease); pointer-events: none; }
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
@@ -424,22 +491,25 @@ small { font-size: 12px; }
 .toast i { width: 7px; height: 7px; border-radius: 50%; background: #5ee6a8; }
 
 /* ── 상세 ────────────────────────────────────────────────── */
-.crumb { display: flex; align-items: center; gap: 10px; padding: 13px var(--pad); border-bottom: 1px solid var(--line); font-weight: 600; font-size: 12px; color: var(--dim); min-width: 0; }
-.crumb .back { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 9px; background: var(--sub); color: var(--mut); font-weight: 700; white-space: nowrap; flex: none; transition: transform 240ms var(--sp), background 200ms var(--ease); }
-.crumb .back:hover { transform: translateY(-1.5px); background: var(--line); }
-.crumb span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.detail { display: grid; grid-template-columns: minmax(0, 1fr) 272px; }
+/* 뒤로가기는 태그 줄 맨 앞에 붙는다 — 예전엔 혼자 한 행을 차지해 첫 화면을 밀어냈다(사용자 지적 2026-09-09) */
+.d-back { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 11px; border-radius: 9px;
+  background: var(--sub); color: var(--mut); font-weight: 800; font-size: 11.5px; white-space: nowrap; flex: none;
+  transition: transform 240ms var(--sp), background 200ms var(--ease), color 200ms var(--ease); }
+.d-back:hover { transform: translateX(-2px); background: var(--line); color: var(--ink); }
+.d-tags { align-items: center; }
+.detail { display: grid; grid-template-columns: minmax(0, 1fr) 292px; }
 .detail-main { min-width: 0; }
 .dsec, .section { padding: 24px var(--pad); border-bottom: 1px solid var(--line); }
-.dsec > h2, .section > h2 { margin: 0 0 14px; font-weight: 800; font-size: 10.5px; line-height: 1; letter-spacing: 0.2em; color: var(--dim); }
-/* 상세 본론 — 단지 목록과 지도. 공고 페이지에서 사람이 실제로 쓰는 곳이라 헤더 바로 다음 첫 섹션으로 올리고,
-   라벨 크기 h2 대신 진짜 제목으로 키운다(사용자 요청 2026-09-09). 나머지 섹션(일정·정정·원문)은 기존 라벨 톤 유지. */
+/* 섹션 제목은 전부 같은 톤 — 작은 라벨(10.5px 자간 넓힘)은 제목처럼 안 읽혔다(사용자 요청 2026-09-09:
+   "접수 일정처럼 타이틀 느낌나는 걸 다른 영역에도"). 왼쪽 강조 막대 + 19px 굵은 제목으로 통일한다. */
+.dsec > h2, .section > h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; font-weight: 900; font-size: 19px; line-height: 1.25; letter-spacing: -0.045em; color: var(--ink); }
+.dsec > h2::before, .section > h2::before { content: ""; flex: none; width: 4px; height: 18px; border-radius: 2px; background: var(--acc); }
+/* lead는 이제 제목 톤이 아니라 자리(패딩·지도 높이)만 다르게 한다 */
 .dsec.lead { padding-top: 22px; }
-.dsec.lead > h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 8px; font-weight: 900; font-size: 19px; line-height: 1.25; letter-spacing: -0.045em; color: var(--ink); }
-.dsec.lead > h2::before { content: ""; flex: none; width: 4px; height: 18px; border-radius: 2px; background: var(--acc); }
+.dsec.lead > h2 { margin-bottom: 8px; }
 .dsec.lead > .note { margin-top: 0; font-size: 12px; }
-.dsec.lead .d-map { height: 420px; }
-.d-head { padding: 22px var(--pad) 20px; border-bottom: 1px solid var(--line); }
+.dsec.lead .d-map { height: 520px; }
+.d-head { padding: 18px var(--pad) 20px; border-bottom: 1px solid var(--line); }
 .d-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .d-title { margin: 0 0 14px; font-weight: 900; font-size: 34px; line-height: 1.22; letter-spacing: -0.05em; color: var(--ink); max-width: 24em; }
 /* 공고 상세 헤드라인 밑 한 줄 — 금액 점보를 걷어낸 자리. 본론(단지 목록·지도)을 위로 끌어올리려고 낮게 유지한다 */
@@ -460,6 +530,10 @@ small { font-size: 12px; }
 .step b { display: block; white-space: nowrap; font-weight: 800; font-size: 16px; line-height: 1.2; letter-spacing: -0.035em; color: var(--mut); }
 /* 기간 단계의 끝 날짜 — 「서류 제출 09.28 ~ 09.30」처럼 둘째 줄로 */
 .step em { display: block; margin-top: 4px; font-style: normal; font-weight: 700; font-size: 12.5px; letter-spacing: -0.02em; color: var(--dim); white-space: nowrap; }
+/* 접수 시작·마감은 사람이 달력에 적는 두 날짜다 — 나머지 단계보다 크고 진하게(사용자 지적 2026-09-09) */
+.step.key { border-color: var(--line-strong); }
+.step.key b { font-size: 20px; color: var(--ink); }
+.step.key span { color: var(--mut); }
 .step.on { background: var(--acc-soft); border-color: var(--acc); }
 .step.on span { color: var(--acc); }
 .step.on b { color: var(--ink); }
@@ -469,7 +543,7 @@ small { font-size: 12px; }
 .ptable > div { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; align-items: baseline; border-bottom: 1px solid var(--line); }
 .ptable > div:last-child { border-bottom: 0; }
 .ptable .h { background: var(--sub); }
-.ptable .h span { padding: 11px 15px; font-weight: 800; font-size: 10px; letter-spacing: 0.12em; color: var(--dim); }
+.ptable .h span { padding: 11px 15px; text-align: center; font-weight: 800; font-size: 10px; letter-spacing: 0.12em; color: var(--dim); }
 .ptable span { padding: 14px 15px; min-width: 0; overflow-wrap: anywhere; }
 .ptable .k { display: flex; align-items: baseline; gap: 6px; font-weight: 700; font-size: 13.5px; color: var(--ink); }
 .ptable .k small { font-weight: 600; font-size: 10.5px; color: var(--dim); white-space: nowrap; }
@@ -483,13 +557,14 @@ small { font-size: 12px; }
 .ptable .max { background: var(--acc-soft); }
 .ptable .max .k, .ptable .max .d, .ptable .max .r { color: var(--acc); }
 .ptable .max .k small { color: var(--acc); opacity: 0.75; }
-.d-map { position: relative; height: 360px; border-radius: var(--r-panel); overflow: hidden; border: 1px solid var(--line); background: var(--sub); }
+.d-map { position: relative; height: 460px; border-radius: var(--r-panel); overflow: hidden; border: 1px solid var(--line); background: var(--sub); }
 .d-map .map { height: 100%; border-radius: 0; }
 .d-sub { margin: -14px 0 22px; font-weight: 600; font-size: 13.5px; color: var(--mut); }
 .note { margin: 12px 0 0; font-weight: 500; font-size: 11.5px; line-height: 1.7; color: var(--dim); }
 /* 섹션 안 소제목 — 「단지 제원」 밑 공급현황 표처럼 같은 이야기의 두 번째 문단 */
 .dsub { margin-top: 20px; }
-.dsub > h3 { margin: 0 0 10px; font-weight: 800; font-size: 10.5px; line-height: 1; letter-spacing: 0.2em; color: var(--dim); }
+.dsub > h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-weight: 800; font-size: 14.5px; line-height: 1.3; letter-spacing: -0.03em; color: var(--ink); }
+.dsub > h3::before { content: ""; flex: none; width: 3px; height: 13px; border-radius: 2px; background: var(--line-strong); }
 .aside { border-left: 1px solid var(--line); }
 .aside-in { position: sticky; top: 60px; padding: 22px var(--pad); display: flex; flex-direction: column; gap: 14px; }
 .dcard { padding: 18px; border-radius: var(--r-panel); }
@@ -518,6 +593,8 @@ small { font-size: 12px; }
 .link-list a { display: inline-flex; align-items: center; height: 36px; padding: 0 13px; border-radius: var(--r-chip); background: var(--acc-soft); color: var(--acc); font-size: 12.5px; font-weight: 800; transition: transform 240ms var(--sp); }
 .link-list a:hover { transform: translateY(-1.5px); }
 .notice-bar { display: flex; gap: 10px; align-items: flex-start; margin: 24px var(--pad) 32px; padding: 12px 14px; border-radius: var(--r-card); background: var(--sub); border: 1px solid var(--line); color: var(--mut); font-size: 12.5px; font-weight: 600; line-height: 1.6; }
+/* 페이지 맨 밑 고지 — 푸터와 붙여 둔다(사용자 지적 2026-09-09: 너무 떨어져 있다) */
+.notice-bar.foot { margin: 22px var(--pad) 0; }
 .notice-bar .i { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 11px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; margin-top: 1px; }
 .map { width: 100%; height: 300px; border-radius: var(--r-panel); background: var(--sub); overflow: hidden; }
 .map-fallback { color: var(--dim); font-size: 13px; font-weight: 600; padding: 14px; text-align: center; }
@@ -526,17 +603,58 @@ small { font-size: 12px; }
 .tbl { border: 1px solid var(--line); border-radius: var(--r-card); overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
 .tbl tr:last-child td { border-bottom: 0; }
 /* 열이 많은 표(공급현황 등)만 최소 폭을 줘 칸이 짜부라지지 않게 한다 */
-.tbl.wide table { min-width: 760px; }
+.tbl.wide table { min-width: 720px; }
+.tbl thead th { background: var(--sub); text-align: center; font-weight: 800; font-size: 10.5px; letter-spacing: 0.08em; color: var(--dim); white-space: nowrap; padding-top: 9px; padding-bottom: 9px; }
+.tbl .num { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl tbody tr:hover { background: var(--sub); }
+
+/* 공급현황 — 칸마다 줄바꿈이 나던 표(사용자 지적 2026-09-09). 모든 칸을 한 줄로 고정하고,
+   접은 값(우선/일반, 공용/계약 면적)만 둘째 줄에 작게 붙인다 */
+.supply td, .supply th { white-space: nowrap; vertical-align: middle; }
+.supply .tc-key { font-weight: 700; color: var(--ink); }
+.supply .strong { font-weight: 800; color: var(--ink); }
+.supply .stack { line-height: 1.35; }
+.supply .stack b { display: block; font-weight: 700; color: var(--ink); }
+.supply .stack small { display: block; margin-top: 2px; font-weight: 600; font-size: 10.5px; color: var(--dim); }
+
+/* 보증금과 임대료 — 공급대상 × 공급유형마다 전세전환 / 기본 / 월세전환 세 줄(components/convert-table.tsx) */
+.ctable { display: grid; gap: 12px; }
+.ct-g { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
+.ct-h { display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 11px 15px; background: var(--sub); border-bottom: 1px solid var(--line); }
+.ct-h b { font-weight: 800; font-size: 13.5px; letter-spacing: -0.02em; color: var(--ink); }
+.ct-h span { font-weight: 700; font-size: 11.5px; color: var(--mut); }
+.ct-h em { margin-left: auto; font-style: normal; font-weight: 800; font-size: 11.5px; color: var(--dim); }
+.ct-r { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; align-items: baseline; border-bottom: 1px solid var(--line); }
+.ct-r:last-child { border-bottom: 0; }
+.ct-r > span { padding: 12px 15px; min-width: 0; }
+.ct-head > span { padding-top: 9px; padding-bottom: 9px; font-weight: 800; font-size: 10px; letter-spacing: 0.12em; color: var(--dim); }
+.ct-head > span { text-align: center; }
+.ct-r .k { display: flex; align-items: baseline; gap: 6px; font-weight: 700; font-size: 13px; color: var(--mut); }
+.ct-r .k small { font-weight: 600; font-size: 10.5px; color: var(--dim); white-space: nowrap; }
+.ct-r .d, .ct-r .r { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ct-r .d { font-weight: 800; font-size: 14px; color: var(--ink); }
+.ct-r .r { font-weight: 700; font-size: 13.5px; color: var(--mut); }
+/* 기본(공고 기준값)이 읽는 사람의 기준선이다 — 전환 두 줄보다 진하게 */
+.ct-r.k-base { background: var(--acc-soft); }
+.ct-r.k-base .k, .ct-r.k-base .d, .ct-r.k-base .r { color: var(--acc); font-weight: 800; }
 
 /* ── 공급 단지 탐색기(components/complex-explorer.tsx) — 좌 목록 / 우 지도 ── */
 /* 왼쪽 목록과 오른쪽 지도는 같은 높이다(--cx-h) — 지도만 짧으면 목록 옆에 빈 띠가 남는다(사용자 지적 2026-09-09) */
-.cx { --cx-h: min(660px, calc(100vh - 150px)); display: grid; grid-template-columns: minmax(300px, 360px) 1fr; gap: 14px; align-items: start; }
+/* 지도가 본론이다 — 목록 칸을 좁히고 높이를 뷰포트에 가깝게(사용자 요청 2026-09-09) */
+.cx { --cx-h: min(780px, calc(100vh - 132px)); display: grid; grid-template-columns: minmax(272px, 320px) 1fr; gap: 14px; align-items: start; }
 .cx-panel { position: relative; z-index: 1; display: flex; flex-direction: column; height: var(--cx-h); border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--bg); }
-.cx-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); }
+/* 공급대상·면적·신규 필터가 공고에 따라 붙었다 빠진다 — 고정 2열 그리드 대신 줄바꿈으로 흐른다 */
+.cx-tools { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); }
+.cx-tools > * { flex: 1 1 132px; min-width: 0; }
 .cx-tools .selw, .cx-tools .sel { width: 100%; }
-.cx-tools .fld { grid-column: 1 / -1; }
+.cx-tools .chip-f { justify-content: center; height: 38px; }
+.cx-tools .fld { flex-basis: 100%; }
 .cx-count { margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--dim); border-bottom: 1px solid var(--line); }
+.cx-count { display: flex; align-items: center; gap: 8px; }
 .cx-count b { color: var(--ink); }
+.cx-count em { font-style: normal; color: var(--ink); font-weight: 800; }
+.cx-clear { margin-left: auto; border: 0; background: none; font-family: inherit; cursor: pointer; padding: 2px 6px; border-radius: 7px; font-weight: 700; font-size: 11.5px; color: var(--acc); white-space: nowrap; }
+.cx-clear:hover { background: var(--acc-soft); }
 .cx-list { position: relative; list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; border-radius: 0 0 var(--r-panel) var(--r-panel); overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
 .cx-list li { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
 .cx-list li:last-child { border-bottom: 0; }
@@ -545,8 +663,12 @@ small { font-size: 12px; }
 .cx-list li.is-focus button { background: var(--sub); transform: translateX(3px); }
 .cx-list li.on button { background: var(--acc-soft); border-left-color: var(--acc); }
 .cx-row-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
-.cx-name { font-weight: 800; font-size: 13.5px; letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.cx-addr { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+/* 이름·주소는 한 줄로 자른다 — 세 줄로 접히면 62개 목록이 한 화면에 열 개도 안 들어온다(2026-09-09).
+   잘린 글자는 [data-tip] 툴팁으로 확인한다(components/trunc.tsx) */
+.cx-name { font-weight: 800; font-size: 13.5px; letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cx-name > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-name .chip { flex: none; }
+.cx-addr { font-size: 11.5px; font-weight: 600; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cx-row-side { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .cx-units { font-size: 12px; font-weight: 800; }
 .cx-money { font-size: 11px; font-weight: 600; color: var(--dim); white-space: nowrap; }
@@ -650,8 +772,13 @@ small { font-size: 12px; }
   .cx { grid-template-columns: 1fr; }
   .cx-map-wrap { position: static; order: -1; height: 400px; }
   .cx-panel { height: 480px; }
-  /* 스코프 바가 줄바꿈되면 높이가 가변이라 sticky top(120px) 계산이 깨진다 — 좁아지면 둘 다 흐름에 둔다 */
   .fbar.sticky { position: static; background: none; backdrop-filter: none; }
+  /* 좁아지면 레일을 목록 위 가로 줄로 눕힌다 — 세로 레일이 목록 폭을 다 먹는다 */
+  .list-stage { grid-template-columns: 1fr; }
+  .rail { border-right: 0; border-bottom: 1px solid var(--line); }
+  .rail-in { position: static; flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; padding: 12px var(--pad); }
+  .rail-g { flex: 0 1 auto; }
+  .rail .selw, .rail .sel { width: auto; }
   .dsec.lead > h2 { font-size: 17px; }
   .dsec.lead .d-map { height: 300px; }
   .cx-card { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; }
@@ -665,6 +792,8 @@ small { font-size: 12px; }
    모바일에선 가로 스크롤 대신 줄바꿈으로. 두 바가 겹쳐 쌓이는 sticky(top:120px)도 높이가 가변이라 깨지므로 해제. */
 @media (max-width: 640px) {
   .fbar .grow { margin-left: 0; }
-  .sbar { position: static; }
   .fbar.sticky { position: static; background: none; backdrop-filter: none; }
+  /* 레일을 눕혀도 좁은 화면에선 목록보다 필터가 길어진다 — 버튼 한 줄로 접고 바텀시트로 연다 */
+  .rail { display: none; }
+  .fsheet-bar { display: flex; align-items: center; gap: 10px; padding: 10px var(--pad); border-bottom: 1px solid var(--line); }
 }
