@@ -84,3 +84,45 @@ def test_misaligned_rows_are_dropped(relines):
         n = int("".join(ch for ch in l.area_type if ch.isdigit()) or 0)
         assert l.area_exclusive is not None and abs(l.area_exclusive - n) <= 1.5
         assert 5_000_000 <= (l.deposit or 0) <= 5_000_000_000
+
+
+# ── 공사 건설형 재공급 지구 묶음 (2026-09-10) ───────────────────────
+# 15~16쪽은 단지명이 「OO지구」 아래 번호 범위("9~12단지")·쉼표 목록("2,3,5,6,7단지")으로 묶여 있다.
+# 실제 단지명은 「단지별 주소」 표(LOC)에 낱개로 있으니 대조해서 펴야 한다 — 전에는 통째로 버려졌다.
+
+DISTRICT_BLOCK = [(n, (FIX / f"p{n}.xml").read_text(encoding="utf-8")) for n in (15, 16)]
+
+
+@pytest.fixture(scope="module")
+def district_lines():
+    names = [r.name for r in parse_location_table(LOC)]
+    return parse_jeonse_supply(DISTRICT_BLOCK, names)
+
+
+def test_district_range_is_expanded(district_lines):
+    """「상암월드컵파크9~12단지」 범위 표기가 4개 단지 모두에 같은 전세금으로 펴진다."""
+    by_name = {l.complex_name: l for l in district_lines if l.area_type == "84" and l.kind == "일반"}
+    members = [f"상암월드컵파크 {n}단지" for n in (9, 10, 11, 12)]
+    for name in members:
+        assert name in by_name, name
+        assert by_name[name].deposit == 500_760_000
+        assert by_name[name].heating == "지역난방"
+        # 호수는 지구 합계라 단지별로 못 나눈다 — 억지로 안 나누고 비워 둔다
+        assert by_name[name].units_total is None
+
+
+def test_district_comma_list_is_expanded(district_lines):
+    """「서초포레스타23567단지」처럼 쉼표를 잃고 붙어 온 목록도 낱개 단지로 펴진다.
+
+    이름과 번호가 서로 다른 줄로 갈리는 경우("서초포레스타" 다음 줄에 "23567단지")까지 포함한다.
+    """
+    names = {l.complex_name for l in district_lines}
+    for n in (2, 3, 5, 6, 7):
+        assert f"서초포레스타 {n}단지" in names
+
+
+def test_district_single_complex_kept(district_lines):
+    """번호 묶음이 아닌 단독 단지(세곡지구)는 지구 합계가 아니라 자기 호수를 그대로 갖는다."""
+    l = next(l for l in district_lines if l.complex_name == "강남데시앙파크")
+    assert l.units_total == 11
+    assert l.deposit == 616_980_000

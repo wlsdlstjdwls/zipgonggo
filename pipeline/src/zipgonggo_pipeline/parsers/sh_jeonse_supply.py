@@ -42,6 +42,94 @@ MOVEIN_DIGITS = re.compile(r"\d{3,4}")
 THOUSAND = 1000
 NAME_SLACK = 15.0   # 전용면적 칸 왼쪽 여유. 단지명이 이만큼 앞까지 밀고 들어온다
 
+# 공사 건설형 재공급(15~17쪽) 지구 묶음 — 단지명 칸이 「OO지구」 표제 아래 여러 단지를 묶어서 낸다.
+# 「상암월드컵파크9~12단지」(번호 범위) · 「서초포레스타23567단지」(쉼표가 다른 줄로 떨어져 붙은 목록 "2,3,5,6,7")
+# 둘 다 실제 단지명은 「단지별 주소」 표(names_hint)에 낱개로 있다 — 대조해서 맞는 것만 편다.
+DISTRICT_HEADER_RE = re.compile(r"지구$")
+GROUP_SUFFIX_RE = re.compile(r"^(?P<base>.+?)(?P<nums>\d+(?:~\d+)?)단지$")
+
+
+def _find_hint(norm_text: str, hint_by_norm: dict[str, str]) -> str | None:
+    """정규화한 이름 → 힌트 단지명 하나. 정확히 같으면 그것, 아니면 힌트가 그 이름으로 "시작"하는 게
+    유일할 때만 인정한다("강남한양수자인" → 힌트의 "강남한양수자인(세곡2-4)"처럼 지구 코드가 괄호로 덧붙기도 한다).
+    후보가 여럿이면(모호하면) 억지로 하나를 고르지 않는다."""
+    if not norm_text or len(norm_text) < 4:
+        return None
+    if norm_text in hint_by_norm:
+        return hint_by_norm[norm_text]
+    hits = {full for norm, full in hint_by_norm.items() if norm.startswith(norm_text)}
+    return next(iter(hits)) if len(hits) == 1 else None
+
+
+def _expand_group_name(text: str, hint_by_norm: dict[str, str]) -> list[str] | None:
+    """지구 묶음의 단지명 조각 → 실제 단지명 목록. 힌트와 대조해 전부 확인될 때만 편다.
+
+    하나라도 힌트에 없으면 억지로 만들지 않고 None(호출부가 기존 방식으로 처리하게 넘긴다).
+    """
+    t = re.sub(r"^[-\s]+", "", text).strip()
+    if not t:
+        return None
+    norm_t = _norm(t)
+    single = _find_hint(norm_t, hint_by_norm)
+    if single:
+        return [single]
+    m = GROUP_SUFFIX_RE.match(norm_t)
+    if not m:
+        return None
+    base, nums = m.group("base"), m.group("nums")
+    if "~" in nums:
+        lo, hi = nums.split("~")
+        if not (lo.isdigit() and hi.isdigit()) or int(lo) > int(hi):
+            return None
+        wanted = [str(n) for n in range(int(lo), int(hi) + 1)]
+    else:
+        wanted = list(nums)   # 쉼표 목록 "2,3,5,6,7"이 쉼표를 잃고 "23567"로 붙어 온다 — 한 자리씩 나눈다
+    out: list[str] = []
+    for w in wanted:
+        hit = _find_hint(f"{base}{w}단지", hint_by_norm)
+        if hit is None:
+            return None
+        out.append(hit)
+    return out
+
+
+BARE_NUMS_RE = re.compile(r"^\d+(?:~\d+)?단지$")
+
+
+def _merge_bare_continuations(raw: list[tuple[float, str]]) -> list[tuple[float, str]]:
+    """단지명이 두 줄로 쪼개져 올 때("서초포레스타" 다음 줄에 "23567단지") 하나로 잇는다.
+
+    다음 조각이 숫자(+범위)+단지 뿐이고, 앞 조각은 그 자체로 그런 모양이 아닐 때만 합친다 —
+    "위례포레샤인18단지"처럼 원래 한 줄로 온 이름은 애초에 나뉘어 있지 않아 여기 걸리지 않는다.
+    """
+    out: list[tuple[float, str]] = []
+    i = 0
+    while i < len(raw):
+        y, n = raw[i]
+        if i + 1 < len(raw):
+            _, nxt = raw[i + 1]
+            bare_next = re.sub(r"[,\s]", "", nxt)
+            bare_cur = re.sub(r"[,\s]", "", n)
+            if BARE_NUMS_RE.match(bare_next) and not BARE_NUMS_RE.match(bare_cur):
+                out.append((y, f"{n}{nxt}"))
+                i += 2
+                continue
+        out.append((y, n))
+        i += 1
+    return out
+
+
+def _resolve_name_frag(n: str, hint_by_norm: dict[str, str]) -> list[str] | None:
+    """이름 칸 조각 하나를 실제 단지명 0개 이상으로. None이면 "평범한 조각"이라 기존 방식(_name_blocks의
+    이어붙이기·힌트 대조)에 맡긴다는 뜻 — 매칭 시도 자체를 안 바꾼다."""
+    expanded = _expand_group_name(n, hint_by_norm)
+    if expanded is not None:
+        return expanded
+    stripped = re.sub(r"^[-\s]+", "", n).strip()
+    if DISTRICT_HEADER_RE.search(_norm(stripped)) and _norm(stripped) not in hint_by_norm:
+        return []   # 「세곡지구」류 지구 표제 — 단지명이 아니니 버린다(안 버리면 다음 단지들이 몽땅 이 이름 소유가 된다)
+    return None
+
 
 @dataclass(frozen=True)
 class JeonseLine:
@@ -202,22 +290,39 @@ def parse_jeonse_page(xml: str, page: int, names_hint: list[str], start: int = 0
         if any(c.values()):
             data.append((r[0].t, c))
 
+    # 유형(일반/주거약자) 열이 있는 재공급 표(공사 건설형, 15~17쪽)는 전용면적 칸이 그 유형 줄들에
+    # 세로로 걸쳐 있다 — "84" 한 번만 찍히고 실제 금액 줄(일반·주거약자)에는 전용면적이 비어 온다.
+    # 대신 그 자리에 "유형" 칸 글자("일반")가 새어 들어와 area_type이 kind와 같은 값으로 오염된다.
+    # 그래서 전용면적은 그 줄에서 못 읽으면 세로로 가장 가까운 순수 숫자 줄(area_anchors)에서 빌린다.
+    has_kind = "kind" in a
+    hint_by_norm = {_norm(x): x for x in names_hint}
+
+    raw_names = _merge_bare_continuations([
+        (y, c.get("name", "")) for y, c in data if c.get("name") and not LOC_RE.match(c["name"])
+    ])
     name_frags: list[tuple[float, str]] = []
+    for y, n in raw_names:
+        resolved = _resolve_name_frag(n, hint_by_norm)
+        if resolved is None:
+            name_frags.append((y, n))
+        else:
+            name_frags.extend((y, name) for name in resolved)
+
     heat_anchors: list[tuple[float, str]] = []
     move_anchors: list[tuple[float, str]] = []
+    area_anchors: list[tuple[float, str]] = []
     body: list[tuple[float, dict[str, str]]] = []
     for y, c in data:
-        # 단지명 칸은 「이름 / (자치구 동)」 두 줄. 위치 줄은 이름이 아니다
-        n = c.get("name", "")
-        if n and not LOC_RE.match(n):
-            name_frags.append((y, n))
         h = _heating(c.get("heating", ""))
         if h:
             heat_anchors.append((y, h))
         m = _movein(c.get("movein", ""))
         if m:
             move_anchors.append((y, m))
-        if _int(c.get("deposit", "")) is not None and TYPE_RE.match(c.get("area_type", "")):
+        at = c.get("area_type", "")
+        if TYPE_RE.match(at):
+            area_anchors.append((y, at))
+        if _int(c.get("deposit", "")) is not None and (TYPE_RE.match(at) or has_kind):
             body.append((y, c))
 
     blocks, nxt = _name_blocks(name_frags, names_hint, start)
@@ -227,27 +332,40 @@ def parse_jeonse_page(xml: str, page: int, names_hint: list[str], start: int = 0
     out: list[JeonseLine] = []
     cur = 0
     for y, c in body:
+        at = c.get("area_type", "")
+        if not TYPE_RE.match(at):
+            at = _nearest(area_anchors, y) or ""  # type: ignore[assignment]
+        if not TYPE_RE.match(at):
+            continue
         best = min(range(len(blocks)), key=lambda i: abs(blocks[i][0] - y))
         cur = max(cur, best)
-        out.append(JeonseLine(
-            complex_name=blocks[cur][1],
-            area_type=c["area_type"],
-            kind=(c.get("kind") or None),
-            is_new=is_new,
-            units_total=_int(c.get("total", "")),
-            units_general=_int(c.get("general", "")),
-            units_priority=_int(c.get("priority", "")),
-            deposit=_mul(_int(c.get("deposit", "")), THOUSAND),
-            down_payment=_mul(_int(c.get("down", "")), THOUSAND),
-            balance=_mul(_int(c.get("balance", "")), THOUSAND),
-            area_exclusive=_area(c.get("a_ex", "")),
-            area_common=_area(c.get("a_com", "")),
-            area_etc=_area(c.get("a_etc", "")),
-            area_total=_area(c.get("a_tot", "")),
-            heating=_heating(c.get("heating", "")) or _nearest(heat_anchors, y),  # type: ignore[arg-type]
-            move_in_from=(_nearest(move_anchors, y) if is_new else None),  # type: ignore[arg-type]
-            page=page,
-        ))
+        # 지구 묶음은 확장된 단지명 여럿이 같은 y를 공유한다(위 _resolve_name_frag) — 그 전부가 이 줄의 주인이다.
+        # 묶이지 않은 보통 단지는 y가 유일해 owners가 한 개뿐이라 기존과 동일하게 동작한다
+        group_y = blocks[cur][0]
+        owners = [name for by, name in blocks if by == group_y]
+        # 지구 묶음(owners 2개 이상)은 호수가 지구 합계라 단지별로 못 나눈다 — 억지로 나누느니 비워 둔다.
+        # 전세금액・계약면적・난방방식만 구성 단지 전부에 그대로 적용한다(handoff.md 22차 세션 결론)
+        grouped = len(owners) > 1
+        for owner in owners:
+            out.append(JeonseLine(
+                complex_name=owner,
+                area_type=at,
+                kind=(c.get("kind") or None),
+                is_new=is_new,
+                units_total=None if grouped else _int(c.get("total", "")),
+                units_general=None if grouped else _int(c.get("general", "")),
+                units_priority=None if grouped else _int(c.get("priority", "")),
+                deposit=_mul(_int(c.get("deposit", "")), THOUSAND),
+                down_payment=_mul(_int(c.get("down", "")), THOUSAND),
+                balance=_mul(_int(c.get("balance", "")), THOUSAND),
+                area_exclusive=_area(c.get("a_ex", "")),
+                area_common=_area(c.get("a_com", "")),
+                area_etc=_area(c.get("a_etc", "")),
+                area_total=_area(c.get("a_tot", "")),
+                heating=_heating(c.get("heating", "")) or _nearest(heat_anchors, y),  # type: ignore[arg-type]
+                move_in_from=(_nearest(move_anchors, y) if is_new else None),  # type: ignore[arg-type]
+                page=page,
+            ))
     return out, nxt
 
 
