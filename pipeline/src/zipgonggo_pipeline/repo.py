@@ -115,16 +115,20 @@ def insert_ingest_log(cur, *, stage: str, source: str, ok: bool, item_count: int
     )
 
 
-# S3가 첨부 공고문에서 읽은 공고 단위 사실. 이미 값이 있으면(마이홈 API 등 1차 출처) 덮지 않는다.
-# 일정은 셋 다 왔을 때만 schedule_source를 attachment로 표시한다.
-UPDATE_FACTS_SQL = """
+# S3가 첨부 공고문에서 읽은 공고 단위 사실.
+# 첨부에서 읽은 금액·호수는 목록에 없던 값이거나, 있어도 더 촘촘하다(공급현황 표 전체를 본다).
+# 그래서 이 다섯 칸은 새 값이 있으면 덮어쓴다 — 예전 파서가 넣어 둔 틀린 값이 COALESCE에 걸려 남는 걸 막는다.
+# 일정은 그대로 COALESCE — API가 준 접수일이 첨부 흐름도보다 믿을 만하다.
+UPDATE_ATTACH_FACTS_SQL = """
 UPDATE notice SET
   apply_start_at  = COALESCE(apply_start_at, %(apply_start_at)s),
   apply_end_at    = COALESCE(apply_end_at, %(apply_end_at)s),
   announce_at     = COALESCE(announce_at, %(announce_at)s),
-  min_deposit     = COALESCE(min_deposit, %(min_deposit)s),
-  max_deposit     = COALESCE(max_deposit, %(max_deposit)s),
-  supply_count    = COALESCE(supply_count, %(supply_count)s),
+  min_deposit     = COALESCE(%(min_deposit)s, min_deposit),
+  max_deposit     = COALESCE(%(max_deposit)s, max_deposit),
+  min_rent        = COALESCE(%(min_rent)s, min_rent),
+  max_rent        = COALESCE(%(max_rent)s, max_rent),
+  supply_count    = COALESCE(%(supply_count)s, supply_count),
   schedule_source = CASE
     WHEN schedule_source IS NOT NULL THEN schedule_source
     WHEN apply_start_at IS NOT NULL OR apply_end_at IS NOT NULL THEN 'api'
@@ -134,12 +138,16 @@ UPDATE notice SET
 WHERE id = %(id)s
 """
 
+FACT_KEYS = ("apply_start_at", "apply_end_at", "announce_at",
+             "min_deposit", "max_deposit", "min_rent", "max_rent", "supply_count")
 
-def update_notice_facts(cur, notice_id: int, **facts: Any) -> None:
-    """첨부 공고문에서 읽은 값으로 빈 칸만 채운다. 값이 전부 None이면 아무것도 안 한다."""
+
+def update_notice_attach_facts(cur, notice_id: int, **facts: Any) -> None:
+    """첨부 공고문 전용 — 금액·호수는 새로 읽은 값이 이긴다. 안 넘긴 칸은 None으로 채워 SQL 자리를 맞춘다."""
     if not any(v is not None for v in facts.values()):
         return
-    cur.execute(UPDATE_FACTS_SQL, {"id": notice_id, **facts})
+    params: dict[str, Any] = {k: facts.get(k) for k in FACT_KEYS}
+    cur.execute(UPDATE_ATTACH_FACTS_SQL, {"id": notice_id, **params})
 
 
 def link_related_post(cur, *, agency: str, base_title: str, seq: str, title: str) -> int | None:

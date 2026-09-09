@@ -40,6 +40,8 @@ class AttachmentFacts:
     supply: SupplySummary | None = None
     supply_lines: list[SupplyLine] = field(default_factory=list)
     jeonse_lines: list[JeonseLine] = field(default_factory=list)
+    #: 공고 단위 금액·호수. 「공급현황」 줄이 있으면 그걸로 채운다 — 요약(parse_supply)보다 정확하다
+    totals: dict[str, int | None] = field(default_factory=dict)
 
 
 def _norm_name(s: str) -> str:
@@ -125,6 +127,30 @@ def merge_jeonse_lines_into_complexes(rows: list[dict[str, Any]], lines: list[Je
     return hit
 
 
+def totals_from_supply_lines(lines: list[SupplyLine]) -> dict[str, int | None]:
+    """「공급현황」 줄 → 공고 단위 금액 범위와 총 호수.
+
+    호수는 (단지, 공급유형, 공급대상)마다 한 칸이다 — 청년 소득있음/없음 두 줄이 같은 칸을 나눠 쓰므로
+    그대로 더하면 두 배가 된다. 2026년 2차 행복주택(309337)에서 이렇게 세면 공고문 머리의 「총 1,484호」와 맞는다.
+    """
+    if not lines:
+        return {}
+    counted: dict[tuple[str, str, str], int] = {}
+    for l in lines:
+        if l.units_total is not None:
+            counted[(l.complex_name, l.supply_type, l.tenant_class)] = l.units_total
+    deposits = [l.deposit for l in lines if l.deposit]
+    rents = [l.rent for l in lines if l.rent]
+    total = sum(counted.values())
+    return {
+        "min_deposit": min(deposits) if deposits else None,
+        "max_deposit": max(deposits) if deposits else None,
+        "min_rent": min(rents) if rents else None,
+        "max_rent": max(rents) if rents else None,
+        "supply_count": total or None,
+    }
+
+
 def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = None) -> AttachmentFacts:
     rows = parse_location_table(pages)
     facts: AttachmentFacts
@@ -160,6 +186,12 @@ def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = Non
             # 「공급현황」 줄이 있으면 그쪽이 더 정확하다(단지별 호수·계층별 금액). 없을 때만 공고 단위 요약을 쓴다
             if not merge_supply_lines_into_complexes(facts.complexes, facts.supply_lines):
                 merge_supply_into_complexes(facts.complexes, facts.supply)
+            # 공고 단위 금액·호수도 줄에서 낸다. parse_supply는 장기전세 표를 겨냥한 파서라
+            # 행복주택 양식에서는 신규공급 표 일부만 읽어 96호처럼 크게 어긋난 값이 나왔다(2026-09-09)
+            facts.totals = totals_from_supply_lines(facts.supply_lines)
+            if not facts.totals and facts.supply:
+                facts.totals = {"min_deposit": facts.supply.min_deposit, "max_deposit": facts.supply.max_deposit,
+                                "supply_count": facts.supply.unit_total or None}
             return facts
         units = parse_unit_pages(pages)
         if units:
@@ -181,6 +213,9 @@ def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = Non
         facts.supply = parse_supply(pages)
     except Exception as exc:  # noqa: BLE001
         log.warning("supply parse failed: %s", exc)
+    if facts.supply and not facts.totals:
+        facts.totals = {"min_deposit": facts.supply.min_deposit, "max_deposit": facts.supply.max_deposit,
+                        "supply_count": facts.supply.unit_total or None}
     if facts.kind in ("location_table", "addr_table"):
         # 신규공급 단지는 면적별 줄이 더 정확하다. 나머지는 공고 단위 요약으로 채운다
         merged = merge_jeonse_lines_into_complexes(facts.complexes, facts.jeonse_lines)

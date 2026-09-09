@@ -21,7 +21,7 @@ from pathlib import Path
 from ..config import PIPELINE_ROOT, settings
 from ..db import connect
 from ..parsers.sh_attach import parse_attachment
-from ..repo import replace_notice_complexes, replace_notice_supply, update_notice_facts
+from ..repo import replace_notice_complexes, replace_notice_supply, update_notice_attach_facts
 from ..sources.ish import IshClient, find_attachments
 from .common import Stats, finish_ingest, stage_main, utc_now
 
@@ -168,14 +168,12 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                         stats.inserted += len(rows)
                     # 공급현황 줄은 단지 행 다음에 넣는다 — complex_id를 같은 공고의 단지에서 이름으로 찾는다
                     replace_notice_supply(cur, n["id"], supply_rows)
-                    update_notice_facts(
+                    update_notice_attach_facts(
                         cur, n["id"],
                         apply_start_at=sch.apply_start if sch else None,
                         apply_end_at=sch.apply_end if sch else None,
                         announce_at=sch.announce if sch else None,
-                        min_deposit=sup.min_deposit if sup else None,
-                        max_deposit=sup.max_deposit if sup else None,
-                        supply_count=sup.unit_total if sup and sup.unit_total else None,
+                        **facts.totals,
                     )
                     cur.execute("RELEASE SAVEPOINT nc")
                     stats.updated += 1
