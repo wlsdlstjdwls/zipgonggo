@@ -39,9 +39,10 @@ export function CalcProvider({ children }: { children: React.ReactNode }) {
 export function CalcButton() {
   const { open, toggle, buttonRef } = useCalc();
   return (
-    <button ref={buttonRef} type="button" className={`nav-btn${open ? " on" : ""}`} onClick={toggle} aria-expanded={open} aria-haspopup="dialog">
+    // 라벨은 span — 상세 머리바가 좁아지면 CSS로 감추고 아이콘만 남긴다. 이름은 aria-label이 지킨다
+    <button ref={buttonRef} type="button" className={`nav-btn${open ? " on" : ""}`} onClick={toggle} aria-expanded={open} aria-haspopup="dialog" aria-label="계산기">
       <IconCalc />
-      계산기
+      <span>계산기</span>
     </button>
   );
 }

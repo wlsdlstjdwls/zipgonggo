@@ -42,25 +42,25 @@ writeFileSync(WEB + "/public/icons/icon-512-maskable.png", await png(maskable(64
 // 노션 북마크·티스토리/네이버 링크 카드는 1.91:1 원본을 정사각에 가깝게 object-fit:cover로 자른다 —
 // 가로 가운데 630px만 남는다고 봐야 한다. 그래서 읽혀야 할 것(마크·제목·도메인)은 전부 폭 560 카드 안에 넣고,
 // 좌우 여백은 잘려도 아무것도 잃지 않는 바탕으로만 쓴다.
-const CARD_W = 560;   // 정사각 크롭(630) 안에 여백까지 남는 폭
+//
+// 설명 문단은 뺐다(2026-09-09: "글씨가 흐리게 보인다"). 북마크 카드는 이 그림을 150px 안팎으로 줄여 그린다 —
+// 작은 글씨는 그 크기에서 무조건 뭉갠다. 설명은 어차피 og:description이 카드 옆에 글자로 나오므로
+// 그림에는 마크·이름·한 줄 문구·도메인만 크게 남긴다.
+const CARD_W = 616;   // 정사각 크롭(630)을 거의 채운다 — 카드가 작을수록 썸네일에서 글씨가 뭉갠다
 const font = (w) => readFileSync(`${S}/Pretendard-${w}.otf`);
 const markUri = "data:image/png;base64," + (await png(tile(64), 320)).toString("base64");
 const h = (type, props, ...children) => ({ type, props: { ...props, style: type === "div" ? { display: "flex", ...(props.style || {}) } : props.style, children: children.length === 1 ? children[0] : children } });
 const el = h("div", { style: { width: 1200, height: 630, display: "flex", alignItems: "center", justifyContent: "center", background: SUB, fontFamily: "Pretendard", position: "relative" } },
-  h("div", { style: { width: CARD_W, display: "flex", flexDirection: "column", alignItems: "center", gap: 26, padding: "40px 36px 34px", background: "#fff", borderRadius: 28, border: `1px solid ${LINE}`, boxShadow: "0 30px 70px -44px rgba(0,0,0,.55)" } },
-    h("div", { style: { display: "flex", alignItems: "center", gap: 16 } },
-      h("img", { src: markUri, width: 76, height: 76 }),
-      h("div", { style: { fontSize: 44, fontWeight: 900, color: INK, letterSpacing: "-0.05em" } }, "집공고"),
+  h("div", { style: { width: CARD_W, display: "flex", flexDirection: "column", alignItems: "center", gap: 30, padding: "46px 34px 40px", background: "#fff", borderRadius: 32, border: `1px solid ${LINE}`, boxShadow: "0 30px 70px -44px rgba(0,0,0,.55)" } },
+    h("div", { style: { display: "flex", alignItems: "center", gap: 18 } },
+      h("img", { src: markUri, width: 96, height: 96 }),
+      h("div", { style: { fontSize: 54, fontWeight: 900, color: INK, letterSpacing: "-0.05em" } }, "집공고"),
     ),
-    h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", fontSize: 52, fontWeight: 900, color: INK, letterSpacing: "-0.055em", lineHeight: 1.18 } },
+    h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", fontSize: 62, fontWeight: 900, color: INK, letterSpacing: "-0.055em", lineHeight: 1.16 } },
       h("div", {}, "공공임대 모집공고,"),
       h("div", { style: { display: "flex" } }, h("span", { style: { color: ACC } }, "호실 단위"), h("span", {}, "로 지도에.")),
     ),
-    h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", fontSize: 22, fontWeight: 600, color: MUT, lineHeight: 1.55, letterSpacing: "-0.015em" } },
-      h("div", {}, "LH, SH, 지방공사 입주자모집공고를"),
-      h("div", {}, "지역과 단지, 마감일로 다시 정리합니다."),
-    ),
-    h("div", { style: { fontSize: 20, fontWeight: 700, color: DIM, letterSpacing: "0.02em" } }, "zipgonggo.com"),
+    h("div", { style: { fontSize: 24, fontWeight: 700, color: DIM, letterSpacing: "0.02em" } }, "zipgonggo.com"),
   ),
   h("div", { style: { position: "absolute", left: 0, right: 0, bottom: 0, height: 10, background: ACC } }),
 );

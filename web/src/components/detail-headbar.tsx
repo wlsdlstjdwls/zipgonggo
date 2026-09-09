@@ -6,6 +6,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { SITE_NAME } from "@/lib/constants";
+import { ROUTES } from "@/lib/routes";
+import { BrandMark } from "./brand-mark";
 import { CalcButton } from "./calc-context";
 import { Trunc } from "./trunc";
 
@@ -44,15 +47,26 @@ export function DetailHeadBar({ title, sub, state, back, action }: Props) {
       {mounted && createPortal(
         <div className={`dhb${on ? " on" : ""}`} aria-hidden={!on}>
           <div className="dhb-in">
+            {/* 이 바가 헤더를 덮는 동안에도 로고와 메뉴는 헤더와 같은 자리에 있어야 한다(사용자 요청 2026-09-09).
+                왼쪽 묶음(로고 + 자격진단)은 헤더와 같은 구성, 그 뒤가 "지금 어디" — 뒤로가기와 제목이다 */}
+            <Link href={ROUTES.home} className="dhb-logo" aria-label={`${SITE_NAME} 홈`} tabIndex={on ? 0 : -1}>
+              <BrandMark size={20} />
+              <b>{SITE_NAME}</b>
+            </Link>
+            <nav className="dhb-nav" aria-label="주요 메뉴">
+              <Link href={ROUTES.eligibility} tabIndex={on ? 0 : -1}>자격진단</Link>
+            </nav>
+            <span className="dhb-div" aria-hidden="true" />
             <Link href={back.href} className="dhb-back" tabIndex={on ? 0 : -1}>{back.label}</Link>
             <span className="dhb-t">
               {sub && <Trunc className="dhb-sub" text={sub} />}
               <Trunc className="dhb-n" text={title} />
             </span>
             {state && <span className={`dhb-s ${state.tone}`}>{state.label}</span>}
-            {/* 이 바가 헤더를 덮는 동안에도 계산기는 닿아야 한다 — 헤더 버튼을 여기 한 번 더 둔다 */}
+            {/* 이 바가 헤더를 덮는 동안에도 계산기는 닿아야 한다 — 헤더 버튼을 여기 한 번 더 둔다.
+                원문 버튼은 이 화면의 것이라 좁아지면 먼저 접고, 계산기는 아이콘만 남겨 끝까지 둔다 */}
             <span className="dhb-a">
-              {action}
+              <span className="dhb-act">{action}</span>
               <CalcButton />
             </span>
           </div>

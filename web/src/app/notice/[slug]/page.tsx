@@ -44,6 +44,18 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
+/** 접수 일정 한 칸의 날짜 — 날짜와 시각을 따로 그린다. 좁은 칸에서는 둘 사이에서만 줄이 바뀐다 */
+type Stamp = { date: string; time: string | null };
+
+function Stamped({ v, pre }: { v: Stamp; pre?: string }) {
+  return (
+    <>
+      <span>{pre}{v.date}</span>
+      {v.time && <i>{v.time}</i>}
+    </>
+  );
+}
+
 function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
   return (
     <li>
@@ -104,21 +116,23 @@ export default async function NoticePage({ params }: Params) {
   // 공고문에 있는데 화면에서 빠져 있었다(사용자 지적 2026-09-09) — 서류 제출일은 접수일만큼 급한 날짜다.
   // 공고문에 시각이 있으면 날짜 뒤에 붙인다(사용자 지적 2026-09-09: "보통 시간까지 명시돼 있는데 안 보인다").
   // 흐름도에 시각이 없는 양식도 있어 없으면 날짜만 — 없는 시각을 지어내지 않는다.
-  const at = (d: string | null, t?: string | null) => (d ? `${dateK(d, true)}${t ? ` ${t}` : ""}` : null);
+  // 날짜와 시각은 따로 들고 다닌다 — 한 문자열로 붙이면 「2026.09.30 (수) 17:00」이 칸을 넘긴다(사용자 지적 2026-09-09).
+  // 칸 안에서 둘 사이만 줄바꿈되게 두 조각으로 그린다(globals.css .step b).
+  const at = (d: string | null, t?: string | null): Stamp | null => (d ? { date: dateK(d, true), time: t || null } : null);
 
   const tail = [
     ...(n.schedule_steps ?? []).map((s) => ({
       label: s.label,
       value: at(s.start, s.start_time),
-      sub: s.end ? `~ ${at(s.end, s.end_time)}` : null,
+      sub: at(s.end, s.end_time),
       at: s.start,
     })),
-    ...(n.announce_at ? [{ label: "당첨자 발표", value: dateK(n.announce_at, true), sub: null, at: n.announce_at }] : []),
+    ...(n.announce_at ? [{ label: "당첨자 발표", value: at(n.announce_at, null), sub: null, at: n.announce_at }] : []),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
   // key = 사람이 달력에 적는 두 날짜. 나머지 단계보다 크게 그린다
-  const steps: { label: string; value: string | null; sub?: string | null; on?: boolean; key?: boolean }[] = [
-    { label: "공고일", value: dateK(n.posted_at, true) },
+  const steps: { label: string; value: Stamp | null; sub?: Stamp | null; on?: boolean; key?: boolean }[] = [
+    { label: "공고일", value: at(n.posted_at, null) },
     { label: "접수 시작", value: at(n.apply_start_at, n.apply_start_tm), key: true },
     { label: "접수 마감", value: at(n.apply_end_at, n.apply_end_tm), on: true, key: true },
     ...tail,
@@ -194,8 +208,8 @@ export default async function NoticePage({ params }: Params) {
                 {steps.map((s) => (
                   <div key={s.label} className={`step${s.key ? " key" : ""}${s.on && s.value ? " on" : ""}`}>
                     <span>{s.label}</span>
-                    <b>{s.value ?? "—"}</b>
-                    {s.sub && <em>{s.sub}</em>}
+                    <b>{s.value ? <Stamped v={s.value} /> : "—"}</b>
+                    {s.sub && <em><Stamped v={s.sub} pre="~ " /></em>}
                   </div>
                 ))}
               </div>
@@ -247,7 +261,7 @@ export default async function NoticePage({ params }: Params) {
           tone={dl.tone}
           ddayLabel={dl.unit}
           ddayNum={dl.num}
-          ddayNote={n.apply_end_at ? `${at(n.apply_end_at, n.apply_end_tm)} 마감` : NO_DATE}
+          ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)}${n.apply_end_tm ? ` ${n.apply_end_tm}` : ""} 마감` : NO_DATE}
           cta={
             <>
               <ExternalLink className="btn acc lg" href={n.source_url}>{L.original}</ExternalLink>
