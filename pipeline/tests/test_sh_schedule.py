@@ -47,6 +47,27 @@ def test_schedule_ignores_note_line():
     assert s.apply_end == date(2026, 9, 3)
 
 
+def test_schedule_extra_steps_haengbok():
+    """행복주택 1쪽 흐름도에는 접수·당첨자발표 말고도 세 상자가 더 있다(사용자 지적 2026-09-09).
+    서류심사 대상자 발표 ’26.9.21.(월) · 서류 제출 ’26.9.28.(월)~9.30.(수) · 계약 체결 ’27.2.10.(수)~2.16.(화)."""
+    s = parse_schedule(pages("309337", [1]), ref_year=2026)
+    assert s is not None
+    assert [(st.label, st.start, st.end) for st in s.steps] == [
+        ("서류심사 대상자 발표", date(2026, 9, 21), None),
+        ("서류 제출", date(2026, 9, 28), date(2026, 9, 30)),
+        ("계약 체결", date(2027, 2, 10), date(2027, 2, 16)),
+    ]
+
+
+def test_schedule_step_drops_weekday_mismatch():
+    """Synap이 자릿수를 흘려 ’26.9.11.(금) → ’26 9 1(금)으로 오는 칸이 있다(308887 3쪽 서류심사 대상자 발표).
+    괄호 요일이 안 맞는 날짜는 틀린 값을 싣느니 그 단계를 통째로 뺀다."""
+    s = parse_schedule(pages("308887", [3]), ref_year=2026)
+    assert s is not None
+    assert "서류심사 대상자 발표" not in {st.label for st in s.steps}
+    assert ("서류 제출", date(2026, 9, 16), date(2026, 9, 18)) in [(st.label, st.start, st.end) for st in s.steps]
+
+
 def test_schedule_none_without_flowchart():
     """일정 흐름도가 없는 쪽(주택 위치 안내 표)에서는 None."""
     assert parse_schedule(pages("309467", [49, 50]), ref_year=2026) is None

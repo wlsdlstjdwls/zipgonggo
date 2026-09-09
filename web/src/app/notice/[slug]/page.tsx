@@ -67,17 +67,30 @@ export default async function NoticePage({ params }: Params) {
   const hi = n.min_rent != null ? n.max_rent : n.max_deposit;
   const lo = n.min_rent != null ? n.min_rent : n.min_deposit;
   const range_ = hi != null && lo != null && hi > lo ? wonShort(hi) : null;
-  const hasSchedule = Boolean(n.apply_start_at || n.apply_end_at || n.announce_at);
+  const hasSchedule = Boolean(n.apply_start_at || n.apply_end_at || n.announce_at || n.schedule_steps?.length);
   const ph = applyPhase(n);
   const dl = deadlineChip(n);
   // 헤드라인에서 뺀 금액 — 제원 패널 한 줄로. 범위가 있으면 "최소~최대"
   const moneyRow = m ? (range_ ? `${m.main}~${range_}` : `${m.main}부터`) : null;
 
-  const steps: { label: string; value: string | null; on?: boolean }[] = [
+  // 흐름도 나머지 단계(서류심사 대상자 발표·서류 제출·계약 체결)와 당첨자 발표를 날짜순으로 섞는다.
+  // 공고문에 있는데 화면에서 빠져 있었다(사용자 지적 2026-09-09) — 서류 제출일은 접수일만큼 급한 날짜다.
+  const tail = [
+    ...(n.schedule_steps ?? []).map((s) => ({
+      label: s.label,
+      value: dateK(s.start, true),
+      sub: s.end ? `~ ${dateK(s.end, true)}` : null,
+      at: s.start,
+    })),
+    ...(n.announce_at ? [{ label: "당첨자 발표", value: dateK(n.announce_at, true), sub: null, at: n.announce_at }] : []),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+
+  const steps: { label: string; value: string | null; sub?: string | null; on?: boolean }[] = [
     { label: "공고일", value: dateK(n.posted_at, true) },
     { label: "접수 시작", value: n.apply_start_at ? dateK(n.apply_start_at, true) : null },
     { label: "접수 마감", value: n.apply_end_at ? dateK(n.apply_end_at, true) : null, on: true },
-    { label: "당첨자 발표", value: n.announce_at ? dateK(n.announce_at, true) : null },
+    ...tail,
+    ...(n.announce_at ? [] : [{ label: "당첨자 발표", value: null }]),
   ];
 
   return (
@@ -139,6 +152,7 @@ export default async function NoticePage({ params }: Params) {
                   <div key={s.label} className={`step${s.on && s.value ? " on" : ""}`}>
                     <span>{s.label}</span>
                     <b>{s.value ?? "—"}</b>
+                    {s.sub && <em>{s.sub}</em>}
                   </div>
                 ))}
               </div>
@@ -146,7 +160,6 @@ export default async function NoticePage({ params }: Params) {
               <p className="note" style={{ marginTop: 0 }}>공고일 {dateK(n.posted_at, true)}{n.source_status && `, 모집 상태 ${n.source_status}`}. 접수 기간은 {L.originalDoc}에서 확인하세요.</p>
             )}
             {hasSchedule && n.source_status && <p className="note">모집 상태 {n.source_status}</p>}
-            {hasSchedule && n.schedule_source === "attachment" && <p className="note">일정은 첨부 공고문의 「입주자 모집 절차 및 일정」에서 읽었습니다. 순위별 세부 일정은 원문을 확인하세요.</p>}
           </section>
 
           {showAreaTable && areas.length > 0 && (

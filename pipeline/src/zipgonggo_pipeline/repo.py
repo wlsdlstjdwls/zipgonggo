@@ -121,14 +121,21 @@ def insert_ingest_log(cur, *, stage: str, source: str, ok: bool, item_count: int
 # 일정은 그대로 COALESCE — API가 준 접수일이 첨부 흐름도보다 믿을 만하다.
 UPDATE_ATTACH_FACTS_SQL = """
 UPDATE notice SET
-  apply_start_at  = COALESCE(apply_start_at, %(apply_start_at)s),
-  apply_end_at    = COALESCE(apply_end_at, %(apply_end_at)s),
-  announce_at     = COALESCE(announce_at, %(announce_at)s),
+  -- API가 준 일정은 건드리지 않는다. 다만 이미 첨부에서 읽어 둔 값(schedule_source='attachment')은
+  -- 파서가 좋아지면 새 값으로 갈아 끼운다 — COALESCE만 쓰면 예전 파서의 틀린 날짜가 영영 남는다(2026-09-09).
+  apply_start_at  = CASE WHEN schedule_source = 'attachment' AND %(apply_start_at)s IS NOT NULL
+                         THEN %(apply_start_at)s ELSE COALESCE(apply_start_at, %(apply_start_at)s) END,
+  apply_end_at    = CASE WHEN schedule_source = 'attachment' AND %(apply_end_at)s IS NOT NULL
+                         THEN %(apply_end_at)s ELSE COALESCE(apply_end_at, %(apply_end_at)s) END,
+  announce_at     = CASE WHEN schedule_source = 'attachment' AND %(announce_at)s IS NOT NULL
+                         THEN %(announce_at)s ELSE COALESCE(announce_at, %(announce_at)s) END,
   min_deposit     = COALESCE(%(min_deposit)s, min_deposit),
   max_deposit     = COALESCE(%(max_deposit)s, max_deposit),
   min_rent        = COALESCE(%(min_rent)s, min_rent),
   max_rent        = COALESCE(%(max_rent)s, max_rent),
   supply_count    = COALESCE(%(supply_count)s, supply_count),
+  -- 흐름도 단계는 첨부에서만 나온다 — 새로 읽었으면 통째로 갈아 끼운다(파서가 좋아지면 바로 반영)
+  schedule_steps  = COALESCE(%(schedule_steps)s::jsonb, schedule_steps),
   schedule_source = CASE
     WHEN schedule_source IS NOT NULL THEN schedule_source
     WHEN apply_start_at IS NOT NULL OR apply_end_at IS NOT NULL THEN 'api'
@@ -138,7 +145,7 @@ UPDATE notice SET
 WHERE id = %(id)s
 """
 
-FACT_KEYS = ("apply_start_at", "apply_end_at", "announce_at",
+FACT_KEYS = ("apply_start_at", "apply_end_at", "announce_at", "schedule_steps",
              "min_deposit", "max_deposit", "min_rent", "max_rent", "supply_count")
 
 

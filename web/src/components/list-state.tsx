@@ -53,7 +53,8 @@ export function ListStateProvider({ children }: { children: React.ReactNode }) {
   const pathSido = sidoFromPath(pathname);
   const isList = pathname === ROUTES.home || Boolean(pathSido);
   const [f, setF] = useState<ListFilters>({});
-  const [view, setViewState] = useState<NoticeView>("list");
+  // 기본은 카드 — 상태 테두리로 접수 중/마감이 한눈에 갈린다(사용자 결정 2026-09-09)
+  const [view, setViewState] = useState<NoticeView>("card");
   const [ready, setReady] = useState(false);
   const booted = useRef(false);
 

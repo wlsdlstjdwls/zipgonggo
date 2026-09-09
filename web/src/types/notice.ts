@@ -40,6 +40,9 @@ export type NoticeListItem = {
   source_rank: number | null;
 };
 
+/** notice.schedule_steps 한 칸. end가 null이면 하루짜리 단계 */
+export type ScheduleStep = { label: string; start: string; end: string | null };
+
 export type Notice = NoticeListItem & {
   source_key: string | null;
   /** 공고 내 최대 보증금·월임대료(원). SH 첨부 공급현황 표(0009). API 공고는 NULL */
@@ -47,6 +50,8 @@ export type Notice = NoticeListItem & {
   max_rent: number | null;
   /** 접수 일정 출처. 'attachment'면 SH 첨부 공고문에서 읽은 값 */
   schedule_source: string | null;
+  /** 흐름도의 접수·발표 외 단계(서류심사 대상자 발표, 서류 제출, 계약 체결). 순서대로 온다(0017) */
+  schedule_steps: ScheduleStep[] | null;
   pnu: string | null;
   heating: string | null;
   total_household: number | null;

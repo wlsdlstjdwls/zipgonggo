@@ -173,7 +173,7 @@ export async function getNoticeBySlug(slug: string): Promise<Notice | null> {
   const rows = await query<Notice>(
     `SELECT ${LIST_COLS}, source_key, pnu, heating, total_household,
             min_down_payment, min_interim, min_balance, portal_url, contact,
-            max_deposit, max_rent, schedule_source,
+            max_deposit, max_rent, schedule_source, schedule_steps,
             to_char(updated_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') AS updated_at
      FROM notice WHERE slug = $1`,
     [slug],

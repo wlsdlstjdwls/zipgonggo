@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import re
 import sys
@@ -26,6 +27,17 @@ from ..sources.ish import IshClient, find_attachments
 from .common import Stats, finish_ingest, stage_main, utc_now
 
 log = logging.getLogger("s3.sh")
+
+
+def steps_json(sch) -> str | None:
+    """흐름도 단계를 notice.schedule_steps(jsonb)에 넣을 문자열로. 단계가 없으면 None(기존 값 유지)."""
+    if not sch or not sch.steps:
+        return None
+    return json.dumps(
+        [{"label": s.label, "start": s.start.isoformat(), "end": s.end.isoformat() if s.end else None}
+         for s in sch.steps],
+        ensure_ascii=False,
+    )
 
 STAGE = "S3"
 SOURCE = "sh_attach"
@@ -173,6 +185,7 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                         apply_start_at=sch.apply_start if sch else None,
                         apply_end_at=sch.apply_end if sch else None,
                         announce_at=sch.announce if sch else None,
+                        schedule_steps=steps_json(sch),
                         **facts.totals,
                     )
                     cur.execute("RELEASE SAVEPOINT nc")

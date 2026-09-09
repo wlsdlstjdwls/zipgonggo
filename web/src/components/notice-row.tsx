@@ -45,6 +45,8 @@ export function NoticeRow({ n, stagger }: Props) {
         href={noticePath(n.slug)}
         className={`row${stagger === undefined ? " static" : ""}`}
         style={style}
+        /* 카드 뷰 테두리 색의 근거 — D-day 칩과 같은 톤을 쓴다(사용자 요청 2026-09-09) */
+        data-tone={d.tone}
       >
         <span className={`row-dday ${d.tone}${d.solid ? " solid" : ""}`} aria-label={`${d.num} ${d.unit}`}>
           <b>{d.num}</b>

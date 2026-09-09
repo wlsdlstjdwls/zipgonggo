@@ -23,17 +23,37 @@ APPLY_RE = re.compile(r"^(?:신청\s*접수|청약\s*접수|접수\s*기간|신�
 ANNOUNCE_RE = re.compile(r"당첨자.{0,8}발표")
 HEADING_RE = re.compile(r"모집\s*절차\s*및\s*일정|공급\s*일정|모집\s*일정")
 
+# 흐름도에서 접수·당첨자발표 말고 더 읽는 단계. 위에서부터 먼저 맞는 하나만 쓴다(라벨이 서로 겹친다:
+# 「서류심사대상자서류제출」은 발표 패턴에도 걸리므로 제출을 먼저 본다).
+# 매칭은 공백을 지운 라벨에 한다 — 흐름도 상자는 줄바꿈으로 글자가 흩어진다.
+EXTRA_STEPS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("서류 제출", re.compile(r"(?:심사|대상자).{0,6}서류제출|서류제출")),
+    ("서류심사 대상자 발표", re.compile(r"(?:서류)?심사대상자.{0,2}발표|대상자발표")),
+    ("계약 체결", re.compile(r"계약체결")),
+)
+
 WEEKDAY = "월화수목금토일"
 # 띄어쓰기 날짜: ‘26 9 9(수) · 2026 8 28(금) · 09 15 (화)
-SPACED_RE = re.compile(rf"(?:(\d{{2}}|\d{{4}})\s+)?(\d{{1,2}})\s+(\d{{1,2}})\s*\([{WEEKDAY}]\)")
+SPACED_RE = re.compile(rf"(?:(\d{{2}}|\d{{4}})\s+)?(\d{{1,2}})\s+(\d{{1,2}})\s*\(([{WEEKDAY}])\)")
 # 붙은 날짜: 260914(월) · 20260914(월) · 2026928(월) · 0915(화) · 928(월)
-COMPACT_RE = re.compile(rf"(\d{{3,8}})\s*\([{WEEKDAY}]\)")
+COMPACT_RE = re.compile(rf"(\d{{3,8}})\s*\(([{WEEKDAY}])\)")
 YEAR_ONLY_RE = re.compile(r"^(20\d{2})$")
 BELOW_PX = 150   # 라벨 아래 이만큼 안에서 날짜를 찾는다(매입임대는 마감 날짜가 142px 아래)
+CHAIN_PX = 60    # 날짜를 하나 찾으면 그 밑으로 이만큼 더 본다 — 「2026 / 8 31(월) / 10:00 / ~ 9 2(수)」처럼
+                 # 한 칸이 네 줄로 흩어지면 시작일만 읽고 마감일을 놓쳤다(미리내집 308644 1쪽, 2026-09-09)
 STACK_PX = 26    # 같은 열에서 이만큼 안에 붙은 두 줄은 한 라벨(신청/접수, 당첨자/발표)
 MAX_DATE_W = 220 # 이보다 넓은 칸은 흐름도 날짜가 아니라 본문 문장이다(라벨 폭 비율은 좁은 라벨에서 오작동)
 # 흐름도 아래 주석("※ 입주예정기간은 2026. 1. 16.(월) ~ 2027. 1. 15.(금)입니다") — 날짜가 있어도 접수일이 아니다
 NOTE_RE = re.compile(r"^\s*[※*·▶■□○-]")
+
+
+@dataclass(frozen=True)
+class Step:
+    """흐름도 상자 하나. end가 있으면 기간, 없으면 하루."""
+
+    label: str
+    start: date
+    end: date | None
 
 
 @dataclass(frozen=True)
@@ -42,6 +62,9 @@ class Schedule:
     apply_end: date | None
     announce: date | None
     page: int | None
+    # 접수·발표 말고 흐름도에 같이 그려진 단계들(서류심사 대상자 발표·서류 제출·계약 체결).
+    # 공고문에 있는데 화면에서 빠져 있다는 지적(사용자 2026-09-09)에 맞춰 통째로 싣는다.
+    steps: tuple[Step, ...] = ()
 
 
 @dataclass
@@ -103,20 +126,21 @@ def _pick(cands: list[date], ref: date | None) -> date | None:
     return min(after) if after else cands[0]
 
 
-def _dates_in(text: str, ref_year: int | None, ref: date | None) -> list[date]:
+def _dates_in(text: str, ref_year: int | None, ref: date | None) -> list[tuple[date, str]]:
+    """(날짜, 원문에 적힌 요일 글자) 쌍. 요일은 검증용 — 쓰는 쪽에서 버릴지 정한다."""
     t = _norm(text)
-    out: list[date] = []
+    out: list[tuple[date, str]] = []
     for m in SPACED_RE.finditer(t):
         d = _mk(_year(m.group(1), ref_year), int(m.group(2)), int(m.group(3)))
         if d:
-            out.append(d)
+            out.append((d, m.group(4)))
             ref, ref_year = d, d.year
     if out:
         return out
     for m in COMPACT_RE.finditer(t):
         d = _pick(_compact_candidates(m.group(1), ref_year), ref)
         if d:
-            out.append(d)
+            out.append((d, m.group(2)))
             ref, ref_year = d, d.year
     return out
 
@@ -136,7 +160,11 @@ def _overlap(a: _Box, b: _Box) -> float:
 
 
 def _stacked_labels(boxes: list[_Box]) -> list[_Box]:
-    """같은 열에 바로 붙은 두 줄을 이어 붙인 가상 라벨(신청+접수, 당첨자+발표)도 후보에 넣는다."""
+    """같은 열에 바로 붙은 두 줄을 이어 붙인 가상 라벨(신청+접수, 당첨자+발표)도 후보에 넣는다.
+
+    합친 라벨의 t는 아래쪽 줄(b.t)을 쓴다 — 날짜는 라벨 마지막 줄 밑에 오므로 거기서부터 BELOW_PX를 세야
+    두 줄짜리 라벨이 손해를 보지 않는다. 위쪽 줄 기준으로 재던 때는 미리내집 「신청접수/(인터넷)」의
+    접수일이 151px 아래라 한 칸 차이로 빠졌다(308644 1쪽, 2026-09-09)."""
     out = list(boxes)
     by_t = sorted(boxes, key=lambda b: b.t)
     for i, a in enumerate(by_t):
@@ -144,33 +172,65 @@ def _stacked_labels(boxes: list[_Box]) -> list[_Box]:
             if b.t - a.t > STACK_PX:
                 break
             if b.t > a.t and _overlap(a, b) >= 0.6 and re.search(r"[가-힣]", a.text) and re.search(r"[가-힣]", b.text):
-                out.append(_Box(min(a.l, b.l), max(a.r, b.r), a.t, a.text + b.text))
+                out.append(_Box(min(a.l, b.l), max(a.r, b.r), b.t, a.text + b.text))
     return out
 
 
-def _dates_below(label: _Box, boxes: list[_Box], ref_year: int | None) -> list[date]:
+def _dates_below(label: _Box, boxes: list[_Box], ref_year: int | None) -> list[tuple[date, str]]:
     """라벨 아래(같은 열)에 붙은 날짜들. 위에서 아래 순. 연도만 있는 줄(2026)은 다음 날짜의 연도로 쓴다.
     ※로 시작하는 주석과 라벨보다 훨씬 넓은 칸(본문 문장)은 건너뛴다 — 「입주예정기간」을 접수기간으로 읽던 회귀."""
     below = sorted(
         (b for b in boxes
-         if label.t < b.t <= label.t + BELOW_PX
+         if b.t > label.t
          and _overlap(label, b) >= 0.4
          and (b.r - b.l) <= MAX_DATE_W
          and not NOTE_RE.match(b.text)),
         key=lambda b: (b.t, b.l),
     )
-    found: list[date] = []
+    found: list[tuple[date, str]] = []
     ref: date | None = None
+    limit = label.t + BELOW_PX
     for b in below:
+        if b.t > limit:
+            break
         t = _norm(b.text)
         ym = YEAR_ONLY_RE.match(t)
         if ym:
             ref_year = int(ym.group(1))
+            limit = max(limit, b.t + CHAIN_PX)
             continue
-        for d in _dates_in(b.text, ref_year, ref):
-            found.append(d)
+        for d, wd in _dates_in(b.text, ref_year, ref):
+            found.append((d, wd))
             ref, ref_year = d, d.year
+            limit = max(limit, b.t + CHAIN_PX)
     return found
+
+
+def _extra_steps(labels: list[_Box], boxes: list[_Box], ref_year: int | None, anchor: date | None) -> tuple[Step, ...]:
+    """흐름도의 나머지 상자들. 같은 단계가 여러 라벨 조합으로 잡히므로 (단계, 날짜)로 한 번만 남긴다.
+
+    anchor(접수 시작일)보다 앞선 날짜는 버린다 — 흐름도는 언제나 앞으로만 간다.
+    ’27.1.20.처럼 연도가 두 자리로 적힌 칸에서 연도를 한 해 앞으로 읽는 경우가 실제로 있어(308123 8쪽),
+    틀린 날짜를 싣느니 그 단계를 빼는 쪽이 낫다.
+    같은 이유로 괄호 요일이 어긋나는 날짜도 버린다 — Synap이 자릿수를 흘리면(’26.9.11.(금) → ’26 9 1(금))
+    날짜만 보고는 못 잡는다(308887 3쪽). 접수·발표는 기존 동작을 지키려 이 검사를 걸지 않는다."""
+    hits: dict[str, tuple[float, Step]] = {}
+    for b in labels:
+        flat = re.sub(r"\s+", "", b.text)
+        name = next((n for n, rx in EXTRA_STEPS if rx.search(flat)), None)
+        if name is None:
+            continue
+        ds = [d for d, wd in _dates_below(b, boxes, ref_year)
+              if (anchor is None or d >= anchor) and WEEKDAY[d.weekday()] == wd]
+        if not ds:
+            continue
+        lo, hi = min(ds), max(ds)
+        step = Step(name, lo, hi if hi > lo else None)
+        # 같은 단계가 여러 번 잡히면 가장 왼쪽(= 흐름도에서 먼저 오는) 상자를 쓴다
+        prev = hits.get(name)
+        if prev is None or b.l < prev[0]:
+            hits[name] = (b.l, step)
+    return tuple(step for _, step in sorted(hits.values(), key=lambda x: (x[1].start, x[0])))
 
 
 def parse_schedule_page(xml: str, ref_year: int | None = None) -> Schedule | None:
@@ -193,19 +253,19 @@ def parse_schedule_page(xml: str, ref_year: int | None = None) -> Schedule | Non
     start = end = None
     if ranked:
         ranked.sort(key=lambda x: (x[0], x[1].t))
-        first = _dates_below(ranked[0][1], boxes, ref_year)
-        last = _dates_below(ranked[-1][1], boxes, first[-1].year if first else ref_year)
+        first = [d for d, _ in _dates_below(ranked[0][1], boxes, ref_year)]
+        last = [d for d, _ in _dates_below(ranked[-1][1], boxes, first[-1].year if first else ref_year)]
         start = first[0] if first else None
         end = max(last) if last else (max(first) if first else None)
     else:
         for lab in sorted(plain, key=lambda b: b.t):
-            ds = _dates_below(lab, boxes, ref_year)
+            ds = [d for d, _ in _dates_below(lab, boxes, ref_year)]
             if ds:
                 start, end = min(ds), max(ds)
                 break
     announce = None
     for lab in sorted(announce_labels, key=lambda b: b.t):
-        ds = _dates_below(lab, boxes, (end or start).year if (end or start) else ref_year)
+        ds = [d for d, _ in _dates_below(lab, boxes, (end or start).year if (end or start) else ref_year)]
         if ds:
             announce = ds[0]
             break
@@ -213,7 +273,7 @@ def parse_schedule_page(xml: str, ref_year: int | None = None) -> Schedule | Non
         return None
     if start and end and end < start:
         end = None
-    return Schedule(start, end, announce, None)
+    return Schedule(start, end, announce, None, _extra_steps(labels, boxes, ref_year, start or end))
 
 
 def parse_schedule(pages: list[tuple[int, str]], ref_year: int | None = None) -> Schedule | None:
@@ -221,5 +281,5 @@ def parse_schedule(pages: list[tuple[int, str]], ref_year: int | None = None) ->
     for page, xml in pages[:12]:
         s = parse_schedule_page(xml, ref_year)
         if s and (s.apply_start or s.apply_end):
-            return Schedule(s.apply_start, s.apply_end, s.announce, page)
+            return Schedule(s.apply_start, s.apply_end, s.announce, page, s.steps)
     return None

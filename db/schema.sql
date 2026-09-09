@@ -622,3 +622,10 @@ COMMENT ON COLUMN notice_result.reconciled IS 'false면 원문 텍스트가 상�
 CREATE INDEX idx_notice_result_notice  ON notice_result (notice_id, tenant_class, bracket);
 CREATE INDEX idx_notice_result_complex ON notice_result (complex_name, tenant_class) WHERE reconciled;
 CREATE INDEX idx_notice_result_address ON notice_result (address) WHERE address <> '';
+
+-- 0017 — 공고 일정 흐름도의 나머지 단계 (SH 첨부 「입주자 모집 절차 및 일정」, S3)
+-- 접수·발표 말고 「서류심사 대상자 발표」·「서류 제출」·「계약 체결」도 싣는다. 단계 구성이 유형마다 달라
+-- 고정 칸 대신 순서 있는 JSON 배열: [{"label","start","end"}] — end가 null이면 하루짜리.
+ALTER TABLE notice ADD COLUMN schedule_steps jsonb;
+COMMENT ON COLUMN notice.schedule_steps IS
+  'SH 첨부 일정 흐름도에서 읽은 접수·발표 외 단계. [{label,start,end}] 순서 배열. end가 null이면 하루';
