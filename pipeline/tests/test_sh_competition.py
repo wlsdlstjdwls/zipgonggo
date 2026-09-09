@@ -1,8 +1,9 @@
-"""SH 청약 결과 표 파서 회귀. 정답지 둘 — 네트워크 없음.
+"""SH 청약 결과 표 파서 회귀. 정답지 셋 — 네트워크 없음.
 
 - ish_288199: 2025년 1차 행복주택 청약 접수 결과 (자치구/단지/계층/우선·일반 양식).
   **Synap 텍스트 레이어가 글자를 흘리는 쪽**이라 구멍 감지·되메움·미검증 표시를 여기서 지킨다.
 - ish_292457: 2025년 2차 청년안심주택 최종 청약경쟁률 (단지/유형/자격/순위 양식). 39개 블록 전부 산술이 맞는다.
+- ish_307073: 2026년 1차 청년 매입임대 경쟁률 (구분/자치구/주소지/주택명/순위 양식). 줄마다 값이 다 있는 납작한 표.
 """
 
 from collections import Counter
@@ -112,3 +113,44 @@ def test_b_address_gives_sigungu(rows_b):
 def test_b_tenant_class_not_doubled(rows_b):
     """블록 값이 띠마다 되풀이 인쇄돼도 이어 붙지 않는다 — 「청청년년」 회귀"""
     assert all(r.tenant_class in {"청년", "신혼I", "신혼Ⅰ", "신혼II", "신혼Ⅱ"} for r in rows_b), {r.tenant_class for r in rows_b}
+
+
+# ── 매입임대 양식 ──────────────────────────────────────────────────────────
+
+PAGES_C = [(n, (FIX / "ish_307073" / f"p{n}.xml").read_text(encoding="utf-8")) for n in (1, 3)]
+
+
+@pytest.fixture(scope="module")
+def rows_c():
+    return parse_competition(PAGES_C)
+
+
+def test_c_shape(rows_c):
+    """줄마다 값이 다 있는 납작한 표. 한 쪽에 73줄씩."""
+    assert Counter(r.page for r in rows_c) == {1: 73, 3: 73}
+    assert all(r.reconciled for r in rows_c)
+
+
+def test_c_wide_cell_does_not_bleed(rows_c):
+    """「주소지」 칸이 넓어 헤더 중간점으로 경계를 잡으면 주소 끝자락이 「주택명」으로 넘어온다.
+
+    빈 띠(글자가 한 번도 지나지 않는 x 구간)를 경계로 삼아야 「백년빌」이 「3백년빌」이 되지 않는다.
+    """
+    r = next(r for r in rows_c if r.page == 1 and r.supply_type == "26B")
+    assert r.complex_name == "백년빌"
+    assert r.sigungu == "강남구"      # 「강남구<재공」처럼 옆 칸이 붙지 않는다
+    assert all(len(r.sigungu) <= 5 and r.sigungu.endswith("구") for r in rows_c)
+
+
+def test_c_all_rows_kept(rows_c):
+    """구분 칸의 첫 조각만 보면 옆 칸 「-」(성별)이 먼저 걸려 줄이 통째로 빠진다 — 3쪽 회귀."""
+    assert {r.bracket for r in rows_c} <= {"일반1순위", "일반2순위", "일반3순위", "소계"}
+    assert len([r for r in rows_c if r.page == 3]) == 73
+
+
+def test_c_integer_ratio_is_accepted(rows_c):
+    """이 양식은 경쟁률을 정수로 반올림해 찍는다 — 105명에 2호면 52.5가 아니라 53."""
+    r = next(r for r in rows_c if r.page == 1 and r.complex_name == "백년빌"
+             and r.supply_type == "26B" and r.bracket == "일반2순위")
+    assert (r.units, r.applicants, r.ratio) == (2, 105, 53.0)
+    assert r.reconciled and not r.repaired

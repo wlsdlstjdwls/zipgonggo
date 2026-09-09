@@ -6,7 +6,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+import re
+from datetime import date, datetime
 from typing import Any
 
 NOTICE_COLS = [
@@ -163,3 +164,97 @@ def link_related_post(cur, *, agency: str, base_title: str, seq: str, title: str
     cur.execute("UPDATE notice SET raw = %s, updated_at = now() WHERE id = %s",
                 (json.dumps(raw, ensure_ascii=False), row["id"]))
     return row["id"]
+
+
+def upsert_result_post(cur, post: dict[str, Any]) -> None:
+    """결과 글 원장. 원 공고를 못 찾아도 넣는다 — 나중에 공고가 들어오면 relink_result_posts가 잇는다."""
+    cur.execute(
+        """
+        INSERT INTO result_post (seq, agency, title, posted_at, result_kind, notice_date, reserve_round, notice_id, note)
+        VALUES (%(seq)s, %(agency)s, %(title)s, %(posted_at)s, %(result_kind)s, %(notice_date)s,
+                %(reserve_round)s, %(notice_id)s, %(note)s)
+        ON CONFLICT (seq) DO UPDATE SET
+          title = EXCLUDED.title,
+          notice_id = COALESCE(EXCLUDED.notice_id, result_post.notice_id),
+          note = EXCLUDED.note
+        """,
+        {"agency": "SH", "notice_id": None, "note": None, **post},
+    )
+
+
+def _norm_title(t: str) -> str:
+    """공백·마침표·가운뎃점을 털어 제목을 맞대 본다. 「(2026. 6. 26.)」과 「(2026.6.26.)」이 같아진다."""
+    return re.sub(r"[\s.·]", "", t)
+
+
+def find_notice_for_result(
+    cur, *, agency: str, notice_date: date, housing_type: str | None, title: str | None = None
+) -> int | None:
+    """결과 글이 인용한 공고일로 원 공고를 찾는다. 제목 문자열끼리 맞추는 것보다 튼튼하다.
+
+    같은 날 같은 유형 공고가 여럿이면(2026-06-26 매입임대 3건) 날짜만으로는 못 가른다.
+    그때는 제목으로 가른다 — 결과 글 제목은 원 공고 제목을 통째로 인용하고 뒤에 「… 최종 청약경쟁률 게시」를
+    붙인 꼴이라, 원 공고 제목이 결과 글 제목의 앞부분이 된다. 그래도 하나로 안 좁혀지면 잇지 않는다.
+    잘못 이으면 남의 공고에 남의 경쟁률이 붙는다.
+    """
+    cur.execute(
+        """
+        SELECT id, title FROM notice
+        WHERE agency = %(agency)s AND posted_at = %(day)s
+          AND (%(ht)s::text IS NULL OR housing_type::text = %(ht)s)
+        """,
+        {"agency": agency, "day": notice_date, "ht": housing_type},
+    )
+    rows = cur.fetchall()
+    if len(rows) == 1:
+        return rows[0]["id"]
+    if len(rows) > 1 and title:
+        want = _norm_title(title)
+        hit = [r for r in rows if _norm_title(r["title"]) and want.startswith(_norm_title(r["title"]))]
+        if len(hit) == 1:
+            return hit[0]["id"]
+    return None
+
+
+def replace_notice_results(cur, *, notice_id: int, post_seq: str, result_kind: str, rows: list[dict[str, Any]]) -> int:
+    """한 결과 글이 준 표를 통째로 교체한다. 다시 돌려도 같은 결과가 되게."""
+    cur.execute("DELETE FROM notice_result WHERE post_seq = %s", (post_seq,))
+    for r in rows:
+        cur.execute(
+            """
+            INSERT INTO notice_result
+              (notice_id, post_seq, row_no, result_kind, complex_name, sigungu, address, supply_kind, supply_type,
+               tenant_class, bracket, units, applicants, ratio, reconciled, repaired, source_page)
+            VALUES (%(notice_id)s, %(post_seq)s, %(row_no)s, %(result_kind)s, %(complex_name)s, %(sigungu)s,
+                    %(address)s, %(supply_kind)s, %(supply_type)s, %(tenant_class)s, %(bracket)s,
+                    %(units)s, %(applicants)s, %(ratio)s, %(reconciled)s, %(repaired)s, %(source_page)s)
+            ON CONFLICT (post_seq, row_no) DO NOTHING
+            """,
+            {"notice_id": notice_id, "post_seq": post_seq, "result_kind": result_kind, **r},
+        )
+    cur.execute(
+        "UPDATE result_post SET row_count = %s, parsed_at = now(), note = %s WHERE seq = %s",
+        (len(rows), None if rows else "표 없음(양식 미지원)", post_seq),
+    )
+    return len(rows)
+
+
+def relink_result_posts(cur, *, agency: str = "SH") -> int:
+    """아직 원 공고를 못 찾은 결과 글을 다시 이어 본다. 공고 백필이 뒤늦게 들어오는 순서를 감당한다.
+
+    적재 때와 **같은 규칙**(find_notice_for_result)을 쓴다 — 여기만 느슨하면 그때 안 이은 걸 지금 잘못 잇는다.
+    """
+    cur.execute(
+        "SELECT seq, title, notice_date FROM result_post WHERE notice_id IS NULL AND notice_date IS NOT NULL AND agency = %s",
+        (agency,),
+    )
+    pending = cur.fetchall()
+    linked = 0
+    for p in pending:
+        notice_id = find_notice_for_result(cur, agency=agency, notice_date=p["notice_date"],
+                                           housing_type=None, title=p["title"])
+        if notice_id is None:
+            continue
+        cur.execute("UPDATE result_post SET notice_id = %s, note = NULL WHERE seq = %s", (notice_id, p["seq"]))
+        linked += 1
+    return linked

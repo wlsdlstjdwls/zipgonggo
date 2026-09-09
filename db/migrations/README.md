@@ -41,3 +41,11 @@ python db\migrate.py --status   # 적용 현황
 | `0006_housing_type_sh.sql` | `housing_type`에 재개발임대·청년안심주택 추가 (SH 청약유형) | Neon 2026-09-08 |
 | `0007_notice_complex.sql` | `notice_complex` — 공고별 공급 단지(단지명·자치구·도로명주소·신규). SH 첨부 공고문 표를 S3가 적재. 좌표 없음 | Neon 2026-09-08 |
 | `0008_notice_complex_units.sql` | `notice_complex`에 complex_code·unit_count·min_deposit·min_rent·area_min·area_max — SH 매입임대 별첨 주택목록(호실 단위) 집계 | Neon 2026-09-08 |
+| `0009_notice_deposit_range.sql` | `notice`에 max_deposit·max_rent — 하한만 있던 금액을 범위로. 화면은 "2.6억~11.7억" | Neon 2026-09-08 |
+| `0010_notice_source_rank.sql` | `notice.source_rank` — 기관 목록에서의 순번. 같은 공고일 안 정렬용 | Neon 2026-09-08 |
+| `0011_notice_supply.sql` | `notice_supply` — 공급현황 표 한 줄(단지 × 공급유형 × 계층 × 소득옵션). 공가·예비·우선/일반·계층별 금액 | Neon 2026-09-08 |
+| `0012_notice_complex_heating.sql` | `notice_complex.heating` — 「단지별 주소」 표의 난방방식 열 | Neon 2026-09-08 |
+| `0013_notice_index_drop_dead_predicate.sql` | 죽어 있던 부분 인덱스 되살리기 — publish='published' 조건이 한 행도 안 맞았다 | Neon 2026-09-09 |
+| `0014_notice_result.sql` | `result_post` · `notice_result` — i-sh 결과 글(경쟁률 게시·당첨자 발표) 원장과 결과 표 줄. 과거 경쟁률·합격선의 원천 | 미적용 |
+| `0015_notice_result_supply_kind.sql` | `notice_result.supply_kind` + UNIQUE 재정의 — 재공급/신규공급이 키에 없어 줄이 사라졌다 | 미적용 |
+| `0016_notice_result_row_identity.sql` | `notice_result`에 address·row_no, UNIQUE를 (게시글, 줄 번호)로 — 이름이 같은 건물 때문에 자연키로는 줄이 사라졌다 | 미적용 |

@@ -32,6 +32,7 @@ i-sh 게시판에는 모집공고와 별개로 결과 글이 올라온다. 지�
 
 from __future__ import annotations
 
+import math
 import re
 import statistics
 from dataclasses import dataclass
@@ -44,11 +45,15 @@ LAYOUT_A_MAIN = ("자치구", "단지명", "유형", "합계", "공가", "예비
 LAYOUT_A_SUB = ("구분", "일반", "인터넷", "방문", "계")
 # 「공급호수(호)」처럼 단위가 붙어 와서 앞자리로 맞춘다
 LAYOUT_B_COLS = ("단지명", "공급유형", "신청자격", "대상", "공급호수", "신청자수", "경쟁률")
+# 매입임대 양식. 세로 병합이 없고 줄마다 값이 다 있다. 주소지까지 들어 있어 제일 값지다.
+# 「주택형」과 「성별」은 붙어 찍혀 한 칸("주택형성별")으로 온다 — 형만 앞에서 떼어 쓴다.
+LAYOUT_C_COLS = ("구분", "자치구", "주소지", "주택명", "주택형성별", "대상", "공급호수", "계", "경쟁률")
 
 BRACKET_A = re.compile(r"^(우선|일반)$")
-BRACKET_B = re.compile(r"^(\d순위|소계)$")
+BRACKET_B = re.compile(r"^(?:(?:우선|일반)\s*)?\d+\s*순위$|^소계$")   # 「3순위」와 「일반1순위」 둘 다
 TOTAL_ROW = re.compile(r"^(총계|계)$")
 SUPPLY_TYPE_RE = re.compile(r"(\d+\s*[A-Z]?)\s*$")     # "아4)39" → "39", "20A" → "20A"
+SUPPLY_TYPE_HEAD = re.compile(r"^(\d+\s*[A-Z]?)")       # "26B-" → "26B" (뒤에 성별 칸이 붙어 온다)
 NAME_OK = re.compile(r"[가-힣A-Za-z]{2,}")             # "_" "( 4)" 같은 조각을 거른다
 BAND_PAD = 6.0        # 구분 글자 위로 이만큼은 같은 띠로 본다
 LABEL_GAP = 25.0      # 이 안에 붙은 라벨 줄은 한 칸이 접힌 것
@@ -61,6 +66,8 @@ class CompetitionRow:
 
     complex_name: str
     sigungu: str
+    address: str            # 표의 소재지. 매입임대 양식에만 있다
+    supply_kind: str        # 재공급 · 신규공급. 매입임대 양식에만 있다(다른 양식은 빈 값)
     supply_type: str        # 면적 표기 "29S" · "20A" · "41C"
     tenant_class: str       # 계층 "청년" · "신혼부부" · "고령자" · "신혼 I"
     bracket: str            # 우선 · 일반 · 1순위 · 2순위 · 3순위 · 소계
@@ -160,14 +167,36 @@ def _labels_of(
     return found
 
 
-def _bounds(header: dict[str, tuple[float, Segment]]) -> list[tuple[str, float, float]]:
-    """헤더 칸 중심 사이 중간점을 열 경계로. sh_addr_table과 같은 방식."""
+def _widest_gap(chars: list[Char], lo: float, hi: float, min_w: float = 2.5) -> float | None:
+    """[lo, hi) 안에서 글자가 한 번도 지나지 않은 가장 넓은 빈 띠의 한가운데."""
+    spans = sorted((c.l, c.r) for c in chars if c.ch.strip() and c.r > lo and c.l < hi)
+    best: tuple[float, float] | None = None
+    cur = lo
+    for l, r in spans:
+        if l - cur >= min_w and (best is None or l - cur > best[1] - best[0]):
+            best = (cur, l)
+        cur = max(cur, r)
+    if hi - cur >= min_w and (best is None or hi - cur > best[1] - best[0]):
+        best = (cur, hi)
+    return (best[0] + best[1]) / 2 if best else None
+
+
+def _bounds(header: dict[str, tuple[float, Segment]], data: list[Char] | None = None) -> list[tuple[str, float, float]]:
+    """열 경계. **글자가 지나지 않는 빈 띠**를 경계로 삼고, 없으면 헤더 중심의 중간점으로 물러선다.
+
+    중간점만 쓰면 넓은 칸이 옆으로 샌다 — 매입임대 양식의 「주소지」는 칸이 넓은데 헤더는 그 한가운데
+    찍혀 있어, 중간점이 주소 칸 안쪽에 떨어지고 주소 뒷부분이 「주택명」으로 넘어간다(실측 seq=307073).
+    """
     cols = sorted(((n, seg) for n, (_t, seg) in header.items()), key=lambda kv: _seg_cx(kv[1]))
+    edges: list[float] = []
+    for (an, a), (bn, b) in zip(cols, cols[1:]):
+        ax, bx = _seg_cx(a), _seg_cx(b)
+        gap = _widest_gap(data, ax, bx) if data else None
+        edges.append(gap if gap is not None else (ax + bx) / 2)
     out: list[tuple[str, float, float]] = []
-    for i, (name, seg) in enumerate(cols):
-        left = float("-inf") if i == 0 else (_seg_cx(cols[i - 1][1]) + _seg_cx(seg)) / 2
-        right = float("inf") if i == len(cols) - 1 else (_seg_cx(seg) + _seg_cx(cols[i + 1][1])) / 2
-        out.append((name, left, right))
+    for i, (name, _seg) in enumerate(cols):
+        out.append((name, float("-inf") if i == 0 else edges[i - 1],
+                    float("inf") if i == len(cols) - 1 else edges[i]))
     return out
 
 
@@ -191,12 +220,16 @@ def _bands(
 ) -> list[_Band]:
     """구분 열에서 띠를 연다. 띠는 다음 구분 글자 바로 위까지 — 그 사이 구두점이 제 값에 붙는다."""
     lo, hi = _span(bounds, key_col)
-    anchors = [
-        (t, text)
-        for t, segs, _c in rows
-        if t >= header_bottom
-        and pattern.fullmatch(text := next((s.text.replace(" ", "") for s in segs if lo <= _seg_cx(s) < hi), ""))
-    ]
+    # 칸 범위 안 조각 중 **패턴에 맞는 것**을 고른다. 첫 조각만 보면 옆 칸의 「-」(성별)이
+    # 먼저 걸려 그 줄이 통째로 빠진다(실측 seq=307073 3쪽).
+    anchors: list[tuple[float, str]] = []
+    for t, segs, _c in rows:
+        if t < header_bottom:
+            continue
+        hit = next((m for s in segs if lo <= _seg_cx(s) < hi
+                    and pattern.fullmatch(m := s.text.replace(" ", ""))), None)
+        if hit:
+            anchors.append((t, hit))
     if not anchors:
         return []
     all_chars = [c for _t, _s, chars in rows for c in chars]
@@ -283,6 +316,12 @@ def _clean_complex(text: str) -> str:
     return re.sub(r"\s*\([^)]*\d[^)]*\)\s*$", "", text).strip()
 
 
+def _road_address(text: str) -> str:
+    """「<재공급> 강남구 [백년빌] (26B) - 서울특별시 강남구 개포로24길 13」에서 주소만."""
+    m = re.search(r"(서울특별시|경기도|인천광역시)\s*\S+.*$", text)
+    return re.sub(r"\s+", " ", m.group(0)).strip() if m else ""
+
+
 def _sigungu_from(text: str) -> str:
     m = re.search(r"\(\s*([가-힣]+구)\s", text)
     return m.group(1) if m else ""
@@ -319,6 +358,9 @@ def parse_competition_page(xml: str, page: int) -> list[CompetitionRow]:
         return []
     if {"인터넷", "방문"} <= set(_labels_of(rows, LAYOUT_A_SUB)):
         return _parse_layout_a(rows, page)
+    cols_c = _labels_of(rows, LAYOUT_C_COLS, prefix=True)
+    if {"주택명", "주소지", "대상", "경쟁률"} <= set(cols_c):
+        return _parse_layout_c(rows, page, cols_c)
     cols = _labels_of(rows, LAYOUT_B_COLS, prefix=True)
     if {"신청자수", "경쟁률"} <= set(cols):
         return _parse_layout_b(rows, page, cols)
@@ -329,7 +371,8 @@ def _parse_layout_a(rows: list[tuple[float, list[Segment], list[Char]]], page: i
     header = {**_labels_of(rows, LAYOUT_A_MAIN), **_labels_of(rows, LAYOUT_A_SUB)}
     if not {"자치구", "단지명", "유형", "일반", "인터넷", "계"} <= set(header):
         return []
-    bounds, hb = _bounds(header), _header_bottom(header)
+    hb = _header_bottom(header)
+    bounds = _bounds(header, [c for _t, _s, chars in rows for c in chars if c.t >= hb])
     bands = _bands(rows, bounds, "일반", BRACKET_A, hb)
     if not bands:
         return []
@@ -375,7 +418,7 @@ def _parse_layout_a(rows: list[tuple[float, list[Segment], list[Char]]], page: i
                 sum_ok = True
             ok = sum_ok and (ratio_ok or b.label == "일반")   # 일반 띠엔 경쟁률이 인쇄되지 않는다
             all_ok &= ok
-            out.append(CompetitionRow(name.get(i, ""), gu.get(i, ""), supply_type, tenant, b.label,
+            out.append(CompetitionRow(name.get(i, ""), gu.get(i, ""), "", "", supply_type, tenant, b.label,
                                       units, total, ratio, ok, repaired, page))
             units_sum += units or 0
             applicants_sum += total or 0
@@ -384,7 +427,7 @@ def _parse_layout_a(rows: list[tuple[float, list[Segment], list[Char]]], page: i
         repaired = False
         if all_ok and derived is not None and not _close(block_ratio, derived):
             block_ratio, repaired = derived, True     # 띠가 다 성하면 소계는 산술로 정한다
-        out.append(CompetitionRow(name.get(i, ""), gu.get(i, ""), supply_type, tenant, "소계",
+        out.append(CompetitionRow(name.get(i, ""), gu.get(i, ""), "", "", supply_type, tenant, "소계",
                                   units_sum or None, applicants_sum or None, block_ratio,
                                   all_ok and _close(block_ratio, derived), repaired, page))
     return out
@@ -395,7 +438,8 @@ def _parse_layout_b(
 ) -> list[CompetitionRow]:
     if not {"단지명", "공급유형", "대상", "공급호수", "신청자수", "경쟁률"} <= set(header):
         return []
-    bounds, hb = _bounds(header), _header_bottom(header)
+    hb = _header_bottom(header)
+    bounds = _bounds(header, [c for _t, _s, chars in rows for c in chars if c.t >= hb])
     bands = _bands(rows, bounds, "대상", BRACKET_B, hb)
     if not bands:
         return []
@@ -427,8 +471,43 @@ def _parse_layout_b(
             ok, repaired = _close(ratio, derived), False
             if not ok and derived is not None and not app_cell.hole and (ratio is None or ratio_cell.hole):
                 ratio, ok, repaired = derived, True, True
-            out.append(CompetitionRow(name.get(i, ""), gu.get(i, ""), supply_type, tenant, b.label,
+            out.append(CompetitionRow(name.get(i, ""), gu.get(i, ""), "", "", supply_type, tenant, b.label,
                                       units, applicants, ratio, ok, repaired, page))
+    return out
+
+
+def _parse_layout_c(
+    rows: list[tuple[float, list[Segment], list[Char]]], page: int, header: dict[str, tuple[float, Segment]]
+) -> list[CompetitionRow]:
+    """매입임대 양식. 줄마다 값이 다 있어 띠 하나가 곧 한 줄이다 — 블록을 묶지 않는다."""
+    if not {"자치구", "주택명", "대상", "공급호수", "계", "경쟁률"} <= set(header):
+        return []
+    hb = _header_bottom(header)
+    bounds = _bounds(header, [c for _t, _s, chars in rows for c in chars if c.t >= hb])
+    bands = _bands(rows, bounds, "대상", BRACKET_B, hb)
+    if not bands:
+        return []
+    pitch = _pitch([c for _t, _s, chars in rows for c in chars])
+
+    out: list[CompetitionRow] = []
+    for b in bands:
+        name = _cell(b.chars, *_span(bounds, "주택명"), pitch).text
+        gu = _cell(b.chars, *_span(bounds, "자치구"), pitch).text
+        kind = _cell(b.chars, *_span(bounds, "구분"), pitch).text if "구분" in header else ""
+        addr = _road_address(_cell(b.chars, *_span(bounds, "주소지"), pitch).text) if "주소지" in header else ""
+        m = SUPPLY_TYPE_HEAD.search(_cell(b.chars, *_span(bounds, "주택형성별"), pitch).text) if "주택형성별" in header else None
+        units = _int(_cell(b.chars, *_span(bounds, "공급호수"), pitch))
+        app_cell = _cell(b.chars, *_span(bounds, "계"), pitch)
+        ratio_cell = _cell(b.chars, *_span(bounds, "경쟁률"), pitch)
+        applicants, ratio = _int(app_cell), _ratio(ratio_cell)
+        derived = round(applicants / units, 1) if (units and applicants is not None) else None
+        # 이 양식은 경쟁률을 정수로 반올림해 찍는다 — 105호에 2호면 52.5가 아니라 53으로 나온다
+        ok = _close(ratio, derived) or (ratio is not None and derived is not None and ratio == math.floor(derived + 0.5))
+        repaired = False
+        if not ok and derived is not None and not app_cell.hole and (ratio is None or ratio_cell.hole):
+            ratio, ok, repaired = derived, True, True
+        out.append(CompetitionRow(name, gu, addr, kind, m.group(1).replace(" ", "") if m else "", "",
+                                  b.label.replace(" ", ""), units, applicants, ratio, ok, repaired, page))
     return out
 
 
