@@ -175,6 +175,17 @@ def page_rows(xml: str) -> list[list[Segment]]:
     return [row_segments(r) for r in group_rows(parse_chars(xml))]
 
 
+def row_center_y(row: list[Char]) -> float:
+    """줄의 세로 중심. 세로 병합 칸은 자기 블록의 정중앙에 놓이므로 병합 복원에 이 값이 필요하다."""
+    boxed = [c for c in row if c.h > 0]
+    return sum(c.t + c.h / 2 for c in boxed) / len(boxed) if boxed else 0.0
+
+
+def page_rows_y(xml: str) -> list[tuple[float, list[Segment]]]:
+    """page_rows에 줄의 세로 중심을 붙인 것."""
+    return [(row_center_y(r), row_segments(r)) for r in group_rows(parse_chars(xml))]
+
+
 class IshClient:
     def __init__(self, *, delay_sec: float = 1.0, timeout_sec: float = 30.0, max_retries: int = 3, http: httpx.Client | None = None):
         # 302 Location을 직접 읽어야 하므로 리다이렉트를 따라가지 않는다

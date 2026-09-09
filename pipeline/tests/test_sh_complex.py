@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from zipgonggo_pipeline.parsers.sh_complex import ROAD_ADDR_RE, parse_location_table
+from zipgonggo_pipeline.parsers.sh_complex import ROAD_ADDR_RE, _split_blocks, parse_location_table
 from zipgonggo_pipeline.sources.ish import SynapDoc, find_attachments, group_rows, page_rows, parse_chars
 
 FIX = Path(__file__).parent / "fixtures" / "ish_309467"
@@ -103,3 +103,51 @@ def test_synap_doc_page_url_keeps_rs_prefix():
     """rs는 302 Location에 실려 오는 값이라 /app/이든 /main/이든 그대로 써야 한다."""
     doc = SynapDoc(rs="/app/upload/bbs/JI1901/html/", fn="20200625112039731")
     assert doc.page_url(1) == "https://www.i-sh.co.kr/app/upload/bbs/JI1901/html/20200625112039731.files/20200625112039731_1.xml"
+
+
+# --- 지구명 세로 병합 복원 -------------------------------------------------
+
+def test_district_counts(rows):
+    """15개 지구에 74단지. 나머지 64단지는 지구명 칸이 `-`인 단독 단지."""
+    by = Counter(r.district for r in rows if r.district)
+    assert len(by) == 15
+    assert sum(by.values()) == 74
+    assert sum(1 for r in rows if r.district is None) == 64
+
+
+def test_district_blocks_are_exact(rows):
+    """블록 경계가 밀리면 바로 여기서 걸린다 — 세곡/세곡2, 천왕/천왕2처럼 크기가 다른 이웃 블록이 함정."""
+    got = {}
+    for r in rows:
+        if r.district:
+            got.setdefault(r.district, []).append(r.name)
+    assert got["세곡지구"] == ["강남신동아파밀리에2단지", "강남신동아파밀리에3단지", "세곡리엔파크4단지", "강남데시앙파크"]
+    assert got["세곡2지구"] == ["래미안포레(세곡2-3)", "강남한양수자인(세곡2-4)", "강남한신휴플러스6단지(2-6)", "강남한신휴플러스8단지(2-8)"]
+    assert got["천왕지구"] == [f"천왕이펜하우스 {n}단지" for n in (2, 3, 4, 5, 6)]
+    assert got["천왕2지구"] == ["천왕연지타운 1단지", "천왕연지타운 2단지"]
+    assert got["강일지구"] == [f"강일리버파크{n}단지" for n in (2, 3, 4, 6, 9, 10)]
+    assert got["강일2지구"] == [f"고덕리엔파크{n}단지" for n in (1, 2, 3)]
+    assert len(got["마곡지구"]) == 13 and all(n.startswith("마곡엠밸리") for n in got["마곡지구"])
+
+
+def test_district_never_leaks_to_standalone(rows):
+    """지구명 칸이 `-`인 줄은 지구가 없어야 한다. 있으면 병합 블록이 이웃 줄을 삼킨 것."""
+    standalone = {"래미안레벤투스", "청담르엘", "수서하니움", "청담자이", "고덕아이파크", "등촌장기전세주택"}
+    for r in rows:
+        if r.name in standalone:
+            assert r.district is None, r
+
+
+def test_district_matches_complex_name(rows):
+    """지구명 앞머리가 단지명·주소에 안 보이는 조합은 블록이 어긋난 신호(휴리스틱 감시용)."""
+    for r in rows:
+        if r.district in ("은평1지구", "은평2지구", "은평3지구"):
+            assert r.sigungu == "은평구", r
+
+
+def test_split_blocks_prefers_center_over_nearest():
+    """가장 가까운 라벨에 붙이면 틀리는 실제 배치(51차 49쪽 강일/강일2)를 DP가 바로잡는지."""
+    ys = [852.1, 874.2, 896.3, 919.0, 940.9, 963.1, 985.1, 1007.3, 1029.5]
+    assert _split_blocks(ys, [907.7, 1007.3]) == [0, 0, 0, 0, 0, 0, 1, 1, 1]
+    # 963.1은 907.7보다 1007.3에 가깝지만(55 vs 44) 블록 중심으로는 앞 덩어리다
+    assert abs((ys[0] + ys[5]) / 2 - 907.7) < 1
