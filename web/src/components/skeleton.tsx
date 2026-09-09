@@ -65,3 +65,26 @@ export function SkeletonDetail() {
     </article>
   );
 }
+
+/** 약관·방침 골격: 좁은 본문 한 단. 이동 즉시 뼈대를 깔아 "아무것도 안 나온다"를 막는다(사용자 지적 2026-09-09) */
+export function SkeletonLegal() {
+  return (
+    <article className="legal" aria-busy="true" aria-label="문서를 불러오는 중">
+      <div className="crumb"><Box w={64} h={30} r={9} /></div>
+      <div className="legal-in">
+        <Box w={180} h={30} />
+        <Box w={220} h={11} style={{ marginTop: 12 }} />
+        <div className="legal-body">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i}>
+              <Box w={150} h={14} style={{ marginBottom: 12 }} />
+              <Box h={11} style={{ marginBottom: 8 }} />
+              <Box h={11} style={{ marginBottom: 8 }} />
+              <Box w="72%" h={11} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </article>
+  );
+}

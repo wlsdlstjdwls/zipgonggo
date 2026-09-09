@@ -289,7 +289,7 @@ small { font-size: 12px; }
 
 /* ── 결과 행 ─────────────────────────────────────────────── */
 .rows { list-style: none; margin: 0; padding: 0; }
-.row { display: grid; grid-template-columns: 56px minmax(0, 1fr) 170px auto; gap: 18px; align-items: center; padding: 18px var(--pad); border-bottom: 1px solid var(--line); color: var(--ink);
+.row { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 18px var(--pad); border-bottom: 1px solid var(--line); color: var(--ink);
   animation: mo-in 440ms var(--sp) both; animation-delay: var(--stagger, 0ms);
   transition: background 200ms var(--ease), transform 300ms var(--sp); }
 .row.static { animation: none; }
@@ -323,15 +323,11 @@ small { font-size: 12px; }
 .row-meta .live.soft { background: var(--sub); color: var(--mut); }
 .row-meta .live.soon { background: var(--soon-soft); color: var(--soon); }
 .row-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-top: 5px; font-weight: 800; font-size: 16px; line-height: 1.35; letter-spacing: -0.03em; color: var(--ink); overflow: hidden; }
-.row-dates { display: block; margin-top: 8px; font-weight: 600; font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-money { display: block; text-align: right; }
-.row-money b { display: block; font-weight: 900; font-size: 22px; line-height: 1; letter-spacing: -0.05em; color: var(--ink); transition: color 240ms var(--ease); }
-.row:hover .row-money b { color: var(--acc); }
-.row-money span { display: block; margin-top: 6px; font-weight: 700; font-size: 11px; color: var(--dim); white-space: nowrap; }
-.row-money.none b { color: var(--dim); font-size: 13px; font-weight: 700; letter-spacing: 0; }
-.row-narrow { display: none; align-items: baseline; gap: 8px; margin-top: 7px; }
-.row-narrow b { font-weight: 900; font-size: 17px; line-height: 1; letter-spacing: -0.045em; color: var(--ink); }
-.row-narrow span { font-weight: 700; font-size: 10.5px; color: var(--dim); }
+/* 날짜 줄 — 목록에서 금액을 뺀 자리(사용자 요청 2026-09-09). 라벨은 연하게, 값은 진하게 */
+.row-dates { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-top: 9px; min-width: 0; }
+.rd { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.rd i { font-style: normal; font-weight: 700; font-size: 10px; letter-spacing: 0.1em; color: var(--dim); }
+.rd b { font-weight: 800; font-size: 12.5px; letter-spacing: -0.01em; color: var(--ink); font-variant-numeric: tabular-nums; }
 .row-act { display: flex; align-items: center; gap: 12px; }
 
 /* ── 보기 모드: 간략 ─────────────────────────────────────── 행 높이를 줄이고 날짜·금액 보조줄을 감춘다 */
@@ -340,23 +336,25 @@ small { font-size: 12px; }
 .rows.v-compact .row-dday b { font-size: 14px; }
 .rows.v-compact .row-dday span { font-size: 8px; margin-top: 3px; }
 .rows.v-compact .row-title { font-size: 14px; -webkit-line-clamp: 1; margin-top: 3px; }
-.rows.v-compact .row-dates { display: none; }
-.rows.v-compact .row-money b { font-size: 17px; }
-.rows.v-compact .row-money span { display: none; }
+.rows.v-compact .row-dates { gap: 2px 12px; margin-top: 4px; }
+.rows.v-compact .rd i { display: none; }
+.rows.v-compact .rd b { font-size: 11.5px; font-weight: 700; color: var(--mut); }
+.rows.v-compact .rd + .rd::before { content: "|"; margin-right: 8px; color: var(--line2); font-weight: 600; }
 
 /* ── 보기 모드: 카드 ─────────────────────────────────────── 행을 세로로 세워 격자에 깐다 */
 .rows.v-card { display: grid; grid-template-columns: repeat(auto-fill, minmax(288px, 1fr)); gap: 12px; padding: 4px var(--pad) 10px; }
 .rows.v-card .row { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 0; height: 100%;
   padding: 16px; border: 1px solid var(--line); border-radius: var(--r-panel); }
 .rows.v-card .row:hover { transform: translateY(-2px); background: var(--bg); border-color: var(--line2); box-shadow: var(--shadow-float); }
-.rows.v-card .row-dday { flex-direction: row; align-items: baseline; gap: 6px; width: auto; height: 28px; padding: 0 10px; border-radius: var(--r-chip); }
-.rows.v-card .row-dday b { font-size: 13px; }
-.rows.v-card .row-dday span { margin-top: 0; }
+/* 칩을 가로로 눕힌다 — baseline 정렬은 큰 글자와 작은 글자가 위로 쏠려 보였다(사용자 지적 2026-09-09).
+   center 정렬 + line-height 1로 두 글자를 한 줄에 딱 맞춘다 */
+.rows.v-card .row-dday { flex-direction: row; align-items: center; justify-content: flex-start; gap: 5px; width: auto; height: 24px; padding: 0 9px; border-radius: var(--r-chip); }
+.rows.v-card .row-dday b { font-size: 12px; line-height: 1; }
+.rows.v-card .row-dday span { margin-top: 0; font-size: 9.5px; line-height: 1; letter-spacing: 0.04em; }
 .rows.v-card .row-body { width: 100%; margin-top: 12px; flex: 1; }
 .rows.v-card .row-title { font-size: 15px; }
-.rows.v-card .row-money { width: 100%; text-align: left; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
-.rows.v-card .row-money b { font-size: 20px; }
-.rows.v-card .row-act { position: absolute; top: 12px; right: 12px; }
+.rows.v-card .row-dates { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
+.rows.v-card .row-act { position: absolute; top: 10px; right: 10px; }
 .rows.v-card .row-act .arrow { display: none; }
 .save { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 0; border-radius: var(--r-chip); background: var(--sub); color: var(--dim); font-weight: 900; font-size: 15px; line-height: 1; cursor: pointer;
   transition: transform 280ms var(--sp), color 220ms linear, background 220ms linear; }
@@ -405,7 +403,7 @@ small { font-size: 12px; }
 .crumb .back { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 9px; background: var(--sub); color: var(--mut); font-weight: 700; white-space: nowrap; flex: none; transition: transform 240ms var(--sp), background 200ms var(--ease); }
 .crumb .back:hover { transform: translateY(-1.5px); background: var(--line); }
 .crumb span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.detail { display: grid; grid-template-columns: minmax(0, 1fr) 336px; }
+.detail { display: grid; grid-template-columns: minmax(0, 1fr) 272px; }
 .detail-main { min-width: 0; }
 .dsec, .section { padding: 24px var(--pad); border-bottom: 1px solid var(--line); }
 .dsec > h2, .section > h2 { margin: 0 0 14px; font-weight: 800; font-size: 10.5px; line-height: 1; letter-spacing: 0.2em; color: var(--dim); }
@@ -419,10 +417,6 @@ small { font-size: 12px; }
 .d-head { padding: 22px var(--pad) 20px; border-bottom: 1px solid var(--line); }
 .d-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .d-title { margin: 0 0 14px; font-weight: 900; font-size: 34px; line-height: 1.22; letter-spacing: -0.05em; color: var(--ink); max-width: 24em; }
-.jumbo-label { display: block; font-weight: 800; font-size: 10.5px; line-height: 1; letter-spacing: 0.18em; color: var(--dim); margin-bottom: 12px; }
-.jumbo { font-weight: 900; font-size: 56px; line-height: 1; letter-spacing: -0.06em; color: var(--ink); }
-.jumbo-from { font-weight: 800; font-size: 15px; color: var(--mut); margin-left: 4px; }
-.jumbo-sub { display: block; margin-top: 12px; font-weight: 700; font-size: 12.5px; color: var(--dim); }
 /* 공고 상세 헤드라인 밑 한 줄 — 금액 점보를 걷어낸 자리. 본론(단지 목록·지도)을 위로 끌어올리려고 낮게 유지한다 */
 .d-when { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin: 0; font-weight: 700; font-size: 12.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
 .d-when .when { display: inline-flex; align-items: center; height: 26px; padding: 0 11px; border-radius: 8px; font-weight: 800; font-size: 13px; letter-spacing: -0.02em; }
@@ -462,18 +456,13 @@ small { font-size: 12px; }
 .ptable .max { background: var(--acc-soft); }
 .ptable .max .k, .ptable .max .d, .ptable .max .r { color: var(--acc); }
 .ptable .max .k small { color: var(--acc); opacity: 0.75; }
-.d-map { position: relative; height: 300px; border-radius: var(--r-panel); overflow: hidden; border: 1px solid var(--line); background: var(--sub); }
+.d-map { position: relative; height: 360px; border-radius: var(--r-panel); overflow: hidden; border: 1px solid var(--line); background: var(--sub); }
 .d-map .map { height: 100%; border-radius: 0; }
 .d-sub { margin: -14px 0 22px; font-weight: 600; font-size: 13.5px; color: var(--mut); }
-/* 같은 공고의 이웃 단지 이동 */
-.pager { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 18px var(--pad); border-bottom: 1px solid var(--line); }
-.pager-a { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line2); border-radius: var(--r-btn);
-  transition: transform 240ms var(--sp), border-color 200ms var(--ease), background 200ms var(--ease); }
-.pager-a:hover { transform: translateY(-1.5px); border-color: var(--acc); background: var(--acc-soft); }
-.pager-a span { font-weight: 800; font-size: 10px; letter-spacing: 0.16em; color: var(--dim); }
-.pager-a b { font-weight: 800; font-size: 13.5px; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pager-a.next { text-align: right; }
 .note { margin: 12px 0 0; font-weight: 500; font-size: 11.5px; line-height: 1.7; color: var(--dim); }
+/* 섹션 안 소제목 — 「단지 제원」 밑 공급현황 표처럼 같은 이야기의 두 번째 문단 */
+.dsub { margin-top: 20px; }
+.dsub > h3 { margin: 0 0 10px; font-weight: 800; font-size: 10.5px; line-height: 1; letter-spacing: 0.2em; color: var(--dim); }
 .aside { border-left: 1px solid var(--line); }
 .aside-in { position: sticky; top: 60px; padding: 22px var(--pad); display: flex; flex-direction: column; gap: 14px; }
 .dcard { padding: 18px; border-radius: var(--r-panel); }
@@ -513,14 +502,15 @@ small { font-size: 12px; }
 .tbl.wide table { min-width: 760px; }
 
 /* ── 공급 단지 탐색기(components/complex-explorer.tsx) — 좌 목록 / 우 지도 ── */
-.cx { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 14px; align-items: start; }
-.cx-panel { position: relative; z-index: 1; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--bg); }
+/* 왼쪽 목록과 오른쪽 지도는 같은 높이다(--cx-h) — 지도만 짧으면 목록 옆에 빈 띠가 남는다(사용자 지적 2026-09-09) */
+.cx { --cx-h: min(660px, calc(100vh - 150px)); display: grid; grid-template-columns: minmax(300px, 360px) 1fr; gap: 14px; align-items: start; }
+.cx-panel { position: relative; z-index: 1; display: flex; flex-direction: column; height: var(--cx-h); border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--bg); }
 .cx-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); }
 .cx-tools .selw, .cx-tools .sel { width: 100%; }
 .cx-tools .fld { grid-column: 1 / -1; }
 .cx-count { margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--dim); border-bottom: 1px solid var(--line); }
 .cx-count b { color: var(--ink); }
-.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: min(820px, calc(100vh + 60px)); border-radius: 0 0 var(--r-panel) var(--r-panel); overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
+.cx-list { position: relative; list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; border-radius: 0 0 var(--r-panel) var(--r-panel); overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
 .cx-list li { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
 .cx-list li:last-child { border-bottom: 0; }
 .cx-list > li > button { display: flex; flex: 1; min-width: 0; gap: 10px; align-items: flex-start; padding: 11px 12px; background: none; border: 0; border-left: 3px solid transparent; text-align: left; font: inherit; color: var(--ink); cursor: pointer; transition: background 200ms var(--ease), transform 300ms var(--sp); }
@@ -543,8 +533,8 @@ small { font-size: 12px; }
 .cx-empty { display: block; padding: 24px 12px; color: var(--dim); font-size: 13px; text-align: center; }
 /* 지도는 목록 옆에 붙박이. 지도가 패널보다 크면 sticky가 걸릴 자리가 없어 페이지와 함께 흘러내린다
    — 지도는 뷰포트보다 낮게, 목록은 뷰포트보다 길게 잡아 붙을 구간을 만든다(사용자 지적 2026-09-09) */
-.cx-map-wrap { position: sticky; top: 72px; }
-.cx-map { width: 100%; height: min(560px, calc(100vh - 160px)); border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--sub); overflow: hidden; position: relative; z-index: 0; }
+.cx-map-wrap { position: sticky; top: 72px; height: var(--cx-h); }
+.cx-map { width: 100%; height: 100%; border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--sub); overflow: hidden; position: relative; z-index: 0; }
 .cx-map .canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; } /* SDK가 position을 relative로 덮어써도 크기가 남게 width/height 명시 */
 /* 지도 위 선택 카드 — 로드뷰 토글과 단지 상세 진입. 로드뷰 패널(z 6)보다 위.
    bottom은 NAVER 로고·축척 바를 가리지 않는 높이 — 로고는 항상 보여야 한다(이용약관) */
@@ -626,20 +616,13 @@ small { font-size: 12px; }
 
 /* ── 반응형: 컨테이너 900px 한 단계 ──────────────────────── */
 @container (max-width: 900px) {
-  .row { grid-template-columns: 56px minmax(0, 1fr) auto; }
-  .row-money { display: none; }
-  .row-narrow { display: flex; }
-  .rows.v-card .row-money { display: block; }
-  .rows.v-card .row-narrow { display: none; }
   .detail { grid-template-columns: 1fr; }
   .aside { border-left: 0; border-top: 1px solid var(--line); }
   .aside-in { position: static; }
   .d-title { font-size: 30px; }
-  .jumbo { font-size: 42px; }
   .cx { grid-template-columns: 1fr; }
-  .cx-map-wrap { position: static; order: -1; }
-  .cx-map { height: 400px; }
-  .cx-list { max-height: 420px; }
+  .cx-map-wrap { position: static; order: -1; height: 400px; }
+  .cx-panel { height: 480px; }
   /* 스코프 바가 줄바꿈되면 높이가 가변이라 sticky top(120px) 계산이 깨진다 — 좁아지면 둘 다 흐름에 둔다 */
   .fbar.sticky { position: static; background: none; backdrop-filter: none; }
   .dsec.lead > h2 { font-size: 17px; }
@@ -648,7 +631,6 @@ small { font-size: 12px; }
   .cx-card-a { display: grid; grid-template-columns: 1fr 1fr; }
   .cx-card-a .map-btn { width: 100%; }
   .cx-card-a .map-btn:only-child { grid-column: 1 / -1; }
-  .pager { grid-template-columns: 1fr; }
 }
 
 /* ── 반응형: 스코프·필터 바 ────────────────────────────────

@@ -60,29 +60,48 @@ export function priceRows(n: Notice): PriceRow[] {
   return rows;
 }
 
-/** 단지 헤드라인 금액의 최소~최대 범위. notice_complex.min_*는 이미 이 단지 안 최소값이고,
-    최대는 공급현황(supply)의 같은 항목 중 가장 큰 값이다 — 범위가 없으면(전부 같으면) null */
-export function complexPriceRange(c: NoticeComplex, supply: NoticeSupply[]): number | null {
-  const min = c.min_rent ?? c.min_deposit;
-  if (min == null) return null;
-  const field = c.min_rent != null ? "rent" : "deposit";
-  const values = supply.map((s) => s[field]).filter((v): v is number => v != null);
-  const max = values.length ? Math.max(...values) : null;
-  return max != null && max > min ? max : null;
-}
-
 /** 단지 상세 「보증금과 임대료」 — 이 단지의 공급현황이 있으면 공급대상 × 공급유형별로 쪼갠다.
-    공고 단위 priceRows와 달리 계약금/중도금/잔금 개념이 없어 그룹은 항상 "base"(평범한 한 줄)다. */
-export function complexPriceRows(supply: NoticeSupply[]): PriceRow[] {
-  return supply
-    .filter((s) => s.deposit != null || s.rent != null)
-    .map((s) => ({
-      id: String(s.id),
+    공고 단위 priceRows와 달리 계약금/중도금/잔금 개념이 없어 낱줄은 항상 "base"다.
+    줄이 둘 이상이고 값이 갈리면 맨 밑에 최소/최대 두 줄을 덧댄다(사용자 요청 2026-09-09) —
+    상호전환 계산기에 넣을 범위를 표에서 바로 읽으라고. 공급현황이 아예 없으면 단지 요약값(min_*)으로 대신한다. */
+export function complexPriceRows(supply: NoticeSupply[], c?: NoticeComplex): PriceRow[] {
+  const priced = supply.filter((s) => s.deposit != null || s.rent != null);
+  const rows: PriceRow[] = priced.map((s) => ({
+    id: String(s.id),
+    group: "base",
+    label: classLabel(s),
+    note: typeLabel(s),
+    deposit: wonKo(s.deposit),
+    rent: s.rent != null ? wonKo(s.rent) : "—",
+    exact: [s.deposit, s.rent],
+  }));
+
+  if (rows.length === 0) {
+    // 첨부 표를 못 읽은 공고 — 목록·지도가 쓰는 단지 요약 최소값이라도 낸다
+    if (!c || (c.min_deposit == null && c.min_rent == null)) return rows;
+    return [{
+      id: "complex-min",
       group: "base",
-      label: classLabel(s),
-      note: typeLabel(s),
-      deposit: wonKo(s.deposit),
-      rent: s.rent != null ? wonKo(s.rent) : "—",
-      exact: [s.deposit, s.rent],
-    }));
+      label: "최소",
+      note: "단지 요약값",
+      deposit: wonKo(c.min_deposit),
+      rent: c.min_rent != null ? wonKo(c.min_rent) : "—",
+      exact: [c.min_deposit, c.min_rent],
+    }];
+  }
+  if (rows.length < 2) return rows;
+
+  const span = (pick: (s: NoticeSupply) => number | null): [number | null, number | null] => {
+    const v = priced.map(pick).filter((x): x is number => x != null);
+    return v.length ? [Math.min(...v), Math.max(...v)] : [null, null];
+  };
+  const [dLo, dHi] = span((s) => s.deposit);
+  const [rLo, rHi] = span((s) => s.rent);
+  if (dLo === dHi && rLo === rHi) return rows;   // 전부 같은 값이면 덧댈 게 없다
+
+  rows.push(
+    { id: "range-min", group: "max", label: "최소", note: "이 단지", deposit: wonKo(dLo), rent: rLo != null ? wonKo(rLo) : "—", exact: [dLo, rLo] },
+    { id: "range-max", group: "max", label: "최대", note: "이 단지", deposit: wonKo(dHi), rent: rHi != null ? wonKo(rHi) : "—", exact: [dHi, rHi] },
+  );
+  return rows;
 }

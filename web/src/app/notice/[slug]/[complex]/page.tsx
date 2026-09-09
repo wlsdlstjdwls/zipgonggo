@@ -12,8 +12,8 @@ import { PriceTable } from "@/components/price-table";
 import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
 import { agencyLabels } from "@/lib/agency";
-import { count, dateK, deadlineChip, num, wonExact, wonKo } from "@/lib/format";
-import { areaText, commonArea, complexPriceRange, complexPriceRows, m2 } from "@/lib/notice-view";
+import { count, dateK, deadlineChip, num, wonKo } from "@/lib/format";
+import { areaText, commonArea, complexPriceRows, m2 } from "@/lib/notice-view";
 import { getComplexSupply, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
 import { regionShort, sidoShort } from "@/lib/sido";
@@ -24,7 +24,7 @@ export const revalidate = 3600;
 
 type Params = { params: Promise<{ slug: string; complex: string }> };
 
-type Found = { n: Notice; c: NoticeComplex; siblings: NoticeComplex[] };
+type Found = { n: Notice; c: NoticeComplex };
 
 async function load(params: Params["params"]): Promise<Found | null> {
   const { slug, complex } = await params;
@@ -34,7 +34,7 @@ async function load(params: Params["params"]): Promise<Found | null> {
   const seg = decodeURIComponent(complex);
   // 코드까지 맞는 행이 정답. 코드가 붙기 전에 나간 링크(이름만)도 살려 준다(URL을 삭제하지 않는다 — CLAUDE.md 6)
   const c = siblings.find((x) => complexSegment(x) === seg) ?? siblings.find((x) => x.name === seg);
-  return c ? { n, c, siblings } : null;
+  return c ? { n, c } : null;
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function ComplexPage({ params }: Params) {
   const f = await load(params);
   if (!f) notFound();
-  const { n, c, siblings } = f;
+  const { n, c } = f;
   const supply = await getComplexSupply(n.id, c.id, c.name);
   // 호수는 (공급유형, 공급대상)마다 한 칸이다 — 청년 소득있음/없음 두 줄이 같은 칸을 나눠 써 두 번 세면 안 된다
   const counted = new Map(supply.filter((s) => s.units_total != null).map((s) => [`${s.supply_type}|${s.tenant_class}`, s]));
@@ -68,17 +68,12 @@ export default async function ComplexPage({ params }: Params) {
   const hasRent = supply.some((s) => s.rent != null);          // 장기전세는 월임대료가 없다
   const hasClass = new Set(supply.map((s) => s.tenant_class)).size > 1 || supply.some((s) => s.income_option);
   const moveIn = supply.find((s) => s.move_in_from)?.move_in_from ?? null;
-  const priceBreak = complexPriceRows(supply);
+  const priceBreak = complexPriceRows(supply, c);
   // 오른쪽 카드는 언제나 "마감"을 센다 — 접수 시작 D-day를 섞으면 「접수 시작까지 / 오늘 / 09.11 마감」처럼 어긋난다
   const dl = deadlineChip(n);
   const L = agencyLabels(n);
   const area = areaText(c);
   const full = c.sido === "서울특별시" ? `서울특별시 ${c.road_address}` : c.road_address;
-  const i = siblings.findIndex((x) => x.id === c.id);
-  const prev = i > 0 ? siblings[i - 1] : null;
-  const next = i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : null;
-  const hasMoney = c.min_deposit != null || c.min_rent != null;
-  const priceMax = complexPriceRange(c, supply);
   // 지도 말풍선 보조 글자 — 금액이 있으면 금액, 없으면 면적, 그것도 없으면 자치구
   const mapSub = c.min_rent != null ? `월 ${wonKo(c.min_rent)}`
     : c.min_deposit != null ? `보증금 ${wonKo(c.min_deposit)}`
@@ -102,40 +97,28 @@ export default async function ComplexPage({ params }: Params) {
             </div>
             <h1 className="d-title">{c.name}</h1>
             <p className="d-sub">{full}</p>
-            {hasMoney ? (
+          </header>
+
+          <section className="dsec">
+            <h2>보증금과 임대료</h2>
+            {priceBreak.length > 0 ? (
               <>
-                <span className="jumbo-label">{c.min_rent != null ? "월 임대료" : hasRent ? "임대보증금" : "전세금"}</span>
-                <b className="jumbo" title={wonExact(c.min_rent ?? c.min_deposit)}>
-                  {priceMax != null ? `${wonKo(c.min_rent ?? c.min_deposit)}~${wonKo(priceMax)}` : wonKo(c.min_rent ?? c.min_deposit)}
-                </b>
-                {priceMax == null && <span className="jumbo-from">부터</span>}
-                {c.min_rent != null && c.min_deposit != null && (
-                  <span className="jumbo-sub" title={wonExact(c.min_deposit)}>보증금 {wonKo(c.min_deposit)} 부터</span>
+                <PriceTable rows={priceBreak} />
+                {hasRent && (
+                  <p className="note">
+                    공고문 기준값입니다. 계약 때 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있습니다. 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
+                  </p>
                 )}
               </>
             ) : (
-              <>
-                <span className="jumbo-label">보증금과 임대료</span>
-                <span className="jumbo-sub" style={{ marginTop: 0 }}>이 표에는 금액이 없습니다. {L.originalDoc}의 표를 확인하세요.</span>
-              </>
+              <p className="note" style={{ marginTop: 0 }}>이 공고 데이터에는 금액이 없습니다. {L.originalDoc}의 표를 확인하세요.</p>
             )}
-          </header>
+          </section>
 
-          {priceBreak.length > 0 && (
-            <section className="dsec">
-              <h2>보증금과 임대료</h2>
-              <PriceTable rows={priceBreak} />
-              {hasRent && (
-                <p className="note">
-                  공고문 기준값입니다. 계약 때 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있습니다. 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
-                </p>
-              )}
-            </section>
-          )}
-
+          {/* 제원과 공급현황은 한 섹션이다 — 같은 표를 세로/가로로 두 번 나눠 보여줄 이유가 없다(사용자 요청 2026-09-09) */}
           <section className="dsec">
-            <h2>단지 제원</h2>
-            {/* 단지명·주소·지역·금액은 머리글이 이미 말했다 — 여기선 겹치지 않는 값만(사용자 요청 2026-09-09) */}
+            <h2>단지 제원{supply.length > 0 && unitTotal > 0 ? ` | ${num(unitTotal, "호")}` : ""}</h2>
+            {/* 단지명·주소·지역은 머리글이 이미 말했다 — 여기선 겹치지 않는 값만 */}
             <SpecList>
               <Spec label="공급 호실" value={c.unit_count != null ? num(c.unit_count, "호") : null} />
               <Spec label="전용면적" value={area} />
@@ -147,24 +130,17 @@ export default async function ComplexPage({ params }: Params) {
               <Spec label="입주 시작" value={moveIn} />
               <Spec label="주택 유형" value={supply.length ? (supply.some((s) => s.is_new) ? "신규 공급" : "재공급") : null} />
             </SpecList>
-            {c.source_page != null && <p className="note">원문 {c.source_page}쪽.</p>}
+            {supply.length > 0 && (
+              <div className="dsub">
+                <h3>공급현황 {count(supply.length, "건")}</h3>
+                <SupplyTable supply={supply} hasReserve={hasReserve} hasRent={hasRent} hasClass={hasClass} />
+              </div>
+            )}
           </section>
-
-          {supply.length > 0 && (
-            <section className="dsec">
-              <h2>공급 {count(supply.length, "건")}{unitTotal > 0 && ` | ${num(unitTotal, "호")}`}</h2>
-              <SupplyTable supply={supply} hasReserve={hasReserve} hasRent={hasRent} hasClass={hasClass} />
-              <p className="note">
-                {hasReserve && "공급호수는 공가(우선과 일반)와 예비입주자 모집분을 더한 값입니다."}
-                {supply[0]?.source_page != null && ` 원문 ${supply[0].source_page}쪽.`}
-              </p>
-            </section>
-          )}
 
           <section className="dsec">
             <h2>위치</h2>
             <div className="d-map"><NaverMap address={full} title={c.name} sub={mapSub} /></div>
-            <p className="note">지도 위치는 도로명주소 기준 근사치입니다. 핀이나 로드뷰 버튼을 누르면 거리뷰가 열립니다.</p>
           </section>
 
           {/* 공고와 원문 링크는 오른쪽 카드가 이미 준다 — 고지 한 줄만 남긴다 */}
@@ -172,21 +148,6 @@ export default async function ComplexPage({ params }: Params) {
             <span className="i">i</span>
             <span>본 자료는 참고용입니다. 정확한 내용과 최종 조건은 {n.agency}의 공식 공고문을 반드시 확인하세요.</span>
           </div>
-
-          {(prev || next) && (
-            <nav className="pager" aria-label="같은 공고의 다른 단지">
-              {prev ? (
-                <Link href={noticeComplexPath(n.slug, prev)} className="pager-a">
-                  <span>이전 단지</span><b>{prev.name}</b>
-                </Link>
-              ) : <span />}
-              {next && (
-                <Link href={noticeComplexPath(n.slug, next)} className="pager-a next">
-                  <span>다음 단지</span><b>{next.name}</b>
-                </Link>
-              )}
-            </nav>
-          )}
         </div>
 
         <DetailAside
