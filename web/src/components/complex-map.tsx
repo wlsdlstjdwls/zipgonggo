@@ -52,8 +52,8 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
   const panoEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markers = useRef<Map<number, { marker: any; pos: any; selected: boolean }>>(new Map());
-  const cb = useRef({ onFocus, onSelect });
-  cb.current = { onFocus, onSelect };
+  const cb = useRef({ onFocus, onSelect, selectedId });
+  cb.current = { onFocus, onSelect, selectedId };
   const [failed, setFailed] = useState(false);
   const [mapReady, setMapReady] = useState(false);
 
@@ -118,20 +118,27 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
     for (const [id, { marker }] of markers.current) {
       if (!live.has(id)) { marker.setMap(null); markers.current.delete(id); changed += 1; }
     }
-    if (changed > 0 && markers.current.size > 0) {
+    // 핀 전부를 담는 확대·중심 계산 — 컨테이너 실제 크기에 좌우된다(모바일 주소창이 접히며 높이가
+    // 나중에 바뀌면 다시 불러야 한다. 안 그러면 접히기 전의 좁은 높이 기준 확대가 그대로 남는다 —
+    // "로딩 끝나면 계속 더 축소돼 보인다"는 지적의 원인, 2026-09-09)
+    const fit = () => {
       const s = map.getSize();
       const all = [...markers.current.values()];
-      if (all.length === 1) { map.setCenter(all[0].pos); map.setZoom(SINGLE_ZOOM); }
-      else if (s.width > 0 && s.height > 0) {
-        const b = new maps.LatLngBounds();
-        all.forEach(({ pos }) => b.extend(pos));
-        map.fitBounds(b, inset(s.width, s.height));
-        // 단지들이 아주 가까이 모여 있으면 fitBounds가 「위치」 지도보다 더 확대해버린다 — 그 이상은 자른다
-        if (map.getZoom() > NAVER_MAP_DEFAULT_ZOOM) map.setZoom(NAVER_MAP_DEFAULT_ZOOM);
-      }
-    }
-    // 컨테이너 크기가 바뀌면(900px 분기) 지도에 알린다
-    const ro = el.current ? new ResizeObserver(() => maps.Event.trigger(map, "resize")) : null;
+      if (all.length === 0) return;
+      if (all.length === 1) { map.setCenter(all[0].pos); map.setZoom(SINGLE_ZOOM); return; }
+      if (s.width <= 0 || s.height <= 0) return;
+      const b = new maps.LatLngBounds();
+      all.forEach(({ pos }) => b.extend(pos));
+      map.fitBounds(b, inset(s.width, s.height));
+      // 단지들이 아주 가까이 모여 있으면 fitBounds가 「위치」 지도보다 더 확대해버린다 — 그 이상은 자른다
+      if (map.getZoom() > NAVER_MAP_DEFAULT_ZOOM) map.setZoom(NAVER_MAP_DEFAULT_ZOOM);
+    };
+    if (changed > 0 && markers.current.size > 0) fit();
+    // 컨테이너 크기가 바뀌면(900px 분기, 모바일 주소창 접힘) 지도에 알리고, 아직 단지를 고르지 않았으면 다시 fit
+    const ro = el.current ? new ResizeObserver(() => {
+      maps.Event.trigger(map, "resize");
+      if (cb.current.selectedId === null) fit();
+    }) : null;
     if (ro && el.current) ro.observe(el.current);
     return () => ro?.disconnect();
   }, [items, coords, split, mapReady]);
