@@ -89,6 +89,7 @@ export default async function ComplexPage({ params }: Params) {
   const reserveTotal = [...counted.values()].reduce((a, s) => a + (s.units_reserve ?? 0), 0);
   const hasReserve = supply.some((s) => s.units_reserve != null);
   const hasRent = supply.some((s) => s.rent != null);          // 장기전세는 월임대료가 없다
+  const showRent = hasRent || c.min_rent != null;               // 「보증금과 임대료」 제목·표의 임대료 열을 그릴지
   const hasClass = new Set(supply.map((s) => s.tenant_class)).size > 1 || supply.some((s) => s.income_option);
   const moveIn = moveInLabel(supply.find((s) => s.move_in_from)?.move_in_from ?? null);
   // 공급현황이 있으면 그 표가, 호실 목록만 있으면(매입임대 별첨) 호실 금액의 범위가 근거다
@@ -184,7 +185,7 @@ export default async function ComplexPage({ params }: Params) {
           {/* 핵심 값 먼저 — 어떤 표를 읽어야 할지 정하기 전에 이 다섯 칸이 답을 준다(사용자 요청 2026-09-09) */}
           <div className="kpi">
             <Kpi
-              label={hasRent || c.min_rent != null ? "보증금" : "전세금"}
+              label={showRent ? "보증금" : "전세금"}
               value={c.min_deposit != null ? wonKo(c.min_deposit) : null}
               sub={c.min_deposit != null ? "최소" : null}
             />
@@ -229,7 +230,7 @@ export default async function ComplexPage({ params }: Params) {
 
           {/* 보증금과 임대료는 공급현황 아래 — 어떤 유형이 있는지 먼저 보고 그 금액을 읽는 순서다(사용자 요청 2026-09-09) */}
           <section className="dsec">
-            <h2>보증금과 임대료</h2>
+            <h2>{showRent ? "보증금과 임대료" : "전세금"}</h2>
             {priceGroups.length > 0 ? (
               <>
                 <ConvertTable groups={priceGroups} />
@@ -241,7 +242,7 @@ export default async function ComplexPage({ params }: Params) {
               </>
             ) : priceBreak.length > 0 ? (
               <>
-                <PriceTable rows={priceBreak} />
+                <PriceTable rows={priceBreak} depositHead={showRent ? "보증금" : "전세금"} showRent={showRent} />
                 {hasRent && (
                   <p className="note">
                     공고문 기준값입니다. 계약 때 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있습니다. 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.

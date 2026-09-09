@@ -578,6 +578,7 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
    라벨을 짧게 줄이고(계약금·중도금·잔금) note는 <small>로 옆에 붙여, 예전처럼 길어서 잘려 보이던(nowrap+ellipsis) 문제를 없앤다. */
 .ptable { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
 .ptable > div { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; align-items: baseline; border-bottom: 1px solid var(--line); }
+.ptable.no-rent > div { grid-template-columns: 1.3fr 1fr; }
 .ptable > div:last-child { border-bottom: 0; }
 .ptable .h { background: var(--sub); }
 .ptable .h span { padding: 11px 15px; text-align: center; font-weight: 800; font-size: 10px; letter-spacing: 0.12em; color: var(--dim); }
