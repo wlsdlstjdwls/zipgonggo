@@ -59,7 +59,7 @@ export const AREA_MIN_COUNT = 3;
 export const NAVER_MAP_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ?? "";
 export const NAVER_MAP_SDK_URL = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAP_CLIENT_ID}&submodules=geocoder,panorama`;
 export const NAVER_MAP_GEOCODER_TIMEOUT_MS = 8000;
-export const NAVER_MAP_DEFAULT_ZOOM = 16;
+export const NAVER_MAP_DEFAULT_ZOOM = 17; // 한 단계 더 확대 — 16은 건물이 잘 안 보인다는 지적(2026-09-09)
 
 // 사이트맵. url-structure.md: 진행중 0.9 / 마감 0.3, 파일당 40,000 URL 상한
 export const SITEMAP_PRIORITY_OPEN = 0.9;
