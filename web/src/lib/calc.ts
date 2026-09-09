@@ -12,6 +12,16 @@ export const CONVERT_RATE_UP = 6.0;
 /** 보증금을 내릴 때(월임대료를 올릴 때) 적용하는 연이율 기본값(%) */
 export const CONVERT_RATE_DOWN = 2.5;
 
+/**
+ * 상호전환 한도. 월임대료의 이 비율까지 보증금으로 올릴 수 있고(전세전환),
+ * 기준 보증금의 이 비율까지 월임대료로 내릴 수 있다(월세전환).
+ * 위 별표1 두 사례가 그대로 50%다 —
+ *   두산위브더프레스티지 신혼부부: 월 421,000의 절반(210,500)을 6.0%로 돌리면 42,100천 → 보증금 151,700천(최대)
+ *   보증금 109,600천의 절반(54,800천)을 2.5%로 돌리면 월 114,100원 → 월 535,100원(최소 보증금 쪽)
+ * 공고마다 다를 수 있어 화면 문구에 원문 확인을 함께 낸다.
+ */
+export const CONVERT_LIMIT_SHARE = 0.5;
+
 export type Conversion = {
   /** 전환 후 보증금(원) */
   deposit: number;
@@ -43,6 +53,24 @@ export function convert(
   // 공고문은 월임대료를 100원 단위로 절사한다 — 별표1 예시(535,167 → 535,100 · 513,417 → 513,400)로 확인
   const rent = Math.max(0, Math.floor(raw / 100) * 100);
   return { deposit: Math.round(deposit), rent, depositDelta, rentDelta: rent - baseRent, rate };
+}
+
+/** 전환 한도까지 밀었을 때의 세 가지 조합 — 전세전환(보증금 최대) · 기본(공고값) · 월세전환(보증금 최소). */
+export type ConvertRange = { max: Conversion; base: Conversion; min: Conversion };
+
+export function convertRange(
+  baseDeposit: number,
+  baseRent: number,
+  share = CONVERT_LIMIT_SHARE,
+  rateUp = CONVERT_RATE_UP,
+  rateDown = CONVERT_RATE_DOWN,
+): ConvertRange {
+  const up = Math.round((baseRent * share * 12 * 100) / rateUp);
+  return {
+    max: convert(baseDeposit, baseRent, baseDeposit + up, rateUp, rateDown),
+    base: convert(baseDeposit, baseRent, baseDeposit, rateUp, rateDown),
+    min: convert(baseDeposit, baseRent, Math.round(baseDeposit * (1 - share)), rateUp, rateDown),
+  };
 }
 
 /** 월임대료가 0이 되는 보증금(원). 이 위로는 전환할 게 없다 — 슬라이더 오른쪽 끝. */

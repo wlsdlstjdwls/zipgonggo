@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { FilterBar } from "@/components/filter-bar";
+import { FilterRail } from "@/components/filter-rail";
 import { NoticeExplorer } from "@/components/notice-explorer";
 import { PAGE_SIZE } from "@/lib/constants";
-import { getHomeStats, listFilterOptions, listNoticesPage } from "@/lib/queries";
+import { listNoticesPage } from "@/lib/queries";
 import { ROUTES } from "@/lib/routes";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
@@ -21,15 +22,19 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  // 서버는 필터 없는 첫 페이지만 만든다 — 필터가 걸리면 NoticeExplorer가 /api/notices로 갈아끼운다
-  const [page, options, stats] = await Promise.all([listNoticesPage({}, null, PAGE_SIZE), listFilterOptions(undefined), getHomeStats()]);
+  // 서버는 필터 없는 첫 페이지만 만든다 — 필터가 걸리면 NoticeExplorer가 /api/notices로 갈아끼운다.
+  // 칩·셀렉트 수량은 레이아웃이 한 번 조회해 ListStateProvider로 내려 준다(여기서 또 세지 않는다)
+  const page = await listNoticesPage({}, null, PAGE_SIZE);
 
   // 홈은 목록만 — 히어로 문구와 KPI 스트립은 뺐다(사용자 요청 2026-09-09). 머리글은 제목 한 줄 + 총 건수뿐이다.
   // 지도는 공고 상세의 공급 단지 탐색기에 있다(사용자 결정 2026-09-08)
   return (
-    <div className="stage">
-      <FilterBar options={{ type: options.type }} closing7={stats.closing7} sticky />
-      <NoticeExplorer initial={page} title="입주자모집공고" />
+    <div className="stage list-stage">
+      <FilterRail />
+      <div className="list-col">
+        <FilterBar sticky />
+        <NoticeExplorer initial={page} title="입주자모집공고" />
+      </div>
     </div>
   );
 }

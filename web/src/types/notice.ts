@@ -40,8 +40,9 @@ export type NoticeListItem = {
   source_rank: number | null;
 };
 
-/** notice.schedule_steps 한 칸. end가 null이면 하루짜리 단계 */
-export type ScheduleStep = { label: string; start: string; end: string | null };
+/** notice.schedule_steps 한 칸. end가 null이면 하루짜리 단계.
+ * *_time은 공고문에 시각이 적혀 있을 때만 "HH:MM"으로 온다 — 없으면 날짜만 보여 준다 */
+export type ScheduleStep = { label: string; start: string; end: string | null; start_time?: string | null; end_time?: string | null };
 
 export type Notice = NoticeListItem & {
   source_key: string | null;
@@ -50,6 +51,9 @@ export type Notice = NoticeListItem & {
   max_rent: number | null;
   /** 접수 일정 출처. 'attachment'면 SH 첨부 공고문에서 읽은 값 */
   schedule_source: string | null;
+  /** 접수 시작·마감 시각("10:00"). 흐름도에 시각이 있는 공고에만 있다(사용자 지적 2026-09-09) */
+  apply_start_tm: string | null;
+  apply_end_tm: string | null;
   /** 흐름도의 접수·발표 외 단계(서류심사 대상자 발표, 서류 제출, 계약 체결). 순서대로 온다(0017) */
   schedule_steps: ScheduleStep[] | null;
   pnu: string | null;
@@ -104,6 +108,8 @@ export type NoticeComplex = {
   source_page: number | null;
   /** 난방방식(개별난방·지역난방). SH 「단지별 주소」 표에만 있다 */
   heating: string | null;
+  /** 이 단지 공급현황에 적힌 공급대상(청년·신혼부부·고령자…). 없으면 빈 배열 — 탐색기 필터가 쓴다 */
+  tenant_classes: string[];
   /** 아래는 매입임대 별첨 주택목록(호실 단위)에서만 채워진다. 장기전세 위치 표는 NULL */
   unit_count: number | null;
   min_deposit: number | null;
@@ -122,10 +128,10 @@ export function isNoticeView(v: unknown): v is NoticeView {
   return typeof v === "string" && (NOTICE_VIEWS as readonly string[]).includes(v);
 }
 
-/** 홈 KPI 스트립. 전부 서비스 전체 집계(필터 무관) */
-/** 목록 화면이 쓰는 집계. 히어로와 KPI를 걷어낸 뒤로 남은 건 필터 칩의 마감 임박 건수뿐이다(2026-09-09) */
-export type HomeStats = { closing7: number };
-
 export type NoticePage = { items: NoticeListItem[]; nextCursor: string | null; total: number };
 
 export type FilterOption = { value: string; count: number };
+
+/** 스코프 바·필터 바의 수량. 지금 걸린 다른 필터를 반영해 센다(자기 축은 빼고) — 지역을 바꾸면 유형 수량도 따라 바뀐다.
+ * total은 부문 칩 「전체」의 수, closing7은 「마감 7일 내」 칩의 수다. */
+export type Facets = { sector: FilterOption[]; sido: FilterOption[]; type: FilterOption[]; closing7: number; total: number };

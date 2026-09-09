@@ -1,4 +1,5 @@
 // 상세 화면(공고·단지) 전용 표시 계산. 두 page.tsx가 공유한다 — 레이아웃 JSX와 분리해 여기 한 곳만 본다.
+import { convertRange, CONVERT_LIMIT_SHARE, CONVERT_RATE_DOWN, CONVERT_RATE_UP } from "./calc";
 import { wonKo } from "./format";
 import type { Notice, NoticeComplex, NoticeSupply } from "@/types/notice";
 
@@ -104,4 +105,56 @@ export function complexPriceRows(supply: NoticeSupply[], c?: NoticeComplex): Pri
     { id: "range-max", group: "max", label: "최대", note: "이 단지", deposit: wonKo(dHi), rent: rHi != null ? wonKo(rHi) : "—", exact: [dHi, rHi] },
   );
   return rows;
+}
+
+// 단지 상세 「보증금과 임대료」 — 공급대상 × 공급유형마다 전세전환 / 기본 / 월세전환 세 줄.
+// 사용자 요청 2026-09-09: "신혼부부 전세전환·기본·월세전환 / 청년 전세전환·기본·월세전환처럼 유형별로,
+// 최소 최대 몇 퍼센트까지 가능한지" — 계약 때 실제로 고를 수 있는 폭을 표에서 바로 읽게 한다.
+// 계산은 lib/calc.ts(SH 별표1 역산 6.0% / 2.5%, 한도 50%)를 쓴다. 하드코딩 금액은 없다.
+export type PriceScenarioKind = "max" | "base" | "min";
+export type PriceScenario = {
+  kind: PriceScenarioKind;
+  label: string;
+  deposit: string;
+  rent: string;
+  exact: [number | null, number | null];
+  /** 기준 보증금 대비 비율(%). 기본 줄은 null */
+  pct: number | null;
+};
+export type PriceGroup = { id: string; label: string; note: string; units: number | null; rows: PriceScenario[] };
+
+/** 전환 한도 안내 문구에 쓰는 값 — 화면이 상수를 다시 적지 않게 여기서 한 번만 만든다 */
+export const CONVERT_HINT = {
+  share: Math.round(CONVERT_LIMIT_SHARE * 100),
+  up: CONVERT_RATE_UP,
+  down: CONVERT_RATE_DOWN,
+};
+
+/** 전환 표를 그릴 수 있는 줄만 — 보증금과 월임대료가 둘 다 있어야 성립한다(장기전세는 월임대료가 없다) */
+export function complexPriceGroups(supply: NoticeSupply[]): PriceGroup[] {
+  return supply
+    .filter((s) => s.deposit != null && s.deposit > 0 && s.rent != null && s.rent > 0)
+    .map((s) => {
+      const base = s.deposit as number;
+      const r = convertRange(base, s.rent as number);
+      const scenario = (kind: PriceScenarioKind, label: string, c: { deposit: number; rent: number }): PriceScenario => ({
+        kind,
+        label,
+        deposit: wonKo(c.deposit),
+        rent: wonKo(c.rent),
+        exact: [c.deposit, c.rent],
+        pct: kind === "base" ? null : Math.round((c.deposit / base) * 100),
+      });
+      return {
+        id: String(s.id),
+        label: classLabel(s),
+        note: typeLabel(s),
+        units: s.units_total,
+        rows: [
+          scenario("max", "전세전환", r.max),
+          scenario("base", "기본", r.base),
+          scenario("min", "월세전환", r.min),
+        ],
+      };
+    });
 }

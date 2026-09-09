@@ -2,12 +2,11 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { HomeLink } from "@/components/home-link";
 import { SaveProvider } from "@/components/save-context";
-import { ScopeBar } from "@/components/scope-bar";
 import { ListStateProvider } from "@/components/list-state";
 import { CONTACT_EMAIL, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
 import Link from "next/link";
-import { listFilterOptions } from "@/lib/queries";
+import { listFacets } from "@/lib/queries";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
@@ -26,8 +25,9 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // 시도·부문 분포 — 스코프 바가 매 페이지에 상시 노출되므로 여기서 한 번만 조회한다(unstable_cache 캐시, 6차 설계)
-  const options = await listFilterOptions(undefined);
+  // 무필터 수량 — 스코프 바가 매 페이지에 상시 노출되므로 여기서 한 번만 조회한다(unstable_cache 캐시, 6차 설계).
+  // 필터가 걸리면 ListStateProvider가 /api/facets로 다시 받아 갈아끼운다.
+  const facets = await listFacets({});
   return (
     <html lang="ko">
       <head>
@@ -45,15 +45,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </header>
           {/* 목록 상태(부문·유형·마감·정렬)는 URL이 아니라 이 Provider가 들고 있다 — 스코프 바·필터 바·목록이 함께 구독한다 */}
           <Suspense fallback={null}>
-            <ListStateProvider>
-              <ScopeBar sidoOptions={options.sido} sectorOptions={options.sector} />
+            {/* 필터는 목록 페이지 안의 왼쪽 레일이 담당한다 — 헤더 아래 전폭 스코프 바는 걷어냈다(2026-09-09) */}
+            <ListStateProvider initialFacets={facets}>
               <main className="shell">{children}</main>
             </ListStateProvider>
           </Suspense>
           <footer className="site-footer">
             <div className="bar">
               <p>출처: 국토교통부 마이홈포털 공공주택 모집공고 조회 서비스(공공데이터포털), 서울주거포털 SH 공고 목록. 공고 원문은 각 기관 링크에서 확인하세요.</p>
-              <p>지도 © NAVER Corp. 보증금과 임대료는 공고에 기재된 최소값입니다. 호실별 금액은 기관 원문을 따릅니다.</p>
               {/* 개인정보처리방침은 다른 링크보다 굵게 — 개인정보보호법 시행령이 "글자 크기나 색상으로 구분해
                   쉽게 확인할 수 있게" 하라고 정한다 */}
               <nav className="foot-legal" aria-label="약관과 방침">

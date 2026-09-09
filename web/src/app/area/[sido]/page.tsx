@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { FilterBar } from "@/components/filter-bar";
+import { FilterRail } from "@/components/filter-rail";
 import { NoticeExplorer } from "@/components/notice-explorer";
 import { AREA_MIN_COUNT, PAGE_SIZE } from "@/lib/constants";
-import { getHomeStats, listFilterOptions, listNoticesPage } from "@/lib/queries";
+import { listFilterOptions, listNoticesPage } from "@/lib/queries";
 import { areaPath, ROUTES } from "@/lib/routes";
 
 // 스코프 착지 페이지 — 시도 경로 한 장. 유형·마감·정렬·부문은 URL이 아니라 클라이언트 상태다(2026-09-09).
@@ -39,23 +40,23 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function AreaPage({ params }: Params) {
   const sido = await loadSido(params);
 
-  // closing7은 홈과 같은 site-wide 집계를 재사용한다(sido로 좁힌 전용 쿼리를 따로 쏘지 않는다) —
-  // getHomeStats는 캐시 키가 인자 없이 고정이라 사이트 어디서든 이미 데워져 있을 가능성이 높다.
-  // options(존재 확인 + 유형·부문 카운트)를 먼저 기다렸다가 나머지를 쏘면 왕복이 직렬로 쌓인다 — 셋 다 한 번에 쏜다.
-  // 부문 필터가 URL에서 빠진 뒤로 옵션 조회는 listFilterOptions(undefined) 한 번뿐이다.
-  const [options, page, stats] = await Promise.all([
+  // options는 이 시도가 발행 대상인지 확인하는 용도다(칩·셀렉트 수량은 레이아웃 → ListStateProvider가 담당).
+  // 먼저 기다렸다가 목록을 쏘면 왕복이 직렬로 쌓인다 — 둘 다 한 번에 쏜다.
+  const [options, page] = await Promise.all([
     listFilterOptions(undefined),
     listNoticesPage({ sido }, null, PAGE_SIZE),
-    getHomeStats(),
   ]);
   const match = options.sido.find((o) => o.value === sido);
   if (!match) notFound();
   if (match.count < AREA_MIN_COUNT) permanentRedirect(ROUTES.home);
 
   return (
-    <div className="stage">
-      <FilterBar options={{ type: options.type }} closing7={stats.closing7} sticky />
-      <NoticeExplorer initial={page} title={`${sido} 입주자모집공고`} />
+    <div className="stage list-stage">
+      <FilterRail />
+      <div className="list-col">
+        <FilterBar sticky />
+        <NoticeExplorer initial={page} title={`${sido} 입주자모집공고`} />
+      </div>
     </div>
   );
 }

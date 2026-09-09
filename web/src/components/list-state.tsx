@@ -9,9 +9,10 @@
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { readScope, writeScope } from "@/lib/scope";
+import { feedParams } from "@/lib/notice-filters";
 import { ROUTES } from "@/lib/routes";
 import { VIEW_STORAGE_KEY } from "@/lib/constants";
-import { isNoticeView, isSector, type NoticeClosing, type NoticeFilters, type NoticeSort, type NoticeView } from "@/types/notice";
+import { isNoticeView, isSector, type Facets, type NoticeClosing, type NoticeFilters, type NoticeSort, type NoticeView } from "@/types/notice";
 
 export type ListFilters = NoticeFilters;
 
@@ -23,6 +24,8 @@ type Ctx = {
   isList: boolean;
   /** 저장값·레거시 쿼리 흡수가 끝났는가. 끝나기 전엔 목록이 서버가 준 첫 페이지를 그대로 쓴다 */
   ready: boolean;
+  /** 칩·셀렉트에 붙는 수량. 필터가 바뀌면 그 조건에서 다시 센 값으로 갈아끼운다 */
+  facets: Facets;
   /** 목록 보기 모드. 조회 조건이 아니라 화면 취향이라 필터와 따로 논다 */
   view: NoticeView;
   setView: (v: NoticeView) => void;
@@ -47,12 +50,15 @@ function sidoFromPath(pathname: string): string | undefined {
 
 const QUERY_KEYS = ["sector", "type", "closing", "sort", "closed"] as const;
 
-export function ListStateProvider({ children }: { children: React.ReactNode }) {
+export function ListStateProvider({ children, initialFacets }: { children: React.ReactNode; initialFacets: Facets }) {
   const router = useRouter();
   const pathname = usePathname();
   const pathSido = sidoFromPath(pathname);
   const isList = pathname === ROUTES.home || Boolean(pathSido);
   const [f, setF] = useState<ListFilters>({});
+  // 서버가 준 무필터 집계. 레이아웃이 다시 렌더돼도 같은 값이라 ref로 고정한다(효과가 헛도는 걸 막는다)
+  const baseFacets = useRef(initialFacets);
+  const [facets, setFacets] = useState<Facets>(initialFacets);
   // 기본은 카드 — 상태 테두리로 접수 중/마감이 한눈에 갈린다(사용자 결정 2026-09-09)
   const [view, setViewState] = useState<NoticeView>("card");
   const [ready, setReady] = useState(false);
@@ -99,6 +105,20 @@ export function ListStateProvider({ children }: { children: React.ReactNode }) {
     writeScope(f);
   }, [ready, isList, f]);
 
+  // 필터가 바뀌면 수량도 그 조건에서 다시 센다. 정렬은 수량을 바꾸지 않으므로 키에서 뺀다.
+  // 무필터로 돌아오면 서버가 준 값을 그대로 쓴다 — 왕복이 필요 없다.
+  const facetKey = feedParams({ ...f, sort: undefined });
+  useEffect(() => {
+    if (!ready) return;
+    if (!facetKey) { setFacets(baseFacets.current); return; }
+    let cancelled = false;
+    fetch(`${ROUTES.apiFacets}?${facetKey}`, { headers: { accept: "application/json" } })
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json() as Promise<Facets>; })
+      .then((d) => { if (!cancelled) setFacets(d); })
+      .catch(() => { /* 수량은 보조 정보 — 실패하면 직전 값을 그대로 둔다 */ });
+    return () => { cancelled = true; };
+  }, [facetKey, ready]);
+
   const setView = useCallback((v: NoticeView) => {
     setViewState(v);
     try { window.localStorage.setItem(VIEW_STORAGE_KEY, v); } catch { /* 저장 실패는 무시 */ }
@@ -114,6 +134,6 @@ export function ListStateProvider({ children }: { children: React.ReactNode }) {
     if (pathSido && next !== pathSido) router.replace(ROUTES.home);
   }, [pathSido, router]);
 
-  const value = useMemo<Ctx>(() => ({ f, pathSido, isList, ready, view, setView, set, reset, setSido }), [f, pathSido, isList, ready, view, setView, set, reset, setSido]);
+  const value = useMemo<Ctx>(() => ({ f, pathSido, isList, ready, facets, view, setView, set, reset, setSido }), [f, pathSido, isList, ready, facets, view, setView, set, reset, setSido]);
   return <ListCtx.Provider value={value}>{children}</ListCtx.Provider>;
 }

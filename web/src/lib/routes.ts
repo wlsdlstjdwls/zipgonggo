@@ -8,6 +8,7 @@ export const ROUTES = {
   area: "/area",
   api: "/api",
   apiNotices: "/api/notices",
+  apiFacets: "/api/facets",
   terms: "/terms",
   privacy: "/privacy",
 } as const;

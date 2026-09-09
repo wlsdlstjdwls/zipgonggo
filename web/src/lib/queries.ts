@@ -6,7 +6,7 @@ import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { todayKST } from "./format";
-import type { FilterOption, HomeStats, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, Sector } from "@/types/notice";
+import type { Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, Sector } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
@@ -156,16 +156,47 @@ export const listFilterOptions = cache(unstable_cache(
   CACHE_OPTS,
 ));
 
-/** 필터 칩 「마감 7일 내」의 건수. **마감은 뺀다** — 목록이 기본으로 마감을 감추는데
- * 칩만 다른 수를 말하면 어긋난다(2026-09-09). 히어로·KPI를 걷어내며 나머지 집계는 뺐다. */
-export const getHomeStats = unstable_cache(
-  async (): Promise<HomeStats> => {
-    const rows = await query<{ closing7: number }>(
-      `SELECT count(*) FILTER (WHERE ${CLOSING_7D})::int AS closing7 FROM notice WHERE ${NOT_CLOSED}`,
-    );
-    return { closing7: rows[0]?.closing7 ?? 0 };
-  },
-  ["notice-home-stats-v3"],
+// 패싯(facet) 집계 — 칩·셀렉트에 붙는 수량. 지금 걸린 다른 필터를 반영한다(사용자 지적 2026-09-09:
+// "지역이 바뀌면 그 지역의 수량이 나와야 한다"). 자기 자신은 빼고 센다 — 검색 패싯의 표준 규칙이다.
+// 서울을 고른 상태에서 유형 셀렉트는 "서울 안에서 각 유형이 몇 건"을 보여 주고,
+// 시도 셀렉트는 유형·마감 조건만 걸린 채 "각 시도가 몇 건"을 보여 준다(자기 필터를 빼야 다른 지역으로 갈아탈 수 있다).
+type FacetAxis = "sector" | "sido" | "type" | "closing";
+
+async function listFacetsRaw(f: NoticeFilters): Promise<Facets> {
+  const params: unknown[] = [];
+  const w = (omit: FacetAxis, extra?: string) => {
+    const parts = buildWhere({ ...f, [omit]: undefined }, params);
+    if (extra) parts.push(extra);
+    return whereSql(parts);
+  };
+  const rows = await query<{ kind: string; value: string; count: number }>(
+    `SELECT 'sector' AS kind, sector::text AS value, count(*)::int AS count FROM notice ${w("sector")} GROUP BY 2
+     UNION ALL
+     SELECT 'sido', sido, count(*)::int FROM notice ${w("sido")} GROUP BY 2
+     UNION ALL
+     SELECT 'type', housing_type::text, count(*)::int FROM notice ${w("type")} GROUP BY 2
+     UNION ALL
+     SELECT 'stat', 'closing7', count(*)::int FROM notice ${w("closing", CLOSING_7D)}
+     UNION ALL
+     SELECT 'stat', 'total', count(*)::int FROM notice ${w("sector")}
+     ORDER BY 1, 3 DESC, 2`,
+    params,
+  );
+  const pick = (k: string) => rows.filter((r) => r.kind === k).map(({ value, count }) => ({ value, count }));
+  const stat = (v: string) => rows.find((r) => r.kind === "stat" && r.value === v)?.count ?? 0;
+  return {
+    sector: pick("sector").sort((a, b) => a.value.localeCompare(b.value, "ko")),
+    sido: pick("sido"),
+    type: pick("type"),
+    closing7: stat("closing7"),
+    total: stat("total"),
+  };
+}
+
+/** 스코프 바·필터 바가 쓰는 수량 묶음. 필터가 바뀌면 /api/facets로 다시 받는다. */
+export const listFacets = unstable_cache(
+  (f: NoticeFilters) => listFacetsRaw(f),
+  ["notice-facets-v1"],
   CACHE_OPTS,
 );
 
@@ -174,6 +205,8 @@ export async function getNoticeBySlug(slug: string): Promise<Notice | null> {
     `SELECT ${LIST_COLS}, source_key, pnu, heating, total_household,
             min_down_payment, min_interim, min_balance, portal_url, contact,
             max_deposit, max_rent, schedule_source, schedule_steps,
+            to_char(apply_start_tm, 'HH24:MI') AS apply_start_tm,
+            to_char(apply_end_tm, 'HH24:MI') AS apply_end_tm,
             to_char(updated_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') AS updated_at
      FROM notice WHERE slug = $1`,
     [slug],
@@ -189,11 +222,22 @@ export async function getNoticeAreas(noticeId: number): Promise<NoticeArea[]> {
   );
 }
 
-/** 공고의 공급 단지 목록. 자치구 → 단지명 순. 0건이면 화면에 섹션을 그리지 않는다. */
+/** 공고의 공급 단지 목록. 자치구 → 단지명 순. 0건이면 화면에 섹션을 그리지 않는다.
+ * tenant_classes는 이 단지의 공급현황에 적힌 공급대상(청년·신혼부부·고령자…)을 모은 것이다 —
+ * 탐색기의 공급대상 필터가 쓴다(사용자 요청 2026-09-09). 공급현황이 없는 공고는 빈 배열이다. */
 export async function getNoticeComplexes(noticeId: number): Promise<NoticeComplex[]> {
   return query<NoticeComplex>(
-    `SELECT id, name, sido, sigungu, road_address, is_new, complex_code, source_page, heating, unit_count, min_deposit, min_rent, area_min, area_max FROM notice_complex
-     WHERE notice_id = $1 ORDER BY sido <> '서울특별시', sigungu, name`,
+    `SELECT c.id, c.name, c.sido, c.sigungu, c.road_address, c.is_new, c.complex_code, c.source_page,
+            c.heating, c.unit_count, c.min_deposit, c.min_rent, c.area_min, c.area_max,
+            COALESCE(t.classes, ARRAY[]::text[]) AS tenant_classes
+     FROM notice_complex c
+     LEFT JOIN LATERAL (
+       SELECT array_agg(DISTINCT s.tenant_class ORDER BY s.tenant_class) AS classes
+       FROM notice_supply s
+       WHERE s.notice_id = c.notice_id AND (s.complex_id = c.id OR s.complex_name = c.name)
+     ) t ON true
+     WHERE c.notice_id = $1
+     ORDER BY c.sido <> '서울특별시', c.sigungu, c.name`,
     [noticeId],
   );
 }
