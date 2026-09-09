@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BRAND_ACC, BRAND_NEW, bubbleMarkerHtml, MARKER_H, MARKER_W, markerHtml } from "@/lib/brand";
+import { NAVER_MAP_DEFAULT_ZOOM } from "@/lib/constants";
 import { hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
 import { usePanorama } from "@/lib/use-panorama";
 
@@ -37,7 +38,8 @@ type Props = {
   ariaLabel: string;
 };
 
-const SINGLE_ZOOM = 15;
+/** 단지가 1곳뿐이면 「위치」 지도(NaverMap)와 같은 배율로 — 둘 다 "공고상세"의 같은 지도로 보인다는 지적(2026-09-09) */
+const SINGLE_ZOOM = NAVER_MAP_DEFAULT_ZOOM;
 const PAN = { duration: 420, easing: "easeOutCubic" };
 
 /** 여백은 컨테이너 크기에 비례 — 300px 지도에 고정값을 쓰면 여백이 화면을 다 먹는다 */
@@ -121,6 +123,8 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
         const b = new maps.LatLngBounds();
         all.forEach(({ pos }) => b.extend(pos));
         map.fitBounds(b, inset(s.width, s.height));
+        // 단지들이 아주 가까이 모여 있으면 fitBounds가 「위치」 지도보다 더 확대해버린다 — 그 이상은 자른다
+        if (map.getZoom() > NAVER_MAP_DEFAULT_ZOOM) map.setZoom(NAVER_MAP_DEFAULT_ZOOM);
       }
     }
     // 컨테이너 크기가 바뀌면(900px 분기) 지도에 알린다
