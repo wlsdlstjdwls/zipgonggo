@@ -22,7 +22,7 @@ export function TermText({ children }: { children: string }) {
 export function Term({ children, as }: { children: string; as?: string }) {
   const entry = glossaryOf(children);
   if (!entry) return <>{as ?? children}</>;
-  // 앞의 물음표 아이콘은 CSS ::before가 그린다 — 눌러서 뜻을 볼 수 있다는 표시(사용자 요청 2026-09-09)
+  // 점선 밑줄이 "눌러서 뜻을 볼 수 있다"는 표시다(globals.css .term). 뒤의 물음표 아이콘은 뺐다(사용자 요청 2026-09-09)
   return (
     <a className="term" href={`#${glossaryId(children)}`} title={entry.def}>
       {as ?? children}

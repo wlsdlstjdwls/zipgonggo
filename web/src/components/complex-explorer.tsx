@@ -348,9 +348,10 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
               <span className="lg" aria-hidden="true" />재공급
             </p>
           )}
-          {phase === "loading" && (
-            /* 지도 위 진행 오버레이 — 상태 문구만으로는 몇 곳이 남았는지 안 보인다(사용자 요청 2026-09-09) */
-            <div className="cx-load" role="status" aria-live="polite">
+          {phase !== "failed" && (
+            /* 지도 위 진행 오버레이 — 상태 문구만으로는 몇 곳이 남았는지 안 보인다(사용자 요청 2026-09-09).
+               다 되면 조건부로 떼지 않고 옅어지게만 한다 — 지도가 뒤에서 빡 하고 드러나던 걸 막는다(사용자 지적 2026-09-09) */
+            <div className={`cx-load${phase !== "loading" ? " hide" : ""}`} role="status" aria-live="polite" aria-hidden={phase !== "loading"}>
               <p className="cx-load-n"><b>{progress}</b><span>/ {items.length}</span></p>
               <p className="cx-load-t">주소를 좌표로 바꾸는 중</p>
               <div className="cx-load-bar" role="progressbar" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={progress}>

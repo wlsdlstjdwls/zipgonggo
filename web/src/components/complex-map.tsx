@@ -161,7 +161,8 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
   if (!hasMapKey()) return <p className="map-note">지도 키가 설정되지 않았습니다.</p>;
   return (
     <>
-      <div ref={el} className="canvas" role="img" aria-label={ariaLabel} />
+      {/* mapReady가 되기 전까지는 투명 — SDK가 지도를 그 순간 빡 하고 그려 넣던 걸 옅게 시작해 서서히 보이게 한다(사용자 지적 2026-09-09) */}
+      <div ref={el} className={`canvas${mapReady ? " ready" : ""}`} role="img" aria-label={ariaLabel} />
       {failed && <p className="map-note">지도를 불러오지 못했습니다. 잠시 후 다시 시도하세요.</p>}
       <div className="pano" hidden={!roadview}>
         <div ref={panoEl} className="canvas" role="img" aria-label="선택한 단지 로드뷰" />

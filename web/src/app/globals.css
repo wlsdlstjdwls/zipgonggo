@@ -164,7 +164,9 @@ small { font-size: 12px; }
 .list-stage { display: grid; grid-template-columns: 236px minmax(0, 1fr); align-items: start; }
 .list-col { min-width: 0; }
 .rail { border-right: 1px solid var(--line); }
-.rail-in { position: sticky; top: 60px; display: flex; flex-direction: column; gap: 18px; padding: 18px var(--pad) 24px; }
+/* z-index를 명시로 준다 — 카드 보기(.rows.v-card .row)도 position:relative라 셀렉트 목록이
+   그 뒤로 가려 보일 수 있었다(사용자 지적 2026-09-09, ComplexExplorer와 같은 문제) */
+.rail-in { position: sticky; top: 60px; z-index: 5; display: flex; flex-direction: column; gap: 18px; padding: 18px var(--pad) 24px; }
 .rail-g { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .rail-g > h3 { margin: 0; font-weight: 800; font-size: 10px; line-height: 1; letter-spacing: 0.16em; color: var(--dim); }
 .rail-chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -256,6 +258,12 @@ small { font-size: 12px; }
 .fld::placeholder { color: var(--dim); font-weight: 600; }
 .fld::-webkit-search-cancel-button { cursor: pointer; }
 
+/* 숫자 입력칸의 위아래 화살표(스피너)를 뺀다 — 자리만 차지하고 손가락으로도 마우스로도 잘 안 눌린다.
+   전용면적 직접 입력·자격진단·계산기 전부 여기 하나로 적용된다(전체화면 검수 2026-09-09) */
+input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
 .seg { position: relative; display: flex; padding: 3px; border-radius: 999px; background: var(--sub); flex: none; }
 .seg-ind { position: absolute; top: 3px; left: 3px; width: calc(50% - 3px); height: calc(100% - 6px); border-radius: 999px; background: #fff; box-shadow: 0 2px 8px -3px rgba(15, 18, 22, 0.3); transition: transform 340ms var(--sp); }
 .seg[data-on="deadline"] .seg-ind { transform: translateX(0); }
@@ -284,9 +292,13 @@ small { font-size: 12px; }
 .zg-mk { display: block; transform-origin: 50% 100%; transition: transform 220ms var(--sp); }
 .zg-mk:hover, .zg-mk.is-focus { transform: scale(1.12); }
 
-/* 선택 마커 — 잉크 핀 + 그 위 말풍선. 래퍼 크기는 핀(34x42)과 같고 말풍선만 밖으로 띄운다 */
-.zg-sel { position: relative; width: 34px; height: 42px; }
+/* 선택 마커 — 잉크 핀 + 그 위 말풍선. 래퍼 크기는 핀(34x42)과 같고 말풍선만 밖으로 띄운다.
+   목록에서 항목을 고르면 마커가 살짝 커지며 나타난다 — 기준점(하단 중앙)은 그대로라 좌표가 튀지 않는다
+   (사용자 요청 2026-09-09: "선택되면 조금 확대되게"). 호버 확대(.zg-mk)와 같은 배율로 맞춘다 */
+.zg-sel { position: relative; width: 34px; height: 42px; transform-origin: 50% 100%; transform: scale(1.12); animation: zg-sel-in 260ms var(--sp) both; }
 .zg-sel > svg { display: block; }
+@keyframes zg-sel-in { from { transform: scale(0.82); } to { transform: scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .zg-sel { animation: none; } }
 .zg-bub { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); z-index: 1;
   display: flex; flex-direction: column; gap: 2px; padding: 8px 12px 9px; border-radius: 13px;
   background: var(--ink); color: #fff; box-shadow: 0 14px 28px -14px rgba(15, 18, 22, 0.75); white-space: nowrap; cursor: pointer;
@@ -616,6 +628,10 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .notice-bar .i { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 11px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; margin-top: 1px; }
 .map { width: 100%; height: 300px; border-radius: var(--r-panel); background: var(--sub); overflow: hidden; }
+/* 타일이 준비되기 전엔 투명, 준비되면 서서히 — SDK가 즉시 그려 넣던 첫 화면을 부드럽게 편다(사용자 지적 2026-09-09) */
+.map { opacity: 0; transition: opacity 420ms var(--ease); }
+.map.ready { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .map { transition: none; opacity: 1; } }
 .map-fallback { color: var(--dim); font-size: 13px; font-weight: 600; padding: 14px; text-align: center; }
 /* 열이 화면보다 넓은 표는 가로 스크롤 — 세로는 그대로 잘라 라운드 모서리를 지킨다.
    과거 .tbl(overflow:hidden)이 .table-scroll(overflow-x:auto)보다 뒤에 와 가로 스크롤을 덮어썼다(모바일에서 표가 잘려 안 보이던 원인) — 한 규칙으로 합친다. */
@@ -665,7 +681,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cx-panel { position: relative; z-index: 1; min-width: 0; display: flex; flex-direction: column; height: var(--cx-h); border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--bg); }
 /* 공급대상·면적·신규 필터가 공고에 따라 붙었다 빠진다 — 고정 2열 그리드 대신 줄바꿈으로 흐른다 */
 /* 첫 줄은 늘 쓰는 검색·자치구·「조건」 토글만. 나머지 조건은 아래 접이식 칸으로 내렸다(사용자 요청 2026-09-09) */
-.cx-tools { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); }
+/* position + z-index를 명시로 준다 — .cx-list도 position:relative라 셀렉트 목록(.selmenu)이
+   그 뒤로 가려 보이는 문제가 있었다(사용자 지적 2026-09-09). 같은 쌓임맥락에서 수 비교가 확실해진다 */
+.cx-tools { position: relative; z-index: 3; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); }
 .cx-tools > * { flex: 1 1 132px; min-width: 0; }
 .cx-tools .cx-q { flex-basis: 100%; }
 .cx-tools .selw, .cx-tools .sel { width: 100%; }
@@ -676,7 +694,7 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cx-more.on { background: var(--ink); border-color: var(--ink); color: #fff; }
 .cx-more em { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px;
   background: var(--acc); color: #fff; font-style: normal; font-weight: 800; font-size: 10.5px; }
-.cx-cond { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: var(--sub); border-bottom: 1px solid var(--line);
+.cx-cond { position: relative; z-index: 3; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: var(--sub); border-bottom: 1px solid var(--line);
   animation: slide-up-fade 200ms var(--sp) both; }
 .cx-cond > * { flex: 1 1 132px; min-width: 0; }
 .cx-cond .selw, .cx-cond .sel { width: 100%; }
@@ -704,18 +722,20 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cx-list { position: relative; list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; border-radius: 0 0 var(--r-panel) var(--r-panel); overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
 .cx-list li { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
 .cx-list li:last-child { border-bottom: 0; }
-.cx-list > li > button { display: flex; flex: 1; min-width: 0; gap: 10px; align-items: flex-start; padding: 11px 12px; background: none; border: 0; border-left: 3px solid transparent; text-align: left; font: inherit; color: var(--ink); cursor: pointer; transition: background 200ms var(--ease), transform 300ms var(--sp); }
+.cx-list > li > button { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 5px; align-items: stretch; padding: 11px 12px; background: none; border: 0; border-left: 3px solid transparent; text-align: left; font: inherit; color: var(--ink); cursor: pointer; transition: background 200ms var(--ease), transform 300ms var(--sp); }
 .cx-list > li > button:hover { background: var(--sub); transform: translateX(3px); }
 .cx-list li.is-focus button { background: var(--sub); transform: translateX(3px); }
 .cx-list li.on button { background: var(--acc-soft); border-left-color: var(--acc); }
-.cx-row-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.cx-row-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 /* 이름·주소는 한 줄로 자른다 — 세 줄로 접히면 62개 목록이 한 화면에 열 개도 안 들어온다(2026-09-09).
-   잘린 글자는 [data-tip] 툴팁으로 확인한다(components/trunc.tsx) */
+   잘린 글자는 [data-tip] 툴팁으로 확인한다(components/trunc.tsx).
+   신규 배지와 자치구·금액 칩이 이름 줄 폭을 갉아먹지 않게 아래 별도 줄(.cx-row-side)로 뺐다(사용자 지적 2026-09-09) */
 .cx-name { font-weight: 800; font-size: 13.5px; letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .cx-name > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cx-name .chip { flex: none; }
 .cx-addr { font-size: 11.5px; font-weight: 600; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cx-row-side { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+/* 이름·주소 줄과 달리 자치구·호수·금액은 짧은 조각이라 줄바꿈으로 흘려도 읽기에 부담이 없다 */
+.cx-row-side { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; }
 .cx-units { font-size: 12px; font-weight: 800; }
 .cx-money { font-size: 11px; font-weight: 600; color: var(--dim); white-space: nowrap; }
 /* 행 오른쪽 상세 링크 — 단지 페이지로 나가는 유일한 앵커. 선택(지도 이동)과 이동을 갈라 놓는다 */
@@ -731,20 +751,27 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cx-map-wrap { position: sticky; top: 72px; height: var(--cx-h); }
 .cx-map { width: 100%; height: 100%; border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--sub); overflow: hidden; position: relative; z-index: 0; }
 .cx-map .canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; } /* SDK가 position을 relative로 덮어써도 크기가 남게 width/height 명시 */
+/* 지도 본체(로드뷰 캔버스는 제외 — 직계 자식만)만 서서히 나타난다. 지오코딩 오버레이(.cx-load)가 걷히는 시점과
+   맞물려 "빡" 하고 나타나던 첫 화면을 부드럽게 편다(사용자 지적 2026-09-09) */
+.cx-map > .canvas { opacity: 0; transition: opacity 420ms var(--ease); }
+.cx-map > .canvas.ready { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .cx-map > .canvas { transition: none; opacity: 1; } }
 /* 지도 위 선택 카드 — 로드뷰 토글과 단지 상세 진입. 로드뷰 패널(z 6)보다 위.
    bottom은 NAVER 로고·축척 바를 가리지 않는 높이 — 로고는 항상 보여야 한다(이용약관) */
 .cx-card { position: absolute; z-index: 8; left: 12px; right: 12px; bottom: 30px; display: flex; align-items: center; gap: 12px;
   padding: 12px 44px 12px 14px; border-radius: var(--r-card); border: 1px solid var(--line); background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(8px); box-shadow: var(--shadow-overlay); animation: slide-up-fade 300ms var(--sp) both; }
 .cx-card-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.cx-card-t b { font-weight: 800; font-size: 14px; letter-spacing: -0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-card-t .cx-card-n { font-weight: 800; font-size: 14px; letter-spacing: -0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cx-card-t span { font-weight: 600; font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cx-card-a { display: flex; gap: 8px; flex: none; }
 .cx-card-x { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: 8px; background: none; color: var(--dim); font-size: 11px; cursor: pointer; transition: background 200ms var(--ease), color 200ms var(--ease); }
 .cx-card-x:hover { background: var(--sub); color: var(--ink); }
-/* 지도 위 지오코딩 진행 오버레이. 카운트가 올라가는 걸 눈으로 보게 한다(사용자 요청 2026-09-09) */
-.cx-load { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: color-mix(in srgb, var(--bg) 76%, transparent); backdrop-filter: blur(2px); animation: cx-load-in 260ms var(--sp) both; }
+/* 지도 위 지오코딩 진행 오버레이. 카운트가 올라가는 걸 눈으로 보게 한다(사용자 요청 2026-09-09).
+   다 되면 지우지 않고 옅어지게만 둔다(.hide) — 지도가 뒤에서 빡 하고 드러나던 걸 막는다(사용자 지적 2026-09-09) */
+.cx-load { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: color-mix(in srgb, var(--bg) 76%, transparent); backdrop-filter: blur(2px); opacity: 1; transition: opacity 360ms var(--ease); animation: cx-load-in 260ms var(--sp) both; }
+.cx-load.hide { opacity: 0; pointer-events: none; }
 .cx-load-n { margin: 0; display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
 .cx-load-n b { font-size: 30px; font-weight: 900; letter-spacing: -0.03em; color: var(--ink); }
 .cx-load-n span { font-size: 14px; font-weight: 700; color: var(--dim); }
@@ -781,8 +808,6 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .ut-count b { color: var(--ink); font-weight: 800; }
 .ut-empty { padding: 22px 12px; text-align: center; color: var(--dim); }
 .supply .tc-key small { font-weight: 600; font-size: 10.5px; color: var(--dim); }
-/* 표 안 보조 줄(「우선 0 / 일반 5」)에서는 물음표를 뗀다 — 글자보다 아이콘이 많아진다. 밑줄만으로도 눌린다 */
-.supply small .term::after { display: none; }
 
 /* ── 상세 머리글 → 헤더 리빌 (components/detail-headbar.tsx) ──
    머리글이 헤더에 가리면 헤더 자리를 이 바가 덮는다. body로 포털되므로 .shell의 @container가 안 닿는다. */
@@ -832,15 +857,10 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* ── 용어 링크와 설명 (lib/glossary.ts) ────────────────────
    툴팁이 아니라 페이지 안 앵커다 — 모바일에는 호버가 없고, 크롤러도 설명 본문을 읽어야 한다. */
 /* 용어 링크 — 누르면 페이지 밑 「용어 설명」이 펴지면서 그 항목으로 내려간다.
-   앞의 작은 물음표가 "눌러 볼 수 있다"를 말한다. 커서도 클릭 커서다(사용자 요청 2026-09-09). */
+   점선 밑줄이 "눌러 볼 수 있다"를 말한다. 커서도 클릭 커서다.
+   뒤의 물음표 아이콘은 뺐다 — 자리마다 깨져 보인다는 지적(사용자 요청 2026-09-09). */
 .term { color: inherit; border-bottom: 1px dashed color-mix(in srgb, var(--dim) 62%, transparent); cursor: pointer; }
-/* 물음표는 용어 뒤에, 더 작게(사용자 요청 2026-09-09) — 글자를 밀지 않고 뒤에서 거든다 */
-/* 아이콘은 em으로 — 10px 표 머리글부터 34px 제목까지 같은 자리에 붙는다 */
-.term::after { content: "?"; display: inline-flex; align-items: center; justify-content: center; width: 0.95em; height: 0.95em;
-  margin-left: 0.22em; vertical-align: 0.12em; border-radius: 50%; background: var(--sub); color: var(--dim);
-  font-size: 0.68em; font-weight: 900; line-height: 1; transition: background 200ms var(--ease), color 200ms var(--ease); }
 .term:hover { color: var(--acc); border-bottom-color: var(--acc); }
-.term:hover::after { background: var(--acc-soft); color: var(--acc); }
 
 /* 「용어 설명」은 접힌 채로 시작한다 — 페이지 끝에 사전이 늘 펼쳐져 있을 이유가 없다(사용자 요청 2026-09-09) */
 .gloss > h2 { margin-bottom: 0; }
