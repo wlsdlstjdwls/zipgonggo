@@ -59,8 +59,7 @@ export function NaverMap({ address, title, sub = "", zoom = NAVER_MAP_DEFAULT_ZO
 
   return (
     <>
-      {/* 준비되기 전엔 투명 — 타일이 그려지는 순간을 부드러운 페이드로 가린다(사용자 지적 2026-09-09) */}
-      <div ref={el} className={`map${state === "ready" ? " ready" : ""}`} role="img" aria-label={`${title} 위치 지도`} />
+      <div ref={el} className="map" role="img" aria-label={`${title} 위치 지도`} />
       {state === "loading" && <p className="map-fallback">지도를 불러오는 중…</p>}
       <div className="pano" hidden={!roadview}>
         <div ref={panoEl} className="canvas" role="img" aria-label={`${title} 로드뷰`} />
