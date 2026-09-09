@@ -12,7 +12,7 @@ import { CalcSeed } from "@/components/calc-context";
 import { DetailAside } from "@/components/detail-aside";
 import { DetailHeadBar } from "@/components/detail-headbar";
 import { ExternalLink } from "@/components/external-link";
-import { GlossaryList, Term } from "@/components/glossary";
+import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
 import { ConvertTable } from "@/components/convert-table";
 import { Pending } from "@/components/pending";
@@ -67,7 +67,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 function Kpi({ label, value, sub }: { label: string; value: string | null; sub?: string | null }) {
   return (
     <div className={`kpi-i${value ? "" : " off"}`}>
-      <span>{label}</span>
+      {/* 라벨이 사전에 있는 말이면 스스로 용어 링크가 된다 */}
+      <span><TermText>{label}</TermText></span>
       <b>{value ?? "준비 중"}</b>
       {value && sub && <em>{sub}</em>}
     </div>
@@ -117,33 +118,40 @@ export default async function ComplexPage({ params }: Params) {
   const hasFacts = supply.length > 0 || units.length > 0;
 
   // 요약 스트립·태그 줄과 겹치지 않는 값만 남긴다. 전부 비면 표 자체를 그리지 않는다
-  const specs: [string, string][] = ([
+  // [라벨, 값, 라벨을 줄여 쓴 자리의 사전 표제어]
+  const specs: [string, string, string?][] = ([
     ["공용면적", supply.length ? m2(commonArea(supply[0])) : null],
     ["계약면적", supply[0]?.area_total != null ? m2(supply[0].area_total) : null],
     ["구조", layouts.length ? layouts.join(" | ") : null],
     ["승강기", elevators.length ? elevators.join(" | ") : null],
     ["난방", c.heating],
     // 공가는 우선·일반 배분이 적힌 공고에만 있다. 재공급 표에 모집호수만 있는 공고에서 「공가 0호」를 쓰면 거짓말이 된다
-    ["현재 공가", hasReserve && vacantTotal > 0 ? num(vacantTotal, "호") : null],
-    ["예비자 모집", hasReserve && reserveTotal > 0 ? num(reserveTotal, "호") : null],
+    ["현재 공가", hasReserve && vacantTotal > 0 ? num(vacantTotal, "호") : null, "공가"],
+    ["예비자 모집", hasReserve && reserveTotal > 0 ? num(reserveTotal, "호") : null, "예비입주자"],
     ["계약금", downPayment != null ? wonKo(downPayment) : null],
     ["잔금", balance != null ? wonKo(balance) : null],
-  ] as [string, string | null][]).filter((r): r is [string, string] => r[1] != null && r[1] !== "");
+  ] as [string, string | null, string?][]).filter((r): r is [string, string, string?] => r[1] != null && r[1] !== "");
 
-  // 화면에 실제로 쓴 말만 페이지 밑에 편다
+  // 화면에 실제로 쓴 말만 페이지 밑에 편다. 이건 서버 렌더용 밑그림이고, 브라우저에서는 GlossaryList가
+  // 실제로 걸린 링크로 목록을 다시 맞춘다 — 손으로 맞춘 목록은 어긋나기 마련이다(사용자 지적 2026-09-09)
   const terms = [
     kind,
     n.housing_type,
-    ...(hasReserve ? ["공가", "예비입주자"] : []),
-    ...(hasClass ? ["우선공급", "일반공급"] : []),
+    // 「공급 정보」 표는 위에서 만든 specs가 곧 라벨이다 — 두 곳을 따로 관리하지 않는다
+    ...specs.map(([label, , term]) => term ?? label),
+    // 공가·예비자 칸은 공급현황 표가 그린다 — 「현재 공가」 제원 줄이 0호라 빠져도 표에는 남는다
+    ...(hasReserve ? ["공가"] : []),
+    ...(supply.length === 1 ? (supply[0].units_reserve != null ? ["예비입주자"] : []) : hasReserve ? ["예비입주자"] : []),
+    // 우선/일반은 공급현황 표가 그린다. 줄이 하나면 값이 있는 쪽만, 여러 줄이면 「우선 n / 일반 n」이 둘 다 나온다
+    ...(supply.length === 1
+      ? [...(supply[0].units_priority != null ? ["우선공급"] : []), ...(supply[0].units_general != null ? ["일반공급"] : [])]
+      : supply.some((x) => x.units_priority != null || x.units_general != null) ? ["우선공급", "일반공급"] : []),
     ...(supply.some((s) => s.income_option) ? ["소득있음", "소득없음"] : []),
     ...(supply.some((s) => s.accessible) ? ["주거약자용"] : []),
-    ...(area ? ["전용면적"] : []),
-    ...(supply.length ? ["공용면적", "계약면적"] : []),
-    ...(downPayment != null ? ["계약금"] : []),
-    ...(balance != null ? ["잔금"] : []),
+    // 전용면적·입주 시작은 요약 스트립 라벨이라 값이 없어도 늘 링크가 걸린다
+    "전용면적",
+    "입주 시작",
     ...(priceGroups.length || units.some((u) => u.deposit_jeonse != null) ? ["전세전환", "월세전환"] : []),
-    ...(moveIn ? ["입주 시작"] : []),
   ];
 
   return (
@@ -191,7 +199,7 @@ export default async function ComplexPage({ params }: Params) {
                 이미 말했다 — 여기 남기는 건 그 어디에도 없는 값뿐이다(사용자 지적 2026-09-09: 겹치는 정보 없애기) */}
             {specs.length > 0 && (
               <SpecList>
-                {specs.map(([label, value]) => <Spec key={label} label={label} value={value} />)}
+                {specs.map(([label, value, term]) => <Spec key={label} label={label} value={value} term={term} />)}
               </SpecList>
             )}
 

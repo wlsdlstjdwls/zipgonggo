@@ -5,6 +5,7 @@
 import { num, wonExact, wonKo } from "@/lib/format";
 import { classLabel, commonArea, m2, typeLabel } from "@/lib/notice-view";
 import { Spec, SpecList } from "./spec-list";
+import { Term, TermText } from "./glossary";
 import type { NoticeSupply } from "@/types/notice";
 
 type Props = { supply: NoticeSupply[]; hasReserve: boolean; hasRent: boolean; hasClass: boolean };
@@ -12,13 +13,13 @@ type Props = { supply: NoticeSupply[]; hasReserve: boolean; hasRent: boolean; ha
 function SupplyCard({ s, hasReserve, hasRent, hasClass }: { s: NoticeSupply } & Omit<Props, "supply">) {
   return (
     <SpecList>
-      {hasClass && <Spec label="공급대상" value={classLabel(s)} />}
-      <Spec label="공급유형" value={typeLabel(s)} />
+      {hasClass && <Spec label="공급대상" value={<TermText>{classLabel(s)}</TermText>} />}
+      <Spec label="공급유형" value={<TermText>{typeLabel(s)}</TermText>} />
       <Spec label="공급호수" value={s.units_total != null ? num(s.units_total, "호") : null} />
       {hasReserve && <Spec label="공가" value={num((s.units_priority ?? 0) + (s.units_general ?? 0), "호")} />}
-      <Spec label="우선" value={s.units_priority != null ? num(s.units_priority, "호") : null} />
-      <Spec label="일반" value={s.units_general != null ? num(s.units_general, "호") : null} />
-      {hasReserve && <Spec label="예비자" value={s.units_reserve != null ? num(s.units_reserve, "호") : null} />}
+      <Spec label="우선" term="우선공급" value={s.units_priority != null ? num(s.units_priority, "호") : null} />
+      <Spec label="일반" term="일반공급" value={s.units_general != null ? num(s.units_general, "호") : null} />
+      {hasReserve && <Spec label="예비자" term="예비입주자" value={s.units_reserve != null ? num(s.units_reserve, "호") : null} />}
       <Spec label={hasRent ? "임대보증금" : "전세금"} value={s.deposit != null ? <span title={wonExact(s.deposit)}>{wonKo(s.deposit)}</span> : null} />
       {hasRent && <Spec label="월임대료" value={s.rent != null ? <span title={wonExact(s.rent)}>{wonKo(s.rent)}</span> : null} />}
       <Spec label="전용면적" value={m2(s.area_exclusive)} />
@@ -55,8 +56,12 @@ export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
             {hasClass && <th>공급대상</th>}
             <th>공급유형</th>
             <th className="num">공급호수</th>
-            {hasSplit && <th className="num">{hasReserve ? "공가" : "우선/일반"}</th>}
-            {hasReserve && <th className="num">예비자</th>}
+            {hasSplit && (
+              <th className="num">
+                {hasReserve ? <Term>공가</Term> : <><Term as="우선">우선공급</Term>/<Term as="일반">일반공급</Term></>}
+              </th>
+            )}
+            {hasReserve && <th className="num"><Term as="예비자">예비입주자</Term></th>}
             <th className="num">{hasRent ? "임대보증금" : "전세금"}</th>
             {hasRent && <th className="num">월임대료</th>}
             <th className="num">면적</th>
@@ -65,13 +70,13 @@ export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
         <tbody>
           {supply.map((s) => (
             <tr key={s.id}>
-              {hasClass && <td className="tc-key">{classLabel(s)}</td>}
-              <td className="tc-key">{typeLabel(s)}</td>
+              {hasClass && <td className="tc-key"><TermText>{classLabel(s)}</TermText></td>}
+              <td className="tc-key"><TermText>{typeLabel(s)}</TermText></td>
               <td className="num strong">{s.units_total != null ? num(s.units_total, "호") : "—"}</td>
               {hasSplit && (
                 <td className="num stack">
                   <b>{num((s.units_priority ?? 0) + (s.units_general ?? 0), "호")}</b>
-                  <small>우선 {s.units_priority ?? 0} / 일반 {s.units_general ?? 0}</small>
+                  <small><Term as="우선">우선공급</Term> {s.units_priority ?? 0} / <Term as="일반">일반공급</Term> {s.units_general ?? 0}</small>
                 </td>
               )}
               {hasReserve && <td className="num">{s.units_reserve != null ? num(s.units_reserve, "호") : "—"}</td>}

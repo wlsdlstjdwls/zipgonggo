@@ -6,7 +6,7 @@ import { ComplexExplorer } from "@/components/complex-explorer";
 import { DetailAside } from "@/components/detail-aside";
 import { DetailHeadBar } from "@/components/detail-headbar";
 import { ExternalLink } from "@/components/external-link";
-import { GlossaryList, Term } from "@/components/glossary";
+import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
 import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
@@ -103,12 +103,11 @@ export default async function NoticePage({ params }: Params) {
   const moveInRaw = supply.map((s) => s.move_in_from).filter(Boolean).sort()[0] ?? null;
   const moveIn = moveInLabel(moveInRaw);
 
+  // 이 화면에 실제로 링크가 걸린 말만 편다 — 공급현황 표(우선공급·공가·소득 조건)는 단지 상세에만 있다.
+  // 설명은 있는데 본문에 링크가 없으면 어디를 눌러야 할지 알 수 없다(사용자 지적 2026-09-09)
   const terms = [
     n.housing_type,
     ...(supplyKind ? (supplyKind === "신규 공급과 재공급" ? ["신규 공급", "재공급"] : [supplyKind]) : []),
-    ...(supply.some((s) => s.units_reserve != null) ? ["공가", "예비입주자"] : []),
-    ...(supply.some((s) => s.units_priority != null) ? ["우선공급", "일반공급"] : []),
-    ...(supply.some((s) => s.income_option) ? ["소득있음", "소득없음"] : []),
     ...(moveIn ? ["입주 시작"] : []),
   ];
 
@@ -161,7 +160,7 @@ export default async function NoticePage({ params }: Params) {
               {n.sector === "민간임대" && <span className="tag">{n.sector}</span>}
               {n.house_type && <span className="tag">{n.house_type}</span>}
               {/* 공급/재공급은 태그 줄에서 바로 읽혀야 한다(사용자 요청 2026-09-09) */}
-              {supplyKind && <span className="tag">{supplyKind}</span>}
+              {supplyKind && <span className="tag"><TermText>{supplyKind}</TermText></span>}
               {n.amends_source_key && <span className="tag acc">정정공고</span>}
             </div>
             <h1 className="d-title">{n.title}</h1>
@@ -244,7 +243,7 @@ export default async function NoticePage({ params }: Params) {
             <h2>공고 정보</h2>
             <SpecList>
               <Spec label="공급 유형" value={<Term>{n.housing_type}</Term>} />
-              <Spec label="공급 구분" value={supplyKind} />
+              <Spec label="공급 구분" value={supplyKind ? <TermText>{supplyKind}</TermText> : null} />
               <Spec label="입주 시작" value={moveIn} />
               <Spec label="문의처" value={n.contact} />
               <Spec label="단지명" value={n.complex_name} />

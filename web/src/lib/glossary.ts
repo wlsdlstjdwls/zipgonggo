@@ -32,6 +32,24 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
 
 const BY_TERM = new Map(GLOSSARY.map((g) => [g.term, g]));
 
+/** 문자열 안에서 사전에 있는 말을 찾는 패턴. 긴 말 먼저 — 「신규 공급」이 「공급」보다 먼저 잡혀야 한다 */
+// 사전의 말은 한글과 공백뿐이라 정규식 특수문자가 없다 — 이스케이프 없이 그대로 잇는다
+const TERM_RE = new RegExp([...GLOSSARY].map((g) => g.term).sort((a, b) => b.length - a.length).join("|"), "g");
+
+/** 문자열을 [보통 글자 | 사전에 있는 말] 조각으로 나눈다. 라벨·표 칸처럼 우리가 만든 짧은 문자열에만 쓴다 */
+export function splitTerms(text: string): { text: string; term: boolean }[] {
+  const out: { text: string; term: boolean }[] = [];
+  let last = 0;
+  TERM_RE.lastIndex = 0;
+  for (let m = TERM_RE.exec(text); m; m = TERM_RE.exec(text)) {
+    if (m.index > last) out.push({ text: text.slice(last, m.index), term: false });
+    out.push({ text: m[0], term: true });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push({ text: text.slice(last), term: false });
+  return out;
+}
+
 export function glossaryOf(term: string): GlossaryEntry | undefined {
   return BY_TERM.get(term);
 }

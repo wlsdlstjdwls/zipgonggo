@@ -534,18 +534,21 @@ small { font-size: 12px; }
 html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 가린다 — 무필터 상태의 칩·수량이 먼저 보이면 같은 문제다 */
 .ex-list.swapping { opacity: 0.45; pointer-events: none; }
 /* 「2026.09.14 (월)」이 20px로는 160px 칸을 넘겼다(사용자 지적 2026-09-09) — 칸을 넓히고 글자를 한 단 줄인다 */
-.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(172px, 1fr)); gap: 10px; }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(184px, 1fr)); gap: 10px; }
 .step { min-width: 0; padding: 15px 16px; border-radius: var(--r-card); background: var(--bg); border: 1px solid var(--line); }
 .step span { display: block; font-weight: 800; font-size: 9.5px; line-height: 1; letter-spacing: 0.14em; color: var(--dim); margin-bottom: 9px; }
 /* 날짜와 시각은 따로 온다 — 각각은 안 쪼개지되 둘 사이에서는 줄이 바뀐다. 「2026.09.30 (수) 17:00」이 칸을 넘기던 자리 */
 .step b { display: block; font-weight: 800; font-size: 16px; line-height: 1.2; letter-spacing: -0.035em; color: var(--mut); }
 .step b > span, .step em > span { white-space: nowrap; }
-.step b > i, .step em > i { display: block; margin-top: 2px; font-style: normal; white-space: nowrap; font-size: 0.8em; font-weight: 700; color: var(--dim); }
+/* 시각은 날짜 아랫줄에 — 줄이지 않는다. 접수 시작·마감은 그 시각이 날짜만큼 중요하다(사용자 지적 2026-09-09) */
+.step b > i { display: block; margin-top: 3px; font-style: normal; white-space: nowrap; font-size: 15px; font-weight: 800; color: var(--mut); }
+.step.key b > i { font-size: 17px; color: var(--ink); }
+.step em > i { display: block; margin-top: 2px; font-style: normal; white-space: nowrap; font-weight: 700; color: var(--dim); }
 /* 기간 단계의 끝 날짜 — 「서류 제출 09.28 ~ 09.30」처럼 둘째 줄로 */
 .step em { display: block; margin-top: 4px; font-style: normal; font-weight: 700; font-size: 12.5px; letter-spacing: -0.02em; color: var(--dim); }
 /* 접수 시작·마감은 사람이 달력에 적는 두 날짜다 — 나머지 단계보다 크고 진하게(사용자 지적 2026-09-09) */
 .step.key { border-color: var(--line-strong); }
-.step.key b { font-size: 18px; color: var(--ink); }
+.step.key b { font-size: 20px; color: var(--ink); }
 .step.key span { color: var(--mut); }
 .step.on { background: var(--acc-soft); border-color: var(--acc); }
 .step.on span { color: var(--acc); }
@@ -777,6 +780,8 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .ut-count b { color: var(--ink); font-weight: 800; }
 .ut-empty { padding: 22px 12px; text-align: center; color: var(--dim); }
 .supply .tc-key small { font-weight: 600; font-size: 10.5px; color: var(--dim); }
+/* 표 안 보조 줄(「우선 0 / 일반 5」)에서는 물음표를 뗀다 — 글자보다 아이콘이 많아진다. 밑줄만으로도 눌린다 */
+.supply small .term::after { display: none; }
 
 /* ── 상세 머리글 → 헤더 리빌 (components/detail-headbar.tsx) ──
    머리글이 헤더에 가리면 헤더 자리를 이 바가 덮는다. body로 포털되므로 .shell의 @container가 안 닿는다. */
@@ -829,9 +834,10 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
    앞의 작은 물음표가 "눌러 볼 수 있다"를 말한다. 커서도 클릭 커서다(사용자 요청 2026-09-09). */
 .term { color: inherit; border-bottom: 1px dashed color-mix(in srgb, var(--dim) 62%, transparent); cursor: pointer; }
 /* 물음표는 용어 뒤에, 더 작게(사용자 요청 2026-09-09) — 글자를 밀지 않고 뒤에서 거든다 */
-.term::after { content: "?"; display: inline-flex; align-items: center; justify-content: center; width: 11px; height: 11px;
-  margin-left: 3px; vertical-align: 2px; border-radius: 50%; background: var(--sub); color: var(--dim);
-  font-size: 8px; font-weight: 900; line-height: 1; transition: background 200ms var(--ease), color 200ms var(--ease); }
+/* 아이콘은 em으로 — 10px 표 머리글부터 34px 제목까지 같은 자리에 붙는다 */
+.term::after { content: "?"; display: inline-flex; align-items: center; justify-content: center; width: 0.95em; height: 0.95em;
+  margin-left: 0.22em; vertical-align: 0.12em; border-radius: 50%; background: var(--sub); color: var(--dim);
+  font-size: 0.68em; font-weight: 900; line-height: 1; transition: background 200ms var(--ease), color 200ms var(--ease); }
 .term:hover { color: var(--acc); border-bottom-color: var(--acc); }
 .term:hover::after { background: var(--acc-soft); color: var(--acc); }
 

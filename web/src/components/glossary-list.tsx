@@ -6,14 +6,29 @@
 // 접혀 있어도 dl은 DOM(HTML)에 그대로 있다 — 크롤러는 설명 본문을 읽는다.
 
 import { useCallback, useEffect, useState } from "react";
-import { glossaryFor, glossaryId } from "@/lib/glossary";
+import { glossaryFor, glossaryId, GLOSSARY } from "@/lib/glossary";
 
 type Jump = { id: string; n: number };
 
 export function GlossaryList({ terms }: { terms: readonly string[] }) {
-  const items = glossaryFor(terms);
+  // 화면에 실제로 걸린 용어 링크에서 목록을 뽑는다. terms는 서버 렌더(SEO·JS 없는 환경)용 밑그림일 뿐이다 —
+  // 손으로 맞춘 목록은 반드시 어긋난다(2026-09-09: 설명은 있는데 링크가 없거나, 링크가 없는 항목을 가리켰다).
+  const [live, setLive] = useState<readonly string[] | null>(null);
+  const items = glossaryFor(live ?? terms);
   const [open, setOpen] = useState(false);
   const [jump, setJump] = useState<Jump | null>(null);
+
+  useEffect(() => {
+    const found = new Set<string>();
+    for (const a of document.querySelectorAll<HTMLAnchorElement>("a.term")) {
+      const i = Number(a.getAttribute("href")?.replace("#g-", ""));
+      const g = Number.isInteger(i) ? GLOSSARY[i] : undefined;
+      if (g) found.add(g.term);
+    }
+    setLive(found.size > 0 ? [...found] : terms);
+    // terms는 서버가 매 렌더 새 배열로 준다 — 내용으로 비교해 효과가 헛돌지 않게 한다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terms.join("|")]);
 
   const go = useCallback((id: string) => {
     setOpen(true);
