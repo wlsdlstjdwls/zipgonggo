@@ -16,16 +16,12 @@ export function ScopeBar({ sidoOptions, sectorOptions }: Props) {
   if (!isList) return null;
   const sido = f.sido;
 
+  // 요약 문구("전체 서울특별시 8건")는 뺐다 — 칩과 시도 셀렉트, 목록 머리의 총 건수가 같은 말을 세 번 한다(2026-09-09)
   const total = sidoOptions.reduce((a, o) => a + o.count, 0);
   const countOf = (s: Sector) => sectorOptions.find((o) => o.value === s)?.count ?? 0;
-  const scopeCount = sido ? sidoOptions.find((o) => o.value === sido)?.count ?? 0 : total;
 
   return (
     <div className="sbar">
-      <p className="sbar-txt">
-        {f.sector ?? "전체"} <b>{sido ?? "전국"}</b> <span>{scopeCount}건</span>
-      </p>
-
       <button type="button" className={`chip-f${!f.sector ? " on" : ""}`} aria-pressed={!f.sector} onClick={() => set({ sector: undefined })}>
         전체 <small>{total}</small>
       </button>

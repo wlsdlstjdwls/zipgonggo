@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CalcDock } from "@/components/calc-dock";
 import { ComplexExplorer } from "@/components/complex-explorer";
 import { DetailAside } from "@/components/detail-aside";
 import { ExternalLink } from "@/components/external-link";
@@ -214,6 +215,9 @@ export default async function NoticePage({ params }: Params) {
           updatedNote={`갱신 ${n.updated_at} | ${L.updatedVia}`}
         />
       </div>
+
+      {/* 계산기는 이 공고 최소 금액을 씨앗으로 연다(사용자 제안 2026-09-09) */}
+      <CalcDock deposit={n.min_deposit} rent={n.min_rent} sourceLabel={L.originalDoc} />
     </article>
   );
 }

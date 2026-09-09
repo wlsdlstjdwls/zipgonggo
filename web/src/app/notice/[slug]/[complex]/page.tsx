@@ -4,6 +4,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CalcDock } from "@/components/calc-dock";
 import { DetailAside } from "@/components/detail-aside";
 import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
@@ -11,7 +12,7 @@ import { PriceTable } from "@/components/price-table";
 import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
 import { agencyLabels } from "@/lib/agency";
-import { count, dateK, ddayChip, num, wonExact, wonKo } from "@/lib/format";
+import { count, dateK, deadlineChip, num, wonExact, wonKo } from "@/lib/format";
 import { areaText, commonArea, complexPriceRange, complexPriceRows, m2 } from "@/lib/notice-view";
 import { getComplexSupply, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
@@ -68,7 +69,8 @@ export default async function ComplexPage({ params }: Params) {
   const hasClass = new Set(supply.map((s) => s.tenant_class)).size > 1 || supply.some((s) => s.income_option);
   const moveIn = supply.find((s) => s.move_in_from)?.move_in_from ?? null;
   const priceBreak = complexPriceRows(supply);
-  const d = ddayChip(n);
+  // 오른쪽 카드는 언제나 "마감"을 센다 — 접수 시작 D-day를 섞으면 「접수 시작까지 / 오늘 / 09.11 마감」처럼 어긋난다
+  const dl = deadlineChip(n);
   const L = agencyLabels(n);
   const area = areaText(c);
   const full = c.sido === "서울특별시" ? `서울특별시 ${c.road_address}` : c.road_address;
@@ -188,10 +190,10 @@ export default async function ComplexPage({ params }: Params) {
         </div>
 
         <DetailAside
-          tone={d.tone}
-          ddayLabel={d.days === null || d.days < 0 ? "접수" : `${d.unit}까지`}
-          ddayNum={d.num}
-          ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)} ${d.days !== null && d.days < 0 ? "마감됨" : "마감"}` : (n.source_status ?? "일정 미정")}
+          tone={dl.tone}
+          ddayLabel={dl.unit}
+          ddayNum={dl.num}
+          ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)} ${dl.days !== null && dl.days < 0 ? "마감됨" : "마감"}` : (n.source_status ?? "일정 미정")}
           cta={
             <>
               <Link className="btn acc lg" href={noticePath(n.slug)}>공고 전체 단지 지도</Link>
@@ -207,6 +209,9 @@ export default async function ComplexPage({ params }: Params) {
           updatedNote={`갱신 ${n.updated_at} | ${L.updatedVia}`}
         />
       </div>
+
+      {/* 계산기는 이 단지 금액을 씨앗으로 연다(사용자 제안 2026-09-09) */}
+      <CalcDock deposit={c.min_deposit} rent={c.min_rent} sourceLabel={L.originalDoc} />
     </article>
   );
 }

@@ -137,9 +137,6 @@ small { font-size: 12px; }
   position: sticky; top: 60px; z-index: 10; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px);
   /* 가로 스크롤을 쓰지 않는다 — 셀렉트 목록(.selmenu)이 잘린다. 항목이 적어 줄바꿈이면 충분 */
   flex-wrap: wrap; row-gap: 8px; }
-.sbar-txt { flex: none; margin: 0 4px 0 0; font-weight: 700; font-size: 12.5px; color: var(--dim); white-space: nowrap; }
-.sbar-txt b { font-weight: 900; color: var(--ink); }
-.sbar-txt span { color: var(--dim); }
 .sbar .selw { flex: none; }
 
 /* ── 버튼 · 칩 · 세그먼트 ────────────────────────────────── */
@@ -202,6 +199,8 @@ small { font-size: 12px; }
 .seg-ind { position: absolute; top: 3px; left: 3px; width: calc(50% - 3px); height: calc(100% - 6px); border-radius: 999px; background: #fff; box-shadow: 0 2px 8px -3px rgba(15, 18, 22, 0.3); transition: transform 340ms var(--sp); }
 .seg[data-on="deadline"] .seg-ind { transform: translateX(0); }
 .seg[data-on="posted"] .seg-ind { transform: translateX(100%); }
+.seg[data-on="convert"] .seg-ind { transform: translateX(0); }
+.seg[data-on="loan"] .seg-ind { transform: translateX(100%); }
 .seg a, .seg button { position: relative; border: 0; background: none; font-family: inherit; cursor: pointer; padding: 6px 14px; border-radius: 999px; font-weight: 800; font-size: 12px; color: var(--dim); white-space: nowrap; transition: color 220ms var(--ease); }
 .seg a.on, .seg button.on { color: var(--ink); }
 
@@ -515,6 +514,52 @@ small { font-size: 12px; }
 }
 .cx-nopin { font-size: 11px; color: var(--dim); }
 
+
+/* ── 계산기 독 (상호전환·대출이자) ───────────────────────── */
+.calc { position: fixed; right: 20px; bottom: 20px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.calc-fab { display: inline-flex; align-items: center; justify-content: center; height: 46px; padding: 0 18px; border: 1px solid var(--ink); border-radius: 999px;
+  background: var(--ink); color: #fff; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: var(--shadow-float);
+  transition: transform 240ms var(--sp), background 200ms var(--ease); }
+.calc-fab:hover { transform: translateY(-2px); }
+.calc-fab.on { background: var(--acc); border-color: var(--acc); }
+.calc-panel { width: min(360px, calc(100vw - 32px)); max-height: min(76vh, 660px); overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid var(--line2); border-radius: var(--r-frame); background: var(--bg); box-shadow: var(--shadow-frame);
+  animation: mo-pop 240ms var(--sp); }
+.calc-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 12px 10px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.calc-seg { flex: 1; }
+.calc-seg button { flex: 1; }
+.calc-x { flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 9px;
+  background: none; color: var(--dim); font-family: inherit; font-size: 12px; cursor: pointer; }
+.calc-x:hover { background: var(--sub); color: var(--ink); }
+.calc-body { padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+.calc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.calc-f { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.calc-f > span:first-child { font-weight: 800; font-size: 11px; color: var(--dim); }
+.calc-fin { display: flex; align-items: center; gap: 6px; height: 38px; padding-right: 11px; border: 1px solid var(--line2); border-radius: var(--r-btn); background: var(--bg); }
+.calc-fin .fld { flex: 1; min-width: 0; width: 100%; height: 100%; border: 0; background: none; font-variant-numeric: tabular-nums; }
+.calc-fin .fld:focus { outline: none; }
+.calc-fin:focus-within { border-color: var(--acc); }
+.calc-fin em { flex: none; font-style: normal; font-weight: 700; font-size: 11px; color: var(--dim); }
+.calc-slide { display: flex; flex-direction: column; gap: 8px; }
+.calc-slide > span { font-weight: 700; font-size: 12px; color: var(--dim); }
+.calc-slide > span b { font-weight: 900; font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.calc-slide input { width: 100%; accent-color: var(--acc); }
+.calc-plans { display: flex; gap: 6px; flex-wrap: wrap; }
+.calc-outs { display: grid; gap: 1px; border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--line); overflow: hidden; }
+.calc-o { display: flex; align-items: baseline; gap: 10px; padding: 11px 13px; background: var(--bg); }
+.calc-o > span { flex: none; width: 74px; font-weight: 800; font-size: 11px; color: var(--dim); }
+.calc-o > b { font-weight: 900; font-size: 15px; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.calc-o > em { margin-left: auto; font-style: normal; font-weight: 700; font-size: 11px; color: var(--dim); text-align: right; }
+.calc-note { margin: 0; font-weight: 600; font-size: 11px; line-height: 1.7; color: var(--dim); }
+/* 독은 body로 포털된다 — .shell의 @container가 안 닿아 일반 @media로 좁힌다 */
+@media (max-width: 720px) {
+  .calc { right: 12px; bottom: 12px; left: 12px; align-items: stretch; }
+  .calc-fab { align-self: flex-end; }
+  .calc-panel { width: 100%; max-height: 70vh; }
+  .calc-o > em { display: none; }
+}
+
 /* ── 반응형: 컨테이너 900px 한 단계 ──────────────────────── */
 @container (max-width: 900px) {
   .row { grid-template-columns: 56px minmax(0, 1fr) auto; }
@@ -544,7 +589,6 @@ small { font-size: 12px; }
    .sbar(스코프 바)는 layout.tsx에서 .shell 밖(헤더 바로 아래)에 있어 @container가 안 먹는다 — 일반 @media로.
    모바일에선 가로 스크롤 대신 줄바꿈으로. 두 바가 겹쳐 쌓이는 sticky(top:120px)도 높이가 가변이라 깨지므로 해제. */
 @media (max-width: 640px) {
-  .sbar-txt { display: none; } /* 칩·셀렉트의 .on 상태가 이미 현재 스코프를 보여준다 */
   .fbar .grow { margin-left: 0; }
   .sbar { position: static; }
   .fbar.sticky { position: static; background: none; backdrop-filter: none; }
