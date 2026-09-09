@@ -17,7 +17,8 @@ from ..config import settings
 from ..db import connect
 from ..housing import derive_sector, slug_code
 from ..normalize import fingerprint, parse_ymd, today_kst
-from ..repo import queue_unmapped
+from ..parsers.ish_title import amendment_base, is_notice
+from ..repo import link_related_post, queue_unmapped
 from ..sources.sh import SHClient, SHRow
 from .common import Stats, finish_ingest, stage_main, upsert_guarded, utc_now
 
@@ -126,6 +127,18 @@ def run(*, dry_run: bool, max_pages: int | None) -> Stats:
     try:
         cur = conn.cursor() if conn else None
         for rank, row in enumerate(rows, 1):
+            # 포털 목록에는 당첨자 발표문·자료 추가 글도 같은 표에 섞여 온다(사용자 지적 2026-09-09).
+            # 별도 공고로 만들면 같은 공고가 목록에 여러 번 나온다.
+            base = amendment_base(row.title)
+            if base:
+                if cur and link_related_post(cur, agency=AGENCY, base_title=base, seq=row.ish_seq or row.portal_seq, title=row.title):
+                    stats.skip("amendment_linked")
+                else:
+                    stats.skip("amendment_orphan")
+                continue
+            if not is_notice(row.title):
+                stats.skip("not_a_notice")
+                continue
             try:
                 mapped = map_sh(row, today, rank)
             except KeyError:

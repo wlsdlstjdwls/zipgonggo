@@ -139,3 +139,27 @@ def update_notice_facts(cur, notice_id: int, **facts: Any) -> None:
     if not any(v is not None for v in facts.values()):
         return
     cur.execute(UPDATE_FACTS_SQL, {"id": notice_id, **facts})
+
+
+def link_related_post(cur, *, agency: str, base_title: str, seq: str, title: str) -> int | None:
+    """자료만 덧붙인 게시글을 원 공고의 raw.related_posts에 붙인다. 원 공고를 못 찾으면 None.
+
+    별도 notice를 만들면 같은 공고가 목록에 두 번 나온다(사용자 지적 2026-09-09).
+    첨부는 자식 글에 붙어 있으므로 seq를 남겨 S3가 나중에 그 글의 첨부까지 읽게 한다.
+    """
+    cur.execute(
+        "SELECT id, raw FROM notice WHERE agency = %s AND title = %s ORDER BY posted_at DESC LIMIT 1",
+        (agency, base_title),
+    )
+    row = cur.fetchone()
+    if row is None:
+        return None
+    raw = row["raw"] or {}
+    if isinstance(raw, str):
+        raw = json.loads(raw)
+    related = [r for r in raw.get("related_posts", []) if r.get("seq") != seq]
+    related.append({"seq": seq, "title": title})
+    raw["related_posts"] = related
+    cur.execute("UPDATE notice SET raw = %s, updated_at = now() WHERE id = %s",
+                (json.dumps(raw, ensure_ascii=False), row["id"]))
+    return row["id"]
