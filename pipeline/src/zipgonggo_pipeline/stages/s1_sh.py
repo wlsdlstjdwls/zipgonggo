@@ -52,6 +52,12 @@ def derive_status_sh(state: str, title: str, announce: date | None, today: date)
         return "접수마감"
     if "[수정]" in title or "[정정]" in title or "정정" in title[:12]:
         return "정정공고중"
+    # 접수 일정을 아예 연기·취소한다는 안내문(원문에 확정 일정도 첨부도 없다) — 이걸 "공고중"(접수 예정)
+    # 으로 두면 접수일이 영영 안 채워지는데도 목록 맨 위에서 계속 확인해 볼 것처럼 보인다.
+    # 상태값을 늘리는 대신(마이그레이션 필요) 기존 "접수마감"을 빌려 기본 목록에서 빼되 URL은 살려 둔다.
+    # 원문 상태(state)가 있는 포털발 공고는 이미 실제 접수 여부를 알 수 있어 건드리지 않는다.
+    if not state and ("연기" in title or "취소" in title):
+        return "접수마감"
     return "접수중" if state == "모집중" else "공고중"
 
 
