@@ -8,6 +8,8 @@ export const ROUTES = {
   area: "/area",
   api: "/api",
   apiNotices: "/api/notices",
+  terms: "/terms",
+  privacy: "/privacy",
 } as const;
 
 /** /notice/{slug}. slug에 한글·콜론이 들어가므로 항상 인코딩한다. */

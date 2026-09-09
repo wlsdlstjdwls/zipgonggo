@@ -39,7 +39,7 @@ export function NoticeRow({ n, stagger }: Props) {
         className={`row${stagger === undefined ? " static" : ""}`}
         style={style}
       >
-        <span className={`row-dday ${d.tone}`} aria-label={`${d.num} ${d.unit}`}>
+        <span className={`row-dday ${d.tone}${d.solid ? " solid" : ""}`} aria-label={`${d.num} ${d.unit}`}>
           <b>{d.num}</b>
           <span>{d.unit}</span>
         </span>

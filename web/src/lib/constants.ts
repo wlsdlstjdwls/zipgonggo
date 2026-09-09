@@ -2,6 +2,9 @@
 
 export const SITE_NAME = "집공고";
 export const SITE_TITLE = `${SITE_NAME} — 공공임대 모집공고 지도`;
+// 문의·권리침해 신고 접수 주소. 이용약관·개인정보처리방침·푸터가 함께 쓴다.
+// 실제 수신되는 주소로 열고 여기만 바꾸면 전체에 반영된다.
+export const CONTACT_EMAIL = "contact@zipgonggo.com";
 export const SITE_DESCRIPTION = "LH, SH, 지방공사 공공임대 입주자모집공고를 지역별 단지별로 모아 보증금과 임대료, 마감일을 한눈에.";
 
 // 저장(★) 목록 localStorage 키. 서버 저장 없음 — 사용자 식별이 생기면 옮긴다

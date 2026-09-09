@@ -49,23 +49,32 @@ export function moneyOf(n: Pick<NoticeListItem, "min_rent" | "min_deposit">): Mo
 
 /** D-day 칩(56×52). num은 큰 글자, unit은 밑 라벨. tone은 색. */
 // soon = 아직 안 열린 접수(D-N 시작)에만 쓴다. 오늘 시작한 건 지금 넣을 수 있으니 접수 중과 같은 acc다(사용자 지적 2026-09-09)
-export type DdayChip = { num: string; unit: string; tone: "hot" | "warn" | "soft" | "acc" | "soon"; days: number | null };
+export type DdayChip = {
+  num: string;
+  unit: string;
+  tone: "hot" | "warn" | "soft" | "acc" | "soon";
+  days: number | null;
+  /** 지금 움직여야 하는 상태(오늘 접수 시작·모집 중·오늘 마감·마감·D-4 이내). 색을 꽉 채워 강조한다(사용자 요청 2026-09-09) */
+  solid?: boolean;
+};
 export function ddayChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "status">): DdayChip {
   const toEnd = daysUntil(n.apply_end_at);
   const toStart = daysUntil(n.apply_start_at);
   if (toEnd === null) {
-    if (n.status === "접수중") return { num: "모집", unit: "진행 중", tone: "acc", days: null };
-    if (n.status === "정정공고중") return { num: "정정", unit: "공고 중", tone: "warn", days: null };
-    if (n.status === "접수마감") return { num: "마감", unit: "종료", tone: "soft", days: null };
+    if (n.status === "접수중") return { num: "모집", unit: "진행 중", tone: "acc", days: null, solid: true };
+    if (n.status === "정정공고중") return { num: "정정", unit: "공고 중", tone: "warn", days: null, solid: true };
+    if (n.status === "접수마감") return { num: "마감", unit: "종료", tone: "soft", days: null, solid: true };
     return { num: "—", unit: "일정 미정", tone: "soft", days: null };
   }
-  if (toEnd < 0) return { num: "마감", unit: "종료", tone: "soft", days: toEnd };
+  if (toEnd < 0) return { num: "마감", unit: "종료", tone: "soft", days: toEnd, solid: true };
   if (toStart !== null && toStart > 0) return { num: `D-${toStart}`, unit: "접수 시작", tone: "soon", days: toStart };
-  if (toEnd === 0) return { num: "오늘", unit: "마감", tone: "hot", days: 0 };
+  if (toEnd === 0) return { num: "오늘", unit: "마감", tone: "hot", days: 0, solid: true };
   // 오늘 접수가 열린 날은 마감 D-day보다 이 사실이 먼저다(사용자 요청 2026-09-09).
   // 단 색은 접수 중과 같은 acc — 오늘 시작도 지금 신청되는 건 매한가지다
-  if (toStart === 0) return { num: "오늘", unit: "접수 시작", tone: "acc", days: toEnd };
-  return { num: `D-${toEnd}`, unit: "마감", tone: toEnd <= DDAY_URGENT_DAYS ? "hot" : toEnd <= DDAY_SOON_DAYS ? "warn" : "soft", days: toEnd };
+  if (toStart === 0) return { num: "오늘", unit: "접수 시작", tone: "acc", days: toEnd, solid: true };
+  // 마감이 코앞이면 숫자 칩이라도 같이 강조한다
+  if (toEnd <= DDAY_URGENT_DAYS) return { num: `D-${toEnd}`, unit: "마감", tone: "hot", days: toEnd, solid: true };
+  return { num: `D-${toEnd}`, unit: "마감", tone: toEnd <= DDAY_SOON_DAYS ? "warn" : "soft", days: toEnd };
 }
 
 /** 2026-09-07 → 09.07 (행 접수기간처럼 연도가 뻔한 자리) */

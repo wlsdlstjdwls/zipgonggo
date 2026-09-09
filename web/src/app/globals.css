@@ -129,6 +129,26 @@ small { font-size: 12px; }
 .site-footer { margin-top: 0; padding: 20px var(--pad) 26px; border-top: 1px solid var(--line); background: var(--sub); color: var(--dim); font-size: 11.5px; line-height: 1.8; font-weight: 500; }
 .site-footer .bar { max-width: var(--maxw); margin: 0 auto; }
 .site-footer p { margin: 0; }
+.foot-legal { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.foot-legal a { font-weight: 700; font-size: 12px; color: var(--mut); }
+.foot-legal a:hover { color: var(--acc); }
+.foot-legal a.strong { font-weight: 800; color: var(--ink); }
+.foot-legal > span { width: 1px; height: 10px; background: var(--line2); }
+.foot-copy { margin-top: 10px; font-size: 10.5px; color: var(--dim); }
+
+/* ── 정책 문서(이용약관·개인정보처리방침) ────────────────── */
+.legal-in { max-width: 720px; padding: 26px var(--pad) 56px; }
+.legal-in h1 { margin: 0; font-weight: 900; font-size: 28px; line-height: 1.2; letter-spacing: -0.05em; color: var(--ink); }
+.legal-eff { margin: 8px 0 0; font-weight: 700; font-size: 11.5px; color: var(--dim); }
+.legal-body { display: flex; flex-direction: column; gap: 26px; margin-top: 28px; }
+.legal-sec h2 { margin: 0 0 8px; font-weight: 800; font-size: 15px; letter-spacing: -0.03em; color: var(--ink); }
+.legal-sec p { margin: 0 0 8px; font-weight: 500; font-size: 13.5px; line-height: 1.85; color: var(--mut); }
+.legal-sec p:last-child { margin-bottom: 0; }
+.legal-sec ul { margin: 0 0 8px; padding-left: 18px; }
+.legal-sec li { margin-bottom: 6px; font-weight: 500; font-size: 13.5px; line-height: 1.85; color: var(--mut); }
+.legal-sec li:last-child { margin-bottom: 0; }
+.legal-sec strong { font-weight: 800; color: var(--ink); }
+.legal-sec a { font-weight: 700; color: var(--acc); text-decoration: underline; text-underline-offset: 3px; }
 
 /* ── 스코프 바(부문+시도) ────────────────────────────────── 헤더 바로 아래 상시 노출, 필터 행보다 상위 범위 */
 .sbar { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line);
@@ -283,6 +303,16 @@ small { font-size: 12px; }
 .row-dday.soft, .tone-soft { background: var(--sub); color: var(--mut); }
 /* 접수 시작 대기 — 접수 중(acc, 파랑)과 눈에 띄게 갈라 놓는다(사용자 요청 2026-09-09) */
 .row-dday.soon, .tone-soon { background: var(--soon-soft); color: var(--soon); }
+/* 지금 움직여야 하는 상태(오늘 접수 시작·모집 중·오늘 마감·D-4 이내)와 끝난 상태는 색을 꽉 채운다.
+   연한 배경끼리는 D-30과 「오늘 마감」이 같은 무게로 보였다(사용자 요청 2026-09-09). */
+.row-dday.solid { color: #fff; }
+.row-dday.solid.hot { background: var(--hot); }
+.row-dday.solid.acc { background: var(--acc); }
+.row-dday.solid.warn { background: var(--warn); }
+.row-dday.solid.soon { background: var(--soon); }
+.row-dday.solid.soft { background: var(--mut); }
+.row-dday.solid b { font-size: 17px; }
+.row-dday.solid span { opacity: 0.88; }
 .row-body { min-width: 0; }
 .row-meta { display: block; font-weight: 700; font-size: 11px; letter-spacing: 0.02em; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 접수 중·오늘 시작 표식 — 마감 D-day만으론 "지금 넣을 수 있다"가 안 보인다(사용자 요청 2026-09-09) */
@@ -490,7 +520,7 @@ small { font-size: 12px; }
 .cx-tools .fld { grid-column: 1 / -1; }
 .cx-count { margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--dim); border-bottom: 1px solid var(--line); }
 .cx-count b { color: var(--ink); }
-.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: min(620px, calc(100vh - 200px)); border-radius: 0 0 var(--r-panel) var(--r-panel); overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
+.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: min(820px, calc(100vh + 60px)); border-radius: 0 0 var(--r-panel) var(--r-panel); overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
 .cx-list li { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
 .cx-list li:last-child { border-bottom: 0; }
 .cx-list > li > button { display: flex; flex: 1; min-width: 0; gap: 10px; align-items: flex-start; padding: 11px 12px; background: none; border: 0; border-left: 3px solid transparent; text-align: left; font: inherit; color: var(--ink); cursor: pointer; transition: background 200ms var(--ease), transform 300ms var(--sp); }
@@ -511,8 +541,10 @@ small { font-size: 12px; }
 .cx-list li.on .cx-go { color: var(--acc); }
 .cx-list li.on .cx-go:hover { color: #fff; }
 .cx-empty { display: block; padding: 24px 12px; color: var(--dim); font-size: 13px; text-align: center; }
+/* 지도는 목록 옆에 붙박이. 지도가 패널보다 크면 sticky가 걸릴 자리가 없어 페이지와 함께 흘러내린다
+   — 지도는 뷰포트보다 낮게, 목록은 뷰포트보다 길게 잡아 붙을 구간을 만든다(사용자 지적 2026-09-09) */
 .cx-map-wrap { position: sticky; top: 72px; }
-.cx-map { width: 100%; height: min(700px, calc(100vh - 108px)); border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--sub); overflow: hidden; position: relative; z-index: 0; }
+.cx-map { width: 100%; height: min(560px, calc(100vh - 160px)); border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--sub); overflow: hidden; position: relative; z-index: 0; }
 .cx-map .canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; } /* SDK가 position을 relative로 덮어써도 크기가 남게 width/height 명시 */
 /* 지도 위 선택 카드 — 로드뷰 토글과 단지 상세 진입. 로드뷰 패널(z 6)보다 위.
    bottom은 NAVER 로고·축척 바를 가리지 않는 높이 — 로고는 항상 보여야 한다(이용약관) */

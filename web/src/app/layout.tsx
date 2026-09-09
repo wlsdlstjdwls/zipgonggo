@@ -4,7 +4,9 @@ import { HomeLink } from "@/components/home-link";
 import { SaveProvider } from "@/components/save-context";
 import { ScopeBar } from "@/components/scope-bar";
 import { ListStateProvider } from "@/components/list-state";
-import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
+import { CONTACT_EMAIL, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
+import { ROUTES } from "@/lib/routes";
+import Link from "next/link";
 import { listFilterOptions } from "@/lib/queries";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
@@ -51,7 +53,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <footer className="site-footer">
             <div className="bar">
               <p>출처: 국토교통부 마이홈포털 공공주택 모집공고 조회 서비스(공공데이터포털), 서울주거포털 SH 공고 목록. 공고 원문은 각 기관 링크에서 확인하세요.</p>
-              <p>보증금과 임대료는 공고에 기재된 최소값입니다. 호실별 금액은 기관 원문을 따릅니다.</p>
+              <p>지도 © NAVER Corp. 보증금과 임대료는 공고에 기재된 최소값입니다. 호실별 금액은 기관 원문을 따릅니다.</p>
+              {/* 개인정보처리방침은 다른 링크보다 굵게 — 개인정보보호법 시행령이 "글자 크기나 색상으로 구분해
+                  쉽게 확인할 수 있게" 하라고 정한다 */}
+              <nav className="foot-legal" aria-label="약관과 방침">
+                <Link href={ROUTES.terms}>이용약관</Link>
+                <span aria-hidden="true" />
+                <Link href={ROUTES.privacy} className="strong">개인정보처리방침</Link>
+                <span aria-hidden="true" />
+                <a href={`mailto:${CONTACT_EMAIL}`}>문의와 권리침해 신고</a>
+              </nav>
+              <p className="foot-copy">© 2026 {SITE_NAME}. All rights reserved.</p>
             </div>
           </footer>
         </SaveProvider>
