@@ -13,10 +13,12 @@ import { usePanorama } from "@/lib/use-panorama";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-type Props = { address: string; title: string; sub?: string };
+type Props = { address: string; title: string; sub?: string;
+  /** 기본은 NAVER_MAP_DEFAULT_ZOOM. 단지 상세는 한 단계 낮게 써서 원래 배율을 지킨다(사용자 요청 2026-09-09) */
+  zoom?: number };
 type State = "loading" | "ready" | "no-key" | "failed";
 
-export function NaverMap({ address, title, sub = "" }: Props) {
+export function NaverMap({ address, title, sub = "", zoom = NAVER_MAP_DEFAULT_ZOOM }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const panoEl = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<State>(hasMapKey() ? "loading" : "no-key");
@@ -36,7 +38,7 @@ export function NaverMap({ address, title, sub = "" }: Props) {
         if (cancelled) return;
         if (!p || !el.current) { setState("failed"); return; }
         const pos = new maps.LatLng(p.lat, p.lng);
-        map = new maps.Map(el.current, { center: pos, zoom: NAVER_MAP_DEFAULT_ZOOM, zoomControl: false, scaleControl: true, mapDataControl: false });
+        map = new maps.Map(el.current, { center: pos, zoom, zoomControl: false, scaleControl: true, mapDataControl: false });
         const marker = new maps.Marker({
           position: pos, map, title,
           icon: { content: bubbleMarkerHtml(title, sub), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) },
@@ -48,7 +50,7 @@ export function NaverMap({ address, title, sub = "" }: Props) {
       })
       .catch(() => { if (!cancelled) setState("failed"); });
     return () => { cancelled = true; if (map?.destroy) map.destroy(); };
-  }, [address, title, sub]);
+  }, [address, title, sub, zoom]);
 
   const panoState = usePanorama(panoEl, coord, roadview, state === "ready");
 

@@ -21,6 +21,7 @@ import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
 import { UnitTable } from "@/components/unit-table";
 import { agencyLabels } from "@/lib/agency";
+import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
 import { applyPhase, count, dateK, deadlineChip, NO_DATE, num, wonKo } from "@/lib/format";
 import { areaText, commonArea, complexPriceGroups, complexPriceRows, CONVERT_HINT, m2, moveInLabel, unitPriceRows } from "@/lib/notice-view";
 import { getComplexSupply, getComplexUnits, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
@@ -265,7 +266,7 @@ export default async function ComplexPage({ params }: Params) {
 
           <section className="dsec">
             <h2>위치</h2>
-            <div className="d-map"><NaverMap address={full} title={c.name} sub={mapSub} /></div>
+            <div className="d-map"><NaverMap address={full} title={c.name} sub={mapSub} zoom={NAVER_MAP_COMPLEX_ZOOM} /></div>
           </section>
 
           <GlossaryList terms={terms} />
