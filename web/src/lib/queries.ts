@@ -7,7 +7,7 @@ import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { todayKST } from "./format";
-import type { Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, Sector } from "@/types/notice";
+import type { Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, Sector } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
@@ -225,7 +225,9 @@ export async function getNoticeAreas(noticeId: number): Promise<NoticeArea[]> {
 
 /** 공고의 공급 단지 목록. 자치구 → 단지명 순. 0건이면 화면에 섹션을 그리지 않는다.
  * tenant_classes는 이 단지의 공급현황에 적힌 공급대상(청년·신혼부부·고령자…)을 모은 것이다 —
- * 탐색기의 공급대상 필터가 쓴다(사용자 요청 2026-09-09). 공급현황이 없는 공고는 빈 배열이다. */
+ * 탐색기의 공급대상 필터가 쓴다(사용자 요청 2026-09-09). 공급현황이 없는 공고는 빈 배열이다.
+ * 청년은 소득 조건까지 붙여 「청년 소득있음」·「청년 소득없음」으로 가른다(사용자 요청 2026-09-09) —
+ * 자격도 배점도 갈리는 서로 다른 줄이라 하나로 묶으면 필터가 뜻을 잃는다. */
 export async function getNoticeComplexes(noticeId: number): Promise<NoticeComplex[]> {
   return query<NoticeComplex>(
     `SELECT c.id, c.name, c.sido, c.sigungu, c.road_address, c.is_new, c.complex_code, c.source_page,
@@ -233,7 +235,7 @@ export async function getNoticeComplexes(noticeId: number): Promise<NoticeComple
             COALESCE(t.classes, ARRAY[]::text[]) AS tenant_classes
      FROM notice_complex c
      LEFT JOIN LATERAL (
-       SELECT array_agg(DISTINCT s.tenant_class ORDER BY s.tenant_class) AS classes
+       SELECT array_agg(DISTINCT s.tenant_class || COALESCE(' ' || s.income_option, '') ORDER BY s.tenant_class || COALESCE(' ' || s.income_option, '')) AS classes
        FROM notice_supply s
        WHERE s.notice_id = c.notice_id AND (s.complex_id = c.id OR s.complex_name = c.name)
      ) t ON true
@@ -262,6 +264,18 @@ export async function getComplexSupply(noticeId: number, complexId: number, comp
      WHERE notice_id = $1 AND (complex_id = $2 OR complex_name = $3)
      ORDER BY ${SUPPLY_ORDER}`,
     [noticeId, complexId, complexName],
+  );
+}
+
+/** 단지 1곳의 호실 목록(0021). 매입임대 별첨이 있는 공고에만 있다 — 나머지는 빈 배열.
+ *  동 → 호 순. 동이 없는 다세대주택은 호만으로 줄 세운다. */
+export async function getComplexUnits(noticeComplexId: number): Promise<NoticeUnit[]> {
+  return query<NoticeUnit>(
+    `SELECT id, unit_key, building, room, floor, area_m2, room_layout, elevator,
+            deposit, rent, deposit_jeonse, rent_jeonse, deposit_wolse, rent_wolse
+       FROM unit WHERE notice_complex_id = $1
+      ORDER BY building NULLS FIRST, floor NULLS LAST, room`,
+    [noticeComplexId],
   );
 }
 

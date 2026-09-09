@@ -1,7 +1,7 @@
 // 상세 화면(공고·단지) 전용 표시 계산. 두 page.tsx가 공유한다 — 레이아웃 JSX와 분리해 여기 한 곳만 본다.
 import { convertRange, CONVERT_LIMIT_SHARE, CONVERT_RATE_DOWN, CONVERT_RATE_UP } from "./calc";
 import { wonKo } from "./format";
-import type { Notice, NoticeComplex, NoticeSupply } from "@/types/notice";
+import type { Notice, NoticeComplex, NoticeSupply, NoticeUnit } from "@/types/notice";
 
 /** 공급유형 표기 — "39㎡", 주거약자용이면 "39㎡ 주거약자용" */
 export function typeLabel(s: NoticeSupply): string {
@@ -11,6 +11,18 @@ export function typeLabel(s: NoticeSupply): string {
 /** 공급대상 표기 — 청년은 소득 조건까지 */
 export function classLabel(s: NoticeSupply): string {
   return s.income_option ? `${s.tenant_class} ${s.income_option}` : s.tenant_class;
+}
+
+/** 입주시작 원문("’27.4", "2027.4", "27.4.")을 사람 말로. 「(예정)」 열이라 확정 표기가 아니면 예정으로 읽는다.
+ *  못 알아보는 표기는 원문 그대로 — 없는 날짜를 지어내지 않는다(사용자 요청 2026-09-09: 확정인지 예정인지 밝힐 것) */
+export function moveInLabel(raw: string | null): string | null {
+  if (!raw) return null;
+  const t = raw.replace(/\s+/g, "");
+  const m = t.match(/^[’'´`]?(\d{2,4})[.\-\/](\d{1,2})/);
+  if (!m) return raw;
+  const y = Number(m[1]);
+  const year = y < 100 ? 2000 + y : y;
+  return `${year}년 ${Number(m[2])}월 예정`;
 }
 
 export function m2(v: number | null): string {
@@ -107,9 +119,31 @@ export function complexPriceRows(supply: NoticeSupply[], c?: NoticeComplex): Pri
   return rows;
 }
 
-// 단지 상세 「보증금과 임대료」 — 공급대상 × 공급유형마다 전세전환 / 기본 / 월세전환 세 줄.
+/** 공급현황 표가 없고 호실 목록만 있는 공고(매입임대 별첨)의 「보증금과 임대료」.
+ *  호실마다 금액이 달라 단지 단위로는 범위가 답이다 — 낱 호실의 기준·전세전환·월세전환은 아래 동호수별 표가 말한다.
+ *  전환 폭을 여기서 또 요약하지 않는 이유: 호실 하나만 잘못 읽혀도 최소·최대가 통째로 어긋난다. */
+export function unitPriceRows(units: NoticeUnit[]): PriceRow[] {
+  if (units.length === 0) return [];
+  const span = (pick: (u: NoticeUnit) => number | null): [number | null, number | null] => {
+    const v = units.map(pick).filter((x): x is number => x != null);
+    return v.length ? [Math.min(...v), Math.max(...v)] : [null, null];
+  };
+  const row = (id: string, label: string, d: number | null, r: number | null): PriceRow => ({
+    id, group: "base", label, note: `${units.length}호 중`, deposit: wonKo(d), rent: r != null ? wonKo(r) : "—", exact: [d, r],
+  });
+  const [dLo, dHi] = span((u) => u.deposit);
+  const [rLo, rHi] = span((u) => u.rent);
+  if (dLo == null && rLo == null) return [];
+  const rows: PriceRow[] = [row("u-min", "기준 최소", dLo, rLo)];
+  if (dLo !== dHi || rLo !== rHi) rows.push(row("u-max", "기준 최대", dHi, rHi));
+  return rows;
+}
+
+// 단지 상세 「보증금과 임대료」 — 공급대상 × 공급유형마다 최대 / 기본 / 최소 세 줄.
 // 사용자 요청 2026-09-09: "신혼부부 전세전환·기본·월세전환 / 청년 전세전환·기본·월세전환처럼 유형별로,
 // 최소 최대 몇 퍼센트까지 가능한지" — 계약 때 실제로 고를 수 있는 폭을 표에서 바로 읽게 한다.
+// 큰 라벨은 「최대」·「최소」로 바꿨다(사용자 요청 2026-09-09): 보증금이 얼마까지 오르내리는지가 먼저 읽혀야 한다.
+// 원래 용어(전세전환·월세전환)는 보조 글자로 남겨 뜻이 사라지지 않게 하고, 페이지 밑 용어 설명이 받는다.
 // 계산은 lib/calc.ts(SH 별표1 역산 6.0% / 2.5%, 한도 50%)를 쓴다. 하드코딩 금액은 없다.
 export type PriceScenarioKind = "max" | "base" | "min";
 export type PriceScenario = {
@@ -120,6 +154,8 @@ export type PriceScenario = {
   exact: [number | null, number | null];
   /** 기준 보증금 대비 비율(%). 기본 줄은 null */
   pct: number | null;
+  /** 공고문 용어(전세전환·월세전환). 기본 줄은 null — 용어 설명 앵커의 키이기도 하다 */
+  term: string | null;
 };
 export type PriceGroup = { id: string; label: string; note: string; units: number | null; rows: PriceScenario[] };
 
@@ -137,9 +173,10 @@ export function complexPriceGroups(supply: NoticeSupply[]): PriceGroup[] {
     .map((s) => {
       const base = s.deposit as number;
       const r = convertRange(base, s.rent as number);
-      const scenario = (kind: PriceScenarioKind, label: string, c: { deposit: number; rent: number }): PriceScenario => ({
+      const scenario = (kind: PriceScenarioKind, label: string, term: string | null, c: { deposit: number; rent: number }): PriceScenario => ({
         kind,
         label,
+        term,
         deposit: wonKo(c.deposit),
         rent: wonKo(c.rent),
         exact: [c.deposit, c.rent],
@@ -151,9 +188,9 @@ export function complexPriceGroups(supply: NoticeSupply[]): PriceGroup[] {
         note: typeLabel(s),
         units: s.units_total,
         rows: [
-          scenario("max", "전세전환", r.max),
-          scenario("base", "기본", r.base),
-          scenario("min", "월세전환", r.min),
+          scenario("max", "최대", "전세전환", r.max),
+          scenario("base", "기본", null, r.base),
+          scenario("min", "최소", "월세전환", r.min),
         ],
       };
     });

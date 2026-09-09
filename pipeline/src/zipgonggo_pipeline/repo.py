@@ -93,6 +93,34 @@ def replace_notice_supply(cur, notice_id: int, rows: list[dict[str, Any]]) -> in
     return len(rows)
 
 
+def replace_units(cur, notice_id: int, rows: list[dict[str, Any]]) -> int:
+    """공고의 호실 목록을 통째로 교체한다. notice_complex_id는 같은 공고의 단지코드로 이어 붙인다.
+
+    별첨 주택목록(sh_units)에서만 나오는 값이다 — 동·호·구조(원룸/투룸)·승강기·전환 금액.
+    unit_key는 공고 안에서만 유일하면 된다: 「단지코드-호」(0001J-0201).
+    """
+    cur.execute("DELETE FROM unit WHERE notice_id = %s", (notice_id,))
+    for r in rows:
+        cur.execute(
+            """
+            INSERT INTO unit
+              (notice_id, notice_complex_id, unit_key, road_address, complex_name, building, room, floor,
+               sido, sigungu, area_m2, deposit, rent, deposit_jeonse, rent_jeonse, deposit_wolse, rent_wolse,
+               room_layout, elevator, has_elevator, seq, source_page)
+            VALUES (%(notice_id)s,
+                    (SELECT id FROM notice_complex
+                      WHERE notice_id = %(notice_id)s AND complex_code = %(complex_code)s LIMIT 1),
+                    %(unit_key)s, %(road_address)s, %(complex_name)s, %(building)s, %(room)s, %(floor)s,
+                    %(sido)s, %(sigungu)s, %(area_m2)s, %(deposit)s, %(rent)s,
+                    %(deposit_jeonse)s, %(rent_jeonse)s, %(deposit_wolse)s, %(rent_wolse)s,
+                    %(room_layout)s, %(elevator)s, %(has_elevator)s, %(seq)s, %(source_page)s)
+            ON CONFLICT (notice_id, unit_key) DO NOTHING
+            """,
+            {"notice_id": notice_id, **r},
+        )
+    return len(rows)
+
+
 def queue_unmapped(cur, key: str, housing_type: str, title: str) -> None:
     """유형 미매핑 공고를 review_queue에 1회만 넣는다(미해결 동일 키 중복 방지)."""
     cur.execute(

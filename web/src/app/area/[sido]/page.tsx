@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { FilterBar } from "@/components/filter-bar";
 import { FilterRail } from "@/components/filter-rail";
 import { NoticeExplorer } from "@/components/notice-explorer";
 import { AREA_MIN_COUNT, PAGE_SIZE } from "@/lib/constants";
@@ -54,7 +53,6 @@ export default async function AreaPage({ params }: Params) {
     <div className="stage list-stage">
       <FilterRail />
       <div className="list-col">
-        <FilterBar sticky />
         <NoticeExplorer initial={page} title={`${sido} 입주자모집공고`} />
       </div>
     </div>

@@ -92,6 +92,31 @@ export type NoticeSupply = {
   source_page: number | null;
 };
 
+/** 공고 안의 호실 한 칸 (unit). SH 매입임대 「[별첨1] 주택목록」에서만 나온다(0021).
+ *  동·호가 여기 있어야 단지 상세에서 동호수별로 갈라 볼 수 있다(사용자 요청 2026-09-09) */
+export type NoticeUnit = {
+  id: number;
+  unit_key: string;
+  /** 동. 표에 없는 다세대주택은 null */
+  building: string | null;
+  /** 호 "0203" */
+  room: string;
+  floor: number | null;
+  area_m2: number | null;
+  /** 구조: 개방형원룸 · 분리형원룸 · 투룸 · 쓰리룸 */
+  room_layout: string | null;
+  /** 승강기 원문 표기: 전체동 설치 · 일부 설치 · 설치 · 미설치 */
+  elevator: string | null;
+  deposit: number | null;
+  rent: number | null;
+  /** 전세전환(보증금 최대) */
+  deposit_jeonse: number | null;
+  rent_jeonse: number | null;
+  /** 월세전환(보증금 최소) */
+  deposit_wolse: number | null;
+  rent_wolse: number | null;
+};
+
 export type NoticeArea = { sido: string; sigungu: string | null; supply_count: number | null };
 
 /** 공고가 공급하는 단지 (notice_complex, SH 첨부 공고문 표). 좌표 없음 — S6 이후 */

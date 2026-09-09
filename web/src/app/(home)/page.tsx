@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { FilterBar } from "@/components/filter-bar";
 import { FilterRail } from "@/components/filter-rail";
 import { NoticeExplorer } from "@/components/notice-explorer";
 import { PAGE_SIZE } from "@/lib/constants";
@@ -32,7 +31,6 @@ export default async function HomePage() {
     <div className="stage list-stage">
       <FilterRail />
       <div className="list-col">
-        <FilterBar sticky />
         <NoticeExplorer initial={page} title="입주자모집공고" />
       </div>
     </div>

@@ -5,7 +5,7 @@
 // 대신 공고일·접수기간·발표일을 한 줄 더 써서 진하게 보여 준다.
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { dateK, dateMD, ddayChip, num } from "@/lib/format";
+import { dateK, dateMD, ddayChip, NO_DATE, num } from "@/lib/format";
 import { noticePath } from "@/lib/routes";
 import { regionShort } from "@/lib/sido";
 import type { NoticeListItem } from "@/types/notice";
@@ -18,10 +18,10 @@ type Props = {
   stagger?: number;
 };
 
-/** "09.07–09.12". 일정이 없으면 모집상태 문구. */
-export function periodLabel(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "source_status">): string {
+/** "09.07–09.12". 날짜를 못 읽은 공고는 「원문 확인」 — 기관 목록의 「모집중」을 접수 기간인 척 쓰지 않는다(사용자 지적 2026-09-09) */
+export function periodLabel(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at">): string {
   if (n.apply_start_at || n.apply_end_at) return `${dateMD(n.apply_start_at)}–${dateMD(n.apply_end_at)}`;
-  return n.source_status ? `모집 상태 ${n.source_status}` : "원문 확인";
+  return NO_DATE;
 }
 
 /** 날짜 한 칸 — 라벨은 작게, 값은 진하게(사용자 요청 2026-09-09) */

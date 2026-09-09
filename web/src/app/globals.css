@@ -123,6 +123,13 @@ small { font-size: 12px; }
 .site-nav { display: flex; gap: 18px; font-size: 13px; font-weight: 700; color: var(--dim); }
 .site-nav a { transition: color 200ms var(--ease); }
 .site-nav a:hover, .site-nav a.on { color: var(--ink); }
+/* 헤더 오른쪽 버튼(계산기). 링크가 아니라 창을 여는 버튼이라 테두리로 구분한다 */
+.nav-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 13px; border: 1px solid var(--line2); border-radius: var(--r-chip);
+  background: var(--bg); color: var(--mut); font-family: inherit; font-weight: 800; font-size: 12.5px; cursor: pointer; white-space: nowrap;
+  transition: background 200ms var(--ease), border-color 200ms var(--ease), color 200ms var(--ease); }
+.nav-btn svg { display: block; }
+.nav-btn:hover { color: var(--ink); border-color: var(--ink); }
+.nav-btn.on { background: var(--acc); border-color: var(--acc); color: #fff; }
 .stage { animation: mo-stage 380ms var(--sp) both; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 900px) { .site-nav { display: none; } }
@@ -165,6 +172,8 @@ small { font-size: 12px; }
 .rail-reset { border: 0; background: none; font-family: inherit; cursor: pointer; align-self: flex-start; display: inline-flex; align-items: center;
   height: 34px; padding: 0 12px; border-radius: var(--r-chip); font-weight: 700; font-size: 12px; color: var(--acc); white-space: nowrap; }
 .rail-reset:hover { background: var(--acc-soft); }
+/* 보기·정렬은 조회 조건이 아니다 — 아래 조건 묶음과 선으로 가른다 */
+.rail-g.rail-view + .rail-g + .rail-g { padding-top: 16px; border-top: 1px solid var(--line); }
 
 /* 좁은 화면 전용 필터 줄 + 바텀시트. 넓은 화면에서는 레일이 대신하므로 감춘다 */
 .fsheet-bar { display: none; }
@@ -265,14 +274,6 @@ small { font-size: 12px; }
 .chip { display: inline-block; padding: 3px 9px; border-radius: 999px; background: var(--sub); color: var(--dim); font-size: 11px; font-weight: 700; line-height: 16px; white-space: nowrap; }
 .chip.new, .chip.amend { background: var(--acc-soft); color: var(--acc); }
 
-/* ── 필터 행 ─────────────────────────────────────────────── */
-.fbar { display: flex; align-items: center; gap: 8px; row-gap: 8px; flex-wrap: wrap; padding: 14px var(--pad); border-bottom: 1px solid var(--line); }
-/* 스코프 바가 없어져 헤더(60) 바로 밑이다. 1px 겹쳐 이음매를 지운다 */
-.fbar.sticky { position: sticky; top: 59px; z-index: 9; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px); }
-.fbar .grow { margin-left: auto; }
-.fbar .selw { flex: none; }
-.fbar .reset { border: 0; background: none; font-family: inherit; cursor: pointer; display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: var(--r-chip); font-weight: 700; font-size: 12px; color: var(--acc); white-space: nowrap; }
-
 /* ── 탐색기: 좌 목록 / 우 지도 ───────────────────────────── */
 .ex-list { min-width: 0; }
 .map-note { position: absolute; z-index: 5; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; font-weight: 600; font-size: 13px; color: var(--dim); pointer-events: none; }
@@ -313,9 +314,12 @@ small { font-size: 12px; }
 .pano .canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
 
-.viewsw { display: flex; gap: 3px; padding: 3px; border-radius: 999px; background: var(--sub); flex: none; }
-.viewsw button { border: 0; background: none; font: inherit; font-weight: 800; font-size: 12px; color: var(--dim); padding: 6px 12px; border-radius: 999px; cursor: pointer;
+/* 보기 전환 — 글자를 빼고 아이콘만 남겼다(사용자 요청 2026-09-09). 칸은 그대로 눌러야 하니 너비는 유지 */
+.viewsw { display: flex; gap: 3px; padding: 3px; border-radius: 999px; background: var(--sub); }
+.viewsw button { flex: 1; display: inline-flex; align-items: center; justify-content: center; height: 32px; border: 0; background: none; color: var(--dim); border-radius: 999px; cursor: pointer;
   transition: background 200ms var(--ease), color 200ms var(--ease); }
+.viewsw button svg { display: block; }
+.viewsw button:hover { color: var(--ink); }
 .viewsw button.on { background: #fff; color: var(--ink); box-shadow: 0 2px 8px -3px rgba(15, 18, 22, 0.3); }
 
 /* ── 결과 행 ─────────────────────────────────────────────── */
@@ -547,7 +551,7 @@ small { font-size: 12px; }
 .ptable span { padding: 14px 15px; min-width: 0; overflow-wrap: anywhere; }
 .ptable .k { display: flex; align-items: baseline; gap: 6px; font-weight: 700; font-size: 13.5px; color: var(--ink); }
 .ptable .k small { font-weight: 600; font-size: 10.5px; color: var(--dim); white-space: nowrap; }
-.ptable .d, .ptable .r { text-align: right; white-space: nowrap; }
+.ptable .d, .ptable .r { text-align: center; white-space: nowrap; }
 .ptable .d { font-weight: 800; font-size: 14px; color: var(--ink); }
 .ptable .r { font-weight: 700; font-size: 14px; color: var(--mut); }
 .ptable .pay { background: var(--sub); }
@@ -595,6 +599,8 @@ small { font-size: 12px; }
 .notice-bar { display: flex; gap: 10px; align-items: flex-start; margin: 24px var(--pad) 32px; padding: 12px 14px; border-radius: var(--r-card); background: var(--sub); border: 1px solid var(--line); color: var(--mut); font-size: 12.5px; font-weight: 600; line-height: 1.6; }
 /* 페이지 맨 밑 고지 — 푸터와 붙여 둔다(사용자 지적 2026-09-09: 너무 떨어져 있다) */
 .notice-bar.foot { margin: 22px var(--pad) 0; }
+/* 페이지가 이 고지로 끝나면 푸터를 바로 밑에 붙인다 — 56px 여백까지 더하면 둘이 따로 논다(사용자 지적 2026-09-09) */
+body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .notice-bar .i { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 11px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; margin-top: 1px; }
 .map { width: 100%; height: 300px; border-radius: var(--r-panel); background: var(--sub); overflow: hidden; }
 .map-fallback { color: var(--dim); font-size: 13px; font-weight: 600; padding: 14px; text-align: center; }
@@ -631,7 +637,7 @@ small { font-size: 12px; }
 .ct-head > span { text-align: center; }
 .ct-r .k { display: flex; align-items: baseline; gap: 6px; font-weight: 700; font-size: 13px; color: var(--mut); }
 .ct-r .k small { font-weight: 600; font-size: 10.5px; color: var(--dim); white-space: nowrap; }
-.ct-r .d, .ct-r .r { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ct-r .d, .ct-r .r { text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ct-r .d { font-weight: 800; font-size: 14px; color: var(--ink); }
 .ct-r .r { font-weight: 700; font-size: 13.5px; color: var(--mut); }
 /* 기본(공고 기준값)이 읽는 사람의 기준선이다 — 전환 두 줄보다 진하게 */
@@ -644,11 +650,35 @@ small { font-size: 12px; }
 .cx { --cx-h: min(780px, calc(100vh - 132px)); display: grid; grid-template-columns: minmax(272px, 320px) 1fr; gap: 14px; align-items: start; }
 .cx-panel { position: relative; z-index: 1; display: flex; flex-direction: column; height: var(--cx-h); border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--bg); }
 /* 공급대상·면적·신규 필터가 공고에 따라 붙었다 빠진다 — 고정 2열 그리드 대신 줄바꿈으로 흐른다 */
+/* 첫 줄은 늘 쓰는 검색·자치구·「조건」 토글만. 나머지 조건은 아래 접이식 칸으로 내렸다(사용자 요청 2026-09-09) */
 .cx-tools { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); }
 .cx-tools > * { flex: 1 1 132px; min-width: 0; }
+.cx-tools .cx-q { flex-basis: 100%; }
 .cx-tools .selw, .cx-tools .sel { width: 100%; }
-.cx-tools .chip-f { justify-content: center; height: 38px; }
-.cx-tools .fld { flex-basis: 100%; }
+.cx-more { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 13px; border-radius: var(--r-chip);
+  border: 1px solid var(--line2); background: var(--bg); color: var(--mut); font-family: inherit; font-weight: 800; font-size: 12.5px; cursor: pointer;
+  transition: background 200ms var(--ease), border-color 200ms var(--ease), color 200ms var(--ease); }
+.cx-more:hover { color: var(--ink); border-color: var(--ink); }
+.cx-more.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.cx-more em { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px;
+  background: var(--acc); color: #fff; font-style: normal; font-weight: 800; font-size: 10.5px; }
+.cx-cond { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: var(--sub); border-bottom: 1px solid var(--line);
+  animation: slide-up-fade 200ms var(--sp) both; }
+.cx-cond > * { flex: 1 1 132px; min-width: 0; }
+.cx-cond .selw, .cx-cond .sel { width: 100%; }
+.cx-cond .chip-f { justify-content: center; height: 38px; background: var(--bg); }
+.cx-range { flex-basis: 100%; display: flex; align-items: center; gap: 6px; }
+.cx-range > span { flex: none; font-weight: 800; font-size: 11px; color: var(--dim); }
+.cx-range .fld { flex: 1; min-width: 0; height: 34px; text-align: center; }
+.cx-range i { flex: none; font-style: normal; color: var(--dim); }
+.cx-range em { flex: none; font-style: normal; font-weight: 700; font-size: 11px; color: var(--dim); }
+/* 핀 색 범례 — 지도 왼쪽 위. NAVER 로고(왼쪽 아래)와 축척(오른쪽 아래)을 피한다 */
+.cx-legend { position: absolute; z-index: 5; left: 12px; top: 12px; margin: 0; display: flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border-radius: 999px; background: rgba(255, 255, 255, 0.94); box-shadow: var(--shadow-overlay);
+  font-weight: 700; font-size: 11px; color: var(--mut); }
+.cx-legend .lg { width: 9px; height: 9px; border-radius: 50%; background: var(--acc); }
+.cx-legend .lg.new { background: var(--soon); }
+.cx-legend .lg:not(:first-child) { margin-left: 6px; }
 .cx-count { margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--dim); border-bottom: 1px solid var(--line); }
 .cx-count { display: flex; align-items: center; gap: 8px; }
 .cx-count b { color: var(--ink); }
@@ -717,13 +747,74 @@ small { font-size: 12px; }
 .cx-nopin { font-size: 11px; color: var(--dim); }
 
 
-/* ── 계산기 독 (상호전환·대출이자) ───────────────────────── */
-.calc { position: fixed; right: 20px; bottom: 20px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
-.calc-fab { display: inline-flex; align-items: center; justify-content: center; height: 46px; padding: 0 18px; border: 1px solid var(--ink); border-radius: 999px;
-  background: var(--ink); color: #fff; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: var(--shadow-float);
-  transition: transform 240ms var(--sp), background 200ms var(--ease); }
-.calc-fab:hover { transform: translateY(-2px); }
-.calc-fab.on { background: var(--acc); border-color: var(--acc); }
+/* ── 상세 요약 스트립 ─────────────────────────────────────
+   "중요한 정보가 뭔지 알기 어렵다"는 지적(2026-09-09)에 대한 답. 표를 읽기 전에 다섯 칸이 먼저 답한다.
+   값이 없는 칸도 지우지 않고 「준비 중」으로 남긴다 — 빈칸은 왜 없는지 말해 주지 않는다. */
+.kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 1px; margin: 0 var(--pad); background: var(--line);
+  border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
+.kpi-i { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; background: var(--bg); min-width: 0; }
+.kpi-i > span { font-weight: 800; font-size: 10px; line-height: 1; letter-spacing: 0.1em; color: var(--dim); }
+.kpi-i > b { font-weight: 900; font-size: 17px; line-height: 1.2; letter-spacing: -0.04em; color: var(--ink); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.kpi-i > em { font-style: normal; font-weight: 700; font-size: 10.5px; color: var(--dim); }
+.kpi-i.off > b { font-size: 14px; font-weight: 800; color: var(--dim); }
+
+/* ── 동호수별 목록 (components/unit-table.tsx) ───────────── */
+.ut-tools { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.ut-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ut-count { margin: 0 0 8px; font-weight: 700; font-size: 11.5px; color: var(--dim); }
+.ut-count b { color: var(--ink); font-weight: 800; }
+.ut-empty { padding: 22px 12px; text-align: center; color: var(--dim); }
+.supply .tc-key small { font-weight: 600; font-size: 10.5px; color: var(--dim); }
+
+/* ── 상세 머리글 → 헤더 리빌 (components/detail-headbar.tsx) ──
+   머리글이 헤더에 가리면 헤더 자리를 이 바가 덮는다. body로 포털되므로 .shell의 @container가 안 닿는다. */
+.dhb-sentinel { height: 1px; margin-top: -1px; }
+.dhb { position: fixed; inset: 0 0 auto; z-index: 21; height: 60px; background: var(--bg);
+  border-bottom: 1px solid var(--line); opacity: 0; transform: translateY(-8px); pointer-events: none;
+  transition: opacity 260ms var(--ease), transform 320ms var(--sp); }
+.dhb.on { opacity: 1; transform: none; pointer-events: auto; }
+.dhb-in { max-width: var(--maxw); height: 100%; margin: 0 auto; padding: 0 var(--pad); display: flex; align-items: center; gap: 12px; }
+.dhb-back { flex: none; display: inline-flex; align-items: center; height: 32px; padding: 0 11px; border-radius: var(--r-chip);
+  background: var(--sub); color: var(--mut); font-weight: 800; font-size: 12px; white-space: nowrap; }
+.dhb-back:hover { background: var(--acc-soft); color: var(--acc); }
+.dhb-t { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.dhb-sub { font-weight: 700; font-size: 10.5px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dhb-n { font-weight: 900; font-size: 14px; letter-spacing: -0.035em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dhb-s { flex: none; display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px;
+  font-weight: 800; font-size: 11.5px; background: var(--sub); color: var(--mut); white-space: nowrap; }
+.dhb-s.hot { background: var(--hot-soft); color: var(--hot); }
+.dhb-s.acc { background: var(--acc-soft); color: var(--acc); }
+.dhb-s.warn { background: var(--warn-soft); color: var(--warn); }
+.dhb-s.soon { background: var(--acc-soft); color: var(--acc); }
+.dhb-a { flex: none; display: flex; gap: 8px; }
+@media (max-width: 640px) {
+  .dhb-sub, .dhb-a { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .dhb { transition: opacity 120ms linear; } }
+
+/* ── 용어 링크와 설명 (lib/glossary.ts) ────────────────────
+   툴팁이 아니라 페이지 안 앵커다 — 모바일에는 호버가 없고, 크롤러도 설명 본문을 읽어야 한다. */
+.term { color: inherit; border-bottom: 1px dashed var(--line2); cursor: help; }
+.term:hover { color: var(--acc); border-bottom-color: var(--acc); }
+.gloss-l { display: grid; gap: 1px; margin: 0; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--line); overflow: hidden; }
+.gloss-l > div { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 14px; padding: 13px 16px; background: var(--bg); scroll-margin-top: 74px; }
+.gloss-l > div:target { background: var(--acc-soft); }
+.gloss-l dt { margin: 0; font-weight: 800; font-size: 13px; letter-spacing: -0.02em; color: var(--ink); }
+.gloss-l dd { margin: 0; font-weight: 500; font-size: 12.5px; line-height: 1.75; color: var(--mut); }
+@container (max-width: 640px) { .gloss-l > div { grid-template-columns: 1fr; gap: 4px; } }
+
+/* ── 「아직 못 읽은 값」 자리 (components/pending.tsx) ────── */
+.pending { display: flex; align-items: center; gap: 13px; padding: 16px 18px; border: 1px dashed var(--line2); border-radius: var(--r-card); background: var(--sub); }
+.pending .ico { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--bg); border: 1px solid var(--line2); display: inline-flex; align-items: center; justify-content: center; }
+.pending .ico i { display: block; width: 3px; height: 12px; border-radius: 2px; background: var(--dim); box-shadow: 5px 0 0 var(--line2), -5px 0 0 var(--line2); }
+.pending > div { min-width: 0; flex: 1; }
+.pending b { display: block; font-weight: 800; font-size: 13px; letter-spacing: -0.02em; color: var(--ink); }
+.pending p { margin: 3px 0 0; font-weight: 600; font-size: 12px; line-height: 1.65; color: var(--dim); }
+.pending .btn { flex: none; }
+
+/* ── 계산기 (상호전환·대출이자) ──────────────────────────
+   여는 버튼은 헤더(.nav-btn)로 올라갔다 — 여기는 그 버튼 밑에 떨어지는 패널만(사용자 요청 2026-09-09). */
+.calc { position: fixed; right: 20px; top: 68px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; }
 .calc-panel { display: flex; flex-direction: column; width: min(360px, calc(100vw - 32px)); height: min(74vh, 520px);
   border: 1px solid var(--line2); border-radius: var(--r-frame); background: var(--bg); box-shadow: var(--shadow-frame);
   overflow: hidden; animation: mo-pop 240ms var(--sp); }
@@ -757,8 +848,7 @@ small { font-size: 12px; }
 .calc-note { margin: 0; font-weight: 600; font-size: 11px; line-height: 1.7; color: var(--dim); }
 /* 독은 body로 포털된다 — .shell의 @container가 안 닿아 일반 @media로 좁힌다 */
 @media (max-width: 720px) {
-  .calc { right: 12px; bottom: 12px; left: 12px; align-items: stretch; }
-  .calc-fab { align-self: flex-end; }
+  .calc { right: 12px; top: 66px; left: 12px; align-items: stretch; }
   .calc-panel { width: 100%; max-height: 70vh; }
   .calc-o > em { display: none; }
 }
@@ -772,13 +862,14 @@ small { font-size: 12px; }
   .cx { grid-template-columns: 1fr; }
   .cx-map-wrap { position: static; order: -1; height: 400px; }
   .cx-panel { height: 480px; }
-  .fbar.sticky { position: static; background: none; backdrop-filter: none; }
   /* 좁아지면 레일을 목록 위 가로 줄로 눕힌다 — 세로 레일이 목록 폭을 다 먹는다 */
   .list-stage { grid-template-columns: 1fr; }
   .rail { border-right: 0; border-bottom: 1px solid var(--line); }
   .rail-in { position: static; flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; padding: 12px var(--pad); }
   .rail-g { flex: 0 1 auto; }
   .rail .selw, .rail .sel { width: auto; }
+  .rail-view .viewsw { flex: none; }
+  .rail-view .viewsw button { flex: none; width: 38px; }
   .dsec.lead > h2 { font-size: 17px; }
   .dsec.lead .d-map { height: 300px; }
   .cx-card { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; }
@@ -791,8 +882,6 @@ small { font-size: 12px; }
    .sbar(스코프 바)는 layout.tsx에서 .shell 밖(헤더 바로 아래)에 있어 @container가 안 먹는다 — 일반 @media로.
    모바일에선 가로 스크롤 대신 줄바꿈으로. 두 바가 겹쳐 쌓이는 sticky(top:120px)도 높이가 가변이라 깨지므로 해제. */
 @media (max-width: 640px) {
-  .fbar .grow { margin-left: 0; }
-  .fbar.sticky { position: static; background: none; backdrop-filter: none; }
   /* 레일을 눕혀도 좁은 화면에선 목록보다 필터가 길어진다 — 버튼 한 줄로 접고 바텀시트로 연다 */
   .rail { display: none; }
   .fsheet-bar { display: flex; align-items: center; gap: 10px; padding: 10px var(--pad); border-bottom: 1px solid var(--line); }
@@ -867,3 +956,4 @@ small { font-size: 12px; }
 @media (max-width: 640px) {
   .elig-grid { grid-template-columns: 1fr; }
 }
+

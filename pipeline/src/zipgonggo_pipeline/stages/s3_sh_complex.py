@@ -2,6 +2,9 @@
 
     python -m zipgonggo_pipeline.stages.s3_sh_complex [--dry-run] [--limit N] [--slug SLUG]
 
+--cached를 주면 네트워크를 아예 쓰지 않고 pipeline/data/ish/{seq}/ 에 이미 받아 둔 쪽 XML만 다시 읽는다.
+파서를 고친 뒤 되돌려 넣을 때 쓴다 — 게시판 본문 마크업이 바뀌어 첨부 링크를 못 찾는 공고도 캐시로는 살아 있다(실측 2026-09-09).
+
 대상: source='sh_scrape'이고 원문이 i-sh.co.kr인 공고. 첨부 미리보기(Synap 뷰어)의 쪽 XML을 1초 간격으로 받고
 「주택 위치 안내」 표(단지명·소재지)를 파싱한다. 받은 XML은 pipeline/data/ish/{seq}/ 에 캐시(커밋 금지).
 표가 없는 공고(매입임대 등 다른 양식)는 0건으로 기록만 남긴다 — 양식별 파서는 이후 추가.
@@ -22,7 +25,7 @@ from pathlib import Path
 from ..config import PIPELINE_ROOT, settings
 from ..db import connect
 from ..parsers.sh_attach import parse_attachment
-from ..repo import replace_notice_complexes, replace_notice_supply, update_notice_attach_facts
+from ..repo import replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts
 from ..sources.ish import IshClient, find_attachments
 from .common import Stats, finish_ingest, stage_main, utc_now
 
@@ -116,7 +119,94 @@ def _jeonse_row(l) -> dict:
     }
 
 
-def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
+_FLOOR_RE = re.compile(r"^(\d{1,2})\d{2}$")
+
+
+def _floor(ho: str) -> int | None:
+    """호 표기에서 층수. 「0201」→2층, 「1103」→11층. 규칙에 안 맞으면 지어내지 않는다."""
+    m = _FLOOR_RE.match(ho)
+    if not m:
+        return None
+    n = int(m.group(1))
+    return n if 1 <= n <= 99 else None
+
+
+# 별첨의 금액 6칸이 한 칸으로 붙어 오면 자릿수가 통째로 이어져 bigint를 넘긴다(실측 2026-09-09: "bigint out of range").
+# 임대보증금 상한을 1000억으로 잡고 그 위는 못 읽은 값으로 버린다 — 틀린 숫자를 싣느니 빈칸이 낫다.
+MONEY_MAX = 100_000_000_000
+
+
+def _money(v: int | None) -> int | None:
+    return v if v is not None and 0 <= v <= MONEY_MAX else None
+
+
+def _layout(v: str | None) -> str | None:
+    """구조 칸 정리 — 앞에 면적 숫자가 새어 들어오고("66 투룸") 띄어쓰기가 들쭉날쭉하다("분리형 원룸")."""
+    if not v:
+        return None
+    t = re.sub(r"^[\d.,\s]+", "", v)
+    t = re.sub(r"\s+", "", t)
+    return t or None
+
+
+def _unit_rows(units) -> list[dict]:
+    """호실 목록 → unit 행. unit_key는 공고 안에서만 유일하면 된다.
+
+    「단지코드-동-호」로 잡되, 그래도 겹치는 줄이 남는다(동이 표에 없는 다세대주택에서 같은 호가 두 번 나온다) —
+    겹치는 키에만 별첨 연번을 붙인다. 조용히 사라지는 줄이 없어야 한다(실측 2026-09-09: 464건 중 105건이 묻혔다).
+    """
+    rows = [_unit_row(u) for u in units]
+    seen: dict[str, int] = {}
+    for r in rows:
+        seen[r["unit_key"]] = seen.get(r["unit_key"], 0) + 1
+    for r in rows:
+        if seen[r["unit_key"]] > 1:
+            r["unit_key"] = f"{r['unit_key']}-{r['seq']}"
+    return rows
+
+
+def _unit_row(u) -> dict:
+    """UnitRow → unit 컬럼. 승강기는 원문 표기를 남기고 「미설치」만 False로 접는다."""
+    return {
+        "complex_code": u.code,
+        "unit_key": "-".join(x for x in (u.code, u.dong, u.ho) if x),
+        "road_address": u.road_address,
+        "complex_name": u.building,
+        "building": u.dong,
+        "room": u.ho,
+        "floor": _floor(u.ho),
+        "sido": u.sido,
+        "sigungu": u.sigungu,
+        "area_m2": u.area,
+        "deposit": _money(u.deposit),
+        "rent": _money(u.rent),
+        "deposit_jeonse": _money(u.deposit_jeonse),
+        "rent_jeonse": _money(u.rent_jeonse),
+        "deposit_wolse": _money(u.deposit_wolse),
+        "rent_wolse": _money(u.rent_wolse),
+        "room_layout": _layout(u.structure),
+        "elevator": u.elevator,
+        "has_elevator": None if u.elevator is None else u.elevator != "미설치",
+        "seq": u.seq,
+        "source_page": u.page,
+    }
+
+
+CACHE_PAGE_RE = re.compile(r"^(?P<fn>.+)_(?P<page>\d+)\.xml$")
+
+
+def iter_cached_pages(seq_dir: Path):
+    """받아 둔 쪽 XML을 쪽번호 순으로. 네트워크를 쓰지 않는다."""
+    pages: list[tuple[int, Path]] = []
+    for f in seq_dir.glob("*.xml"):
+        m = CACHE_PAGE_RE.match(f.name)
+        if m:
+            pages.append((int(m.group("page")), f))
+    for page, f in sorted(pages):
+        yield page, f.read_text(encoding="utf-8")
+
+
+def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) -> Stats:
     cfg = settings()
     client = IshClient(delay_sec=cfg.scrape_delay_sec)
     started = utc_now()
@@ -135,17 +225,29 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                     continue
                 seq = seq_m.group(1)
                 try:
-                    html = client.fetch_notice_html(n["source_url"])
-                    att = pick_attachment(find_attachments(html), n["title"])
-                    if att is None:
-                        stats.skip("no_attachment")
-                        log.info("%s 첨부 없음", n["slug"])
-                        continue
-                    doc = client.resolve_preview(att.preview_url)
-                    if doc is None:
-                        stats.skip("preview_unresolved")
-                        continue
-                    pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq))
+                    if cached:
+                        seq_dir = CACHE_ROOT / seq
+                        if not seq_dir.is_dir():
+                            stats.skip("no_cache")
+                            continue
+                        att_name = "(캐시)"
+                        pages = list(iter_cached_pages(seq_dir))
+                        if not pages:
+                            stats.skip("no_cache")
+                            continue
+                    else:
+                        html = client.fetch_notice_html(n["source_url"])
+                        att = pick_attachment(find_attachments(html), n["title"])
+                        if att is None:
+                            stats.skip("no_attachment")
+                            log.info("%s 첨부 없음", n["slug"])
+                            continue
+                        doc = client.resolve_preview(att.preview_url)
+                        if doc is None:
+                            stats.skip("preview_unresolved")
+                            continue
+                        att_name = att.name
+                        pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq))
                     facts = parse_attachment(pages, ref_year=n["posted_at"].year if n["posted_at"] else None)
                     kind, rows, units = facts.kind, facts.complexes, facts.units
                     supply_rows = [_supply_row(l) for l in facts.supply_lines] + [_jeonse_row(l) for l in facts.jeonse_lines]
@@ -159,7 +261,7 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                     n["slug"], len(pages), kind, len(rows), len(units), len(supply_rows),
                     f"{sch.apply_start}~{sch.apply_end}" if sch else "없음",
                     f"{sup.min_deposit}~{sup.max_deposit}({sup.unit_total}호)" if sup else "없음",
-                    att.name,
+                    att_name,
                 )
                 if sch:
                     stats.skip("schedule")
@@ -179,6 +281,10 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                     if rows:
                         replace_notice_complexes(cur, n["id"], rows)
                         stats.inserted += len(rows)
+                    # 호실 행은 단지 행 다음에 — notice_complex_id를 단지코드로 찾는다.
+                    # 파서는 예전부터 읽고 있었는데 적재를 안 해 unit이 0건이었다(실측 2026-09-09)
+                    if units:
+                        replace_units(cur, n["id"], _unit_rows(units))
                     # 공급현황 줄은 단지 행 다음에 넣는다 — complex_id를 같은 공고의 단지에서 이름으로 찾는다
                     replace_notice_supply(cur, n["id"], supply_rows)
                     update_notice_attach_facts(
@@ -208,12 +314,13 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
 def _add_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--limit", type=int, default=200)
     ap.add_argument("--slug", default=None, help="공고 1건만")
+    ap.add_argument("--cached", action="store_true", help="네트워크 없이 받아 둔 쪽 XML만 다시 읽는다")
 
 
 def main(argv: list[str] | None = None) -> int:
     return stage_main(
         "S3 SH 첨부 공고문 단지 표 수집",
-        lambda a: run(dry_run=a.dry_run, limit=a.limit, slug=a.slug),
+        lambda a: run(dry_run=a.dry_run, limit=a.limit, slug=a.slug, cached=a.cached),
         add_args=_add_args,
         argv=argv,
     )

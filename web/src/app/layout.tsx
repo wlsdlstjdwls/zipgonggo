@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { CalcButton, CalcProvider } from "@/components/calc-context";
+import { CalcDock } from "@/components/calc-dock";
 import { HomeLink } from "@/components/home-link";
 import { SaveProvider } from "@/components/save-context";
 import { ListStateProvider } from "@/components/list-state";
@@ -36,6 +38,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <SaveProvider>
+          {/* 계산기는 화면 오른쪽 아래 떠 있던 버튼에서 헤더 메뉴로 올렸다(사용자 요청 2026-09-09).
+              패널은 body로 포털되지만 여는 버튼과 씨앗값이 서로 다른 트리라 Provider가 감싼다 */}
+          <CalcProvider>
           <header className="site-header">
             <div className="bar">
               <div className="left">
@@ -45,6 +50,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href={ROUTES.eligibility}>자격진단</Link>
                 </nav>
               </div>
+              <CalcButton />
             </div>
           </header>
           {/* 목록 상태(부문·유형·마감·정렬)는 URL이 아니라 이 Provider가 들고 있다 — 스코프 바·필터 바·목록이 함께 구독한다 */}
@@ -69,6 +75,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <p className="foot-copy">© 2026 {SITE_NAME}. All rights reserved.</p>
             </div>
           </footer>
+          <CalcDock />
+          </CalcProvider>
         </SaveProvider>
       </body>
     </html>

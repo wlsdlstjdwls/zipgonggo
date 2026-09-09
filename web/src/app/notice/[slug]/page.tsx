@@ -1,16 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalcDock } from "@/components/calc-dock";
+import { CalcSeed } from "@/components/calc-context";
 import { ComplexExplorer } from "@/components/complex-explorer";
 import { DetailAside } from "@/components/detail-aside";
+import { DetailHeadBar } from "@/components/detail-headbar";
 import { ExternalLink } from "@/components/external-link";
+import { GlossaryList, Term } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
 import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
-import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, num, won, wonShort } from "@/lib/format";
-import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
+import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, NO_DATE, num, won, wonShort } from "@/lib/format";
+import { moveInLabel } from "@/lib/notice-view";
+import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeSupply } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
 import type { NoticeListItem } from "@/types/notice";
@@ -54,7 +57,9 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
 export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
-  const [areas, chain, complexes] = await Promise.all([getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id)]);
+  const [areas, chain, complexes, supply] = await Promise.all([
+    getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id), getNoticeSupply(n.id),
+  ]);
   // 매입임대 별첨(호실 단위)이면 호수·면적·금액 열을 더 보여준다
   const hasUnits = complexes.some((c) => c.unit_count != null);
   const unitTotal = complexes.reduce((a, c) => a + (c.unit_count ?? 0), 0);
@@ -72,6 +77,28 @@ export default async function NoticePage({ params }: Params) {
   const dl = deadlineChip(n);
   // 헤드라인에서 뺀 금액 — 제원 패널 한 줄로. 범위가 있으면 "최소~최대"
   const moneyRow = m ? (range_ ? `${m.main}~${range_}` : `${m.main}부터`) : null;
+  // 공급 구분과 입주 시작 — 공고문에는 있는데 화면에 없던 값이다(사용자 요청 2026-09-09).
+  // 공급현황 표가 있으면 그 표가 근거, 없으면 단지 표의 [신규] 표시로 가른다.
+  const newRows = supply.filter((s) => s.is_new).length;
+  const oldRows = supply.length - newRows;
+  const supplyKind = supply.length
+    ? (newRows > 0 && oldRows > 0 ? "신규 공급과 재공급" : newRows > 0 ? "신규 공급" : "재공급")
+    : complexes.length
+      ? (complexes.some((c) => c.is_new) && complexes.some((c) => !c.is_new) ? "신규 공급과 재공급"
+        : complexes.some((c) => c.is_new) ? "신규 공급" : "재공급")
+      : null;
+  // 입주 시작 예정 — 표에 여러 값이 있으면 가장 이른 것 하나. 「(예정)」 열이라 확정일이 아니다
+  const moveInRaw = supply.map((s) => s.move_in_from).filter(Boolean).sort()[0] ?? null;
+  const moveIn = moveInLabel(moveInRaw);
+
+  const terms = [
+    n.housing_type,
+    ...(supplyKind ? (supplyKind === "신규 공급과 재공급" ? ["신규 공급", "재공급"] : [supplyKind]) : []),
+    ...(supply.some((s) => s.units_reserve != null) ? ["공가", "예비입주자"] : []),
+    ...(supply.some((s) => s.units_priority != null) ? ["우선공급", "일반공급"] : []),
+    ...(supply.some((s) => s.income_option) ? ["소득있음", "소득없음"] : []),
+    ...(moveIn ? ["입주 시작"] : []),
+  ];
 
   // 흐름도 나머지 단계(서류심사 대상자 발표·서류 제출·계약 체결)와 당첨자 발표를 날짜순으로 섞는다.
   // 공고문에 있는데 화면에서 빠져 있었다(사용자 지적 2026-09-09) — 서류 제출일은 접수일만큼 급한 날짜다.
@@ -100,6 +127,14 @@ export default async function NoticePage({ params }: Params) {
 
   return (
     <article className="stage">
+      {/* 머리글이 헤더에 가리면 제목·상태를 헤더 자리에 띄운다(사용자 요청 2026-09-09) */}
+      <DetailHeadBar
+        title={n.title}
+        sub={`${n.agency} | ${n.housing_type}`}
+        state={{ label: ph.label, tone: ph.tone }}
+        back={{ href: ROUTES.home, label: "← 목록" }}
+        action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
+      />
       <div className="detail">
         <div className="detail-main">
           <header className="d-head">
@@ -107,10 +142,12 @@ export default async function NoticePage({ params }: Params) {
               {/* 뒤로가기는 이 줄 맨 앞에 — 혼자 한 행을 쓰지 않는다(사용자 요청 2026-09-09) */}
               <Link href={ROUTES.home} className="d-back">← 목록</Link>
               {/* D-day는 오른쪽 카드가 크게 센다 — 여기서 또 세지 않는다 */}
-              <span className="tag type">{n.housing_type}</span>
+              <span className="tag type"><Term>{n.housing_type}</Term></span>
               <span className="tag">{n.agency}</span>
               {n.sector === "민간임대" && <span className="tag">{n.sector}</span>}
               {n.house_type && <span className="tag">{n.house_type}</span>}
+              {/* 공급/재공급은 태그 줄에서 바로 읽혀야 한다(사용자 요청 2026-09-09) */}
+              {supplyKind && <span className="tag">{supplyKind}</span>}
               {n.amends_source_key && <span className="tag acc">정정공고</span>}
             </div>
             <h1 className="d-title">{n.title}</h1>
@@ -192,6 +229,9 @@ export default async function NoticePage({ params }: Params) {
           <section className="dsec">
             <h2>공고 정보</h2>
             <SpecList>
+              <Spec label="공급 유형" value={<Term>{n.housing_type}</Term>} />
+              <Spec label="공급 구분" value={supplyKind} />
+              <Spec label="입주 시작" value={moveIn} />
               <Spec label="문의처" value={n.contact} />
               <Spec label="단지명" value={n.complex_name} />
               <Spec label="총세대수" value={n.total_household != null ? num(n.total_household, "세대") : null} />
@@ -199,13 +239,15 @@ export default async function NoticePage({ params }: Params) {
               <Spec label="주소" value={n.address} wide />
             </SpecList>
           </section>
+
+          <GlossaryList terms={terms} />
         </div>
 
         <DetailAside
           tone={dl.tone}
           ddayLabel={dl.unit}
           ddayNum={dl.num}
-          ddayNote={n.apply_end_at ? `${at(n.apply_end_at, n.apply_end_tm)} 마감` : (n.source_status ?? "일정 미정")}
+          ddayNote={n.apply_end_at ? `${at(n.apply_end_at, n.apply_end_tm)} 마감` : NO_DATE}
           cta={
             <>
               <ExternalLink className="btn acc lg" href={n.source_url}>{L.original}</ExternalLink>
@@ -219,7 +261,9 @@ export default async function NoticePage({ params }: Params) {
             /* 공급기관·공급유형은 제목 위 태그가 이미 말한다 — 카드에서 뺐다(사용자 지적 2026-09-09) */
             { label: "지역", value: region },
             { label: "공급호수", value: n.supply_count != null ? num(n.supply_count, "호") : null },
-            { label: "접수", value: period },
+            { label: "공급 구분", value: supplyKind },
+            { label: "입주 시작", value: moveIn },
+            { label: "접수", value: period ?? NO_DATE },
             { label: "문의처", value: n.contact },
           ]}
           updatedNote={`갱신 ${n.updated_at} | ${L.updatedVia}`}
@@ -232,8 +276,8 @@ export default async function NoticePage({ params }: Params) {
         <span>본 자료는 참고용입니다. 정확한 내용과 최종 조건은 {n.agency}의 공식 공고문을 반드시 확인하세요.</span>
       </div>
 
-      {/* 계산기는 이 공고 최소 금액을 씨앗으로 연다(사용자 제안 2026-09-09) */}
-      <CalcDock deposit={n.min_deposit} rent={n.min_rent} sourceLabel={L.originalDoc} />
+      {/* 계산기는 헤더 버튼이 연다 — 이 공고 최소 금액을 첫 값으로 넘긴다(사용자 제안 2026-09-09) */}
+      <CalcSeed deposit={n.min_deposit} rent={n.min_rent} sourceLabel={L.originalDoc} />
     </article>
   );
 }

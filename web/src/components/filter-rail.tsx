@@ -9,12 +9,21 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useState } from "react";
 import { AREA_MIN_COUNT } from "@/lib/constants";
 import { hasFilter } from "@/lib/notice-filters";
-import { SECTORS, type Sector } from "@/types/notice";
+import { NOTICE_VIEWS, SECTORS, type NoticeView, type Sector } from "@/types/notice";
+import { IconCard, IconCompact, IconList } from "./icons";
 import { useListState } from "./list-state";
 import { Select } from "./select";
 
+// 보기 전환은 글자를 지우고 아이콘만 남긴다(사용자 요청 2026-09-09).
+// 뜻은 title/aria-label이 지고, 모양은 카드 한 장 · 줄 목록 · 촘촘한 줄로 갈린다.
+const VIEW_META: Record<NoticeView, { label: string; Icon: typeof IconCard }> = {
+  card: { label: "카드", Icon: IconCard },
+  list: { label: "목록", Icon: IconList },
+  compact: { label: "간략", Icon: IconCompact },
+};
+
 function RailBody() {
-  const { f, facets, set, setSido } = useListState();
+  const { f, facets, set, setSido, view, setView } = useListState();
   const sido = f.sido;
 
   // 3건 미만 시도는 감춘다(얇은 페이지 방지와 같은 기준). 지금 고른 시도는 수가 줄어도 남긴다 —
@@ -28,6 +37,30 @@ function RailBody() {
 
   return (
     <>
+      {/* 「무엇을 보느냐」가 아니라 「어떻게 보느냐」 — 조건 위에 한 줄로 묶는다.
+          예전엔 목록 위 얇은 바(filter-bar)였는데 좁은 화면에서 두 줄로 넘쳤다(사용자 요청 2026-09-09) */}
+      <div className="rail-g rail-view">
+        <h3>보기</h3>
+        <div className="viewsw" role="group" aria-label="목록 보기">
+          {NOTICE_VIEWS.map((v) => {
+            const { label, Icon } = VIEW_META[v];
+            return (
+              <button key={v} type="button" className={view === v ? "on" : ""} aria-pressed={view === v} aria-label={label} title={label} onClick={() => setView(v)}>
+                <Icon />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rail-g">
+        <h3>정렬</h3>
+        <div className="rail-chips">
+          <button type="button" className={`chip-f${f.sort === "deadline" ? " on" : ""}`} aria-pressed={f.sort === "deadline"} onClick={() => set({ sort: "deadline" })}>마감 임박순</button>
+          <button type="button" className={`chip-f${f.sort !== "deadline" ? " on" : ""}`} aria-pressed={f.sort !== "deadline"} onClick={() => set({ sort: "posted" })}>최신 공고순</button>
+        </div>
+      </div>
+
       <div className="rail-g">
         <h3>부문</h3>
         <div className="rail-chips">

@@ -4,6 +4,10 @@ import type { NoticeListItem } from "@/types/notice";
 
 const KO = "ko-KR";
 
+/** 접수 날짜를 공고문에서 못 읽었을 때 쓰는 한 마디. 목록·공고 상세·단지 상세가 같은 말을 한다
+ *  (사용자 요청 2026-09-09: 기관 목록의 「모집중」을 날짜 자리에 대신 쓰지 말 것) */
+export const NO_DATE = "원문 확인";
+
 export function todayKST(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }); // YYYY-MM-DD
 }
@@ -64,7 +68,7 @@ export function ddayChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_a
     if (n.status === "접수중") return { num: "모집", unit: "진행 중", tone: "acc", days: null, solid: true };
     if (n.status === "정정공고중") return { num: "정정", unit: "공고 중", tone: "warn", days: null, solid: true };
     if (n.status === "접수마감") return { num: "마감", unit: "종료", tone: "soft", days: null, solid: true };
-    return { num: "—", unit: "일정 미정", tone: "soft", days: null };
+    return { num: "원문", unit: "확인", tone: "soft", days: null };
   }
   if (toEnd < 0) return { num: "마감", unit: "종료", tone: "soft", days: toEnd, solid: true };
   if (toStart !== null && toStart > 0) return { num: `D-${toStart}`, unit: "접수 시작", tone: "soon", days: toStart };
@@ -142,7 +146,7 @@ export type ApplyPhase = {
   live: string | null;
   tone: "hot" | "warn" | "acc" | "soft" | "soon";
 };
-export function applyPhase(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "source_status">): ApplyPhase {
+export function applyPhase(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at">): ApplyPhase {
   const toStart = daysUntil(n.apply_start_at);
   const toEnd = daysUntil(n.apply_end_at);
   const span = n.apply_start_at || n.apply_end_at ? `${dateK(n.apply_start_at, true)} ~ ${dateK(n.apply_end_at, true)}` : null;
@@ -157,7 +161,7 @@ export function applyPhase(n: Pick<NoticeListItem, "apply_start_at" | "apply_end
     return { kind: "open", label: `접수 중, ${toEnd}일 남음`, note: endNote, live: "접수 중", tone: toEnd <= DDAY_URGENT_DAYS ? "hot" : toEnd <= DDAY_SOON_DAYS ? "warn" : "acc" };
   }
   if (toEnd !== null && toEnd < 0) return { kind: "closed", label: "접수 마감", note: endNote, live: null, tone: "soft" };
-  return { kind: "none", label: n.source_status ?? "접수 일정 미정", note: "접수 기간은 기관 원문을 확인하세요", live: null, tone: "soft" };
+  return { kind: "none", label: NO_DATE, note: "접수 기간이 공고문에 없어 기관 원문에서 확인해야 합니다", live: null, tone: "soft" };
 }
 
 /** 우측 카드용 — 접수 시작과 무관하게 항상 "마감"을 센다(사용자 요청 2026-09-09: 마감 D-day를 없애지 말 것). */

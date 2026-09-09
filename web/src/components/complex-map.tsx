@@ -6,13 +6,19 @@
 // 선택 핀은 화면 밖일 때만 panTo, 줌은 건드리지 않는다(휙휙 이동 방지).
 
 import { useEffect, useRef, useState } from "react";
-import { bubbleMarkerHtml, MARKER_H, MARKER_W, markerHtml } from "@/lib/brand";
+import { BRAND_ACC, BRAND_NEW, bubbleMarkerHtml, MARKER_H, MARKER_W, markerHtml } from "@/lib/brand";
 import { hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
 import { usePanorama } from "@/lib/use-panorama";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export type MapItem = { id: number; address: string; title: string; sub: string };
+export type MapItem = { id: number; address: string; title: string; sub: string;
+  /** 금회 신규 공급 단지. 핀 색이 갈린다(사용자 요청 2026-09-09) */ isNew?: boolean };
+
+/** 핀 색 — 신규 공급은 청록, 재공급은 액센트 파랑 */
+function pinFill(it: { isNew?: boolean } | undefined): string {
+  return it?.isNew ? BRAND_NEW : BRAND_ACC;
+}
 
 type Props = {
   items: MapItem[];
@@ -94,7 +100,7 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
       const pos = new maps.LatLng(c.lat, c.lng);
       const marker = new maps.Marker({
         position: pos, map, title: it.title, zIndex: 100,
-        icon: { content: markerHtml(), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) },
+        icon: { content: markerHtml(pinFill(it)), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) },
       });
       maps.Event.addListener(marker, "click", () => cb.current.onSelect(it.id));
       maps.Event.addListener(marker, "mouseover", () => cb.current.onFocus(it.id));
@@ -133,7 +139,7 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
         const it = byId.get(id);
         m.marker.setIcon(sel && it
           ? { content: bubbleMarkerHtml(it.title, it.sub), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) }
-          : { content: markerHtml(), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) });
+          : { content: markerHtml(pinFill(it)), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) });
         m.selected = sel;
       }
       m.marker.setZIndex(sel ? 950 : id === focusId ? 900 : 100);

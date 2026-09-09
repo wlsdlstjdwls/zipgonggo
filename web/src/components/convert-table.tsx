@@ -1,9 +1,10 @@
-// 단지 상세 「보증금과 임대료」 — 공급대상 × 공급유형마다 전세전환 / 기본 / 월세전환 세 줄.
+// 단지 상세 「보증금과 임대료」 — 공급대상 × 공급유형마다 최대 / 기본 / 최소 세 줄.
 // 사용자 요청 2026-09-09: 신혼부부와 청년이 함께 있으면 각각의 전환 폭을 따로 보여 준다.
+// 큰 라벨은 「최대」·「최소」, 그 밑 작은 글자가 공고문 용어(전세전환·월세전환)와 비율이다 — 용어는 페이지 밑 설명으로 잇는다.
 // 값은 lib/notice-view.ts의 complexPriceGroups가 만든다 — 여기선 그리기만 한다.
-import { wonExact } from "@/lib/format";
+import { num, wonExact } from "@/lib/format";
 import type { PriceGroup } from "@/lib/notice-view";
-import { num } from "@/lib/format";
+import { Term } from "./glossary";
 
 export function ConvertTable({ groups }: { groups: PriceGroup[] }) {
   return (
@@ -25,7 +26,7 @@ export function ConvertTable({ groups }: { groups: PriceGroup[] }) {
               <div key={r.kind} className={`ct-r k-${r.kind}`} role="row">
                 <span className="k" role="cell">
                   {r.label}
-                  {r.pct != null && <small>보증금 {r.pct}%</small>}
+                  {r.term && <small><Term>{r.term}</Term> {r.pct}%</small>}
                 </span>
                 <span className="d" role="cell" title={r.exact[0] != null ? wonExact(r.exact[0]) : undefined}>{r.deposit}</span>
                 <span className="r" role="cell" title={r.exact[1] != null ? wonExact(r.exact[1]) : undefined}>{r.rent}</span>
