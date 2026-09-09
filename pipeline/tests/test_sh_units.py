@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from zipgonggo_pipeline.parsers.sh_attach import parse_attachment
-from zipgonggo_pipeline.parsers.sh_units import group_units, parse_unit_pages
+from zipgonggo_pipeline.parsers.sh_units import DONG_RE, group_units, parse_unit_pages, parse_unit_row
 from zipgonggo_pipeline.sources.ish import is_rotated, parse_chars
 
 FIX = Path(__file__).parent / "fixtures" / "ish_309403"
@@ -66,3 +66,36 @@ def test_dispatcher_picks_unit_list():
     kind, rows, units = facts.kind, facts.complexes, facts.units
     assert kind == "unit_list" and len(rows) == 33 and len(units) == 75
     assert rows[0]["complex_code"] == "0001J" and rows[0]["unit_count"] == 1 and rows[0]["min_deposit"] == 15_620_000
+
+
+# 동 표기(2026-09-09) — 라틴 글자 동(A동)을 놓쳐 엘클루 A~C동 170호가 통째로 동 없이 들어갔다.
+# 지역 동 이름(용답동)을 동으로 착각하지도 않아야 한다. 실제 별첨 30쪽 행의 칸 구성 그대로.
+ELCLU = [
+    "245", "0034K", "엘클루 (용답동 238-6)", "1001",
+    "서울특별시 성동구 자동차시장1길 104-75(용답동, 엘클루) A동 1001호",
+    "3714", "투룸", "전체동 설치", "46,960,000", "484,000 116,300,000", "96,800 18,780,000", "542,700",
+]
+
+
+def test_latin_dong_read():
+    u = parse_unit_row(ELCLU, 30)
+    assert u is not None
+    assert (u.code, u.building, u.jibun, u.ho) == ("0034K", "엘클루", "용답동 238-6", "1001")
+    assert u.dong == "A동"
+    assert u.road_address == "성동구 자동차시장1길 104-75"
+
+
+@pytest.mark.parametrize(
+    ("tail", "want"),
+    [
+        ("A동 1001호", "A동"),
+        ("나동 301호", "나동"),
+        ("101동 302호", "101동"),
+        ("제3동 1502호", "제3동"),
+        ("용답동 238-6", None),      # 지역 동 이름은 동이 아니다
+        ("203호", None),
+    ],
+)
+def test_dong_re(tail, want):
+    m = DONG_RE.search(tail)
+    assert (m.group(1) if m else None) == want

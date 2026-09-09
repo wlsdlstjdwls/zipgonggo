@@ -6,7 +6,7 @@
 // 선택 핀은 화면 밖일 때만 panTo, 줌은 건드리지 않는다(휙휙 이동 방지).
 
 import { useEffect, useRef, useState } from "react";
-import { BRAND_ACC, BRAND_MUTED, bubbleMarkerHtml, MARKER_H, MARKER_W, markerHtml } from "@/lib/brand";
+import { BRAND_ACC, BRAND_NEW, bubbleMarkerHtml, MARKER_H, MARKER_W, markerHtml } from "@/lib/brand";
 import { hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
 import { usePanorama } from "@/lib/use-panorama";
 
@@ -15,9 +15,9 @@ import { usePanorama } from "@/lib/use-panorama";
 export type MapItem = { id: number; address: string; title: string; sub: string;
   /** 금회 신규 공급 단지. 핀 색이 갈린다(사용자 요청 2026-09-09) */ isNew?: boolean };
 
-/** 핀 색 — 신규와 재공급이 섞인 공고에서만 갈린다. 신규는 액센트, 재공급은 중성 회색 */
+/** 핀 색 — 기본은 액센트. 신규와 재공급이 섞인 공고에서 신규만 주황으로 갈린다 */
 function pinFill(it: { isNew?: boolean } | undefined, split: boolean): string {
-  return !split || it?.isNew ? BRAND_ACC : BRAND_MUTED;
+  return split && it?.isNew ? BRAND_NEW : BRAND_ACC;
 }
 
 type Props = {

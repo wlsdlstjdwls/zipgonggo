@@ -99,6 +99,8 @@ export type NoticeUnit = {
   unit_key: string;
   /** 동. 표에 없는 다세대주택은 null */
   building: string | null;
+  /** 호실의 도로명주소(시군구부터). 동 표기가 없는 단지에서 건물을 가르는 유일한 값이다 */
+  road_address: string | null;
   /** 호 "0203" */
   room: string;
   floor: number | null;

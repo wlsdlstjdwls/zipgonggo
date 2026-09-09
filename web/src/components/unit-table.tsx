@@ -3,10 +3,13 @@
 // 단지 상세 「동호수별 목록」 — SH 매입임대 별첨 주택목록의 호실 행(unit, 0021).
 // 사용자 요청 2026-09-09: "이미 동수, 호수 정보가 나와 있다면 버튼이나 필터로 각 동호수별 정보를 볼 수 있어야 한다".
 // 동이 둘 이상이면 동 칩으로 먼저 가르고, 구조(원룸/투룸)도 칩으로 가른다. 표에는 층·면적·구조·승강기·금액 3종.
-// 동 칸은 별첨에 동 표기가 있는 단지에만 선다 — 다세대·빌라 목록은 대개 호만 실린다(사용자 지적 2026-09-09).
+//
+// 건물을 가르는 값은 동이 1순위, 주소가 2순위다(사용자 지적 2026-09-09: "다른 동인데 동 표기가 없으면 더 헷갈린다").
+// 별첨에 동이 없어도 주소가 갈리면 같은 「404호」가 건물마다 따로 있다 — 그때는 주소 칸을 세운다.
+// 동도 주소도 하나뿐이면 한 건물이라 호만으로 유일하다.
 // 금액은 계약 때 고를 수 있는 폭 그대로 — 최대(전세전환) / 기준 / 최소(월세전환).
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { num, wonExact, wonKo } from "@/lib/format";
 import type { NoticeUnit } from "@/types/notice";
 import { Term } from "./glossary";
@@ -35,31 +38,46 @@ function Money({ v }: { v: number | null }) {
   return <span title={wonExact(v)}>{wonKo(v)}</span>;
 }
 
+/** 주소에서 시군구를 뗀다 — 머리글이 이미 말한 값이라 칸만 넓힌다 */
+function addrShort(a: string): string {
+  const i = a.indexOf(" ");
+  return i > 0 ? a.slice(i + 1) : a;
+}
+
 export function UnitTable({ units }: Props) {
   const [dong, setDong] = useState(ALL);
   const [layout, setLayout] = useState(ALL);
 
-  const dongs = useMemo(() => tally(units, (u) => u.building), [units]);
+  // 동이 하나라도 있으면 동으로, 없으면 주소가 갈릴 때만 주소로 가른다
+  const byDong = units.some((u) => u.building);
+  const addrs = useMemo(() => new Set(units.map((u) => u.road_address).filter(Boolean)), [units]);
+  const groupOf = useCallback(
+    (u: NoticeUnit) => (byDong ? u.building : addrs.size > 1 ? u.road_address : null),
+    [byDong, addrs.size],
+  );
+  const groupLabel = byDong ? "동" : "주소";
+
+  const dongs = useMemo(() => tally(units, groupOf), [units, groupOf]);
   const layouts = useMemo(() => tally(units, (u) => u.room_layout), [units]);
 
   const visible = useMemo(
-    () => units.filter((u) => (!dong || u.building === dong) && (!layout || u.room_layout === layout)),
-    [units, dong, layout],
+    () => units.filter((u) => (!dong || groupOf(u) === dong) && (!layout || u.room_layout === layout)),
+    [units, dong, layout, groupOf],
   );
 
   // 전세전환·월세전환 열은 값이 있을 때만 — 장기전세형 별첨에는 없다
   const hasSwap = units.some((u) => u.deposit_jeonse != null || u.deposit_wolse != null);
   const hasRent = units.some((u) => u.rent != null);
 
-  const Chips = ({ label, list, value, set }: { label: string; list: [string, number][]; value: string; set: (v: string) => void }) =>
+  const Chips = ({ label, list, value, set, labelize }: { label: string; list: [string, number][]; value: string; set: (v: string) => void; labelize?: (v: string) => string }) =>
     list.length < 2 ? null : (
       <div className="ut-chips" role="group" aria-label={label}>
         <button type="button" className={`chip-f${value === ALL ? " on" : ""}`} aria-pressed={value === ALL} onClick={() => set(ALL)}>
           전체 <small>{units.length}</small>
         </button>
         {list.map(([v, n]) => (
-          <button key={v} type="button" className={`chip-f${value === v ? " on" : ""}`} aria-pressed={value === v} onClick={() => set(value === v ? ALL : v)}>
-            {v} <small>{n}</small>
+          <button key={v} type="button" className={`chip-f${value === v ? " on" : ""}`} aria-pressed={value === v} onClick={() => set(value === v ? ALL : v)} title={v}>
+            {labelize ? labelize(v) : v} <small>{n}</small>
           </button>
         ))}
       </div>
@@ -68,7 +86,7 @@ export function UnitTable({ units }: Props) {
   return (
     <div className="ut">
       <div className="ut-tools">
-        <Chips label="동" list={dongs} value={dong} set={setDong} />
+        <Chips label={groupLabel} list={dongs} value={dong} set={setDong} labelize={byDong ? undefined : addrShort} />
         <Chips label="구조" list={layouts} value={layout} set={setLayout} />
       </div>
       <p className="ut-count"><b>{visible.length}</b> / {num(units.length, "호")}</p>
@@ -76,7 +94,7 @@ export function UnitTable({ units }: Props) {
         <table className="supply">
           <thead>
             <tr>
-              {dongs.length > 0 && <th>동</th>}
+              {dongs.length > 0 && <th>{groupLabel}</th>}
               <th>호</th>
               <th className="num">전용면적</th>
               <th>구조</th>
@@ -90,7 +108,7 @@ export function UnitTable({ units }: Props) {
           <tbody>
             {visible.map((u) => (
               <tr key={u.id}>
-                {dongs.length > 0 && <td className="tc-key">{u.building ?? "—"}</td>}
+                {dongs.length > 0 && <td className="tc-key" title={groupOf(u) ?? undefined}>{byDong ? (u.building ?? "—") : addrShort(groupOf(u) ?? "—")}</td>}
                 <td className="tc-key">{hoText(u.room)}{u.floor != null && <small> {u.floor}층</small>}</td>
                 <td className="num">{u.area_m2 != null ? `${u.area_m2}㎡` : "—"}</td>
                 <td>{u.room_layout ?? "—"}</td>
@@ -118,7 +136,10 @@ export function UnitTable({ units }: Props) {
         </table>
       </div>
       {dongs.length === 0 && (
-        <p className="note">공고문 별첨에 이 단지의 동 표기가 없어 호와 층만 실었습니다. 동이 나뉘는 단지는 동 칸이 함께 섭니다.</p>
+        <p className="note">공고문 별첨에 이 단지의 동 표기가 없습니다. 주소도 하나라 한 건물이며, 호만으로 호실이 갈립니다.</p>
+      )}
+      {dongs.length > 0 && !byDong && (
+        <p className="note">이 단지는 별첨에 동 표기가 없어 주소로 나눴습니다. 같은 호수가 건물마다 따로 있으니 주소를 함께 보세요.</p>
       )}
       {hasSwap && (
         <p className="note">

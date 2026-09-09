@@ -5,7 +5,7 @@ import { CalcDock } from "@/components/calc-dock";
 import { HomeLink } from "@/components/home-link";
 import { SaveProvider } from "@/components/save-context";
 import { ListStateProvider } from "@/components/list-state";
-import { CONTACT_EMAIL, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
+import { BOOT_SCOPE_JS, CONTACT_EMAIL, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
 import Link from "next/link";
 import { listFacets } from "@/lib/queries";
@@ -31,10 +31,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // 필터가 걸리면 ListStateProvider가 /api/facets로 다시 받아 갈아끼운다.
   const facets = await listFacets({});
   return (
-    <html lang="ko">
+    // 부트 스크립트가 하이드레이션 전에 data-booting을 걸어 서버 HTML과 어긋난다 — 의도된 차이라 경고를 끈다
+    <html lang="ko" suppressHydrationWarning>
       <head>
         {/* Pretendard 단일 패밀리 — fitin-app이 라틴/한글 2폰트 조합을 버리고 정착한 결론 */}
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+        {/* 저장된 필터가 있으면 하이드레이션 전에 목록을 가려 둔다 — 무필터 목록이 보였다 갈리는 걸 막는다(사용자 지적 2026-09-09) */}
+        <script dangerouslySetInnerHTML={{ __html: BOOT_SCOPE_JS }} />
       </head>
       <body>
         <SaveProvider>

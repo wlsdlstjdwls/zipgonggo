@@ -272,7 +272,9 @@ small { font-size: 12px; }
 .tag.soft { background: var(--sub); color: var(--mut); }
 .tag.soon { background: var(--soon-soft); color: var(--soon); }
 .chip { display: inline-block; padding: 3px 9px; border-radius: 999px; background: var(--sub); color: var(--dim); font-size: 11px; font-weight: 700; line-height: 16px; white-space: nowrap; }
-.chip.new, .chip.amend { background: var(--acc-soft); color: var(--acc); }
+.chip.amend { background: var(--acc-soft); color: var(--acc); }
+/* 「신규」 칩은 지도 신규 핀과 같은 주황이다 — 목록과 지도가 다른 색으로 같은 말을 하면 안 된다(2026-09-09) */
+.chip.new { background: #fdefe6; color: #b8460a; }
 
 /* ── 탐색기: 좌 목록 / 우 지도 ───────────────────────────── */
 .ex-list { min-width: 0; }
@@ -527,8 +529,12 @@ small { font-size: 12px; }
 .dcard-x { display: block; margin-top: 10px; font-style: normal; font-weight: 800; font-size: 12px; opacity: 0.9; }
 /* 필터를 바꿔 목록을 갈아끼우는 동안 — 기존 목록을 지우지 않고 살짝 물린다(라우팅 깜빡임 대신) */
 .ex-list { transition: opacity 180ms var(--ease); }
+/* 저장된 필터가 있는 재방문 — 서버가 그린 무필터 목록을 첫 조회가 끝날 때까지 가린다(사용자 지적 2026-09-09).
+   표식은 layout.tsx의 부트 스크립트가 걸고, NoticeExplorer가 첫 조회를 마치면 뗀다(스크립트에 3초 안전장치도 있다) */
+html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 가린다 — 무필터 상태의 칩·수량이 먼저 보이면 같은 문제다 */
 .ex-list.swapping { opacity: 0.45; pointer-events: none; }
-.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+/* 「2026.09.14 (월)」이 20px로는 160px 칸을 넘겼다(사용자 지적 2026-09-09) — 칸을 넓히고 글자를 한 단 줄인다 */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(172px, 1fr)); gap: 10px; }
 .step { min-width: 0; padding: 15px 16px; border-radius: var(--r-card); background: var(--bg); border: 1px solid var(--line); }
 .step span { display: block; font-weight: 800; font-size: 9.5px; line-height: 1; letter-spacing: 0.14em; color: var(--dim); margin-bottom: 9px; }
 .step b { display: block; white-space: nowrap; font-weight: 800; font-size: 16px; line-height: 1.2; letter-spacing: -0.035em; color: var(--mut); }
@@ -536,7 +542,7 @@ small { font-size: 12px; }
 .step em { display: block; margin-top: 4px; font-style: normal; font-weight: 700; font-size: 12.5px; letter-spacing: -0.02em; color: var(--dim); white-space: nowrap; }
 /* 접수 시작·마감은 사람이 달력에 적는 두 날짜다 — 나머지 단계보다 크고 진하게(사용자 지적 2026-09-09) */
 .step.key { border-color: var(--line-strong); }
-.step.key b { font-size: 20px; color: var(--ink); }
+.step.key b { font-size: 18px; color: var(--ink); }
 .step.key span { color: var(--mut); }
 .step.on { background: var(--acc-soft); border-color: var(--acc); }
 .step.on span { color: var(--acc); }
@@ -677,9 +683,10 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cx-legend { position: absolute; z-index: 5; left: 12px; top: 12px; margin: 0; display: flex; align-items: center; gap: 6px;
   padding: 6px 11px; border-radius: 999px; background: rgba(255, 255, 255, 0.94); box-shadow: var(--shadow-overlay);
   font-weight: 700; font-size: 11px; color: var(--mut); }
-/* 핀 색은 lib/brand.ts와 같은 값이다 — SDK 마커가 CSS 변수를 못 읽어 양쪽에 리터럴로 둔다 */
-.cx-legend .lg { width: 9px; height: 9px; border-radius: 50%; background: #79808f; }
-.cx-legend .lg.new { background: var(--acc); }
+/* 핀 색은 lib/brand.ts와 같은 값이다 — SDK 마커가 CSS 변수를 못 읽어 양쪽에 리터럴로 둔다.
+   재공급은 예전 그대로 액센트, 신규만 주황이다(사용자 지적 2026-09-09: 기존 마커는 건드리지 말 것) */
+.cx-legend .lg { width: 9px; height: 9px; border-radius: 50%; background: var(--acc); }
+.cx-legend .lg.new { background: #ea580c; }
 .cx-legend .lg:not(:first-child) { margin-left: 6px; }
 .cx-count { margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--dim); border-bottom: 1px solid var(--line); }
 .cx-count { display: flex; align-items: center; gap: 8px; }
@@ -798,12 +805,13 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
    툴팁이 아니라 페이지 안 앵커다 — 모바일에는 호버가 없고, 크롤러도 설명 본문을 읽어야 한다. */
 /* 용어 링크 — 누르면 페이지 밑 「용어 설명」이 펴지면서 그 항목으로 내려간다.
    앞의 작은 물음표가 "눌러 볼 수 있다"를 말한다. 커서도 클릭 커서다(사용자 요청 2026-09-09). */
-.term { color: inherit; border-bottom: 1px dashed var(--line2); cursor: pointer; }
-.term::before { content: "?"; display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px;
-  margin-right: 3px; vertical-align: 1px; border-radius: 50%; background: var(--sub); color: var(--dim);
-  font-size: 9px; font-weight: 900; line-height: 1; transition: background 200ms var(--ease), color 200ms var(--ease); }
+.term { color: inherit; border-bottom: 1px dashed color-mix(in srgb, var(--dim) 62%, transparent); cursor: pointer; }
+/* 물음표는 용어 뒤에, 더 작게(사용자 요청 2026-09-09) — 글자를 밀지 않고 뒤에서 거든다 */
+.term::after { content: "?"; display: inline-flex; align-items: center; justify-content: center; width: 11px; height: 11px;
+  margin-left: 3px; vertical-align: 2px; border-radius: 50%; background: var(--sub); color: var(--dim);
+  font-size: 8px; font-weight: 900; line-height: 1; transition: background 200ms var(--ease), color 200ms var(--ease); }
 .term:hover { color: var(--acc); border-bottom-color: var(--acc); }
-.term:hover::before { background: var(--acc-soft); color: var(--acc); }
+.term:hover::after { background: var(--acc-soft); color: var(--acc); }
 
 /* 「용어 설명」은 접힌 채로 시작한다 — 페이지 끝에 사전이 늘 펼쳐져 있을 이유가 없다(사용자 요청 2026-09-09) */
 .gloss > h2 { margin-bottom: 0; }

@@ -38,28 +38,32 @@ export function NoticeExplorer({ initial, title }: Props) {
   const sentinel = useRef<HTMLDivElement>(null);
   const inFlight = useRef(false);
   const applied = useRef(serverKey);
+  // layout의 부트 스크립트가 걸어 둔 가림막. 저장된 필터로 갈아끼운 뒤(또는 갈아끼울 게 없다고 판명된 뒤) 뗀다
+  const unveil = useCallback(() => { document.documentElement.removeAttribute("data-booting"); }, []);
 
   // 서버가 준 페이지로 되돌린다(필터를 전부 풀었을 때) — 다시 받아올 필요가 없다
   useEffect(() => { setPage(initial); setItems(initial.items); setCursor(initial.nextCursor); applied.current = serverKey; }, [initial, serverKey]);
 
   // 필터가 바뀌면 1페이지를 새로 받아 통째로 갈아끼운다. 받는 동안 기존 목록을 지우지 않는다(깜빡임 방지)
   useEffect(() => {
-    if (!ready || key === applied.current) return;
+    if (!ready) return;
+    if (key === applied.current) { unveil(); return; }
     let cancelled = false;
     applied.current = key;
     setSwapping(true);
     setError(null);
     if (key === serverKey) {
       setPage(initial); setItems(initial.items); setCursor(initial.nextCursor); setSwapping(false);
+      unveil();
       return;
     }
     fetch(`${ROUTES.apiNotices}?${key}`, { headers: { accept: "application/json" } })
       .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json() as Promise<NoticePage>; })
       .then((p) => { if (cancelled) return; setPage(p); setItems(p.items); setCursor(p.nextCursor); })
       .catch(() => { if (!cancelled) setError("목록을 불러오지 못했습니다."); })
-      .finally(() => { if (!cancelled) setSwapping(false); });
+      .finally(() => { if (!cancelled) setSwapping(false); unveil(); });
     return () => { cancelled = true; };
-  }, [key, ready, serverKey, initial]);
+  }, [key, ready, serverKey, initial, unveil]);
 
   const loadMore = useCallback(async () => {
     if (inFlight.current || !cursor) return;

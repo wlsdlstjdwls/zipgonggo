@@ -271,10 +271,10 @@ export async function getComplexSupply(noticeId: number, complexId: number, comp
  *  동 → 호 순. 동이 없는 다세대주택은 호만으로 줄 세운다. */
 export async function getComplexUnits(noticeComplexId: number): Promise<NoticeUnit[]> {
   return query<NoticeUnit>(
-    `SELECT id, unit_key, building, room, floor, area_m2, room_layout, elevator,
+    `SELECT id, unit_key, building, road_address, room, floor, area_m2, room_layout, elevator,
             deposit, rent, deposit_jeonse, rent_jeonse, deposit_wolse, rent_wolse
        FROM unit WHERE notice_complex_id = $1
-      ORDER BY building NULLS FIRST, floor NULLS LAST, room`,
+      ORDER BY building NULLS FIRST, road_address NULLS FIRST, floor NULLS LAST, room`,
     [noticeComplexId],
   );
 }
