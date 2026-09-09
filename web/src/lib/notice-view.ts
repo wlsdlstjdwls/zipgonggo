@@ -94,15 +94,11 @@ export function complexPriceRows(supply: NoticeSupply[], c?: NoticeComplex): Pri
       exact: [s.deposit, s.rent],
     });
     const down = pos(s.down_payment), balance = pos(s.balance);
-    if (down != null && balance != null) {
-      rows.push({ id: `${s.id}-pay`, group: "pay", label: "계약금/잔금", deposit: `${wonKo(down)} | ${wonKo(balance)}`, rent: "—", exact: [down, balance] });
-    } else if (down != null) {
-      rows.push({ id: `${s.id}-pay`, group: "pay", label: "계약금", deposit: wonKo(down), rent: "—", exact: [down, null] });
-    } else if (balance != null) {
-      rows.push({ id: `${s.id}-pay`, group: "pay", label: "잔금", deposit: wonKo(balance), rent: "—", exact: [balance, null] });
-    } else if (s.rent == null && s.deposit != null) {
-      const est10 = Math.round(s.deposit * 0.1), est90 = Math.round(s.deposit * 0.9);
-      rows.push({ id: `${s.id}-pay-est`, group: "pay", label: "계약금/잔금", note: "10%/90% 가정", deposit: `${wonKo(est10)} | ${wonKo(est90)}`, rent: "—", exact: [est10, est90] });
+    if (down != null) rows.push({ id: `${s.id}-down`, group: "pay", label: "계약금", deposit: wonKo(down), rent: "—", exact: [down, null] });
+    if (balance != null) rows.push({ id: `${s.id}-balance`, group: "pay", label: "잔금", deposit: wonKo(balance), rent: "—", exact: [balance, null] });
+    if (down == null && balance == null && s.rent == null && s.deposit != null) {
+      rows.push({ id: `${s.id}-down-est`, group: "pay", label: "계약금", note: "10% 가정", deposit: wonKo(Math.round(s.deposit * 0.1)), rent: "—", exact: [Math.round(s.deposit * 0.1), null] });
+      rows.push({ id: `${s.id}-balance-est`, group: "pay", label: "잔금", note: "90% 가정", deposit: wonKo(Math.round(s.deposit * 0.9)), rent: "—", exact: [Math.round(s.deposit * 0.9), null] });
     }
   }
 
