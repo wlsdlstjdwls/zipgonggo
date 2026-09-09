@@ -1,0 +1,173 @@
+"use client";
+
+// 자격진단 — 내 조건을 넣으면 33개 공급유형 중 어디에 넣을 수 있는지 가른다.
+// 규칙은 서버가 DB(supply_type·income_standard·region_tier)에서 읽어 넘긴다. 여기서 계산만 한다(lib/eligibility).
+// 값은 전부 브라우저 안에만 있다 — 어디로도 보내지 않는다(개인정보처리방침과 같은 약속).
+import { useMemo, useState } from "react";
+import { classOptions, diagnoseAll, HOUSEHOLD_MAX, type Marital, type Profile, type Verdict } from "@/lib/eligibility";
+import type { EligibilityRules } from "@/types/eligibility";
+
+const MAN = 10_000;
+
+const DEFAULT: Profile = {
+  age: 30,
+  marital: "미혼",
+  marriedYears: 0,
+  hasNewborn: false,
+  household: 1,
+  incomeSelfWon: 300 * MAN,
+  incomeHouseholdWon: 300 * MAN,
+  assetMan: 15_000,
+  carMan: 0,
+  homeless: true,
+  classes: ["청년"],
+  residence: "",
+};
+
+export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
+  const [p, setP] = useState<Profile>(DEFAULT);
+  const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setP((prev) => ({ ...prev, [k]: v }));
+
+  const classes = useMemo(() => classOptions(rules.types), [rules.types]);
+  const regions = useMemo(() => rules.tiers.filter((t) => t.tier === "서울").map((t) => t.name), [rules.tiers]);
+  const nearby = useMemo(() => rules.tiers.filter((t) => t.tier === "연접").map((t) => t.name), [rules.tiers]);
+
+  const verdicts = useMemo(() => diagnoseAll(p, rules), [p, rules]);
+  const pass = verdicts.filter((v) => v.ok);
+  const fail = verdicts.filter((v) => !v.ok);
+
+  const toggleClass = (c: string) =>
+    set("classes", p.classes.includes(c) ? p.classes.filter((x) => x !== c) : [...p.classes, c]);
+
+  return (
+    <div className="elig">
+      <form className="elig-form" onSubmit={(e) => e.preventDefault()} aria-label="내 조건 입력">
+        <div className="elig-grid">
+          <Num label="나이" value={p.age} unit="세" onChange={(v) => set("age", v)} max={120} />
+          <div className="elig-f">
+            <span>혼인 상태</span>
+            <div className="elig-seg" role="group" aria-label="혼인 상태">
+              {(["미혼", "기혼"] as Marital[]).map((m) => (
+                <button key={m} type="button" className={p.marital === m ? "on" : ""} onClick={() => set("marital", m)}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+          {p.marital === "기혼" && (
+            <Num label="혼인 연차" value={p.marriedYears} unit="년차" onChange={(v) => set("marriedYears", v)} max={60} />
+          )}
+          <Num label="가구원 수" value={p.household} unit="명" onChange={(v) => set("household", v)} min={1} max={HOUSEHOLD_MAX} />
+          <Num label="본인 월소득" value={Math.round(p.incomeSelfWon / MAN)} unit="만 원" onChange={(v) => set("incomeSelfWon", v * MAN)} max={100_000} />
+          <Num label="세대 합산 월소득" value={Math.round(p.incomeHouseholdWon / MAN)} unit="만 원" onChange={(v) => set("incomeHouseholdWon", v * MAN)} max={100_000} />
+          <Num label="총자산" value={p.assetMan} unit="만 원" onChange={(v) => set("assetMan", v)} max={1_000_000} />
+          <Num label="자동차가액" value={p.carMan} unit="만 원" onChange={(v) => set("carMan", v)} max={100_000} />
+          <div className="elig-f">
+            <span>거주지</span>
+            <select className="elig-sel" value={p.residence} onChange={(e) => set("residence", e.target.value)} aria-label="거주지">
+              <option value="">선택 안 함</option>
+              <optgroup label="서울">
+                {regions.map((r) => <option key={r} value={r}>{r}</option>)}
+              </optgroup>
+              <optgroup label="연접지역">
+                {nearby.map((r) => <option key={r} value={r}>{r}</option>)}
+              </optgroup>
+              <option value="그 외 지역">그 외 지역</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="elig-checks">
+          <label className="elig-chk">
+            <input type="checkbox" checked={p.homeless} onChange={(e) => set("homeless", e.target.checked)} />
+            <span>무주택이다</span>
+          </label>
+          <label className="elig-chk">
+            <input type="checkbox" checked={p.hasNewborn} onChange={(e) => set("hasNewborn", e.target.checked)} />
+            <span>2세 이하 자녀가 있다</span>
+          </label>
+        </div>
+
+        <fieldset className="elig-cls">
+          <legend>해당하는 계층 (여러 개 고를 수 있다)</legend>
+          <div className="elig-chips">
+            {classes.map((c) => (
+              <button key={c} type="button" className={`elig-chip${p.classes.includes(c) ? " on" : ""}`} aria-pressed={p.classes.includes(c)} onClick={() => toggleClass(c)}>
+                {c}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      </form>
+
+      <div className="elig-out">
+        <h2>
+          신청해 볼 수 있는 유형 <b>{pass.length}</b>
+          <small>전체 {verdicts.length}개 중</small>
+        </h2>
+        {pass.length === 0 ? (
+          <p className="elig-none">조건에 맞는 유형이 없다. 아래 미달 목록에서 어떤 기준에 걸리는지 볼 수 있다.</p>
+        ) : (
+          <ul className="elig-list">{pass.map((v) => <Card key={v.type.code} v={v} />)}</ul>
+        )}
+
+        <h2 className="mute">기준에 못 미치는 유형 <b>{fail.length}</b></h2>
+        <ul className="elig-list">{fail.map((v) => <Card key={v.type.code} v={v} />)}</ul>
+
+        <p className="elig-note">
+          도시근로자 월평균소득은 {rules.incomeYear}년 고시액 기준이다. 이 진단은 안내일 뿐 심사 결과가 아니다 —
+          실제 자격은 각 공고문과 기관 심사가 정한다. 입력한 값은 이 브라우저를 벗어나지 않는다.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Card({ v }: { v: Verdict }) {
+  const t = v.type;
+  const failed = v.checks.filter((c) => !c.ok);
+  return (
+    <li className={`elig-card${v.ok ? " ok" : ""}`}>
+      <div className="elig-card-h">
+        <b>{t.category}</b>
+        <span>{t.name}</span>
+        {t.ranking_method && <em>{t.ranking_method}</em>}
+      </div>
+      <ul className="elig-why">
+        {(v.ok ? v.checks : failed).map((c) => (
+          <li key={c.label} className={c.ok ? "y" : "n"}>
+            <span>{c.label}</span>
+            <p>{c.detail}</p>
+          </li>
+        ))}
+      </ul>
+      {v.ok && t.ranks.length > 0 && (
+        <p className="elig-rank">
+          순위 {t.ranks.map((r, i) => `${i + 1}순위 ${r}`).join(" | ")}
+        </p>
+      )}
+      {v.ok && t.note && <p className="elig-memo">{t.note}</p>}
+    </li>
+  );
+}
+
+function Num({ label, value, unit, onChange, min = 0, max }: {
+  label: string; value: number; unit: string; onChange: (v: number) => void; min?: number; max: number;
+}) {
+  return (
+    <label className="elig-f">
+      <span>{label}</span>
+      <span className="elig-in">
+        <input
+          type="number"
+          inputMode="numeric"
+          value={Number.isFinite(value) ? value : 0}
+          min={min}
+          max={max}
+          onChange={(e) => onChange(Math.min(max, Math.max(min, Number(e.target.value) || 0)))}
+        />
+        <em>{unit}</em>
+      </span>
+    </label>
+  );
+}

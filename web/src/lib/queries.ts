@@ -2,6 +2,7 @@
 // 발행 상태(publish) 필터는 S8이 생기기 전까지 걸지 않는다 — 지금은 전부 'parsed'.
 // 목록·옵션은 unstable_cache로 REVALIDATE_SEC 캐시한다. 파이프라인이 DB를 갱신해도 그 안엔 반영된다(page.tsx revalidate와 동일).
 import { unstable_cache } from "next/cache";
+import type { EligibilityRules, IncomeStandard, RegionTier, SupplyType } from "@/types/eligibility";
 import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
@@ -300,4 +301,30 @@ export const listSitemapNotices = unstable_cache(
     ),
   ["notice-sitemap"],
   CACHE_OPTS,
+);
+
+
+/* ── 자격진단 사양 (0020) ────────────────────────────────
+   공고와 무관한 제도 규칙이라 공고 캐시 태그를 쓰지 않는다. 파이프라인 시드가 바뀌는 빈도도 훨씬 낮다. */
+
+export const getEligibilityRules = unstable_cache(
+  async (): Promise<EligibilityRules> => {
+    const [types, income, tiers] = await Promise.all([
+      query<SupplyType>(
+        `SELECT code, category, name, housing_type, sort_order, age_min, age_max, age_exempt, marital,
+                marital_max_yr, newborn_exempt, required_class, homeless_scope, income_scope, income_pct,
+                asset_scope, asset_limit_man, car_limit_man, region_limit, birth_bonus, note,
+                ranking_method, ranks, general_ranks, score
+           FROM supply_type ORDER BY sort_order`,
+      ),
+      query<IncomeStandard & { year: number }>(
+        `SELECT household, pct, monthly_won, year FROM income_standard
+          WHERE year = (SELECT max(year) FROM income_standard) ORDER BY household, pct`,
+      ),
+      query<RegionTier>(`SELECT name, kind, tier FROM region_tier ORDER BY tier, name`),
+    ]);
+    return { types, income, tiers, incomeYear: income[0]?.year ?? 0 };
+  },
+  ["eligibility-rules"],
+  { revalidate: REVALIDATE_SEC },
 );

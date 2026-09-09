@@ -40,6 +40,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="bar">
               <div className="left">
                 <HomeLink />
+                {/* 자격진단은 공고 목록과 나란한 한 갈래다 — 헤더에서 바로 닿게 둔다 */}
+                <nav className="site-nav" aria-label="주요 메뉴">
+                  <Link href={ROUTES.eligibility}>자격진단</Link>
+                </nav>
               </div>
             </div>
           </header>

@@ -1,0 +1,1973 @@
+{
+  "source": "내집마련.xlsx",
+  "income_year": 2025,
+  "supply_types": [
+    {
+      "code": "happy_student",
+      "category": "행복주택",
+      "name": "대학생/취준생",
+      "housing_type": "행복주택",
+      "sort_order": 1,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [
+        "대학생",
+        "취업준비생"
+      ],
+      "marital": "미혼",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "대학생",
+        "취업준비생"
+      ],
+      "homeless_scope": "본인",
+      "income_scope": "본인+부모",
+      "income_pct": 100,
+      "asset_scope": "본인",
+      "asset_limit_man": 10800,
+      "car_limit_man": 0,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "미성년도 신청가능. 본인+부모소득합산",
+      "ranking_method": "우선→배점→추첨",
+      "ranks": [
+        "해당자치구",
+        "서울시"
+      ],
+      "general_ranks": [
+        "서울+연접지역(거주지/대학소재지)",
+        "연접 외 경기도(거주지/대학소재지)",
+        "그 외 지역"
+      ],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "3년↑3/미만1",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "비고": "우선:2세미만자녀→순위→배점→추첨"
+      }
+    },
+    {
+      "code": "happy_youth",
+      "category": "행복주택",
+      "name": "청년",
+      "housing_type": "행복주택",
+      "sort_order": 2,
+      "age_min": 19,
+      "age_max": 39,
+      "age_exempt": [],
+      "marital": "미혼",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "청년",
+        "사회초년생"
+      ],
+      "homeless_scope": "본인",
+      "income_scope": "본인",
+      "income_pct": 100,
+      "asset_scope": "본인",
+      "asset_limit_man": 25100,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "미혼만 신청가능, 본인만 심사",
+      "ranking_method": "우선→배점→추첨",
+      "ranks": [
+        "해당자치구",
+        "서울시"
+      ],
+      "general_ranks": [
+        "서울+연접지역(거주지/소득근거지)",
+        "연접 외 경기도(거주지/소득근거지)",
+        "그 외 지역"
+      ],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "3년↑3/미만1",
+        "부양가족MAX": "0",
+        "청약통장MAX": "3",
+        "청약통장기준": "24↑3/12↑2/6↑1",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "비고": "일반:순위→추첨"
+      }
+    },
+    {
+      "code": "happy_newlywed",
+      "category": "행복주택",
+      "name": "신혼부부",
+      "housing_type": "행복주택",
+      "sort_order": 3,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "혼인",
+      "marital_max_yr": 7,
+      "newborn_exempt": true,
+      "required_class": [
+        "신혼",
+        "한부모",
+        "신생아"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 120,
+      "asset_scope": "세대",
+      "asset_limit_man": 34500,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "맞벌이120%. 예비신혼/한부모 포함",
+      "ranking_method": "우선→배점→추첨",
+      "ranks": [
+        "해당자치구",
+        "서울시"
+      ],
+      "general_ranks": [
+        "서울+연접지역(거주지/소득근거지)",
+        "연접 외 경기도(거주지/소득근거지)",
+        "그 외 지역"
+      ],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "3년↑3/미만1",
+        "부양가족MAX": "0",
+        "청약통장MAX": "3",
+        "청약통장기준": "24↑3/12↑2/6↑1",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0"
+      }
+    },
+    {
+      "code": "happy_elderly",
+      "category": "행복주택",
+      "name": "고령자",
+      "housing_type": "행복주택",
+      "sort_order": 4,
+      "age_min": 65,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "고령자"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 100,
+      "asset_scope": "세대",
+      "asset_limit_man": 34500,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "만 65세 이상",
+      "ranking_method": "우선→배점→추첨",
+      "ranks": [
+        "해당자치구",
+        "서울시"
+      ],
+      "general_ranks": [
+        "추첨(순위없음)"
+      ],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "5년↑3/5미만2/서울1",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "3",
+        "나이기준": "75↑3/70↑2/65↑1",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "기타가점": "장애/유공자",
+        "기타MAX": "3"
+      }
+    },
+    {
+      "code": "happy_welfare",
+      "category": "행복주택",
+      "name": "주거급여수급자",
+      "housing_type": "행복주택",
+      "sort_order": 5,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "수급자"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "무관",
+      "income_pct": null,
+      "asset_scope": "무관",
+      "asset_limit_man": null,
+      "car_limit_man": null,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "증명서 발급 필수",
+      "ranking_method": "우선→배점→추첨",
+      "ranks": [
+        "해당자치구",
+        "서울시"
+      ],
+      "general_ranks": [
+        "추첨(순위없음)"
+      ],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "5년↑3/5미만2/서울1",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "기타가점": "유공/장애/한부모",
+        "기타MAX": "3"
+      }
+    },
+    {
+      "code": "ys_youth",
+      "category": "청년안심주택(공공)",
+      "name": "청년",
+      "housing_type": "청년안심주택",
+      "sort_order": 6,
+      "age_min": 19,
+      "age_max": 39,
+      "age_exempt": [
+        "대학생",
+        "취업준비생"
+      ],
+      "marital": "미혼",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "청년",
+        "대학생",
+        "취업준비생"
+      ],
+      "homeless_scope": "본인",
+      "income_scope": "본인",
+      "income_pct": 100,
+      "asset_scope": "본인",
+      "asset_limit_man": 25100,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "2순위:본인+부모합산100%+자산34500 \n3순위:본인100%+25100",
+      "ranking_method": "순위→배점→추첨",
+      "ranks": [
+        "수급자/한부모/차상위",
+        "본인+부모소득100%+자산34500",
+        "본인소득100%+자산25100"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "3",
+        "청약통장기준": "24↑3/12↑2/6↑1",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "3",
+        "미성년자녀MAX": "수급3/한부모3/차상위2",
+        "기타가점": "0",
+        "기타MAX": "부모무주택2/장애2/소득50%이하3",
+        "비고": "10"
+      }
+    },
+    {
+      "code": "ys_new1",
+      "category": "청년안심주택(공공)",
+      "name": "신혼Ⅰ",
+      "housing_type": "청년안심주택",
+      "sort_order": 7,
+      "age_min": 19,
+      "age_max": 39,
+      "age_exempt": [],
+      "marital": "혼인",
+      "marital_max_yr": 7,
+      "newborn_exempt": true,
+      "required_class": [
+        "신혼",
+        "한부모",
+        "신생아"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 90,
+      "asset_scope": "세대",
+      "asset_limit_man": 34500,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "맞벌이90%. 소득70%이하",
+      "ranking_method": "순위→배점→추첨",
+      "ranks": [
+        "신생아/보호대상한부모",
+        "유자녀신혼",
+        "무자녀신혼",
+        "6세이하혼인가구"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "5년↑3/3년↑2/미만1",
+        "부양가족MAX": "4",
+        "청약통장MAX": "3",
+        "청약통장기준": "24↑3/12↑2/6↑1",
+        "나이MAX": "0",
+        "나이기준": "0",
+        "미성년자녀MAX": "3",
+        "기타가점": "수급3/차상위2",
+        "기타MAX": "0",
+        "비고": "장애인2"
+      }
+    },
+    {
+      "code": "ys_new2",
+      "category": "청년안심주택(공공)",
+      "name": "신혼Ⅱ",
+      "housing_type": "청년안심주택",
+      "sort_order": 8,
+      "age_min": 19,
+      "age_max": 39,
+      "age_exempt": [],
+      "marital": "혼인",
+      "marital_max_yr": 0,
+      "newborn_exempt": true,
+      "required_class": [
+        "신혼",
+        "한부모",
+        "혼인가구"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 200,
+      "asset_scope": "세대",
+      "asset_limit_man": 36200,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "맞벌이200%. 소득130%이하",
+      "ranking_method": "순위→배점→추첨",
+      "ranks": [
+        "신생아/보호대상한부모",
+        "유자녀신혼",
+        "무자녀신혼",
+        "6세이하혼인가구"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "5년↑3/3년↑2/미만1",
+        "부양가족MAX": "4",
+        "청약통장MAX": "3",
+        "청약통장기준": "24↑3/12↑2/6↑1",
+        "나이MAX": "0",
+        "나이기준": "0",
+        "미성년자녀MAX": "3",
+        "기타가점": "수급3/차상위2",
+        "기타MAX": "0",
+        "비고": "장애인2"
+      }
+    },
+    {
+      "code": "ys_priv_youth",
+      "category": "청년안심주택(민간)",
+      "name": "청년특별공급",
+      "housing_type": "청년안심주택",
+      "sort_order": 9,
+      "age_min": 19,
+      "age_max": 39,
+      "age_exempt": [],
+      "marital": "미혼",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "청년"
+      ],
+      "homeless_scope": "본인",
+      "income_scope": "청년특공_분기",
+      "income_pct": 120,
+      "asset_scope": "본인",
+      "asset_limit_man": 25100,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "미혼만 신청가능, 본인만 심사",
+      "ranking_method": "소득순위→지역순위→추첨",
+      "ranks": [
+        "소득100% 이하",
+        "소득110% 이하",
+        "소득120% 이하"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "기타가점": "0",
+        "기타MAX": "0",
+        "비고": "특공: 동일소득 시 지역순위(자치구>서울>그외)"
+      }
+    },
+    {
+      "code": "ys_priv_newlywed",
+      "category": "청년안심주택(민간)",
+      "name": "신혼특별공급",
+      "housing_type": "청년안심주택",
+      "sort_order": 10,
+      "age_min": 19,
+      "age_max": 39,
+      "age_exempt": [],
+      "marital": "혼인",
+      "marital_max_yr": 7,
+      "newborn_exempt": false,
+      "required_class": [
+        "신혼"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 120,
+      "asset_scope": "세대",
+      "asset_limit_man": 34500,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "부부합산 소득 120%",
+      "ranking_method": "소득순위→지역순위→추첨",
+      "ranks": [
+        "소득100% 이하",
+        "소득110% 이하",
+        "소득120% 이하"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "기타가점": "0",
+        "기타MAX": "0",
+        "비고": "특공: 동일소득 시 지역순위(자치구>서울>그외)"
+      }
+    },
+    {
+      "code": "ys_priv_general",
+      "category": "청년안심주택(민간)",
+      "name": "일반",
+      "housing_type": "청년안심주택",
+      "sort_order": 11,
+      "age_min": 19,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [],
+      "homeless_scope": "본인",
+      "income_scope": "무관",
+      "income_pct": null,
+      "asset_scope": "무관",
+      "asset_limit_man": null,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "소득·자산·지역 무관. 자동차 심사O",
+      "ranking_method": "추첨",
+      "ranks": [],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "기타가점": "0",
+        "기타MAX": "0",
+        "비고": "추첨"
+      }
+    },
+    {
+      "code": "buy_youth",
+      "category": "매입임대",
+      "name": "청년(SH,LH)",
+      "housing_type": "매입임대",
+      "sort_order": 12,
+      "age_min": 19,
+      "age_max": 39,
+      "age_exempt": [
+        "대학생",
+        "취업준비생"
+      ],
+      "marital": "미혼",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "청년",
+        "대학생",
+        "취업준비생"
+      ],
+      "homeless_scope": "본인",
+      "income_scope": "본인",
+      "income_pct": 100,
+      "asset_scope": "본인",
+      "asset_limit_man": 25100,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "2순위:본인+부모합산100%+자산34500 \n3순위:본인100%+25100",
+      "ranking_method": "순위→배점→추첨",
+      "ranks": [
+        "수급자/차상위/한부모",
+        "본인+부모소득100%+자산33700",
+        "본인소득100%+자산25400"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "3",
+        "청약통장기준": "24↑3/12↑2/6↑1",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "3",
+        "미성년자녀MAX": "수급3/한부모3/차상위2",
+        "기타가점": "0",
+        "기타MAX": "부모무주택2/장애2/소득50%이하3",
+        "비고": "10"
+      }
+    },
+    {
+      "code": "buy_new1",
+      "category": "매입임대",
+      "name": "신매입Ⅰ",
+      "housing_type": "매입임대",
+      "sort_order": 13,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "혼인",
+      "marital_max_yr": 7,
+      "newborn_exempt": true,
+      "required_class": [
+        "신생아",
+        "한부모",
+        "신혼"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 90,
+      "asset_scope": "세대",
+      "asset_limit_man": 34500,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "맞벌이90%. 소득70%이하",
+      "ranking_method": "순위→배점→추첨",
+      "ranks": [
+        "신생아/보호대상한부모",
+        "유자녀신혼",
+        "무자녀신혼",
+        "6세이하혼인가구"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "5년↑3/3년↑2/미만1",
+        "부양가족MAX": "4",
+        "청약통장MAX": "3",
+        "청약통장기준": "24↑3/12↑2/6↑1",
+        "나이MAX": "0",
+        "나이기준": "0",
+        "미성년자녀MAX": "3",
+        "기타가점": "수급3/차상위2",
+        "기타MAX": "0",
+        "비고": "장애2/65세부양1"
+      }
+    },
+    {
+      "code": "buy_new2",
+      "category": "매입임대",
+      "name": "신매입Ⅱ",
+      "housing_type": "매입임대",
+      "sort_order": 14,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "혼인",
+      "marital_max_yr": 0,
+      "newborn_exempt": true,
+      "required_class": [
+        "신혼",
+        "한부모",
+        "신생아"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 200,
+      "asset_scope": "세대",
+      "asset_limit_man": 36200,
+      "car_limit_man": null,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "맞벌이200%. 소득130%이하, 자동차 심사X",
+      "ranking_method": "순위→배점→추첨",
+      "ranks": [
+        "신생아/보호대상한부모",
+        "유자녀신혼",
+        "무자녀신혼",
+        "6세이하혼인가구"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "5년↑3/3년↑2/미만1",
+        "부양가족MAX": "4",
+        "청약통장MAX": "3",
+        "청약통장기준": "24↑3/12↑2/6↑1",
+        "나이MAX": "0",
+        "나이기준": "0",
+        "미성년자녀MAX": "3",
+        "기타가점": "수급3/차상위2",
+        "기타MAX": "0",
+        "비고": "장애2/65세부양1"
+      }
+    },
+    {
+      "code": "buy_long",
+      "category": "매입임대",
+      "name": "장기미임대",
+      "housing_type": "매입임대",
+      "sort_order": 15,
+      "age_min": 19,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [],
+      "homeless_scope": "세대원",
+      "income_scope": "무관",
+      "income_pct": null,
+      "asset_scope": "무관",
+      "asset_limit_man": null,
+      "car_limit_man": null,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "소득·자산무관, 추첨",
+      "ranking_method": "추첨",
+      "ranks": [],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0"
+      }
+    },
+    {
+      "code": "buy_gen",
+      "category": "매입임대",
+      "name": "일반",
+      "housing_type": "매입임대",
+      "sort_order": 16,
+      "age_min": 19,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "수급자",
+        "한부모",
+        "고령자",
+        "장애인",
+        "저소득"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 100,
+      "asset_scope": "세대",
+      "asset_limit_man": 25100,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "수급자/한부모/고령자/장애인",
+      "ranking_method": "순위→배점→추첨",
+      "ranks": [
+        "수급/한부모/고령/70%장애",
+        "소득50%/100%장애"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "5년↑3/3년↑2/미만1",
+        "부양가족MAX": "3",
+        "청약통장MAX": "3",
+        "청약통장기준": "24↑3/12↑2/6↑1",
+        "무주택기간MAX": "24↑3/12↑2/6↑1",
+        "나이MAX": "0",
+        "나이기준": "0",
+        "미성년자녀MAX": "0",
+        "기타가점": "3",
+        "기타MAX": "미성년3↑3/2→2/1→1",
+        "비고": "65세부양1/장애1"
+      }
+    },
+    {
+      "code": "rent_nat",
+      "category": "임대주택",
+      "name": "국민임대",
+      "housing_type": "국민임대",
+      "sort_order": 17,
+      "age_min": 19,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 70,
+      "asset_scope": "세대",
+      "asset_limit_man": 34500,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "소득70%이하",
+      "ranking_method": "배점합산→추첨",
+      "ranks": [
+        "소득50%+청약24회",
+        "나머지"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "5년↑3/3년↑2/미만1",
+        "부양가족MAX": "3",
+        "청약통장MAX": "6",
+        "청약통장기준": "61↑6/49↑5/37↑4/25↑3/13↑2/6↑1",
+        "무주택기간MAX": "60↑3/48↑2/36↑1",
+        "나이MAX": "0",
+        "나이기준": "3",
+        "취약계층MAX": "50↑3/40↑2/30↑1",
+        "미성년자녀MAX": "3",
+        "기타가점": "사회취약계층",
+        "기타MAX": "3",
+        "비고": "미성년3↑3/2→2/1→1"
+      }
+    },
+    {
+      "code": "rent_perm",
+      "category": "임대주택",
+      "name": "영구임대",
+      "housing_type": "영구임대",
+      "sort_order": 18,
+      "age_min": 19,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "수급자",
+        "국가유공자",
+        "한부모",
+        "장애인",
+        "북한이탈주민",
+        "저소득"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 90,
+      "asset_scope": "세대",
+      "asset_limit_man": 25100,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "수급자/한부모/장애인 등",
+      "ranking_method": "별도배점",
+      "ranks": [
+        "수급자",
+        "유공/한부모/북한/70%장애",
+        "65세수급/차상위"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "비고": "100점만점 별도체계"
+      }
+    },
+    {
+      "code": "rent_redev",
+      "category": "임대주택",
+      "name": "재개발임대",
+      "housing_type": "재개발임대",
+      "sort_order": 19,
+      "age_min": 19,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 70,
+      "asset_scope": "세대",
+      "asset_limit_man": 34500,
+      "car_limit_man": 4542,
+      "region_limit": "서울",
+      "birth_bonus": true,
+      "note": "소득70%이하",
+      "ranking_method": "소득→배점→추첨",
+      "ranks": [
+        "소득50%이하",
+        "나머지"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "5년↑3/3년↑2/미만1",
+        "부양가족MAX": "3",
+        "청약통장MAX": "3",
+        "청약통장기준": "60↑3/48↑2/36↑1",
+        "무주택기간MAX": "60↑3/48↑2/36↑1",
+        "나이MAX": "0",
+        "나이기준": "3",
+        "취약계층MAX": "50↑3/40↑2/30↑1",
+        "미성년자녀MAX": "4",
+        "기타가점": "사회취약계층",
+        "기타MAX": "3",
+        "비고": "미성년3↑3/2→2/1→1"
+      }
+    },
+    {
+      "code": "ls_youth",
+      "category": "전세임대",
+      "name": "청년",
+      "housing_type": "전세임대",
+      "sort_order": 20,
+      "age_min": 19,
+      "age_max": 39,
+      "age_exempt": [
+        "대학생",
+        "취업준비생"
+      ],
+      "marital": "미혼",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "수급자",
+        "한부모",
+        "차상위",
+        "청년"
+      ],
+      "homeless_scope": "본인",
+      "income_scope": "무관",
+      "income_pct": null,
+      "asset_scope": "무관",
+      "asset_limit_man": null,
+      "car_limit_man": null,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "수급자/한부모/차상위",
+      "ranking_method": "선착순",
+      "ranks": [
+        "수급/한부모/차상위",
+        "선착순"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0"
+      }
+    },
+    {
+      "code": "ls_new1",
+      "category": "전세임대",
+      "name": "신혼Ⅰ",
+      "housing_type": "전세임대",
+      "sort_order": 21,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "혼인",
+      "marital_max_yr": 7,
+      "newborn_exempt": true,
+      "required_class": [
+        "신혼",
+        "한부모",
+        "신생아"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 90,
+      "asset_scope": "세대",
+      "asset_limit_man": 36200,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "맞벌이90%. 순위별선착순",
+      "ranking_method": "순위별선착순",
+      "ranks": [
+        "신생아/보호대상한부모",
+        "유자녀신혼",
+        "무자녀신혼"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0"
+      }
+    },
+    {
+      "code": "ls_new2",
+      "category": "전세임대",
+      "name": "신혼Ⅱ",
+      "housing_type": "전세임대",
+      "sort_order": 22,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "혼인",
+      "marital_max_yr": 0,
+      "newborn_exempt": true,
+      "required_class": [
+        "신혼",
+        "한부모",
+        "신생아"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 200,
+      "asset_scope": "세대",
+      "asset_limit_man": 36200,
+      "car_limit_man": null,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "맞벌이200%. 자동차 심사X",
+      "ranking_method": "순위별선착순",
+      "ranks": [
+        "신생아/보호대상한부모",
+        "유자녀신혼",
+        "무자녀신혼"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0"
+      }
+    },
+    {
+      "code": "ls_multi",
+      "category": "전세임대",
+      "name": "다자녀",
+      "housing_type": "전세임대",
+      "sort_order": 23,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "혼인",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "다자녀"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 70,
+      "asset_scope": "세대",
+      "asset_limit_man": 34500,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "미성년 자녀 2명 이상",
+      "ranking_method": "선착순",
+      "ranks": [],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0"
+      }
+    },
+    {
+      "code": "ls_gen",
+      "category": "전세임대",
+      "name": "일반(SH)",
+      "housing_type": "전세임대",
+      "sort_order": 24,
+      "age_min": 19,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "수급자",
+        "한부모",
+        "고령자",
+        "장애인",
+        "저소득"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 100,
+      "asset_scope": "무관",
+      "asset_limit_man": null,
+      "car_limit_man": null,
+      "region_limit": "서울",
+      "birth_bonus": true,
+      "note": "수급자/한부모/고령자/장애인",
+      "ranking_method": "배점→추첨",
+      "ranks": [
+        "수급/한부모/고령/장애",
+        "소득50%이하"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "3",
+        "거주기간기준": "5년↑3/3년↑2/미만1",
+        "부양가족MAX": "3",
+        "청약통장MAX": "3",
+        "청약통장기준": "24↑3/12↑2/6↑1",
+        "무주택기간MAX": "24↑3/12↑2/6↑1",
+        "나이MAX": "0",
+        "나이기준": "0",
+        "미성년자녀MAX": "0",
+        "기타가점": "3",
+        "기타MAX": "미성년3↑3/2→2/1→1",
+        "비고": "65세부양1/장애1"
+      }
+    },
+    {
+      "code": "lt1",
+      "category": "장기전세",
+      "name": "장기전세Ⅰ",
+      "housing_type": "장기전세",
+      "sort_order": 25,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 200,
+      "asset_scope": "세대",
+      "asset_limit_man": 64000,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": true,
+      "note": "청약24회 이상 필수(1순위)",
+      "ranking_method": "배점합산→추첨",
+      "ranks": [
+        "배점합산"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "5",
+        "거주기간기준": "10년↑5/7↑4/5↑3/3↑2/미만1",
+        "부양가족MAX": "5",
+        "청약통장MAX": "5",
+        "청약통장기준": "96↑5/84↑4/72↑3/60↑2/24↑1",
+        "무주택기간MAX": "96↑5/72↑4/48↑3/24↑2/12↑1",
+        "나이MAX": "5",
+        "나이기준": "10년↑5/7↑4/5↑3/3↑2/미만1",
+        "취약계층MAX": "5",
+        "미성년자녀MAX": "50↑5/45↑4/40↑3/35↑2/미만1",
+        "기타가점": "0",
+        "기타MAX": "0"
+      }
+    },
+    {
+      "code": "lt2",
+      "category": "장기전세",
+      "name": "장기전세Ⅱ",
+      "housing_type": "장기전세",
+      "sort_order": 26,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "혼인",
+      "marital_max_yr": 7,
+      "newborn_exempt": true,
+      "required_class": [
+        "신혼",
+        "신생아"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 200,
+      "asset_scope": "세대",
+      "asset_limit_man": 64000,
+      "car_limit_man": 4542,
+      "region_limit": "서울",
+      "birth_bonus": true,
+      "note": "미리내집. 서울거주필수",
+      "ranking_method": "배점합산→추첨",
+      "ranks": [
+        "배점합산"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "5",
+        "거주기간기준": "10년↑5/7↑4/5↑3/3↑2/미만1",
+        "부양가족MAX": "0",
+        "청약통장MAX": "5",
+        "청약통장기준": "120↑5/96↑4/72↑3/48↑2/36↑1",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "비고": "10점만점"
+      }
+    },
+    {
+      "code": "safe",
+      "category": "든든전세",
+      "name": "든든전세(HUG)",
+      "housing_type": "든든전세",
+      "sort_order": 27,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [],
+      "homeless_scope": "세대원",
+      "income_scope": "무관",
+      "income_pct": null,
+      "asset_scope": "무관",
+      "asset_limit_man": null,
+      "car_limit_man": null,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "소득·자산무관, 추첨",
+      "ranking_method": "무관",
+      "ranks": [],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0"
+      }
+    },
+    {
+      "code": "pub_ls",
+      "category": "전세형매입임대",
+      "name": "공공전세",
+      "housing_type": "매입임대",
+      "sort_order": 28,
+      "age_min": 19,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [],
+      "homeless_scope": "세대원",
+      "income_scope": "무관",
+      "income_pct": null,
+      "asset_scope": "무관",
+      "asset_limit_man": null,
+      "car_limit_man": null,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "배점합산",
+      "ranking_method": "배점합산→추첨",
+      "ranks": [
+        "배점합산"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "3",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "나이MAX": "0",
+        "나이기준": "0",
+        "미성년자녀MAX": "0",
+        "기타가점": "0",
+        "기타MAX": "신생아가구1",
+        "비고": "1"
+      }
+    },
+    {
+      "code": "custom",
+      "category": "수요자맞춤형",
+      "name": "수요자맞춤형",
+      "housing_type": null,
+      "sort_order": 29,
+      "age_min": 0,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "청년",
+        "신혼",
+        "고령자"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 100,
+      "asset_scope": "세대",
+      "asset_limit_man": 25100,
+      "car_limit_man": 4542,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "자치구별상이",
+      "ranking_method": "자치구별상이",
+      "ranks": [
+        "자치구별상이"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "비고": "자치구별 공고마다 상이"
+      }
+    },
+    {
+      "code": "ppmh_youth",
+      "category": "공공지원민간임대",
+      "name": "청년특별공급",
+      "housing_type": "공공지원민간임대",
+      "sort_order": 30,
+      "age_min": 19,
+      "age_max": 39,
+      "age_exempt": [],
+      "marital": "미혼",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [
+        "청년"
+      ],
+      "homeless_scope": "본인",
+      "income_scope": "청년특공_분기",
+      "income_pct": 120,
+      "asset_scope": "무관",
+      "asset_limit_man": null,
+      "car_limit_man": null,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "소득만 확인, 자산 및 자동차 심사X",
+      "ranking_method": "소득순위→지역순위→추첨",
+      "ranks": [
+        "소득100% 이하",
+        "소득110% 이하",
+        "소득120% 이하"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "기타가점": "0",
+        "기타MAX": "0",
+        "비고": "특공: 소득순위→지역순위→추첨"
+      }
+    },
+    {
+      "code": "ppmh_newlywed",
+      "category": "공공지원민간임대",
+      "name": "신혼특별공급",
+      "housing_type": "공공지원민간임대",
+      "sort_order": 31,
+      "age_min": 19,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "혼인",
+      "marital_max_yr": 7,
+      "newborn_exempt": false,
+      "required_class": [
+        "신혼"
+      ],
+      "homeless_scope": "세대원",
+      "income_scope": "세대",
+      "income_pct": 120,
+      "asset_scope": "무관",
+      "asset_limit_man": null,
+      "car_limit_man": null,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "소득만 확인, 자산 및 자동차 심사X",
+      "ranking_method": "소득순위→지역순위→추첨",
+      "ranks": [
+        "소득100% 이하",
+        "소득110% 이하",
+        "소득120% 이하"
+      ],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "기타가점": "0",
+        "기타MAX": "0",
+        "비고": "특공: 소득순위→지역순위→추첨"
+      }
+    },
+    {
+      "code": "ppmh_general",
+      "category": "공공지원민간임대",
+      "name": "일반",
+      "housing_type": "공공지원민간임대",
+      "sort_order": 32,
+      "age_min": 19,
+      "age_max": 999,
+      "age_exempt": [],
+      "marital": "무관",
+      "marital_max_yr": 0,
+      "newborn_exempt": false,
+      "required_class": [],
+      "homeless_scope": "세대원",
+      "income_scope": "무관",
+      "income_pct": null,
+      "asset_scope": "무관",
+      "asset_limit_man": null,
+      "car_limit_man": null,
+      "region_limit": "전국",
+      "birth_bonus": false,
+      "note": "소득·자산무관, 추첨",
+      "ranking_method": "추첨",
+      "ranks": [],
+      "general_ranks": [],
+      "score": {
+        "거주기간MAX": "0",
+        "부양가족MAX": "0",
+        "청약통장MAX": "0",
+        "청약통장기준": "0",
+        "무주택기간MAX": "0",
+        "나이MAX": "0",
+        "취약계층MAX": "0",
+        "미성년자녀MAX": "0",
+        "기타가점": "0",
+        "기타MAX": "0",
+        "비고": "추첨"
+      }
+    }
+  ],
+  "income_standard": [
+    {
+      "year": 2025,
+      "household": 1,
+      "pct": 50,
+      "monthly_won": 1906682
+    },
+    {
+      "year": 2025,
+      "household": 1,
+      "pct": 70,
+      "monthly_won": 2669354
+    },
+    {
+      "year": 2025,
+      "household": 1,
+      "pct": 90,
+      "monthly_won": 3432027
+    },
+    {
+      "year": 2025,
+      "household": 1,
+      "pct": 100,
+      "monthly_won": 3813363
+    },
+    {
+      "year": 2025,
+      "household": 1,
+      "pct": 110,
+      "monthly_won": 4194699
+    },
+    {
+      "year": 2025,
+      "household": 1,
+      "pct": 120,
+      "monthly_won": 4576036
+    },
+    {
+      "year": 2025,
+      "household": 1,
+      "pct": 130,
+      "monthly_won": 4957372
+    },
+    {
+      "year": 2025,
+      "household": 1,
+      "pct": 200,
+      "monthly_won": 7626726
+    },
+    {
+      "year": 2025,
+      "household": 2,
+      "pct": 50,
+      "monthly_won": 2933135
+    },
+    {
+      "year": 2025,
+      "household": 2,
+      "pct": 70,
+      "monthly_won": 4106389
+    },
+    {
+      "year": 2025,
+      "household": 2,
+      "pct": 90,
+      "monthly_won": 5279643
+    },
+    {
+      "year": 2025,
+      "household": 2,
+      "pct": 100,
+      "monthly_won": 5866270
+    },
+    {
+      "year": 2025,
+      "household": 2,
+      "pct": 110,
+      "monthly_won": 6452897
+    },
+    {
+      "year": 2025,
+      "household": 2,
+      "pct": 120,
+      "monthly_won": 7039524
+    },
+    {
+      "year": 2025,
+      "household": 2,
+      "pct": 130,
+      "monthly_won": 7626151
+    },
+    {
+      "year": 2025,
+      "household": 2,
+      "pct": 200,
+      "monthly_won": 11732540
+    },
+    {
+      "year": 2025,
+      "household": 3,
+      "pct": 50,
+      "monthly_won": 4084215
+    },
+    {
+      "year": 2025,
+      "household": 3,
+      "pct": 70,
+      "monthly_won": 5717900
+    },
+    {
+      "year": 2025,
+      "household": 3,
+      "pct": 90,
+      "monthly_won": 7351586
+    },
+    {
+      "year": 2025,
+      "household": 3,
+      "pct": 100,
+      "monthly_won": 8168429
+    },
+    {
+      "year": 2025,
+      "household": 3,
+      "pct": 110,
+      "monthly_won": 8985272
+    },
+    {
+      "year": 2025,
+      "household": 3,
+      "pct": 120,
+      "monthly_won": 9802115
+    },
+    {
+      "year": 2025,
+      "household": 3,
+      "pct": 130,
+      "monthly_won": 10618958
+    },
+    {
+      "year": 2025,
+      "household": 3,
+      "pct": 200,
+      "monthly_won": 16336858
+    },
+    {
+      "year": 2025,
+      "household": 4,
+      "pct": 50,
+      "monthly_won": 4401101
+    },
+    {
+      "year": 2025,
+      "household": 4,
+      "pct": 70,
+      "monthly_won": 6161541
+    },
+    {
+      "year": 2025,
+      "household": 4,
+      "pct": 90,
+      "monthly_won": 7921982
+    },
+    {
+      "year": 2025,
+      "household": 4,
+      "pct": 100,
+      "monthly_won": 8802202
+    },
+    {
+      "year": 2025,
+      "household": 4,
+      "pct": 110,
+      "monthly_won": 9682422
+    },
+    {
+      "year": 2025,
+      "household": 4,
+      "pct": 120,
+      "monthly_won": 10562642
+    },
+    {
+      "year": 2025,
+      "household": 4,
+      "pct": 130,
+      "monthly_won": 11442863
+    },
+    {
+      "year": 2025,
+      "household": 4,
+      "pct": 200,
+      "monthly_won": 17604404
+    },
+    {
+      "year": 2025,
+      "household": 5,
+      "pct": 50,
+      "monthly_won": 4663493
+    },
+    {
+      "year": 2025,
+      "household": 5,
+      "pct": 70,
+      "monthly_won": 6528890
+    },
+    {
+      "year": 2025,
+      "household": 5,
+      "pct": 90,
+      "monthly_won": 8394287
+    },
+    {
+      "year": 2025,
+      "household": 5,
+      "pct": 100,
+      "monthly_won": 9326985
+    },
+    {
+      "year": 2025,
+      "household": 5,
+      "pct": 110,
+      "monthly_won": 10259684
+    },
+    {
+      "year": 2025,
+      "household": 5,
+      "pct": 120,
+      "monthly_won": 11192382
+    },
+    {
+      "year": 2025,
+      "household": 5,
+      "pct": 130,
+      "monthly_won": 12125081
+    },
+    {
+      "year": 2025,
+      "household": 5,
+      "pct": 200,
+      "monthly_won": 18653970
+    },
+    {
+      "year": 2025,
+      "household": 6,
+      "pct": 50,
+      "monthly_won": 4953132
+    },
+    {
+      "year": 2025,
+      "household": 6,
+      "pct": 70,
+      "monthly_won": 6934384
+    },
+    {
+      "year": 2025,
+      "household": 6,
+      "pct": 90,
+      "monthly_won": 8915637
+    },
+    {
+      "year": 2025,
+      "household": 6,
+      "pct": 100,
+      "monthly_won": 9906263
+    },
+    {
+      "year": 2025,
+      "household": 6,
+      "pct": 110,
+      "monthly_won": 10896889
+    },
+    {
+      "year": 2025,
+      "household": 6,
+      "pct": 120,
+      "monthly_won": 11887516
+    },
+    {
+      "year": 2025,
+      "household": 6,
+      "pct": 130,
+      "monthly_won": 12878142
+    },
+    {
+      "year": 2025,
+      "household": 6,
+      "pct": 200,
+      "monthly_won": 19812526
+    },
+    {
+      "year": 2025,
+      "household": 7,
+      "pct": 50,
+      "monthly_won": 5325640
+    },
+    {
+      "year": 2025,
+      "household": 7,
+      "pct": 70,
+      "monthly_won": 7455895
+    },
+    {
+      "year": 2025,
+      "household": 7,
+      "pct": 90,
+      "monthly_won": 9586151
+    },
+    {
+      "year": 2025,
+      "household": 7,
+      "pct": 100,
+      "monthly_won": 10651279
+    },
+    {
+      "year": 2025,
+      "household": 7,
+      "pct": 110,
+      "monthly_won": 11716407
+    },
+    {
+      "year": 2025,
+      "household": 7,
+      "pct": 120,
+      "monthly_won": 12781535
+    },
+    {
+      "year": 2025,
+      "household": 7,
+      "pct": 130,
+      "monthly_won": 13846663
+    },
+    {
+      "year": 2025,
+      "household": 7,
+      "pct": 200,
+      "monthly_won": 21302558
+    }
+  ],
+  "region_tiers": [
+    {
+      "name": "강남구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "강동구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "강북구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "강서구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "관악구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "광진구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "구로구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "금천구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "노원구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "도봉구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "동대문구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "동작구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "마포구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "서대문구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "서초구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "성동구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "성북구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "송파구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "양천구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "영등포구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "용산구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "은평구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "종로구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "중구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "중랑구",
+      "kind": "sigungu",
+      "tier": "서울"
+    },
+    {
+      "name": "의정부시",
+      "kind": "sigungu",
+      "tier": "연접"
+    },
+    {
+      "name": "구리시",
+      "kind": "sigungu",
+      "tier": "연접"
+    },
+    {
+      "name": "남양주시",
+      "kind": "sigungu",
+      "tier": "연접"
+    },
+    {
+      "name": "하남시",
+      "kind": "sigungu",
+      "tier": "연접"
+    },
+    {
+      "name": "성남시",
+      "kind": "sigungu",
+      "tier": "연접"
+    },
+    {
+      "name": "과천시",
+      "kind": "sigungu",
+      "tier": "연접"
+    },
+    {
+      "name": "안양시",
+      "kind": "sigungu",
+      "tier": "연접"
+    },
+    {
+      "name": "광명시",
+      "kind": "sigungu",
+      "tier": "연접"
+    },
+    {
+      "name": "부천시",
+      "kind": "sigungu",
+      "tier": "연접"
+    },
+    {
+      "name": "인천광역시",
+      "kind": "sido",
+      "tier": "연접"
+    },
+    {
+      "name": "김포시",
+      "kind": "sigungu",
+      "tier": "연접"
+    },
+    {
+      "name": "고양시",
+      "kind": "sigungu",
+      "tier": "연접"
+    },
+    {
+      "name": "양주시",
+      "kind": "sigungu",
+      "tier": "연접"
+    }
+  ]
+}
