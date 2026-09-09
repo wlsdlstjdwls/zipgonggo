@@ -48,7 +48,7 @@ export function moneyOf(n: Pick<NoticeListItem, "min_rent" | "min_deposit">): Mo
 }
 
 /** D-day 칩(56×52). num은 큰 글자, unit은 밑 라벨. tone은 색. */
-// soon = 아직 안 열린 접수(접수 시작 예정). acc(접수 중)와 색을 나눈다 — 사용자 요청 2026-09-09
+// soon = 아직 안 열린 접수(D-N 시작)에만 쓴다. 오늘 시작한 건 지금 넣을 수 있으니 접수 중과 같은 acc다(사용자 지적 2026-09-09)
 export type DdayChip = { num: string; unit: string; tone: "hot" | "warn" | "soft" | "acc" | "soon"; days: number | null };
 export function ddayChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "status">): DdayChip {
   const toEnd = daysUntil(n.apply_end_at);
@@ -61,9 +61,10 @@ export function ddayChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_a
   }
   if (toEnd < 0) return { num: "마감", unit: "종료", tone: "soft", days: toEnd };
   if (toStart !== null && toStart > 0) return { num: `D-${toStart}`, unit: "접수 시작", tone: "soon", days: toStart };
-  // 오늘 접수가 열린 날은 마감 D-day보다 이 사실이 먼저다(사용자 요청 2026-09-09)
-  if (toStart === 0) return { num: "오늘", unit: "접수 시작", tone: "soon", days: toEnd };
   if (toEnd === 0) return { num: "오늘", unit: "마감", tone: "hot", days: 0 };
+  // 오늘 접수가 열린 날은 마감 D-day보다 이 사실이 먼저다(사용자 요청 2026-09-09).
+  // 단 색은 접수 중과 같은 acc — 오늘 시작도 지금 신청되는 건 매한가지다
+  if (toStart === 0) return { num: "오늘", unit: "접수 시작", tone: "acc", days: toEnd };
   return { num: `D-${toEnd}`, unit: "마감", tone: toEnd <= DDAY_URGENT_DAYS ? "hot" : toEnd <= DDAY_SOON_DAYS ? "warn" : "soft", days: toEnd };
 }
 
@@ -138,7 +139,9 @@ export function applyPhase(n: Pick<NoticeListItem, "apply_start_at" | "apply_end
   const span = n.apply_start_at || n.apply_end_at ? `${dateK(n.apply_start_at, true)} ~ ${dateK(n.apply_end_at, true)}` : null;
   const endNote = n.apply_end_at ? `${dateK(n.apply_end_at, true)} 마감` : null;
 
-  if (toStart === 0) return { kind: "today-open", label: "오늘 접수 시작", note: span, live: "오늘 시작", tone: "soon" };
+  // 오늘 시작은 이미 접수 중이라 acc. 같은 날 마감까지면 마감이 더 급하니 hot
+  if (toStart === 0 && toEnd === 0) return { kind: "today-close", label: "오늘 접수 시작, 오늘 마감", note: span, live: "오늘 마감", tone: "hot" };
+  if (toStart === 0) return { kind: "today-open", label: "오늘 접수 시작", note: span, live: "접수 중", tone: "acc" };
   if (toStart !== null && toStart > 0) return { kind: "before", label: `${toStart}일 뒤 접수 시작`, note: span, live: `D-${toStart} 시작`, tone: "soon" };
   if (toEnd === 0) return { kind: "today-close", label: "오늘 접수 마감", note: span, live: "오늘 마감", tone: "hot" };
   if (toEnd !== null && toEnd > 0) {
