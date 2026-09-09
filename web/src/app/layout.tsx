@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { HomeLink } from "@/components/home-link";
 import { SaveProvider } from "@/components/save-context";
 import { ScopeBar } from "@/components/scope-bar";
-import { ScopeRestore } from "@/components/scope-restore";
+import { ScopeSync } from "@/components/scope-sync";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
 import { listFilterOptions } from "@/lib/queries";
 import { SITE_URL } from "@/lib/site-url";
@@ -43,7 +43,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </header>
           {/* usePathname·useSearchParams를 쓰는 클라이언트 조각이라 Suspense로 감싸 나머지 트리의 정적 렌더를 지킨다 */}
           <Suspense fallback={null}>
-            <ScopeRestore />
+            <ScopeSync />
             <ScopeBar sidoOptions={options.sido} sectorOptions={options.sector} />
           </Suspense>
           <main className="shell">{children}</main>

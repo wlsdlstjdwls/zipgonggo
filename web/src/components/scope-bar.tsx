@@ -2,12 +2,11 @@
 
 // 스코프 바 — 부문(공공/민간)+시도. 헤더 바로 아래 상시 노출, 필터(FilterBar)보다 상위 범위.
 // 부문은 쿼리(?sector=), 시도는 경로(/area/{시도})로 다르다 — "부문은 갈림길 페이지를 만들지 않는다"(6차 결정,
-// 민간임대 0건이라 카드 2장이면 절반이 빈 문). 사용자가 직접 바꿀 때만 localStorage에 남긴다(강제 이동 없음).
+// 민간임대 0건이라 카드 2장이면 절반이 빈 문). 저장은 여기서 하지 않는다 — ScopeSync가 URL을 보고 기억한다.
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { AREA_MIN_COUNT } from "@/lib/constants";
 import { areaPath, homePath } from "@/lib/routes";
-import { writeScope } from "@/lib/scope";
 import { SECTORS, type FilterOption, type NoticeClosing, type NoticeSort, type Sector } from "@/types/notice";
 
 type Props = { sidoOptions: FilterOption[]; sectorOptions: FilterOption[] };
@@ -43,15 +42,13 @@ export function ScopeBar({ sidoOptions, sectorOptions }: Props) {
     return nextSido ? areaPath(nextSido, f) : homePath(f);
   };
 
-  const remember = (nextSido: string | undefined, nextSector: Sector | undefined) => writeScope({ sido: nextSido, sector: nextSector });
-
   return (
     <div className="sbar">
       <p className="sbar-txt">
         {sector ?? "전체"} <b>{sido ?? "전국"}</b> <span>{scopeCount}건</span>
       </p>
 
-      <Link href={hrefFor(sido, undefined)} className={`chip-f${!sector ? " on" : ""}`} onClick={() => remember(sido, undefined)}>
+      <Link href={hrefFor(sido, undefined)} className={`chip-f${!sector ? " on" : ""}`}>
         전체 <small>{total}</small>
       </Link>
       {SECTORS.map((s) =>
@@ -60,7 +57,7 @@ export function ScopeBar({ sidoOptions, sectorOptions }: Props) {
             민간임대 <small>준비 중</small>
           </span>
         ) : (
-          <Link key={s} href={hrefFor(sido, s)} className={`chip-f${sector === s ? " on" : ""}`} onClick={() => remember(sido, s)}>
+          <Link key={s} href={hrefFor(sido, s)} className={`chip-f${sector === s ? " on" : ""}`}>
             {s} <small>{countOf(s)}</small>
           </Link>
         ),
@@ -69,9 +66,7 @@ export function ScopeBar({ sidoOptions, sectorOptions }: Props) {
       <select
         value={sido ?? ""}
         onChange={(e) => {
-          const nextSido = e.target.value || undefined;
-          remember(nextSido, sector);
-          router.push(hrefFor(nextSido, sector));
+          router.push(hrefFor(e.target.value || undefined, sector));
         }}
         aria-label="시도"
         className={`sel${sido ? " on" : ""}`}

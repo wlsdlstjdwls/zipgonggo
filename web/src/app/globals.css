@@ -332,6 +332,13 @@ small { font-size: 12px; }
 .detail-main { min-width: 0; }
 .dsec, .section { padding: 24px var(--pad); border-bottom: 1px solid var(--line); }
 .dsec > h2, .section > h2 { margin: 0 0 14px; font-weight: 800; font-size: 10.5px; line-height: 1; letter-spacing: 0.2em; color: var(--dim); }
+/* 상세 본론 — 단지 목록과 지도. 공고 페이지에서 사람이 실제로 쓰는 곳이라 헤더 바로 다음 첫 섹션으로 올리고,
+   라벨 크기 h2 대신 진짜 제목으로 키운다(사용자 요청 2026-09-09). 나머지 섹션(일정·정정·원문)은 기존 라벨 톤 유지. */
+.dsec.lead { padding-top: 22px; }
+.dsec.lead > h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 8px; font-weight: 900; font-size: 19px; line-height: 1.25; letter-spacing: -0.045em; color: var(--ink); }
+.dsec.lead > h2::before { content: ""; flex: none; width: 4px; height: 18px; border-radius: 2px; background: var(--acc); }
+.dsec.lead > .note { margin-top: 0; font-size: 12px; }
+.dsec.lead .d-map { height: 420px; }
 .d-head { padding: 28px var(--pad) 26px; border-bottom: 1px solid var(--line); }
 .d-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .d-title { margin: 0 0 24px; font-weight: 900; font-size: 34px; line-height: 1.22; letter-spacing: -0.05em; color: var(--ink); max-width: 24em; }
@@ -479,6 +486,8 @@ small { font-size: 12px; }
   .cx-map-wrap { position: static; order: -1; }
   .cx-map { height: 320px; }
   .cx-list { max-height: 420px; }
+  .dsec.lead > h2 { font-size: 17px; }
+  .dsec.lead .d-map { height: 300px; }
   .cx-card { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; }
   .cx-card-a { display: grid; grid-template-columns: 1fr 1fr; }
   .cx-card-a .map-btn { width: 100%; }

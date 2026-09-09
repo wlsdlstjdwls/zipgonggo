@@ -1,33 +1,41 @@
 "use client";
 
-// 스코프(부문+시도) — 목록의 상위 범위. 필터(유형·마감·정렬)와 분리해 세션 동안 기억한다.
+// 스코프(부문+시도)와 필터(유형·마감·정렬)를 세션 동안 기억한다.
 // docs/url-structure.md 6차 설계. localStorage는 클라이언트 전용 — "/"의 서버 렌더(ISR)엔 절대 반영하지 않는다.
-// 크롤러·공유 링크 수신자는 항상 전국 목록을 봐야 하고, 저장된 값은 사용자가 스코프 바를 직접 조작할 때만 쓰인다.
+// 크롤러·공유 링크 수신자는 항상 전국 목록을 받고, 저장값은 마운트 뒤 클라이언트에서만 쓰인다(ScopeSync).
 import { DEFAULT_SCOPE_SIDO, SCOPE_STORAGE_KEY } from "./constants";
 import { areaPath, homePath } from "./routes";
-import { isSector, type NoticeFilters, type Sector } from "@/types/notice";
+import { isSector, type NoticeClosing, type NoticeFilters, type NoticeSort } from "@/types/notice";
 
-export type Scope = { sector?: Sector; sido?: string };
+/** 기억 대상 = 목록 상태 전체(스코프 + 필터). URL에 실리는 값과 1:1이다. */
+export type Scope = NoticeFilters;
 
 export { DEFAULT_SCOPE_SIDO };
 
-/** localStorage에서 마지막 스코프를 읽는다. 서버(SSR)에선 항상 빈 스코프. */
+function str(v: unknown): string | undefined {
+  return typeof v === "string" && v ? v : undefined;
+}
+
+/** localStorage에서 마지막 목록 상태를 읽는다. 서버(SSR)에선 항상 빈 값. */
 export function readScope(): Scope {
   if (typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(SCOPE_STORAGE_KEY);
     if (!raw) return {};
-    const parsed = JSON.parse(raw) as { sector?: unknown; sido?: unknown };
+    const p = JSON.parse(raw) as Record<string, unknown>;
     return {
-      sector: isSector(parsed.sector) ? parsed.sector : undefined,
-      sido: typeof parsed.sido === "string" && parsed.sido ? parsed.sido : undefined,
+      sector: isSector(p.sector) ? p.sector : undefined,
+      sido: str(p.sido),
+      type: str(p.type),
+      closing: p.closing === "7d" ? ("7d" as NoticeClosing) : undefined,
+      sort: p.sort === "deadline" ? ("deadline" as NoticeSort) : undefined,
     };
   } catch {
     return {};
   }
 }
 
-/** 사용자가 스코프를 바꿀 때만 호출 — 페이지 진입만으로는 쓰지 않는다(강제 이동 방지). */
+/** URL이 목록 상태를 말할 때마다 호출된다(ScopeSync). 저장 자체는 화면을 바꾸지 않는다. */
 export function writeScope(s: Scope): void {
   if (typeof window === "undefined") return;
   try {
@@ -37,7 +45,7 @@ export function writeScope(s: Scope): void {
   }
 }
 
-/** "전국"으로 되돌릴 때. */
+/** "전국 전체"로 되돌릴 때(헤더 로고). */
 export function clearScope(): void {
   if (typeof window === "undefined") return;
   try {
@@ -47,8 +55,7 @@ export function clearScope(): void {
   }
 }
 
-/** 스코프 → 경로. sido가 있으면 /area/{시도}, 없으면 "/". 유형·마감·정렬은 그대로 얹는다. */
-export function scopePath(s: Scope, rest: Omit<NoticeFilters, "sector" | "sido"> = {}): string {
-  const f: NoticeFilters = { ...rest, sector: s.sector };
-  return s.sido ? areaPath(s.sido, f) : homePath(f);
+/** 목록 상태 → 경로. sido가 있으면 /area/{시도}, 없으면 "/". 나머지는 쿼리로. */
+export function scopePath(s: Scope): string {
+  return s.sido ? areaPath(s.sido, s) : homePath(s);
 }

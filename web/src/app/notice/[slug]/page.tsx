@@ -112,6 +112,26 @@ export default async function NoticePage({ params }: Params) {
             )}
           </header>
 
+          {complexes.length > 0 && (
+            <section className="dsec lead">
+              <h2>공급 단지 {count(complexes.length, "곳")}{hasUnits && ` | ${count(unitTotal, "호")}`}</h2>
+              <p className="note" style={{ margin: "0 0 12px" }}>
+                {hasUnits
+                  ? "첨부 공고문의 「주택목록」(호실 단위)을 단지별로 묶은 목록입니다. 보증금과 월임대료는 단지 안 최소값이고, 호별 금액은 원문 표를 확인하세요. 단지를 고르면 지도 위에서 로드뷰와 단지 상세로 갈 수 있습니다."
+                  : `첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.${newCount > 0 ? ` 이번 공고 신규 단지 ${newCount}곳.` : ""} 단지별 면적과 호수, 금액은 원문 표를 확인하세요.`}
+              </p>
+              <ComplexExplorer items={complexes} hasUnits={hasUnits} noticeSlug={n.slug} />
+            </section>
+          )}
+
+          {n.address && (
+            <section className="dsec lead">
+              <h2>위치</h2>
+              <div className="d-map"><NaverMap address={n.address} title={n.complex_name ?? n.title} sub={n.housing_type} /></div>
+              <p className="note">지도 위치는 주소 기준 근사치입니다. 핀이나 로드뷰 버튼을 누르면 거리뷰가 열립니다. {n.address}</p>
+            </section>
+          )}
+
           {(chain.original || chain.amendments.length > 0) && (
             <section className="dsec">
               <h2>정정 이력</h2>
@@ -139,26 +159,6 @@ export default async function NoticePage({ params }: Params) {
             {hasSchedule && n.source_status && <p className="note">모집 상태 {n.source_status}</p>}
             {hasSchedule && n.schedule_source === "attachment" && <p className="note">일정은 첨부 공고문의 「입주자 모집 절차 및 일정」에서 읽었습니다. 순위별 세부 일정은 원문을 확인하세요.</p>}
           </section>
-
-          {complexes.length > 0 && (
-            <section className="dsec">
-              <h2>공급 단지 {count(complexes.length, "곳")}{hasUnits && ` | ${count(unitTotal, "호")}`}</h2>
-              <p className="note" style={{ margin: "0 0 12px" }}>
-                {hasUnits
-                  ? "첨부 공고문의 「주택목록」(호실 단위)을 단지별로 묶은 목록입니다. 보증금과 월임대료는 단지 안 최소값이고, 호별 금액은 원문 표를 확인하세요. 단지를 고르면 지도 위에서 로드뷰와 단지 상세로 갈 수 있습니다."
-                  : `첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.${newCount > 0 ? ` 이번 공고 신규 단지 ${newCount}곳.` : ""} 단지별 면적과 호수, 금액은 원문 표를 확인하세요.`}
-              </p>
-              <ComplexExplorer items={complexes} hasUnits={hasUnits} noticeSlug={n.slug} />
-            </section>
-          )}
-
-          {n.address && (
-            <section className="dsec">
-              <h2>위치</h2>
-              <div className="d-map"><NaverMap address={n.address} title={n.complex_name ?? n.title} sub={n.housing_type} /></div>
-              <p className="note">지도 위치는 주소 기준 근사치입니다. 핀이나 로드뷰 버튼을 누르면 거리뷰가 열립니다. {n.address}</p>
-            </section>
-          )}
 
           {showAreaTable && areas.length > 0 && (
             <section className="dsec">
