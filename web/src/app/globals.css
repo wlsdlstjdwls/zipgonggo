@@ -772,7 +772,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* 지도 위 지오코딩 진행 오버레이. 카운트가 올라가는 걸 눈으로 보게 한다(사용자 요청 2026-09-09).
    다 되면 지우지 않고 옅어지게만 둔다(.hide) — 지도가 뒤에서 빡 하고 드러나던 걸 막는다(사용자 지적 2026-09-09) */
 .cx-load { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: color-mix(in srgb, var(--bg) 76%, transparent); backdrop-filter: blur(2px); opacity: 1; transition: opacity 360ms var(--ease); animation: cx-load-in 260ms var(--sp) both; }
-.cx-load.hide { opacity: 0; pointer-events: none; }
+/* animation(both)이 opacity:1을 계속 붙잡고 있어 .hide의 opacity:0 트랜지션이 끝나면 도로 1로 튕겨 돌아온다 —
+   로딩이 끝나도 오버레이가 안 사라지던 원인(사용자 지적 2026-09-09). hide에서 animation을 꺼서 트랜지션값이 그대로 남게 한다 */
+.cx-load.hide { opacity: 0; pointer-events: none; animation: none; }
 .cx-load-n { margin: 0; display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
 .cx-load-n b { font-size: 30px; font-weight: 900; letter-spacing: -0.03em; color: var(--ink); }
 .cx-load-n span { font-size: 14px; font-weight: 700; color: var(--dim); }
