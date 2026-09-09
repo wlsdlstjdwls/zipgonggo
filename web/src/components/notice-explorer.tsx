@@ -1,31 +1,62 @@
 "use client";
 
-// 홈 본문 — 결과 행 목록. 지도는 없다(공고별 지도는 상세의 공급 단지 탐색기, 2026-09-08 결정).
-// 첫 페이지는 서버가 HTML로 넣어 주고(SEO), 이후 페이지는 /api/notices 에서 받는다.
-// 무한 스크롤(IntersectionObserver sentinel, rootMargin) 유지 + 「더 보기」 버튼 폴백. 로딩 중 재호출 차단·에러 시 재시도.
-// 행 등장은 CSS 애니메이션(.row + --stagger). 목록이 바뀌면 page.tsx가 key를 바꿔 다시 마운트되므로 등장 모션이 다시 돈다.
+// 목록 본문 — 결과 행 + 무한 스크롤. 지도는 없다(공고별 지도는 상세의 공급 단지 탐색기, 2026-09-08 결정).
+// 첫 페이지는 서버가 필터 없이 HTML로 넣어 주고(SEO·ISR 캐시 한 장), 필터가 걸리면 여기서 /api/notices로 갈아끼운다.
+// 라우팅을 하지 않으므로 URL이 지저분해지지 않고 화면도 깜빡이지 않는다(사용자 요청 2026-09-09).
+// 무한 스크롤(IntersectionObserver sentinel, rootMargin) + 「더 보기」 버튼 폴백. 로딩 중 재호출 차단·에러 시 재시도.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FEED_ROOT_MARGIN, PAGE_SIZE, ROW_STAGGER_MS } from "@/lib/constants";
 import { count } from "@/lib/format";
-import { apiNoticesPath } from "@/lib/routes";
+import { feedParams } from "@/lib/notice-filters";
+import { apiNoticesPath, ROUTES } from "@/lib/routes";
 import type { NoticeListItem, NoticePage } from "@/types/notice";
+import { EmptyState } from "./empty-state";
+import { useListState } from "./list-state";
 import { NoticeRow } from "./notice-row";
 import { SkeletonRows } from "./skeleton";
 
 type Props = {
+  /** 서버가 준 첫 페이지 — 필터 없이 스코프(시도)만 걸린 상태 */
   initial: NoticePage;
-  /** 필터 쿼리스트링(sector·sido·type·sort·closing). 바뀌면 page.tsx가 key로 다시 마운트한다 */
-  params: string;
 };
 
-export function NoticeExplorer({ initial, params }: Props) {
+export function NoticeExplorer({ initial }: Props) {
+  const { f, sido, ready, reset } = useListState();
+  const serverKey = feedParams({ sido });
+  const key = feedParams({ ...f, sido });
+
+  const [page, setPage] = useState<NoticePage>(initial);
   const [items, setItems] = useState<NoticeListItem[]>(initial.items);
   const [cursor, setCursor] = useState<string | null>(initial.nextCursor);
   const [loading, setLoading] = useState(false);
+  const [swapping, setSwapping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const inFlight = useRef(false);
+  const applied = useRef(serverKey);
+
+  // 서버가 준 페이지로 되돌린다(필터를 전부 풀었을 때) — 다시 받아올 필요가 없다
+  useEffect(() => { setPage(initial); setItems(initial.items); setCursor(initial.nextCursor); applied.current = serverKey; }, [initial, serverKey]);
+
+  // 필터가 바뀌면 1페이지를 새로 받아 통째로 갈아끼운다. 받는 동안 기존 목록을 지우지 않는다(깜빡임 방지)
+  useEffect(() => {
+    if (!ready || key === applied.current) return;
+    let cancelled = false;
+    applied.current = key;
+    setSwapping(true);
+    setError(null);
+    if (key === serverKey) {
+      setPage(initial); setItems(initial.items); setCursor(initial.nextCursor); setSwapping(false);
+      return;
+    }
+    fetch(`${ROUTES.apiNotices}?${key}`, { headers: { accept: "application/json" } })
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json() as Promise<NoticePage>; })
+      .then((p) => { if (cancelled) return; setPage(p); setItems(p.items); setCursor(p.nextCursor); })
+      .catch(() => { if (!cancelled) setError("목록을 불러오지 못했습니다."); })
+      .finally(() => { if (!cancelled) setSwapping(false); });
+    return () => { cancelled = true; };
+  }, [key, ready, serverKey, initial]);
 
   const loadMore = useCallback(async () => {
     if (inFlight.current || !cursor) return;
@@ -33,21 +64,21 @@ export function NoticeExplorer({ initial, params }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(apiNoticesPath(params, cursor), { headers: { accept: "application/json" } });
+      const res = await fetch(apiNoticesPath(applied.current, cursor), { headers: { accept: "application/json" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const page = (await res.json()) as NoticePage;
+      const next = (await res.json()) as NoticePage;
       setItems((prev) => {
         const seen = new Set(prev.map((n) => n.id));
-        return [...prev, ...page.items.filter((n) => !seen.has(n.id))];
+        return [...prev, ...next.items.filter((n) => !seen.has(n.id))];
       });
-      setCursor(page.nextCursor);
+      setCursor(next.nextCursor);
     } catch {
       setError("더 불러오지 못했습니다.");
     } finally {
       inFlight.current = false;
       setLoading(false);
     }
-  }, [cursor, params]);
+  }, [cursor]);
 
   useEffect(() => {
     const el = sentinel.current;
@@ -57,11 +88,22 @@ export function NoticeExplorer({ initial, params }: Props) {
     return () => io.disconnect();
   }, [cursor, loadMore]);
 
-  const loadLabel = !cursor ? "모두 표시했습니다" : loading ? "불러오는 중…" : `더 보기 +${Math.min(PAGE_SIZE, initial.total - items.length)}`;
+  if (!swapping && items.length === 0) {
+    return (
+      <EmptyState
+        lead={f.sector === "민간임대"
+          ? "민간임대는 청년안심주택 등 수집을 준비 중입니다. 지역이나 유형을 넓혀 보세요."
+          : "지역이나 유형을 넓히거나, 마감 임박 필터를 풀어 보세요."}
+        onReset={reset}
+      />
+    );
+  }
 
-  const list = (
-    <div className="ex-list">
-      <ul className="rows">
+  const loadLabel = !cursor ? "모두 표시했습니다" : loading ? "불러오는 중…" : `더 보기 +${Math.min(PAGE_SIZE, page.total - items.length)}`;
+
+  return (
+    <div className={`ex-list${swapping ? " swapping" : ""}`} aria-busy={swapping}>
+      <ul className="rows" key={applied.current}>
         {items.map((n, i) => (
           <NoticeRow key={n.id} n={n} stagger={(i % PAGE_SIZE) * ROW_STAGGER_MS} />
         ))}
@@ -73,12 +115,10 @@ export function NoticeExplorer({ initial, params }: Props) {
         </p>
       )}
       <div className="more-bar">
-        <span className="cnt">{count(initial.total)} 중 {count(items.length)} 표시</span>
+        <span className="cnt">{count(page.total)} 중 {count(items.length)} 표시</span>
         <button type="button" className="btn ink lg" onClick={loadMore} disabled={!cursor || loading}>{loadLabel}</button>
       </div>
       {cursor && <div ref={sentinel} className="feed-sentinel" aria-hidden="true" />}
     </div>
   );
-
-  return list;
 }

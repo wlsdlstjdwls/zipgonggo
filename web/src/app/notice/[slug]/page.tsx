@@ -8,7 +8,7 @@ import { NaverMap } from "@/components/naver-map";
 import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
-import { applyPhase, count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonShort } from "@/lib/format";
+import { applyPhase, count, dateK, dateMD, daysUntil, ddayChip, deadlineChip, moneyOf, num, won, wonShort } from "@/lib/format";
 import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
@@ -70,6 +70,7 @@ export default async function NoticePage({ params }: Params) {
   const range_ = hi != null && lo != null && hi > lo ? wonShort(hi) : null;
   const hasSchedule = Boolean(n.apply_start_at || n.apply_end_at || n.announce_at);
   const ph = applyPhase(n);
+  const dl = deadlineChip(n);
   // 헤드라인에서 뺀 금액 — 제원 패널 한 줄로. 범위가 있으면 "최소~최대"
   const moneyRow = m ? (range_ ? `${m.main}~${range_}` : `${m.main}부터`) : null;
 
@@ -99,12 +100,11 @@ export default async function NoticePage({ params }: Params) {
               {n.amends_source_key && <span className="tag acc">정정공고</span>}
             </div>
             <h1 className="d-title">{n.title}</h1>
-            {/* 헤드라인은 금액이 아니라 접수 상태다(사용자 요청 2026-09-09). 금액은 우측 제원 패널과 단지 목록에 남는다 */}
-            <div className={`d-apply tone-${ph.tone}`}>
-              <span className="d-apply-k">접수</span>
-              <b>{ph.label}</b>
-              {ph.note && <span className="d-apply-s">{ph.note}</span>}
-            </div>
+            {/* 헤드라인은 금액이 아니라 접수 상태다. 다만 한 줄로 — 본론은 아래 단지 목록과 지도다(사용자 요청 2026-09-09) */}
+            <p className="d-when">
+              <b className={`when ${ph.tone}`}>{ph.label}</b>
+              {ph.note && <span>{ph.note}</span>}
+            </p>
           </header>
 
           {complexes.length > 0 && (
@@ -197,10 +197,11 @@ export default async function NoticePage({ params }: Params) {
         </div>
 
         <DetailAside
-          tone={ph.tone}
-          ddayLabel={d.unit}
-          ddayNum={d.num}
-          ddayNote={ph.note ?? ph.label}
+          tone={dl.tone}
+          ddayLabel={dl.unit}
+          ddayNum={dl.num}
+          ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)} 마감` : (n.source_status ?? "일정 미정")}
+          ddayExtra={ph.kind === "today-open" || ph.kind === "before" ? ph.label : null}
           cta={
             <>
               <ExternalLink className="btn acc lg" href={n.source_url}>{L.original}</ExternalLink>

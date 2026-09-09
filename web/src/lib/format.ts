@@ -146,3 +146,12 @@ export function applyPhase(n: Pick<NoticeListItem, "apply_start_at" | "apply_end
   if (toEnd !== null && toEnd < 0) return { kind: "closed", label: "접수 마감", note: endNote, live: null, tone: "soft" };
   return { kind: "none", label: n.source_status ?? "접수 일정 미정", note: "접수 기간은 기관 원문을 확인하세요", live: null, tone: "soft" };
 }
+
+/** 우측 카드용 — 접수 시작과 무관하게 항상 "마감"을 센다(사용자 요청 2026-09-09: 마감 D-day를 없애지 말 것). */
+export function deadlineChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "status">): DdayChip {
+  const toEnd = daysUntil(n.apply_end_at);
+  if (toEnd === null) return ddayChip(n);
+  if (toEnd < 0) return { num: "마감", unit: "종료", tone: "soft", days: toEnd };
+  if (toEnd === 0) return { num: "오늘", unit: "마감", tone: "hot", days: 0 };
+  return { num: `D-${toEnd}`, unit: "마감까지", tone: toEnd <= DDAY_URGENT_DAYS ? "hot" : toEnd <= DDAY_SOON_DAYS ? "warn" : "acc", days: toEnd };
+}

@@ -14,18 +14,18 @@ type Props = {
   /** value === "" 일 때 버튼에 보일 문구이자 목록 첫 줄(전체) */
   placeholder: string;
   ariaLabel: string;
-  /** 목록을 버튼 오른쪽 끝에 맞춘다 */
-  align?: "start" | "end";
   className?: string;
 };
 
-export function Select({ value, options, onChange, placeholder, ariaLabel, align = "start", className }: Props) {
+export function Select({ value, options, onChange, placeholder, ariaLabel, className }: Props) {
   const id = useId();
   const wrap = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLUListElement>(null);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  // 좁은 화면에서 버튼이 오른쪽에 있으면 목록이 화면 밖으로 나간다 — 열 때 남은 폭을 재서 오른쪽 정렬로 뒤집는다
+  const [flip, setFlip] = useState(false);
 
   const all: SelectOption[] = [{ value: "", label: placeholder }, ...options];
   const current = all.find((o) => o.value === value) ?? all[0];
@@ -35,14 +35,13 @@ export function Select({ value, options, onChange, placeholder, ariaLabel, align
     if (focusBack) btn.current?.focus();
   }, []);
 
-  // 바깥 클릭·스크롤로 닫기. 목록이 버튼에 붙어 있어 스크롤하면 떠 보이므로 같이 닫는다
+  // 바깥 클릭으로만 닫는다. 목록은 버튼에 붙어 함께 움직이므로 스크롤로 닫지 않는다(사용자 지적 2026-09-09)
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false); };
-    const onScroll = () => setOpen(false);
+    const onDown = (e: MouseEvent | TouchEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", onDown);
-    window.addEventListener("scroll", onScroll, true);
-    return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("scroll", onScroll, true); };
+    document.addEventListener("touchstart", onDown);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("touchstart", onDown); };
   }, [open]);
 
   // 열리면 현재 값에 커서를 놓고 목록을 그 줄로 스크롤
@@ -89,7 +88,11 @@ export function Select({ value, options, onChange, placeholder, ariaLabel, align
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         aria-activedescendant={open ? `${id}-${active}` : undefined}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          const r = btn.current?.getBoundingClientRect();
+          setFlip(Boolean(r && r.left + 240 > window.innerWidth && r.right > 240));
+          setOpen((v) => !v);
+        }}
         onKeyDown={onKey}
       >
         <span className="sel-v">{current.label}</span>
@@ -102,7 +105,7 @@ export function Select({ value, options, onChange, placeholder, ariaLabel, align
           ref={menu}
           role="listbox"
           aria-label={ariaLabel}
-          className={`selmenu${align === "end" ? " end" : ""}`}
+          className={`selmenu${flip ? " end" : ""}`}
           tabIndex={-1}
           onKeyDown={onKey}
         >

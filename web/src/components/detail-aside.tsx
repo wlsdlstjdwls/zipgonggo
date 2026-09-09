@@ -8,6 +8,8 @@ type Props = {
   ddayLabel: string;
   ddayNum: string;
   ddayNote: string;
+  /** D-day 카드 안 보조 한 줄 — "오늘 접수 시작"처럼 마감과 별개인 상태 */
+  ddayExtra?: ReactNode;
   /** 버튼류 — 페이지마다 CTA 구성이 다르다(원문 링크, 포털, 저장, 지도로 이동 등) */
   cta: ReactNode;
   rows: SpecRow[];
@@ -16,7 +18,7 @@ type Props = {
   footNote?: ReactNode;
 };
 
-export function DetailAside({ tone, ddayLabel, ddayNum, ddayNote, cta, rows, updatedNote, footNote }: Props) {
+export function DetailAside({ tone, ddayLabel, ddayNum, ddayNote, ddayExtra, cta, rows, updatedNote, footNote }: Props) {
   return (
     <aside className="aside">
       <div className="aside-in">
@@ -24,6 +26,7 @@ export function DetailAside({ tone, ddayLabel, ddayNum, ddayNote, cta, rows, upd
           <span>{ddayLabel}</span>
           <b>{ddayNum}</b>
           <p>{ddayNote}</p>
+          {ddayExtra && <em className="dcard-x">{ddayExtra}</em>}
         </div>
         {cta}
         <div className="specs">

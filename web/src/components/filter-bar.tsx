@@ -1,52 +1,41 @@
 "use client";
 
-// 필터 행 — 좌: 칩(마감 7일 내) + 유형 셀렉트 / 우: 정렬 세그먼트. 전부 URL 파라미터(?closing=7d&type=&sort=).
-// 부문·시도는 스코프(스코프 바)로 옮겨갔다 — 여긴 스코프 안에서 좁히는 2층 필터만 다룬다(6차 설계).
-// basePath로 "/"와 "/area/{시도}" 둘 다에서 쓴다. 셀렉트는 바꾸는 즉시 이동한다.
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { areaPath, homePath } from "@/lib/routes";
-import { writeScope } from "@/lib/scope";
+// 필터 행 — 좌: 칩(마감 7일 내) + 유형 셀렉트 / 우: 정렬 세그먼트.
+// 값은 URL이 아니라 ListStateProvider가 들고 있다(사용자 요청 2026-09-09) — 목록은 /api/notices로 갈아끼운다.
+// 부문·시도는 스코프(스코프 바) 담당. 여긴 스코프 안에서 좁히는 2층 필터만 다룬다(6차 설계).
+import type { FilterOption } from "@/types/notice";
+import { useListState } from "./list-state";
 import { Select } from "./select";
-import type { FilterOption, NoticeFilters } from "@/types/notice";
 
 type Props = {
-  f: NoticeFilters;
   /** 유형 옵션만 쓴다. sector·sido는 스코프 바가 담당. */
   options: { type: FilterOption[] };
   closing7: number;
   sticky?: boolean;
-  /** 이 필터가 걸리는 스코프. 시도가 있으면 /area/{시도}, 없으면 "/". */
-  basePath?: { sido?: string };
 };
 
-export function FilterBar({ f, options, closing7, sticky, basePath }: Props) {
-  const router = useRouter();
-  const buildPath = (patch: NoticeFilters) => (basePath?.sido ? areaPath(basePath.sido, patch) : homePath(patch));
-  const base = { ...f, closing: undefined };
-  // 조작 즉시 기억한다 — 전국에서 필터를 다 풀면 URL이 빈 "/"라 ScopeSync가 URL만으로는 그 선택을 알 수 없다
-  const remember = (patch: Partial<NoticeFilters>) => writeScope({ ...f, ...patch, sido: basePath?.sido ?? f.sido });
-  const go = (patch: Partial<NoticeFilters>) => { remember(patch); router.push(buildPath({ ...f, ...patch })); };
+export function FilterBar({ options, closing7, sticky }: Props) {
+  const { f, set } = useListState();
 
   return (
     <div className={`fbar${sticky ? " sticky" : ""}`}>
-      <Link href={buildPath(f.closing ? base : { ...base, closing: "7d" })} onClick={() => remember({ closing: f.closing ? undefined : "7d" })} className={`chip-f${f.closing ? " on" : ""}`} aria-current={f.closing ? "true" : undefined}>
+      <button type="button" className={`chip-f${f.closing ? " on" : ""}`} aria-pressed={Boolean(f.closing)} onClick={() => set({ closing: f.closing ? undefined : "7d" })}>
         마감 7일 내 <small>{closing7}</small>
-      </Link>
+      </button>
 
       <Select
         value={f.type ?? ""}
         options={options.type.map((o) => ({ value: o.value, label: o.value, count: o.count }))}
-        onChange={(v) => go({ type: v || undefined })}
+        onChange={(v) => set({ type: v || undefined })}
         placeholder="전체 유형"
         ariaLabel="공급유형"
       />
-      {f.type && <Link className="reset" onClick={() => remember({ type: undefined })} href={buildPath({ ...f, type: undefined })}>초기화</Link>}
+      {f.type && <button type="button" className="reset" onClick={() => set({ type: undefined })}>초기화</button>}
 
       <nav className="seg grow" data-on={f.sort ?? "posted"} aria-label="정렬">
         <span className="seg-ind" aria-hidden="true" />
-        <Link href={buildPath({ ...f, sort: "deadline" })} onClick={() => remember({ sort: "deadline" })} className={f.sort === "deadline" ? "on" : ""} aria-current={f.sort === "deadline" ? "true" : undefined}>마감 임박순</Link>
-        <Link href={buildPath({ ...f, sort: "posted" })} onClick={() => remember({ sort: "posted" })} className={f.sort !== "deadline" ? "on" : ""} aria-current={f.sort !== "deadline" ? "true" : undefined}>최신 공고순</Link>
+        <button type="button" onClick={() => set({ sort: "deadline" })} className={f.sort === "deadline" ? "on" : ""} aria-pressed={f.sort === "deadline"}>마감 임박순</button>
+        <button type="button" onClick={() => set({ sort: "posted" })} className={f.sort !== "deadline" ? "on" : ""} aria-pressed={f.sort !== "deadline"}>최신 공고순</button>
       </nav>
     </div>
   );

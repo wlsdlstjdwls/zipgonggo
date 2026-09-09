@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { HomeLink } from "@/components/home-link";
 import { SaveProvider } from "@/components/save-context";
 import { ScopeBar } from "@/components/scope-bar";
-import { ScopeSync } from "@/components/scope-sync";
+import { ListStateProvider } from "@/components/list-state";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
 import { listFilterOptions } from "@/lib/queries";
 import { SITE_URL } from "@/lib/site-url";
@@ -41,12 +41,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
             </div>
           </header>
-          {/* usePathname·useSearchParams를 쓰는 클라이언트 조각이라 Suspense로 감싸 나머지 트리의 정적 렌더를 지킨다 */}
+          {/* 목록 상태(부문·유형·마감·정렬)는 URL이 아니라 이 Provider가 들고 있다 — 스코프 바·필터 바·목록이 함께 구독한다 */}
           <Suspense fallback={null}>
-            <ScopeSync />
-            <ScopeBar sidoOptions={options.sido} sectorOptions={options.sector} />
+            <ListStateProvider>
+              <ScopeBar sidoOptions={options.sido} sectorOptions={options.sector} />
+              <main className="shell">{children}</main>
+            </ListStateProvider>
           </Suspense>
-          <main className="shell">{children}</main>
           <footer className="site-footer">
             <div className="bar">
               <p>출처: 국토교통부 마이홈포털 공공주택 모집공고 조회 서비스(공공데이터포털), 서울주거포털 SH 공고 목록. 공고 원문은 각 기관 링크에서 확인하세요.</p>
