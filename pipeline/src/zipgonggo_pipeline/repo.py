@@ -45,7 +45,28 @@ def upsert_notice(cur, notice: dict[str, Any], areas: list[dict[str, Any]]) -> b
 
 
 def replace_notice_complexes(cur, notice_id: int, rows: list[dict[str, Any]]) -> int:
-    """공고의 공급 단지 목록을 통째로 교체한다(notice_area와 같은 방식). 돌려주는 값은 넣은 행 수."""
+    """공고의 공급 단지 목록을 통째로 교체한다(notice_area와 같은 방식). 돌려주는 값은 넣은 행 수.
+
+    좌표(S6이 요약DB로 맞춘 값)는 지우고 다시 넣어도 살아남아야 한다 — 파서를 고쳐 S3을 다시 돌릴 때마다
+    좌표가 통째로 날아가면 S6을 매번 다시 돌려야 한다(실측 2026-09-09: 재실행 한 번에 262건 소실).
+    유일키가 (공고, 단지명, 도로명주소)라 그 키로 그대로 되돌린다. 주소가 바뀐 행은 못 찾아 비는 게 맞다.
+    """
+    cur.execute(
+        """
+        CREATE TEMP TABLE IF NOT EXISTS _nc_geom
+          (name text, road_address text, geom geography(Point,4326), geo_precision geo_precision,
+           geo_matched_by text, geo_matched_at timestamptz) ON COMMIT DROP
+        """
+    )
+    cur.execute("TRUNCATE _nc_geom")
+    cur.execute(
+        """
+        INSERT INTO _nc_geom
+        SELECT name, road_address, geom, geo_precision, geo_matched_by, geo_matched_at
+          FROM notice_complex WHERE notice_id = %s AND geom IS NOT NULL
+        """,
+        (notice_id,),
+    )
     cur.execute("DELETE FROM notice_complex WHERE notice_id = %s", (notice_id,))
     for r in rows:
         cur.execute(
@@ -65,6 +86,15 @@ def replace_notice_complexes(cur, notice_id: int, rows: list[dict[str, Any]]) ->
             {"notice_id": notice_id, "zone": None, "complex_code": None, "unit_count": None, "heating": None,
              "min_deposit": None, "min_rent": None, "area_min": None, "area_max": None, **r},
         )
+    cur.execute(
+        """
+        UPDATE notice_complex c SET geom = g.geom, geo_precision = g.geo_precision,
+               geo_matched_by = g.geo_matched_by, geo_matched_at = g.geo_matched_at
+          FROM _nc_geom g
+         WHERE c.notice_id = %s AND c.name = g.name AND c.road_address = g.road_address
+        """,
+        (notice_id,),
+    )
     return len(rows)
 
 
