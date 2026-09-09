@@ -62,7 +62,7 @@ export const NAVER_MAP_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ?
 export const NAVER_MAP_SDK_URL = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAP_CLIENT_ID}&submodules=geocoder,panorama`;
 export const NAVER_MAP_GEOCODER_TIMEOUT_MS = 8000;
 // 공고 상세 「위치」 지도의 기본 줌 — 한 단계 더 확대했다(2026-09-09).
-export const NAVER_MAP_DEFAULT_ZOOM = 17;
+export const NAVER_MAP_DEFAULT_ZOOM = 18;
 // 단지 상세는 이전 배율 그대로 — 공고 상세만 확대해 달라는 요청이라 되돌렸다(2026-09-09)
 export const NAVER_MAP_COMPLEX_ZOOM = 16;
 
