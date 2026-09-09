@@ -45,6 +45,21 @@ STACK_PX = 26    # 같은 열에서 이만큼 안에 붙은 두 줄은 한 라�
 MAX_DATE_W = 220 # 이보다 넓은 칸은 흐름도 날짜가 아니라 본문 문장이다(라벨 폭 비율은 좁은 라벨에서 오작동)
 # 흐름도 아래 주석("※ 입주예정기간은 2026. 1. 16.(월) ~ 2027. 1. 15.(금)입니다") — 날짜가 있어도 접수일이 아니다
 NOTE_RE = re.compile(r"^\s*[※*·▶■□○-]")
+# 접수 시각 — 「9 28(월) 10:00 ~ 9 30(수) 17:00」. _norm이 콜론을 지우므로 원문에서 먼저 뽑는다
+TIME_RE = re.compile(r"([01]?\d|2[0-3])\s*:\s*([0-5]\d)")
+
+
+def _times_in(text: str) -> list[str]:
+    return [f"{int(h):02d}:{m}" for h, m in TIME_RE.findall(text)]
+
+
+@dataclass(frozen=True)
+class Hit:
+    """흐름도에서 읽은 날짜 한 개. time은 같은 칸(또는 바로 아랫줄)에 적힌 "HH:MM"."""
+
+    date: date
+    weekday: str
+    time: str | None = None
 
 
 @dataclass(frozen=True)
@@ -54,6 +69,8 @@ class Step:
     label: str
     start: date
     end: date | None
+    start_time: str | None = None
+    end_time: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,6 +79,10 @@ class Schedule:
     apply_end: date | None
     announce: date | None
     page: int | None
+    # 접수 시작·마감 시각("10:00"·"17:00"). 공고문에는 대개 적혀 있는데 화면에 없었다(사용자 지적 2026-09-09).
+    # 흐름도에 시각이 없는 양식도 있어 None을 그대로 둔다 — 없는 시각을 지어내지 않는다.
+    apply_start_time: str | None = None
+    apply_end_time: str | None = None
     # 접수·발표 말고 흐름도에 같이 그려진 단계들(서류심사 대상자 발표·서류 제출·계약 체결).
     # 공고문에 있는데 화면에서 빠져 있다는 지적(사용자 2026-09-09)에 맞춰 통째로 싣는다.
     steps: tuple[Step, ...] = ()
@@ -176,7 +197,7 @@ def _stacked_labels(boxes: list[_Box]) -> list[_Box]:
     return out
 
 
-def _dates_below(label: _Box, boxes: list[_Box], ref_year: int | None) -> list[tuple[date, str]]:
+def _dates_below(label: _Box, boxes: list[_Box], ref_year: int | None) -> list[Hit]:
     """라벨 아래(같은 열)에 붙은 날짜들. 위에서 아래 순. 연도만 있는 줄(2026)은 다음 날짜의 연도로 쓴다.
     ※로 시작하는 주석과 라벨보다 훨씬 넓은 칸(본문 문장)은 건너뛴다 — 「입주예정기간」을 접수기간으로 읽던 회귀."""
     below = sorted(
@@ -187,7 +208,7 @@ def _dates_below(label: _Box, boxes: list[_Box], ref_year: int | None) -> list[t
          and not NOTE_RE.match(b.text)),
         key=lambda b: (b.t, b.l),
     )
-    found: list[tuple[date, str]] = []
+    found: list[Hit] = []
     ref: date | None = None
     limit = label.t + BELOW_PX
     for b in below:
@@ -199,9 +220,16 @@ def _dates_below(label: _Box, boxes: list[_Box], ref_year: int | None) -> list[t
             ref_year = int(ym.group(1))
             limit = max(limit, b.t + CHAIN_PX)
             continue
-        for d, wd in _dates_in(b.text, ref_year, ref):
-            found.append((d, wd))
-            ref, ref_year = d, d.year
+        ds = _dates_in(b.text, ref_year, ref)
+        tms = _times_in(b.text)
+        if ds:
+            for i, (d, wd) in enumerate(ds):
+                found.append(Hit(d, wd, tms[i] if i < len(tms) else None))
+                ref, ref_year = d, d.year
+                limit = max(limit, b.t + CHAIN_PX)
+        elif tms and found and found[-1].time is None:
+            # 시각만 따로 떨어진 줄(「9 28(월)」 밑에 「10:00」) — 바로 위 날짜에 붙인다
+            found[-1] = Hit(found[-1].date, found[-1].weekday, tms[0])
             limit = max(limit, b.t + CHAIN_PX)
     return found
 
@@ -220,12 +248,13 @@ def _extra_steps(labels: list[_Box], boxes: list[_Box], ref_year: int | None, an
         name = next((n for n, rx in EXTRA_STEPS if rx.search(flat)), None)
         if name is None:
             continue
-        ds = [d for d, wd in _dates_below(b, boxes, ref_year)
-              if (anchor is None or d >= anchor) and WEEKDAY[d.weekday()] == wd]
-        if not ds:
+        found = [h for h in _dates_below(b, boxes, ref_year)
+                 if (anchor is None or h.date >= anchor) and WEEKDAY[h.date.weekday()] == h.weekday]
+        if not found:
             continue
-        lo, hi = min(ds), max(ds)
-        step = Step(name, lo, hi if hi > lo else None)
+        lo, hi = min(found, key=lambda h: h.date), max(found, key=lambda h: h.date)
+        step = Step(name, lo.date, hi.date if hi.date > lo.date else None,
+                    lo.time, hi.time if hi.date > lo.date else None)
         # 같은 단계가 여러 번 잡히면 가장 왼쪽(= 흐름도에서 먼저 오는) 상자를 쓴다
         prev = hits.get(name)
         if prev is None or b.l < prev[0]:
@@ -250,30 +279,41 @@ def parse_schedule_page(xml: str, ref_year: int | None = None) -> Schedule | Non
         elif ANNOUNCE_RE.search(b.text.replace(" ", "")):
             announce_labels.append(b)
 
-    start = end = None
+    start_h: Hit | None = None
+    end_h: Hit | None = None
     if ranked:
         ranked.sort(key=lambda x: (x[0], x[1].t))
-        first = [d for d, _ in _dates_below(ranked[0][1], boxes, ref_year)]
-        last = [d for d, _ in _dates_below(ranked[-1][1], boxes, first[-1].year if first else ref_year)]
-        start = first[0] if first else None
-        end = max(last) if last else (max(first) if first else None)
+        first = _dates_below(ranked[0][1], boxes, ref_year)
+        last = _dates_below(ranked[-1][1], boxes, first[-1].date.year if first else ref_year)
+        start_h = first[0] if first else None
+        pool = last or first
+        end_h = max(pool, key=lambda h: h.date) if pool else None
     else:
         for lab in sorted(plain, key=lambda b: b.t):
-            ds = [d for d, _ in _dates_below(lab, boxes, ref_year)]
-            if ds:
-                start, end = min(ds), max(ds)
+            hits = _dates_below(lab, boxes, ref_year)
+            if hits:
+                start_h = min(hits, key=lambda h: h.date)
+                end_h = max(hits, key=lambda h: h.date)
                 break
+    start = start_h.date if start_h else None
+    end = end_h.date if end_h else None
     announce = None
     for lab in sorted(announce_labels, key=lambda b: b.t):
-        ds = [d for d, _ in _dates_below(lab, boxes, (end or start).year if (end or start) else ref_year)]
-        if ds:
-            announce = ds[0]
+        hits = _dates_below(lab, boxes, (end or start).year if (end or start) else ref_year)
+        if hits:
+            announce = hits[0].date
             break
     if start is None and end is None and announce is None:
         return None
     if start and end and end < start:
         end = None
-    return Schedule(start, end, announce, None, _extra_steps(labels, boxes, ref_year, start or end))
+        end_h = None
+    return Schedule(
+        start, end, announce, None,
+        steps=_extra_steps(labels, boxes, ref_year, start or end),
+        apply_start_time=start_h.time if start_h else None,
+        apply_end_time=end_h.time if end_h else None,
+    )
 
 
 def parse_schedule(pages: list[tuple[int, str]], ref_year: int | None = None) -> Schedule | None:
@@ -281,5 +321,8 @@ def parse_schedule(pages: list[tuple[int, str]], ref_year: int | None = None) ->
     for page, xml in pages[:12]:
         s = parse_schedule_page(xml, ref_year)
         if s and (s.apply_start or s.apply_end):
-            return Schedule(s.apply_start, s.apply_end, s.announce, page, s.steps)
+            return Schedule(s.apply_start, s.apply_end, s.announce, page,
+                            steps=s.steps,
+                            apply_start_time=s.apply_start_time,
+                            apply_end_time=s.apply_end_time)
     return None

@@ -34,7 +34,8 @@ def steps_json(sch) -> str | None:
     if not sch or not sch.steps:
         return None
     return json.dumps(
-        [{"label": s.label, "start": s.start.isoformat(), "end": s.end.isoformat() if s.end else None}
+        [{"label": s.label, "start": s.start.isoformat(), "end": s.end.isoformat() if s.end else None,
+          "start_time": s.start_time, "end_time": s.end_time}
          for s in sch.steps],
         ensure_ascii=False,
     )
@@ -183,6 +184,8 @@ def run(*, dry_run: bool, limit: int, slug: str | None) -> Stats:
                     update_notice_attach_facts(
                         cur, n["id"],
                         apply_start_at=sch.apply_start if sch else None,
+                        apply_start_tm=sch.apply_start_time if sch else None,
+                        apply_end_tm=sch.apply_end_time if sch else None,
                         apply_end_at=sch.apply_end if sch else None,
                         announce_at=sch.announce if sch else None,
                         schedule_steps=steps_json(sch),

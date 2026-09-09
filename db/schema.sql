@@ -65,6 +65,8 @@ CREATE TABLE notice (
   posted_at       date        NOT NULL,         -- 공고일 (API rcritPblancDe)
   apply_start_at  date,                         -- API beginDe
   apply_end_at    date,                         -- 마감일. D-day의 근거 (API endDe)
+  apply_start_tm  time,                         -- 접수 시작 시각(SH 첨부 흐름도). 없으면 NULL
+  apply_end_tm    time,                         -- 접수 마감 시각. 마감일 당일 몇 시까지인지
   announce_at     date,                         -- 당첨자 발표일 (API przwnerPresnatnDe, SH 목록 발표일)
   status          notice_status NOT NULL,       -- 일정 기준으로 파이프라인이 도출
   source_status   text,                         -- 출처 원문 상태값: 일반공고·정정공고·접수중…

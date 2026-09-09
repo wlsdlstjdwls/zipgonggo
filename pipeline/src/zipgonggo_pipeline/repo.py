@@ -123,12 +123,15 @@ UPDATE_ATTACH_FACTS_SQL = """
 UPDATE notice SET
   -- API가 준 일정은 건드리지 않는다. 다만 이미 첨부에서 읽어 둔 값(schedule_source='attachment')은
   -- 파서가 좋아지면 새 값으로 갈아 끼운다 — COALESCE만 쓰면 예전 파서의 틀린 날짜가 영영 남는다(2026-09-09).
-  apply_start_at  = CASE WHEN schedule_source = 'attachment' AND %(apply_start_at)s IS NOT NULL
-                         THEN %(apply_start_at)s ELSE COALESCE(apply_start_at, %(apply_start_at)s) END,
-  apply_end_at    = CASE WHEN schedule_source = 'attachment' AND %(apply_end_at)s IS NOT NULL
-                         THEN %(apply_end_at)s ELSE COALESCE(apply_end_at, %(apply_end_at)s) END,
-  announce_at     = CASE WHEN schedule_source = 'attachment' AND %(announce_at)s IS NOT NULL
-                         THEN %(announce_at)s ELSE COALESCE(announce_at, %(announce_at)s) END,
+  apply_start_at  = CASE WHEN schedule_source = 'attachment' AND %(apply_start_at)s::date IS NOT NULL
+                         THEN %(apply_start_at)s::date ELSE COALESCE(apply_start_at, %(apply_start_at)s::date) END,
+  apply_end_at    = CASE WHEN schedule_source = 'attachment' AND %(apply_end_at)s::date IS NOT NULL
+                         THEN %(apply_end_at)s::date ELSE COALESCE(apply_end_at, %(apply_end_at)s::date) END,
+  announce_at     = CASE WHEN schedule_source = 'attachment' AND %(announce_at)s::date IS NOT NULL
+                         THEN %(announce_at)s::date ELSE COALESCE(announce_at, %(announce_at)s::date) END,
+  -- 접수 시각은 첨부 흐름도에만 있다(API는 날짜까지만) — 읽었으면 그대로 넣는다
+  apply_start_tm  = COALESCE(%(apply_start_tm)s::time, apply_start_tm),
+  apply_end_tm    = COALESCE(%(apply_end_tm)s::time, apply_end_tm),
   min_deposit     = COALESCE(%(min_deposit)s, min_deposit),
   max_deposit     = COALESCE(%(max_deposit)s, max_deposit),
   min_rent        = COALESCE(%(min_rent)s, min_rent),
@@ -139,13 +142,13 @@ UPDATE notice SET
   schedule_source = CASE
     WHEN schedule_source IS NOT NULL THEN schedule_source
     WHEN apply_start_at IS NOT NULL OR apply_end_at IS NOT NULL THEN 'api'
-    WHEN %(apply_start_at)s IS NOT NULL OR %(apply_end_at)s IS NOT NULL THEN 'attachment'
+    WHEN %(apply_start_at)s::date IS NOT NULL OR %(apply_end_at)s::date IS NOT NULL THEN 'attachment'
     ELSE NULL END,
   updated_at = now()
 WHERE id = %(id)s
 """
 
-FACT_KEYS = ("apply_start_at", "apply_end_at", "announce_at", "schedule_steps",
+FACT_KEYS = ("apply_start_at", "apply_end_at", "apply_start_tm", "apply_end_tm", "announce_at", "schedule_steps",
              "min_deposit", "max_deposit", "min_rent", "max_rent", "supply_count")
 
 
