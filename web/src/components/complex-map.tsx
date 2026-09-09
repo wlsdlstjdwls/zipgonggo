@@ -118,18 +118,22 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
     for (const [id, { marker }] of markers.current) {
       if (!live.has(id)) { marker.setMap(null); markers.current.delete(id); changed += 1; }
     }
-    // 핀 전부를 담는 확대·중심 계산 — 컨테이너 실제 크기에 좌우된다(모바일 주소창이 접히며 높이가
-    // 나중에 바뀌면 다시 불러야 한다. 안 그러면 접히기 전의 좁은 높이 기준 확대가 그대로 남는다 —
-    // "로딩 끝나면 계속 더 축소돼 보인다"는 지적의 원인, 2026-09-09)
+    // 핀 전부를 담는 확대·중심 계산 — 컨테이너 실제 크기에 좌우된다. map.getSize()는 지도 생성 시점에
+    // SDK 내부에 캐시된 값이라 그 뒤 레이아웃이 자리 잡아도 그대로 낡아 있을 수 있다 — DOM에서 직접 잰다
+    // (모바일 주소창이 접히며 높이가 나중에 바뀌는 경우도 포함. "로딩 끝나면 계속 더 축소돼 보인다"는
+    // 지적의 원인, 2026-09-09)
     const fit = () => {
-      const s = map.getSize();
       const all = [...markers.current.values()];
       if (all.length === 0) return;
       if (all.length === 1) { map.setCenter(all[0].pos); map.setZoom(SINGLE_ZOOM); return; }
-      if (s.width <= 0 || s.height <= 0) return;
+      const box = el.current?.getBoundingClientRect();
+      const w = box?.width ?? 0;
+      const h = box?.height ?? 0;
+      if (w <= 0 || h <= 0) return;
+      maps.Event.trigger(map, "resize");
       const b = new maps.LatLngBounds();
       all.forEach(({ pos }) => b.extend(pos));
-      map.fitBounds(b, inset(s.width, s.height));
+      map.fitBounds(b, inset(w, h));
       // 단지들이 아주 가까이 모여 있으면 fitBounds가 「위치」 지도보다 더 확대해버린다 — 그 이상은 자른다
       if (map.getZoom() > NAVER_MAP_DEFAULT_ZOOM) map.setZoom(NAVER_MAP_DEFAULT_ZOOM);
     };
