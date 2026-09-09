@@ -988,13 +988,17 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-form { display: flex; flex-direction: column; gap: 18px; align-self: start; position: sticky; top: 76px; }
 .elig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .elig-f { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+/* 혼인 상태처럼 선택지가 3개로 늘면 반 칸(1fr)에선 글자가 눌린다 — 그 줄만 폭 전체를 쓴다 */
+.elig-f.wide { grid-column: 1 / -1; }
 .elig-f > span:first-child { font-weight: 800; font-size: 11px; color: var(--dim); }
 .elig-in { display: flex; align-items: center; gap: 6px; height: 38px; padding-right: 11px; border: 1px solid var(--line2); border-radius: var(--r-btn); background: var(--bg); }
 .elig-in input { flex: 1; min-width: 0; width: 100%; height: 100%; padding: 0 0 0 11px; border: 0; background: none; font: inherit; font-variant-numeric: tabular-nums; }
 .elig-in input:focus { outline: none; }
 .elig-in:focus-within { border-color: var(--acc); }
 .elig-in em { flex: none; font-style: normal; font-weight: 700; font-size: 11px; color: var(--dim); }
-.elig-sel { height: 38px; padding: 0 8px; border: 1px solid var(--line2); border-radius: var(--r-btn); background: var(--bg); font: inherit; }
+/* 거주지는 톤앤매너를 맞춘 공용 Select(components/select.tsx)를 쓴다 — OS 기본 드롭다운이 아니다.
+   기본은 내용 폭만 차지해(inline-flex) 좁은 폼 칸 안에서 오그라들어 보였다(사용자 지적 2026-09-09) */
+.elig-f .selw, .elig-f .sel { width: 100%; }
 .elig-seg { display: flex; gap: 6px; }
 .elig-seg button { flex: 1; height: 38px; border: 1px solid var(--line2); border-radius: var(--r-btn); background: var(--bg); font-weight: 800; font-size: 13px; color: var(--mut); cursor: pointer; transition: all var(--duration-fast) var(--ease); }
 .elig-seg button.on { border-color: var(--ink); background: var(--ink); color: #fff; }
@@ -1016,13 +1020,20 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-out h2 small { font-weight: 700; font-size: 11px; color: var(--dim); }
 .elig-none { margin: 0; padding: 18px; border: 1px dashed var(--line2); border-radius: var(--r-card); font-size: 13px; color: var(--mut); }
 
-.elig-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+/* 좁은 목록보다 2열이 한눈에 더 잘 들어온다는 지적(2026-09-09) — 카드 폭이 좁아지면 자동으로 1열로 접는다 */
+.elig-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .elig-card { padding: 13px 15px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
 .elig-card.ok { border-color: rgba(21, 128, 61, 0.3); background: #fbfefc; }
 .elig-card-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .elig-card-h b { font-weight: 900; font-size: 14px; letter-spacing: -0.02em; }
 .elig-card-h span { font-weight: 700; font-size: 13px; color: var(--mut); }
-.elig-card-h em { margin-left: auto; font-style: normal; font-weight: 700; font-size: 11px; color: var(--dim); }
+/* 카드 색만으로는 통과·미달이 잘 안 읽힌다는 지적(2026-09-09) — 말로도 못 박는다 */
+.elig-card-r { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.elig-badge { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px;
+  font-style: normal; font-weight: 800; font-size: 11px; letter-spacing: -0.01em; white-space: nowrap;
+  background: var(--sub); color: var(--mut); }
+.elig-badge.ok { background: #e7f6ec; color: var(--ok); }
+.elig-card-r small { font-style: normal; font-weight: 700; font-size: 11px; color: var(--dim); white-space: nowrap; }
 
 .elig-why { display: grid; gap: 3px; margin: 9px 0 0; padding: 0; list-style: none; }
 .elig-why li { display: flex; gap: 9px; align-items: baseline; }

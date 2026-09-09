@@ -4,7 +4,8 @@
 // 그래서 통과/미달을 이유까지 다 적어 돌려준다 — "왜 안 되는지"를 보여야 사용자가 다음 수를 둘 수 있다.
 import type { EligibilityRules, IncomeStandard, RegionTier, SupplyType } from "@/types/eligibility";
 
-export type Marital = "미혼" | "기혼";
+/** 예비신혼부부(혼인신고 예정)는 미혼도 기혼도 아닌 별도 상태다 — 신혼부부 유형 상당수가 이 상태를 받아 준다 */
+export type Marital = "미혼" | "예비신혼부부" | "기혼";
 
 export type Profile = {
   age: number;
@@ -91,10 +92,15 @@ function checkMarital(t: SupplyType, p: Profile): Check | null {
   if (t.marital === "미혼") {
     return { label: "혼인", ok: p.marital === "미혼", detail: "미혼만 신청할 수 있다" };
   }
-  // 혼인 유형 — 한부모/예비신혼도 받아 주는 유형이라 계층 선택으로 갈음할 수 있다
+  // 혼인 유형 — 예비신혼부부(혼인신고 예정)·한부모·신생아 가구도 받아 주는 유형이라
+  // 실제 혼인 여부와 별개로 신청 자격을 준다
+  const engaged = p.marital === "예비신혼부부";
   const byClass = has(["한부모", "신생아"], p.classes);
-  if (p.marital !== "기혼" && !byClass) {
-    return { label: "혼인", ok: false, detail: "혼인가구(예비신혼과 한부모 포함)만 신청할 수 있다" };
+  if (p.marital !== "기혼" && !engaged && !byClass) {
+    return { label: "혼인", ok: false, detail: "혼인가구(예비신혼부부와 한부모 포함)만 신청할 수 있다" };
+  }
+  if (engaged) {
+    return { label: "혼인", ok: true, detail: "예비신혼부부(혼인신고 예정)로 신청할 수 있다" };
   }
   if (!t.marital_max_yr) return { label: "혼인", ok: true, detail: "혼인기간 제한 없음" };
   if (t.newborn_exempt && p.hasNewborn) {

@@ -6,6 +6,7 @@
 import { useMemo, useState } from "react";
 import { classOptions, diagnoseAll, HOUSEHOLD_MAX, type Marital, type Profile, type Verdict } from "@/lib/eligibility";
 import type { EligibilityRules } from "@/types/eligibility";
+import { Select } from "./select";
 
 const MAN = 10_000;
 
@@ -31,6 +32,12 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
   const classes = useMemo(() => classOptions(rules.types), [rules.types]);
   const regions = useMemo(() => rules.tiers.filter((t) => t.tier === "서울").map((t) => t.name), [rules.tiers]);
   const nearby = useMemo(() => rules.tiers.filter((t) => t.tier === "연접").map((t) => t.name), [rules.tiers]);
+  // 서울 구 → 연접지역(표시로 구분) → 그 외 지역 순. Select는 그룹 없는 단일 목록이라 이름에 표를 붙인다
+  const residenceOptions = useMemo(() => [
+    ...regions.map((r) => ({ value: r, label: r })),
+    ...nearby.map((r) => ({ value: r, label: `${r} (연접지역)` })),
+    { value: "그 외 지역", label: "그 외 지역" },
+  ], [regions, nearby]);
 
   const verdicts = useMemo(() => diagnoseAll(p, rules), [p, rules]);
   const pass = verdicts.filter((v) => v.ok);
@@ -44,10 +51,11 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
       <form className="elig-form" onSubmit={(e) => e.preventDefault()} aria-label="내 조건 입력">
         <div className="elig-grid">
           <Num label="나이" value={p.age} unit="세" onChange={(v) => set("age", v)} max={120} />
-          <div className="elig-f">
+          <div className="elig-f wide">
             <span>혼인 상태</span>
+            {/* 혼인신고 전인 예비신혼부부도 신혼부부 유형 상당수가 받아 준다 — 미혼/기혼 둘로는 못 담는 상태다 */}
             <div className="elig-seg" role="group" aria-label="혼인 상태">
-              {(["미혼", "기혼"] as Marital[]).map((m) => (
+              {(["미혼", "예비신혼부부", "기혼"] as Marital[]).map((m) => (
                 <button key={m} type="button" className={p.marital === m ? "on" : ""} onClick={() => set("marital", m)}>
                   {m}
                 </button>
@@ -64,16 +72,13 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
           <Num label="자동차가액" value={p.carMan} unit="만 원" onChange={(v) => set("carMan", v)} max={100_000} />
           <div className="elig-f">
             <span>거주지</span>
-            <select className="elig-sel" value={p.residence} onChange={(e) => set("residence", e.target.value)} aria-label="거주지">
-              <option value="">선택 안 함</option>
-              <optgroup label="서울">
-                {regions.map((r) => <option key={r} value={r}>{r}</option>)}
-              </optgroup>
-              <optgroup label="연접지역">
-                {nearby.map((r) => <option key={r} value={r}>{r}</option>)}
-              </optgroup>
-              <option value="그 외 지역">그 외 지역</option>
-            </select>
+            <Select
+              value={p.residence}
+              options={residenceOptions}
+              onChange={(v) => set("residence", v)}
+              placeholder="선택 안 함"
+              ariaLabel="거주지"
+            />
           </div>
         </div>
 
@@ -131,7 +136,11 @@ function Card({ v }: { v: Verdict }) {
       <div className="elig-card-h">
         <b>{t.category}</b>
         <span>{t.name}</span>
-        {t.ranking_method && <em>{t.ranking_method}</em>}
+        {/* 카드 색만으로는 통과·미달이 잘 안 읽힌다는 지적(2026-09-09) — 말로도 못 박는다 */}
+        <span className="elig-card-r">
+          <em className={`elig-badge${v.ok ? " ok" : ""}`}>{v.ok ? "신청 가능" : "신청불가"}</em>
+          {t.ranking_method && <small>{t.ranking_method}</small>}
+        </span>
       </div>
       <ul className="elig-why">
         {(v.ok ? v.checks : failed).map((c) => (

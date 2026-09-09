@@ -222,7 +222,7 @@ export default async function ComplexPage({ params }: Params) {
 
             {/* 주차·관리비는 SH 공고문 첨부에 없는 값이다 — 없다고 하지 않고 어디서 확인하는지 말한다 */}
             <p className="note">주차장과 관리비, 주차 요금은 공고문 첨부에 실리지 않아 아직 싣지 못합니다. 계약 전에 관리사무소나 {L.originalDoc}에서 확인하세요.</p>
-            {units.length > 0 && <p className="note" style={{ marginTop: 4 }}>호실별 층·구조·승강기·금액은 아래 「{unitLabel}」에 있습니다.</p>}
+            {units.length > 0 && <p className="note" style={{ marginTop: 4 }}>호실별 층, 구조, 승강기, 금액은 아래 「{unitLabel}」에 있습니다.</p>}
           </section>
 
           {/* 보증금과 임대료는 공급현황 아래 — 어떤 유형이 있는지 먼저 보고 그 금액을 읽는 순서다(사용자 요청 2026-09-09) */}
