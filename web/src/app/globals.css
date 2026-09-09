@@ -896,6 +896,11 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .pending b { display: block; font-weight: 800; font-size: 13px; letter-spacing: -0.02em; color: var(--ink); }
 .pending p { margin: 3px 0 0; font-weight: 600; font-size: 12px; line-height: 1.65; color: var(--dim); }
 .pending .btn { flex: none; }
+/* 좁은 화면: 아이콘+글 옆에 버튼까지 한 줄로 밀어넣으면 글이 한 글자씩 꺾인다(실측 2026-09-09) — 버튼만 아래 줄로 */
+@container (max-width: 480px) {
+  .pending { flex-wrap: wrap; row-gap: 10px; }
+  .pending .btn { flex: 1 1 100%; width: 100%; }
+}
 
 /* ── 계산기 (상호전환·대출이자) ──────────────────────────
    여는 버튼은 헤더(.nav-btn)로 올라갔다 — 여기는 그 버튼 밑에 떨어지는 패널만(사용자 요청 2026-09-09). */

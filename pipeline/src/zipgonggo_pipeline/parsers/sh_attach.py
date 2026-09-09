@@ -25,6 +25,7 @@ from .sh_complex import parse_location_table
 from .sh_schedule import Schedule, parse_schedule
 from .sh_supply import SupplySummary, parse_supply
 from .sh_jeonse_supply import JeonseLine, parse_jeonse_supply
+from .sh_jaegaebal_supply import parse_jaegaebal_supply
 from .sh_supply_lines import SupplyLine, parse_supply_lines
 from .sh_units import UnitRow, group_units, parse_unit_pages
 
@@ -168,6 +169,13 @@ def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = Non
             facts.jeonse_lines = parse_jeonse_supply(pages, [r.name for r in rows])
         except Exception as exc:  # noqa: BLE001
             log.warning("jeonse supply parse failed: %s", exc)
+        # 재개발임대주택 「공급대상 현황 및 금액」 표 — 장기전세와 같은 「주택 위치 안내」 표를 쓰지만
+        # 공급현황은 딴 표라 별도 파서다(310041, 2026-09-09). 위 jeonse 파서가 이미 채웠으면 건드리지 않는다
+        if not facts.jeonse_lines:
+            try:
+                facts.supply_lines = parse_jaegaebal_supply(pages, [r.name for r in rows])
+            except Exception as exc:  # noqa: BLE001
+                log.warning("jaegaebal supply parse failed: %s", exc)
     else:
         addrs = parse_addr_table(pages)
         if addrs:
@@ -216,12 +224,16 @@ def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = Non
         facts.supply = parse_supply(pages)
     except Exception as exc:  # noqa: BLE001
         log.warning("supply parse failed: %s", exc)
+    if not facts.totals:
+        # 「공급현황」 줄이 있으면 표 요약(parse_supply)보다 그쪽이 정확하다(addr_table과 같은 우선순위)
+        facts.totals = totals_from_supply_lines(facts.supply_lines)
     if facts.supply and not facts.totals:
         facts.totals = {"min_deposit": facts.supply.min_deposit, "max_deposit": facts.supply.max_deposit,
                         "supply_count": facts.supply.unit_total or None}
     if facts.kind in ("location_table", "addr_table"):
         # 신규공급 단지는 면적별 줄이 더 정확하다. 나머지는 공고 단위 요약으로 채운다
         merged = merge_jeonse_lines_into_complexes(facts.complexes, facts.jeonse_lines)
+        merged += merge_supply_lines_into_complexes(facts.complexes, facts.supply_lines)
         merged += merge_supply_into_complexes(
             [r for r in facts.complexes if r.get("unit_count") is None], facts.supply)
         if merged:
