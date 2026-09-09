@@ -392,7 +392,7 @@ CREATE TABLE notice_complex (
   sido          text    NOT NULL,                  -- 소재지에서 도출. 기본 서울특별시, 의정부 등 시외 단지는 경기도
   sigungu       text    NOT NULL,                  -- 자치구·시. 소재지 첫 토큰
   road_address  text    NOT NULL,                  -- 시군구부터 시작하는 도로명주소. 시외면 시도 포함
-  zone          text,                              -- 지구명(세곡지구·마곡지구). 병합셀이라 아직 안 채움
+  zone          text,                              -- 지구명(세곡지구·마곡지구). 세로 병합 칸을 좌표로 복원해 채운다(sh_complex.py)
   is_new        boolean NOT NULL DEFAULT false,    -- 금회 신규공급 ([신규])
   source_page   integer,                           -- 첨부 공고문 쪽번호. 검수용
   created_at    timestamptz NOT NULL DEFAULT now(),

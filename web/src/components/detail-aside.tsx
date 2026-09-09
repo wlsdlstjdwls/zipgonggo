@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 type SpecRow = { label: string; value: ReactNode };
 
 type Props = {
-  tone: "hot" | "warn" | "soft" | "acc";
+  tone: "hot" | "warn" | "soft" | "acc" | "soon";
   ddayLabel: string;
   ddayNum: string;
   ddayNote: string;

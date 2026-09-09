@@ -107,7 +107,8 @@ export type NoticeComplex = {
   area_max: number | null;
 };
 
-export type NoticeFilters = { sido?: string; type?: string; sector?: Sector; sort?: NoticeSort; closing?: NoticeClosing };
+// closed: 마감 공고 포함 여부. 기본(undefined)은 감춘다 — 백필로 2004년치까지 들어와 목록이 마감으로 덮인다(사용자 요청 2026-09-09)
+export type NoticeFilters = { sido?: string; type?: string; sector?: Sector; sort?: NoticeSort; closing?: NoticeClosing; closed?: boolean };
 
 /** 홈 KPI 스트립. 전부 서비스 전체 집계(필터 무관) */
 export type HomeStats = { total: number; seoul: number; closing7: number; medianRent: number | null };

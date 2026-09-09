@@ -18,6 +18,7 @@ export function parseNoticeFilters(get: (key: string) => string | string[] | nul
     type: firstParam(get("type")),
     sort: firstParam(get("sort")) === "deadline" ? "deadline" : DEFAULT_SORT,
     closing: firstParam(get("closing")) === "7d" ? "7d" : undefined,
+    closed: firstParam(get("closed")) === "1" || undefined,
   };
 }
 
@@ -29,11 +30,12 @@ export function noticeFiltersToParams(f: NoticeFilters): URLSearchParams {
   if (f.type) u.set("type", f.type);
   if (f.sort && f.sort !== DEFAULT_SORT) u.set("sort", f.sort);
   if (f.closing) u.set("closing", f.closing);
+  if (f.closed) u.set("closed", "1");
   return u;
 }
 
 export function hasFilter(f: NoticeFilters): boolean {
-  return Boolean(f.sector || f.sido || f.type || f.closing || (f.sort && f.sort !== DEFAULT_SORT));
+  return Boolean(f.sector || f.sido || f.type || f.closing || f.closed || (f.sort && f.sort !== DEFAULT_SORT));
 }
 
 /** /api/notices 용 쿼리. */

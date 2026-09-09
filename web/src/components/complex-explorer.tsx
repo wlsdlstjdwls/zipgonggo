@@ -169,6 +169,16 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug }: Props) {
             zoom={SEOUL_ZOOM}
             ariaLabel="공급 단지 위치 지도"
           />
+          {phase === "loading" && (
+            /* 지도 위 진행 오버레이 — 상태 문구만으로는 몇 곳이 남았는지 안 보인다(사용자 요청 2026-09-09) */
+            <div className="cx-load" role="status" aria-live="polite">
+              <p className="cx-load-n"><b>{progress}</b><span>/ {items.length}</span></p>
+              <p className="cx-load-t">주소를 좌표로 바꾸는 중</p>
+              <div className="cx-load-bar" role="progressbar" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={progress}>
+                <i style={{ transform: `scaleX(${items.length ? progress / items.length : 0})` }} />
+              </div>
+            </div>
+          )}
           {phase === "failed" && <p className="map-note">주소를 찾지 못해 핀을 표시하지 못했습니다.</p>}
           {picked && (
             <div className="cx-card">

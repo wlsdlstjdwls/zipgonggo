@@ -131,7 +131,7 @@ def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = Non
     if rows:
         facts = AttachmentFacts("location_table", [
             {"name": r.name, "sido": r.sido, "sigungu": r.sigungu, "road_address": r.road_address,
-             "is_new": r.is_new, "source_page": r.page, "complex_code": None, "heating": None,
+             "is_new": r.is_new, "source_page": r.page, "complex_code": None, "heating": None, "zone": r.district,
              "unit_count": None, "min_deposit": None, "min_rent": None, "area_min": None, "area_max": None}
             for r in rows
         ])

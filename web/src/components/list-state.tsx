@@ -41,7 +41,7 @@ function sidoFromPath(pathname: string): string | undefined {
   return m ? decodeURIComponent(m[1]) : undefined;
 }
 
-const QUERY_KEYS = ["sector", "type", "closing", "sort"] as const;
+const QUERY_KEYS = ["sector", "type", "closing", "sort", "closed"] as const;
 
 export function ListStateProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -68,6 +68,7 @@ export function ListStateProvider({ children }: { children: React.ReactNode }) {
         type: q.get("type") || undefined,
         closing: q.get("closing") === "7d" ? ("7d" as NoticeClosing) : undefined,
         sort: q.get("sort") === "deadline" ? ("deadline" as NoticeSort) : undefined,
+        closed: q.get("closed") === "1" || undefined,
         sido: pathSido ?? saved.sido,
       });
       // 주소창만 정리한다 — 라우팅이 아니라 history 치환이라 다시 렌더하지 않는다

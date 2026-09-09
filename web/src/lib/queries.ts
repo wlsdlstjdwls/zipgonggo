@@ -30,11 +30,16 @@ function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
     where.push(`housing_type::text = $${params.length}`);
   }
   if (f.closing === "7d") where.push(CLOSING_7D);
+  if (!f.closed) where.push(NOT_CLOSED);
   return where;
 }
 
 // 마감 7일 내: 오늘 포함 7일 안에 접수 마감. KPI·칩 카운트·목록 필터가 같은 식을 쓴다
 const CLOSING_7D = `apply_end_at >= CURRENT_DATE AND apply_end_at < CURRENT_DATE + 7`;
+
+// 마감: 상태가 접수마감이거나 마감일이 지났다. 기본 목록에서 감추고 「마감 포함」 칩으로만 꺼낸다.
+// URL은 남는다(CLAUDE.md 하지 말 것 6) — 목록에서 감출 뿐 상세는 그대로 열린다.
+const NOT_CLOSED = `NOT (status = '접수마감' OR (apply_end_at IS NOT NULL AND apply_end_at < CURRENT_DATE))`;
 
 function whereSql(where: string[]): string {
   return where.length ? "WHERE " + where.join(" AND ") : "";
@@ -125,7 +130,7 @@ async function listNoticesPageRaw(f: NoticeFilters, cursor: string | null, limit
 /** 목록 1페이지. cursor는 이전 페이지의 nextCursor. */
 export const listNoticesPage = unstable_cache(
   (f: NoticeFilters, cursor: string | null = null, limit: number = PAGE_SIZE) => listNoticesPageRaw(f, cursor, limit),
-  ["notice-page-v3"],
+  ["notice-page-v4"],
   CACHE_OPTS,
 );
 
@@ -136,7 +141,7 @@ export const listFilterOptions = cache(unstable_cache(
     const params: unknown[] = [];
     const where = whereSql(buildWhere({ sector }, params));
     const rows = await query<{ kind: string; value: string; count: number }>(
-      `SELECT 'sector' AS kind, sector::text AS value, count(*)::int AS count FROM notice GROUP BY 2
+      `SELECT 'sector' AS kind, sector::text AS value, count(*)::int AS count FROM notice WHERE ${NOT_CLOSED} GROUP BY 2
        UNION ALL
        SELECT 'sido', sido, count(*)::int FROM notice ${where} GROUP BY 2
        UNION ALL
@@ -147,11 +152,12 @@ export const listFilterOptions = cache(unstable_cache(
     const pick = (k: string) => rows.filter((r) => r.kind === k).map(({ value, count }) => ({ value, count }));
     return { sector: pick("sector").sort((a, b) => a.value.localeCompare(b.value, "ko")), sido: pick("sido"), type: pick("type") };
   },
-  ["notice-filter-options-v2"],
+  ["notice-filter-options-v3"],
   CACHE_OPTS,
 ));
 
-/** 홈 KPI. 전체·서울·7일 내 마감·중위 월임대료(금액 있는 공고 기준). 필터와 무관한 서비스 전체 집계 */
+/** 홈 KPI. 전체·서울·7일 내 마감·중위 월임대료(금액 있는 공고 기준).
+ * 필터와 무관하지만 **마감은 뺀다** — 목록이 기본으로 마감을 감추는데 KPI만 266건이라고 하면 숫자가 어긋난다(2026-09-09). */
 export const getHomeStats = unstable_cache(
   async (): Promise<HomeStats> => {
     const rows = await query<{ total: number; seoul: number; closing7: number; median_rent: number | null }>(
@@ -159,13 +165,13 @@ export const getHomeStats = unstable_cache(
               count(*) FILTER (WHERE sido = $1)::int AS seoul,
               count(*) FILTER (WHERE ${CLOSING_7D})::int AS closing7,
               percentile_cont(0.5) WITHIN GROUP (ORDER BY min_rent)::bigint AS median_rent
-       FROM notice`,
+       FROM notice WHERE ${NOT_CLOSED}`,
       [SH_SIDO],
     );
     const r = rows[0];
     return { total: r?.total ?? 0, seoul: r?.seoul ?? 0, closing7: r?.closing7 ?? 0, medianRent: r?.median_rent ?? null };
   },
-  ["notice-home-stats"],
+  ["notice-home-stats-v2"],
   CACHE_OPTS,
 );
 

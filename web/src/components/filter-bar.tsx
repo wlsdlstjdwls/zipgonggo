@@ -23,6 +23,11 @@ export function FilterBar({ options, closing7, sticky }: Props) {
         마감 7일 내 <small>{closing7}</small>
       </button>
 
+      {/* 마감 공고는 기본으로 감춘다(사용자 요청 2026-09-09). URL은 살아 있고 목록에서만 빠진다 */}
+      <button type="button" className={`chip-f${f.closed ? " on" : ""}`} aria-pressed={Boolean(f.closed)} onClick={() => set({ closed: f.closed ? undefined : true })}>
+        마감 포함
+      </button>
+
       <Select
         value={f.type ?? ""}
         options={options.type.map((o) => ({ value: o.value, label: o.value, count: o.count }))}

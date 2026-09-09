@@ -16,6 +16,8 @@
   --hot-soft: #fdeeeb;
   --warn: #a35c06;       /* D-5~7 */
   --warn-soft: #fff5e6;
+  --soon: #0f766e;       /* 아직 안 열린 접수 — 접수 시작 D-day (AA 5.1:1 on soon-soft) */
+  --soon-soft: #e4f6f3;
   --ok: #15803d;
 
   /* 옛 이름 재매핑 — complex-explorer·표·노트가 그대로 새 스킨을 입는다 */
@@ -208,6 +210,7 @@ small { font-size: 12px; }
 .tag.warn { background: var(--warn-soft); color: var(--warn); }
 .tag.acc, .tag.type { background: var(--acc-soft); color: var(--acc); }
 .tag.soft { background: var(--sub); color: var(--mut); }
+.tag.soon { background: var(--soon-soft); color: var(--soon); }
 .chip { display: inline-block; padding: 3px 9px; border-radius: 999px; background: var(--sub); color: var(--dim); font-size: 11px; font-weight: 700; line-height: 16px; white-space: nowrap; }
 .chip.new, .chip.amend { background: var(--acc-soft); color: var(--acc); }
 
@@ -220,6 +223,7 @@ small { font-size: 12px; }
 .kpi b { font-weight: 900; font-size: 32px; line-height: 1; letter-spacing: -0.055em; color: var(--ink); }
 .kpi b.hot { color: var(--hot); }
 .kpi b.acc { color: var(--acc); }
+.kpi b.soon { color: var(--soon); }
 .kpi .u { font-weight: 700; font-size: 11.5px; color: var(--dim); }
 
 /* ── 필터 행 ─────────────────────────────────────────────── */
@@ -284,6 +288,8 @@ small { font-size: 12px; }
 .row-dday.warn, .tone-warn { background: var(--warn-soft); color: var(--warn); }
 .row-dday.acc, .tone-acc { background: var(--acc-soft); color: var(--acc); }
 .row-dday.soft, .tone-soft { background: var(--sub); color: var(--mut); }
+/* 접수 시작 대기 — 접수 중(acc, 파랑)과 눈에 띄게 갈라 놓는다(사용자 요청 2026-09-09) */
+.row-dday.soon, .tone-soon { background: var(--soon-soft); color: var(--soon); }
 .row-body { min-width: 0; }
 .row-meta { display: block; font-weight: 700; font-size: 11px; letter-spacing: 0.02em; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 접수 중·오늘 시작 표식 — 마감 D-day만으론 "지금 넣을 수 있다"가 안 보인다(사용자 요청 2026-09-09) */
@@ -292,6 +298,7 @@ small { font-size: 12px; }
 .row-meta .live.hot { background: var(--hot-soft); color: var(--hot); }
 .row-meta .live.warn { background: var(--warn-soft); color: var(--warn); }
 .row-meta .live.soft { background: var(--sub); color: var(--mut); }
+.row-meta .live.soon { background: var(--soon-soft); color: var(--soon); }
 .row-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-top: 5px; font-weight: 800; font-size: 16px; line-height: 1.35; letter-spacing: -0.03em; color: var(--ink); overflow: hidden; }
 .row-dates { display: block; margin-top: 8px; font-weight: 600; font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row-money { display: block; text-align: right; }
@@ -377,6 +384,7 @@ small { font-size: 12px; }
 .d-when .when.hot { background: var(--hot-soft); color: var(--hot); }
 .d-when .when.warn { background: var(--warn-soft); color: var(--warn); }
 .d-when .when.soft { background: var(--sub); color: var(--mut); }
+.d-when .when.soon { background: var(--soon-soft); color: var(--soon); }
 .dcard-x { display: block; margin-top: 10px; font-style: normal; font-weight: 800; font-size: 12px; opacity: 0.9; }
 /* 필터를 바꿔 목록을 갈아끼우는 동안 — 기존 목록을 지우지 않고 살짝 물린다(라우팅 깜빡임 대신) */
 .ex-list { transition: opacity 180ms var(--ease); }
@@ -502,6 +510,23 @@ small { font-size: 12px; }
 .cx-card-x { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: 8px; background: none; color: var(--dim); font-size: 11px; cursor: pointer; transition: background 200ms var(--ease), color 200ms var(--ease); }
 .cx-card-x:hover { background: var(--sub); color: var(--ink); }
+/* 지도 위 지오코딩 진행 오버레이. 카운트가 올라가는 걸 눈으로 보게 한다(사용자 요청 2026-09-09) */
+.cx-load { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: color-mix(in srgb, var(--bg) 76%, transparent); backdrop-filter: blur(2px); animation: cx-load-in 260ms var(--sp) both; }
+.cx-load-n { margin: 0; display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.cx-load-n b { font-size: 30px; font-weight: 900; letter-spacing: -0.03em; color: var(--ink); }
+.cx-load-n span { font-size: 14px; font-weight: 700; color: var(--dim); }
+.cx-load-t { margin: 0; font-size: 12px; font-weight: 700; color: var(--mut); }
+.cx-load-bar { position: relative; width: min(220px, 60%); height: 5px; border-radius: 999px; background: var(--sub); overflow: hidden; }
+/* 결정형 막대 위에 흐르는 광택 — 좌표 응답이 뜸해도 멈춰 보이지 않는다 */
+.cx-load-bar::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--acc) 22%, transparent), transparent); animation: cx-load-sweep 1.25s linear infinite; }
+.cx-load-bar i { display: block; height: 100%; border-radius: 999px; background: var(--acc); transform-origin: left center; transform: scaleX(0); transition: transform 360ms var(--sp); }
+@keyframes cx-load-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cx-load-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .cx-load { animation: none; }
+  .cx-load-bar::after { animation: none; }
+  .cx-load-bar i { transition: none; }
+}
 .cx-status { margin: 6px 0 0; font-size: 11.5px; font-weight: 600; color: var(--dim); }
 .cx-nopin { font-size: 11px; color: var(--dim); }
 

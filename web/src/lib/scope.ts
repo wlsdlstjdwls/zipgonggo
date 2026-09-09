@@ -26,6 +26,7 @@ export function readScope(): Scope {
       type: str(p.type),
       closing: p.closing === "7d" ? ("7d" as NoticeClosing) : undefined,
       sort: p.sort === "deadline" ? ("deadline" as NoticeSort) : undefined,
+      closed: p.closed === true || undefined,
     };
   } catch {
     return {};
