@@ -182,8 +182,9 @@ export default async function ComplexPage({ params }: Params) {
               <Spec label="구조" value={layouts.length ? layouts.join(" | ") : null} />
               <Spec label="승강기" value={elevators.length ? elevators.join(" | ") : null} />
               <Spec label="난방" value={c.heating} />
-              {hasReserve && <Spec label="현재 공가" value={`${num(vacantTotal, "호")}`} />}
-              {hasReserve && <Spec label="예비자 모집" value={`${num(reserveTotal, "호")}`} />}
+              {/* 공가는 우선·일반 배분이 적힌 공고에만 있다. 재공급 표에 모집호수만 있는 공고에서 「공가 0호」를 쓰면 거짓말이 된다 */}
+              {hasReserve && vacantTotal > 0 && <Spec label="현재 공가" value={`${num(vacantTotal, "호")}`} />}
+              {hasReserve && reserveTotal > 0 && <Spec label="예비자 모집" value={`${num(reserveTotal, "호")}`} />}
               <Spec label="계약금" value={downPayment != null ? wonKo(downPayment) : null} />
               <Spec label="잔금" value={balance != null ? wonKo(balance) : null} />
               <Spec label="입주 시작" value={moveIn} />

@@ -94,18 +94,25 @@ def _supply_row(l) -> dict:
 
 
 def _jeonse_row(l) -> dict:
-    """JeonseLine → notice_supply 컬럼. 장기전세에는 계층 열이 없어 공급대상은 「일반공급」 한 가지다."""
+    """JeonseLine → notice_supply 컬럼. 장기전세에는 계층 열이 없어 공급대상은 「일반공급」 한 가지다.
+
+    재공급 표에는 「유형」 열(일반·주거약자)이 있다. 계층이 아니라 주택의 성격이라 tenant_class가 아니라
+    accessible로 접고, 유형 코드에는 행복주택 양식과 같은 S를 붙인다("59"·"59S") —
+    안 붙이면 같은 면적의 일반/주거약자 두 줄이 (공고, 단지, 유형, 계층) 유일키에서 겹쳐 한 줄이 사라진다.
+    """
+    accessible = bool(l.kind and "주거약자" in l.kind.replace(" ", ""))
     return {
         "complex_name": l.complex_name,
-        "supply_type": l.area_type,
-        "accessible": False,
+        "supply_type": f"{l.area_type}S" if accessible else l.area_type,
+        "accessible": accessible,
         "tenant_class": "일반공급",
         "income_option": None,
         "is_new": l.is_new,
         "units_total": l.units_total,
         "units_priority": l.units_priority,
         "units_general": l.units_general,
-        "units_reserve": None,
+        # 재공급은 전원 예비입주자 모집이다("재공급단지는 모두 예비입주자로 모집합니다", 공고문 15·17쪽)
+        "units_reserve": None if l.is_new else l.units_total,
         "deposit": l.deposit,
         "down_payment": l.down_payment,
         "balance": l.balance,

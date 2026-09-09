@@ -13,6 +13,7 @@ from zipgonggo_pipeline.parsers.sh_jeonse_supply import parse_jeonse_supply
 
 FIX = Path(__file__).parent / "fixtures" / "ish_309467"
 SUPPLY = [(13, (FIX / "p13.xml").read_text(encoding="utf-8"))]
+RESUPPLY = [(n, (FIX / f"p{n}.xml").read_text(encoding="utf-8")) for n in (17, 18)]
 LOC = [(n, (FIX / f"p{n}.xml").read_text(encoding="utf-8")) for n in (49, 50, 51, 52)]
 
 
@@ -51,3 +52,35 @@ def test_resupply_table_is_skipped():
     """재공급 표(15~19쪽)는 단지명이 지구 단위로 묶여 있어 읽지 않는다 — 틀린 호수를 붙이느니 비워 둔다."""
     pages = [(n, (FIX / f"p{n}.xml").read_text(encoding="utf-8")) for n in (15, 16, 17, 18, 19)]
     assert parse_jeonse_supply(pages, []) == []
+
+
+# ── 재공급 표 (2026-09-09) ───────────────────────────────────
+# 매입형 재공급(18쪽)은 한 줄이 한 단지라 읽는다. 같은 양식으로 보이지만 열이 어긋나 읽히는 17쪽 윗부분
+# (공사 건설형, 단지명이 지구 단위)은 _plausible 검문에서 전부 걸러져야 한다.
+
+
+@pytest.fixture(scope="module")
+def relines():
+    names = [r.name for r in parse_location_table(LOC)]
+    return parse_jeonse_supply(RESUPPLY, names)
+
+
+def test_maeip_resupply_rows(relines):
+    """매입형 재공급 단지가 살아 나온다 — 이걸 통째로 버려 단지 상세가 비어 있었다."""
+    by = {(l.complex_name, l.area_type): l for l in relines}
+    assert ("래미안퍼스티지", "84") in by
+    l = by[("래미안퍼스티지", "84")]
+    assert l.is_new is False
+    assert l.units_total == 5
+    assert l.deposit == 1_388_400_000
+    assert l.area_exclusive == pytest.approx(84.93)
+    assert l.area_total == pytest.approx(168.42)
+    assert l.heating == "지역난방"
+
+
+def test_misaligned_rows_are_dropped(relines):
+    """17쪽 윗부분(공사 건설형)은 유형 숫자와 전용면적이 안 맞는다 — 한 줄도 나오면 안 된다."""
+    for l in relines:
+        n = int("".join(ch for ch in l.area_type if ch.isdigit()) or 0)
+        assert l.area_exclusive is not None and abs(l.area_exclusive - n) <= 1.5
+        assert 5_000_000 <= (l.deposit or 0) <= 5_000_000_000

@@ -105,7 +105,10 @@ def merge_supply_lines_into_complexes(rows: list[dict[str, Any]], lines: list[Su
 
 
 def merge_jeonse_lines_into_complexes(rows: list[dict[str, Any]], lines: list[JeonseLine]) -> int:
-    """장기전세 신규공급 표의 면적별 줄을 단지 행에 묶는다. 돌려주는 값은 채운 단지 수."""
+    """장기전세 「공급현황」 표의 면적별 줄을 단지 행에 묶는다. 돌려주는 값은 채운 단지 수.
+
+    신규공급뿐 아니라 검문을 통과한 매입형 재공급 줄도 들어온다(2026-09-09) — 목록·지도가 쓰는
+    호수·전세금·면적이 여기서 채워져야 단지 상세가 비지 않는다."""
     if not lines:
         return 0
     by_name: dict[str, list[JeonseLine]] = {}

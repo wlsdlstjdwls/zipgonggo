@@ -6,9 +6,12 @@
 - 14쪽 [우선공급 배정]: 단지명(위치) | 전용면적 | 계 | 고령자 | 장애인 | 노부모부양자 | 국가유공자 등 | 2자녀이상가구
 - 15~19쪽 [재공급]: 자치구 | 단지명 | 전용면적 | 유형(일반·주거약자) | 모집호수(예비) | 전세금액 3열 | 계약면적 4열 | 난방방식
 
-**재공급 표는 읽지 않는다.** 단지명 칸이 지구 단위로 묶여 있어("상암2지구" 아래 "-상암월드컵파크9~12단지")
-한 줄이 어느 단지 것인지 정해지지 않는다. 틀린 호수를 단지에 붙이느니 비워 둔다 — 공고 단위 집계는 sh_supply가 낸다.
-신규공급 표(13쪽)만 단지별로 낸다.
+**재공급 표는 검문을 통과한 줄만 읽는다** (2026-09-09).
+공사 건설형 재공급(15~16쪽)은 단지명 칸이 지구 단위로 묶여 있어("상암2지구" 아래 "-상암월드컵파크9~12단지")
+한 줄이 어느 단지 것인지 정해지지 않는다. 반면 매입형 재공급(18쪽)은 한 줄이 한 단지다 — 이 줄들까지 버리는 바람에
+단지 상세가 통째로 비어 있었다(사용자 지적 2026-09-09: 제51차 단지 138곳 중 12곳만 내용이 있었다).
+그래서 버리는 기준을 「표 종류」가 아니라 「줄이 스스로 앞뒤가 맞는가」로 바꿨다 — _plausible 참조.
+열이 어긋난 쪽(17·19쪽)의 줄은 이 검문에서 전부 걸린다.
 
 행복주택 양식(sh_supply_lines)과 다른 점 — 공급구분(계층) 열이 없고, 월임대료가 없다(전세). 대신 난방방식과 우선공급 배정 상세가 있다.
 같은 좌표 기법을 쓴다: 헤더 라벨의 x로 열 경계를 잡고, 붙어 온 숫자는 글자 x 중심으로 가른다.
@@ -21,7 +24,7 @@ import re
 from dataclasses import dataclass
 
 from ..sources.ish import Char, columns_by_x, group_rows, parse_chars, row_segments
-from .sh_supply_lines import FOOTNOTE_CHARS, NAME_GAP, PUNCT_ONLY, _area, _int, _name_blocks, _nearest, _Seg
+from .sh_supply_lines import FOOTNOTE_CHARS, NAME_GAP, PUNCT_ONLY, _area, _int, _name_blocks, _nearest, _norm, _Seg
 
 HEADER_NAME = re.compile(r"^단지\s*(?:이름|명)$")
 HEADER_AREA_COL = re.compile(r"^전용\s*면적$|^전용$")
@@ -252,7 +255,35 @@ def _mul(v: int | None, k: int) -> int | None:
     return None if v is None else v * k
 
 
+# 재공급 줄 검문 — 틀린 값을 싣느니 비워 둔다(CLAUDE.md 얇은 페이지 방지와 같은 태도).
+# 한계값은 실측(제51차 13·17·18·19쪽)에서 맞은 줄과 어긋난 줄이 갈리는 자리에 뒀다.
+JEONSE_MIN = 5_000_000            # 전세금 하한. 이보다 작으면 천원 단위 환산이 어긋난 것
+JEONSE_MAX = 5_000_000_000        # 상한 50억. 넘으면 두 칸이 붙어 읽힌 것
+UNITS_MAX = 3_000
+AREA_MIN, AREA_MAX = 10.0, 200.0
+AREA_SLACK = 1.5                  # 「59」형의 실제 전용면적은 59.47~59.99. 1.5㎡ 넘게 벌어지면 열이 어긋난 것
+
+
+def _plausible(l: JeonseLine, names: set[str]) -> bool:
+    """줄 하나가 스스로 앞뒤가 맞는가. 단지명이 「단지별 주소」 표에 있고, 유형 숫자와 전용면적이 맞아야 한다."""
+    if not l.complex_name or _norm(l.complex_name) not in names:
+        return False
+    if l.deposit is None or not (JEONSE_MIN <= l.deposit <= JEONSE_MAX):
+        return False
+    if l.units_total is not None and not (1 <= l.units_total <= UNITS_MAX):
+        return False
+    digits = re.sub(r"\D", "", l.area_type or "")
+    if not digits:
+        return False
+    n = int(digits)
+    if not (AREA_MIN <= n <= AREA_MAX):
+        return False
+    # 유형 숫자는 전용면적을 버림한 값이다 — 열이 밀리면 여기서 갈린다(17쪽: 유형 592 / 전용 99.2)
+    return l.area_exclusive is not None and abs(l.area_exclusive - n) <= AREA_SLACK
+
+
 def parse_jeonse_supply(pages: list[tuple[int, str]], names_hint: list[str]) -> list[JeonseLine]:
+    names = {_norm(x) for x in names_hint}
     out: list[JeonseLine] = []
     idx = 0
     for page, xml in sorted(pages):
@@ -260,5 +291,6 @@ def parse_jeonse_supply(pages: list[tuple[int, str]], names_hint: list[str]) -> 
             lines, idx = parse_jeonse_page(xml, page, names_hint, idx)
         except Exception:  # noqa: BLE001 — 한 쪽이 깨져도 나머지는 살린다
             continue
-        out.extend(l for l in lines if l.is_new)   # 재공급 표는 단지명이 지구 단위라 버린다(모듈 설명 참조)
+        # 신규공급 표는 지금까지의 회귀 그대로 통과시키고, 재공급 줄만 검문한다
+        out.extend(l for l in lines if l.is_new or _plausible(l, names))
     return out

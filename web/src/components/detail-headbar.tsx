@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { CalcButton } from "./calc-context";
 import { Trunc } from "./trunc";
 
 type Props = {
@@ -49,7 +50,11 @@ export function DetailHeadBar({ title, sub, state, back, action }: Props) {
               <Trunc className="dhb-n" text={title} />
             </span>
             {state && <span className={`dhb-s ${state.tone}`}>{state.label}</span>}
-            {action && <span className="dhb-a">{action}</span>}
+            {/* 이 바가 헤더를 덮는 동안에도 계산기는 닿아야 한다 — 헤더 버튼을 여기 한 번 더 둔다 */}
+            <span className="dhb-a">
+              {action}
+              <CalcButton />
+            </span>
           </div>
         </div>,
         document.body,
