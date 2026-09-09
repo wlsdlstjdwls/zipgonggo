@@ -33,3 +33,6 @@ Thumbs.db
 
 # 공고 첨부 텍스트 캐시(i-sh Synap 뷰어 XML) — 재배포 금지, 재수집 가능
 pipeline/data/ish/
+
+# OG 생성용 글꼴 — 필요할 때 내려받는다(design/brand/README.md)
+design/brand/Pretendard-*.otf

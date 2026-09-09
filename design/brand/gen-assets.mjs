@@ -37,28 +37,31 @@ writeFileSync(WEB + "/public/icons/icon-512.png", await png(tile(64), 512));
 writeFileSync(WEB + "/public/icons/icon-512-maskable.png", await png(maskable(64), 512));
 
 // OG 1200×630 — satori. 마크는 PNG data URI로 넣는다(SVG 중첩보다 안전)
+//
+// 가운데 카드 한 장에 다 담는다(사용자 지적 2026-09-09: "노션이나 블로그에서 북마크하면 이미지가 잘려 보인다").
+// 노션 북마크·티스토리/네이버 링크 카드는 1.91:1 원본을 정사각에 가깝게 object-fit:cover로 자른다 —
+// 가로 가운데 630px만 남는다고 봐야 한다. 그래서 읽혀야 할 것(마크·제목·도메인)은 전부 폭 560 카드 안에 넣고,
+// 좌우 여백은 잘려도 아무것도 잃지 않는 바탕으로만 쓴다.
+const CARD_W = 560;   // 정사각 크롭(630) 안에 여백까지 남는 폭
 const font = (w) => readFileSync(`${S}/Pretendard-${w}.otf`);
 const markUri = "data:image/png;base64," + (await png(tile(64), 320)).toString("base64");
 const h = (type, props, ...children) => ({ type, props: { ...props, style: type === "div" ? { display: "flex", ...(props.style || {}) } : props.style, children: children.length === 1 ? children[0] : children } });
-const el = h("div", { style: { width: 1200, height: 630, display: "flex", flexDirection: "column", justifyContent: "space-between", background: "#fff", padding: "64px 72px", fontFamily: "Pretendard", position: "relative" } },
-  h("div", { style: { display: "flex", alignItems: "center", gap: 18 } },
-    h("img", { src: markUri, width: 56, height: 56 }),
-    h("div", { style: { fontSize: 40, fontWeight: 900, color: INK, letterSpacing: "-0.05em" } }, "집공고"),
-  ),
-  h("div", { style: { display: "flex", flexDirection: "column", gap: 26, maxWidth: 760 } },
-    h("div", { style: { display: "flex", flexDirection: "column", fontSize: 76, fontWeight: 900, color: INK, letterSpacing: "-0.055em", lineHeight: 1.12 } },
+const el = h("div", { style: { width: 1200, height: 630, display: "flex", alignItems: "center", justifyContent: "center", background: SUB, fontFamily: "Pretendard", position: "relative" } },
+  h("div", { style: { width: CARD_W, display: "flex", flexDirection: "column", alignItems: "center", gap: 26, padding: "40px 36px 34px", background: "#fff", borderRadius: 28, border: `1px solid ${LINE}`, boxShadow: "0 30px 70px -44px rgba(0,0,0,.55)" } },
+    h("div", { style: { display: "flex", alignItems: "center", gap: 16 } },
+      h("img", { src: markUri, width: 76, height: 76 }),
+      h("div", { style: { fontSize: 44, fontWeight: 900, color: INK, letterSpacing: "-0.05em" } }, "집공고"),
+    ),
+    h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", fontSize: 52, fontWeight: 900, color: INK, letterSpacing: "-0.055em", lineHeight: 1.18 } },
       h("div", {}, "공공임대 모집공고,"),
       h("div", { style: { display: "flex" } }, h("span", { style: { color: ACC } }, "호실 단위"), h("span", {}, "로 지도에.")),
     ),
-    h("div", { style: { fontSize: 27, fontWeight: 600, color: MUT, lineHeight: 1.5, letterSpacing: "-0.01em" } }, "LH, SH, 지방공사 입주자모집공고를 지역별 단지별 보증금과 임대료, 마감일로 다시 정리합니다."),
-  ),
-  h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 22, fontWeight: 700, color: DIM, letterSpacing: "0.02em" } },
-    h("div", {}, "zipgonggo.com"),
-    h("div", { style: { display: "flex", gap: 10 } },
-      ...["공공임대", "공공지원민간임대", "장기전세"].map((t) => h("div", { style: { padding: "8px 14px", borderRadius: 12, background: SUB, border: `1px solid ${LINE}`, color: MUT, fontSize: 18 } }, t)),
+    h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", fontSize: 22, fontWeight: 600, color: MUT, lineHeight: 1.55, letterSpacing: "-0.015em" } },
+      h("div", {}, "LH, SH, 지방공사 입주자모집공고를"),
+      h("div", {}, "지역과 단지, 마감일로 다시 정리합니다."),
     ),
+    h("div", { style: { fontSize: 20, fontWeight: 700, color: DIM, letterSpacing: "0.02em" } }, "zipgonggo.com"),
   ),
-  h("img", { src: markUri, width: 300, height: 300, style: { position: "absolute", right: 72, top: 165, opacity: 1 } }),
   h("div", { style: { position: "absolute", left: 0, right: 0, bottom: 0, height: 10, background: ACC } }),
 );
 const res = new ImageResponse(el, { width: 1200, height: 630, fonts: [
