@@ -3,12 +3,19 @@ name = "zipgonggo-pipeline"
 version = "0.1.0"
 description = "집공고 — 공공임대 공고 수집·파싱·좌표매칭 파이프라인"
 requires-python = ">=3.11"
-dependencies = ["httpx>=0.28", "psycopg[binary]>=3.2", "python-dotenv>=1.0", "selectolax>=0.3"]
+dependencies = [
+  "httpx>=0.28", "psycopg[binary]>=3.2", "python-dotenv>=1.0", "selectolax>=0.3",
+  "openpyxl>=3.1",  # 자격진단 엑셀 · SH 공개 주택목록
+  "pyproj>=3.7",    # 요약DB 출입구 좌표 EPSG:5179 → WGS84
+]
 
 [project.scripts]
 zipgonggo-s1 = "zipgonggo_pipeline.stages.s1_collect:main"
 zipgonggo-s1-sh = "zipgonggo_pipeline.stages.s1_sh:main"
 zipgonggo-s3-sh = "zipgonggo_pipeline.stages.s3_sh_complex:main"
+zipgonggo-s0-eligibility = "zipgonggo_pipeline.stages.s0_eligibility:main"
+zipgonggo-s6 = "zipgonggo_pipeline.stages.s6_geocode:main"
+zipgonggo-juso-load = "zipgonggo_pipeline.geo.entrance:main"
 
 [build-system]
 requires = ["setuptools>=68"]

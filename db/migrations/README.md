@@ -49,3 +49,7 @@ python db\migrate.py --status   # 적용 현황
 | `0014_notice_result.sql` | `result_post` · `notice_result` — i-sh 결과 글(경쟁률 게시·당첨자 발표) 원장과 결과 표 줄. 과거 경쟁률·합격선의 원천 | 미적용 |
 | `0015_notice_result_supply_kind.sql` | `notice_result.supply_kind` + UNIQUE 재정의 — 재공급/신규공급이 키에 없어 줄이 사라졌다 | 미적용 |
 | `0016_notice_result_row_identity.sql` | `notice_result`에 address·row_no, UNIQUE를 (게시글, 줄 번호)로 — 이름이 같은 건물 때문에 자연키로는 줄이 사라졌다 | 미적용 |
+| `0017_notice_schedule_steps.sql` | `notice.schedule_steps` — 일정 흐름도의 서류심사·서류제출·계약 단계 | Neon 2026-09-09 |
+| `0018_notice_apply_time.sql` | `notice`에 접수 시작·마감 시각 — 흐름도에 시각까지 적혀 있다 | Neon 2026-09-09 |
+| `0019_notice_complex_geom.sql` | `notice_complex`에 geom·geo_precision·geo_matched_by·geo_matched_at, `complex`에 매칭 출처 2칸 — S6 오프라인 주소-좌표 조인 결과 자리 | Neon 2026-09-09 |
+| `0020_eligibility_rules.sql` | `supply_type` · `income_standard` · `region_tier` — 공고와 무관한 제도 규칙(32개 공급유형 자격·배점, 도시근로자 소득기준, 지역등급). `/eligibility` 자격진단의 원천 | Neon 2026-09-09 |

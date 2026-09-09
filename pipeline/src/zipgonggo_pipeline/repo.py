@@ -276,3 +276,107 @@ def relink_result_posts(cur, *, agency: str = "SH") -> int:
         cur.execute("UPDATE result_post SET notice_id = %s, note = NULL WHERE seq = %s", (notice_id, p["seq"]))
         linked += 1
     return linked
+
+
+# ─────────────────────────────────────────────────────────────
+# S6 — 주소-좌표 조인 결과 적재
+#
+# 넣는 값은 행안부 요약DB 오프라인 조인 결과뿐이다. 지오코딩 API 응답은 받지도 저장하지도 않는다
+# (CLAUDE.md 하지 말 것 1). 요약DB 원본은 pipeline/data/juso/ 에 두고 여기엔 맞은 좌표만 온다(하지 말 것 2).
+# ─────────────────────────────────────────────────────────────
+
+_POINT = "ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326)::geography"
+
+ADDRESS_MATCH_SQL = f"""
+INSERT INTO address_match (normalized_addr, geom, precision, matched_by)
+VALUES (%(normalized_addr)s, {_POINT}, %(precision)s, %(matched_by)s)
+ON CONFLICT (normalized_addr) DO UPDATE SET
+  geom = EXCLUDED.geom, precision = EXCLUDED.precision, matched_by = EXCLUDED.matched_by
+RETURNING id
+"""
+
+
+def upsert_address_match(cur, match) -> int:
+    """address_match 1행. 키는 공고 표기가 아니라 요약DB가 돌려준 정규 주소다."""
+    cur.execute(ADDRESS_MATCH_SQL, _geo_params(match))
+    return cur.fetchone()["id"]
+
+
+def set_notice_complex_geom(cur, complex_id: int, match) -> None:
+    cur.execute(
+        f"""
+        UPDATE notice_complex SET
+          geom = {_POINT}, geo_precision = %(precision)s, geo_matched_by = %(matched_by)s,
+          geo_matched_at = now(), updated_at = now()
+        WHERE id = %(id)s
+        """,
+        {"id": complex_id, **_geo_params(match)},
+    )
+
+
+def set_complex_geom(cur, complex_id: int, match) -> None:
+    cur.execute(
+        f"""
+        UPDATE complex SET
+          geom = {_POINT}, geo_precision = %(precision)s, geo_matched_by = %(matched_by)s,
+          geo_matched_at = now(), updated_at = now()
+        WHERE id = %(id)s
+        """,
+        {"id": complex_id, **_geo_params(match)},
+    )
+
+
+def _geo_params(match) -> dict[str, Any]:
+    return {
+        "normalized_addr": match.normalized_addr, "lon": match.lon, "lat": match.lat,
+        "precision": match.precision, "matched_by": match.matched_by,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# S0 — 공급유형 자격·배점 사양 (db/seeds/eligibility.json)
+#
+# 공고와 무관한 제도 규칙이라 수집 스테이지가 아니라 시드다. 통째로 갈아 끼운다.
+# ─────────────────────────────────────────────────────────────
+
+SUPPLY_TYPE_COLS = [
+    "code", "category", "name", "housing_type", "sort_order",
+    "age_min", "age_max", "age_exempt", "marital", "marital_max_yr", "newborn_exempt",
+    "required_class", "homeless_scope", "income_scope", "income_pct",
+    "asset_scope", "asset_limit_man", "car_limit_man", "region_limit", "birth_bonus", "note",
+    "ranking_method", "ranks", "general_ranks", "score",
+]
+
+SUPPLY_TYPE_SQL = (
+    f"INSERT INTO supply_type ({', '.join(SUPPLY_TYPE_COLS)}) "
+    f"VALUES ({', '.join('%(' + c + ')s' for c in SUPPLY_TYPE_COLS)}) "
+    "ON CONFLICT (code) DO UPDATE SET "
+    + ", ".join(f"{c} = EXCLUDED.{c}" for c in SUPPLY_TYPE_COLS if c != "code")
+    + ", updated_at = now()"
+)
+
+
+def replace_supply_types(cur, rows: list[dict[str, Any]]) -> int:
+    """공급유형 사양을 시드 파일 내용으로 맞춘다. 시드에서 빠진 코드는 지운다."""
+    for r in rows:
+        cur.execute(SUPPLY_TYPE_SQL, {**r, "score": json.dumps(r.get("score") or {}, ensure_ascii=False)})
+    codes = [r["code"] for r in rows]
+    cur.execute("DELETE FROM supply_type WHERE NOT (code = ANY(%s))", (codes,))
+    return len(rows)
+
+
+def replace_income_standard(cur, rows: list[dict[str, Any]], *, year: int) -> int:
+    cur.execute("DELETE FROM income_standard WHERE year = %s", (year,))
+    for r in rows:
+        cur.execute(
+            "INSERT INTO income_standard (year, household, pct, monthly_won) VALUES (%(year)s, %(household)s, %(pct)s, %(monthly_won)s)",
+            r,
+        )
+    return len(rows)
+
+
+def replace_region_tiers(cur, rows: list[dict[str, Any]]) -> int:
+    cur.execute("DELETE FROM region_tier")
+    for r in rows:
+        cur.execute("INSERT INTO region_tier (name, kind, tier) VALUES (%(name)s, %(kind)s, %(tier)s)", r)
+    return len(rows)
