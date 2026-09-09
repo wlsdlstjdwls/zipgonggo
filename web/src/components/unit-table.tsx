@@ -3,6 +3,7 @@
 // 단지 상세 「동호수별 목록」 — SH 매입임대 별첨 주택목록의 호실 행(unit, 0021).
 // 사용자 요청 2026-09-09: "이미 동수, 호수 정보가 나와 있다면 버튼이나 필터로 각 동호수별 정보를 볼 수 있어야 한다".
 // 동이 둘 이상이면 동 칩으로 먼저 가르고, 구조(원룸/투룸)도 칩으로 가른다. 표에는 층·면적·구조·승강기·금액 3종.
+// 동 칸은 별첨에 동 표기가 있는 단지에만 선다 — 다세대·빌라 목록은 대개 호만 실린다(사용자 지적 2026-09-09).
 // 금액은 계약 때 고를 수 있는 폭 그대로 — 최대(전세전환) / 기준 / 최소(월세전환).
 
 import { useMemo, useState } from "react";
@@ -21,6 +22,12 @@ function tally(units: NoticeUnit[], pick: (u: NoticeUnit) => string | null): [st
     if (v) m.set(v, (m.get(v) ?? 0) + 1);
   }
   return [...m.entries()];
+}
+
+/** 별첨의 호는 "0302"처럼 층+호를 붙인 네 자리다 — 사람이 읽는 "302호"로 편다 */
+function hoText(room: string): string {
+  const t = room.replace(/^0+/, "");
+  return /^\d+$/.test(t) ? `${t}호` : room;
 }
 
 function Money({ v }: { v: number | null }) {
@@ -84,7 +91,7 @@ export function UnitTable({ units }: Props) {
             {visible.map((u) => (
               <tr key={u.id}>
                 {dongs.length > 0 && <td className="tc-key">{u.building ?? "—"}</td>}
-                <td className="tc-key">{u.room}{u.floor != null && <small> {u.floor}층</small>}</td>
+                <td className="tc-key">{hoText(u.room)}{u.floor != null && <small> {u.floor}층</small>}</td>
                 <td className="num">{u.area_m2 != null ? `${u.area_m2}㎡` : "—"}</td>
                 <td>{u.room_layout ?? "—"}</td>
                 <td>{u.elevator ?? "—"}</td>
@@ -110,6 +117,9 @@ export function UnitTable({ units }: Props) {
           </tbody>
         </table>
       </div>
+      {dongs.length === 0 && (
+        <p className="note">공고문 별첨에 이 단지의 동 표기가 없어 호와 층만 실었습니다. 동이 나뉘는 단지는 동 칸이 함께 섭니다.</p>
+      )}
       {hasSwap && (
         <p className="note">
           최대 보증금은 <Term>전세전환</Term>, 최소 보증금은 <Term>월세전환</Term>을 끝까지 적용했을 때의 값입니다. 그 사이 금액도 고를 수 있습니다.

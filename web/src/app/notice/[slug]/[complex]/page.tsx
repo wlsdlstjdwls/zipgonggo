@@ -112,7 +112,23 @@ export default async function ComplexPage({ params }: Params) {
   const downPayment = supply.find((s) => s.down_payment != null)?.down_payment ?? null;
   const balance = supply.find((s) => s.balance != null)?.balance ?? null;
   const unitCount = c.unit_count ?? (units.length || null) ?? (unitTotal || null);
+  // 별첨에 동 표기가 있는 단지만 「동호수별」이다 — 다세대·빌라는 호만 실린다(사용자 지적 2026-09-09)
+  const unitLabel = units.some((u) => u.building) ? "동호수별 정보" : "호실별 정보";
   const hasFacts = supply.length > 0 || units.length > 0;
+
+  // 요약 스트립·태그 줄과 겹치지 않는 값만 남긴다. 전부 비면 표 자체를 그리지 않는다
+  const specs: [string, string][] = ([
+    ["공용면적", supply.length ? m2(commonArea(supply[0])) : null],
+    ["계약면적", supply[0]?.area_total != null ? m2(supply[0].area_total) : null],
+    ["구조", layouts.length ? layouts.join(" | ") : null],
+    ["승강기", elevators.length ? elevators.join(" | ") : null],
+    ["난방", c.heating],
+    // 공가는 우선·일반 배분이 적힌 공고에만 있다. 재공급 표에 모집호수만 있는 공고에서 「공가 0호」를 쓰면 거짓말이 된다
+    ["현재 공가", hasReserve && vacantTotal > 0 ? num(vacantTotal, "호") : null],
+    ["예비자 모집", hasReserve && reserveTotal > 0 ? num(reserveTotal, "호") : null],
+    ["계약금", downPayment != null ? wonKo(downPayment) : null],
+    ["잔금", balance != null ? wonKo(balance) : null],
+  ] as [string, string | null][]).filter((r): r is [string, string] => r[1] != null && r[1] !== "");
 
   // 화면에 실제로 쓴 말만 페이지 밑에 편다
   const terms = [
@@ -171,24 +187,13 @@ export default async function ComplexPage({ params }: Params) {
           {/* 제원과 공급현황은 한 섹션이다 — 같은 표를 세로/가로로 두 번 나눠 보여줄 이유가 없다(사용자 요청 2026-09-09) */}
           <section className="dsec">
             <h2>공급 정보{supply.length > 0 && unitTotal > 0 ? ` | ${num(unitTotal, "호")}` : ""}</h2>
-            {/* 단지명·주소·지역은 머리글이 이미 말했다 — 여기선 겹치지 않는 값만 */}
-            <SpecList>
-              <Spec label="공급 구분" value={<Term>{kind}</Term>} />
-              <Spec label="공급 유형" value={<Term>{n.housing_type}</Term>} />
-              <Spec label="공급 호실" value={unitCount != null ? num(unitCount, "호") : null} />
-              <Spec label="전용면적" value={area} />
-              <Spec label="공용면적" value={supply.length ? m2(commonArea(supply[0])) : null} />
-              <Spec label="계약면적" value={supply[0]?.area_total != null ? m2(supply[0].area_total) : null} />
-              <Spec label="구조" value={layouts.length ? layouts.join(" | ") : null} />
-              <Spec label="승강기" value={elevators.length ? elevators.join(" | ") : null} />
-              <Spec label="난방" value={c.heating} />
-              {/* 공가는 우선·일반 배분이 적힌 공고에만 있다. 재공급 표에 모집호수만 있는 공고에서 「공가 0호」를 쓰면 거짓말이 된다 */}
-              {hasReserve && vacantTotal > 0 && <Spec label="현재 공가" value={`${num(vacantTotal, "호")}`} />}
-              {hasReserve && reserveTotal > 0 && <Spec label="예비자 모집" value={`${num(reserveTotal, "호")}`} />}
-              <Spec label="계약금" value={downPayment != null ? wonKo(downPayment) : null} />
-              <Spec label="잔금" value={balance != null ? wonKo(balance) : null} />
-              <Spec label="입주 시작" value={moveIn} />
-            </SpecList>
+            {/* 단지명·주소·지역은 머리글이, 공급 구분·유형은 태그 줄이, 호수·전용면적·입주 시작은 위 요약 스트립이
+                이미 말했다 — 여기 남기는 건 그 어디에도 없는 값뿐이다(사용자 지적 2026-09-09: 겹치는 정보 없애기) */}
+            {specs.length > 0 && (
+              <SpecList>
+                {specs.map(([label, value]) => <Spec key={label} label={label} value={value} />)}
+              </SpecList>
+            )}
 
             {supply.length > 0 && (
               <div className="dsub">
@@ -209,7 +214,7 @@ export default async function ComplexPage({ params }: Params) {
 
             {/* 주차·관리비는 SH 공고문 첨부에 없는 값이다 — 없다고 하지 않고 어디서 확인하는지 말한다 */}
             <p className="note">주차장과 관리비, 주차 요금은 공고문 첨부에 실리지 않아 아직 싣지 못합니다. 계약 전에 관리사무소나 {L.originalDoc}에서 확인하세요.</p>
-            {units.length > 0 && <p className="note" style={{ marginTop: 4 }}>호실별 층·구조·승강기·금액은 아래 「동호수별 정보」에 있습니다.</p>}
+            {units.length > 0 && <p className="note" style={{ marginTop: 4 }}>호실별 층·구조·승강기·금액은 아래 「{unitLabel}」에 있습니다.</p>}
           </section>
 
           {/* 보증금과 임대료는 공급현황 아래 — 어떤 유형이 있는지 먼저 보고 그 금액을 읽는 순서다(사용자 요청 2026-09-09) */}
@@ -245,7 +250,7 @@ export default async function ComplexPage({ params }: Params) {
           {/* 별첨 주택목록이 있는 공고만 — 동호수별로 갈라 본다(사용자 요청 2026-09-09) */}
           {units.length > 0 && (
             <section className="dsec">
-              <h2>동호수별 정보 | {num(units.length, "호")}</h2>
+              <h2>{unitLabel} | {num(units.length, "호")}</h2>
               <UnitTable units={units} />
             </section>
           )}
@@ -269,10 +274,9 @@ export default async function ComplexPage({ params }: Params) {
               <ExternalLink className="btn lg" href={n.source_url}>{L.original}</ExternalLink>
             </>
           }
+          /* 공급 구분은 태그 줄이, 입주 시작은 요약 스트립이 이미 센다 — 여기서 또 쓰지 않는다 */
           rows={[
             { label: "공급기관", value: n.agency },
-            { label: "공급 구분", value: kind },
-            { label: "입주 시작", value: moveIn },
             { label: "공고일", value: dateK(n.posted_at) },
             { label: "접수 마감", value: n.apply_end_at ? `${dateK(n.apply_end_at)}${n.apply_end_tm ? ` ${n.apply_end_tm}` : ""}` : NO_DATE },
             { label: "문의처", value: n.contact },

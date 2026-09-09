@@ -336,6 +336,7 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
             onFocus={onPinFocus}
             onSelect={onPick}
             roadview={roadview}
+            split={showNewChip}
             center={SEOUL_CENTER}
             zoom={SEOUL_ZOOM}
             ariaLabel="공급 단지 위치 지도"

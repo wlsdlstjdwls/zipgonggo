@@ -647,8 +647,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* ── 공급 단지 탐색기(components/complex-explorer.tsx) — 좌 목록 / 우 지도 ── */
 /* 왼쪽 목록과 오른쪽 지도는 같은 높이다(--cx-h) — 지도만 짧으면 목록 옆에 빈 띠가 남는다(사용자 지적 2026-09-09) */
 /* 지도가 본론이다 — 목록 칸을 좁히고 높이를 뷰포트에 가깝게(사용자 요청 2026-09-09) */
-.cx { --cx-h: min(780px, calc(100vh - 132px)); display: grid; grid-template-columns: minmax(272px, 320px) 1fr; gap: 14px; align-items: start; }
-.cx-panel { position: relative; z-index: 1; display: flex; flex-direction: column; height: var(--cx-h); border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--bg); }
+/* 두 칸 다 minmax(0,…) — auto 최소폭이면 조건 칸(직접 입력 줄)의 min-content가 좁은 화면에서 그리드를 밀어낸다 */
+.cx { --cx-h: min(780px, calc(100vh - 132px)); display: grid; grid-template-columns: minmax(272px, 320px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.cx-panel { position: relative; z-index: 1; min-width: 0; display: flex; flex-direction: column; height: var(--cx-h); border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--bg); }
 /* 공급대상·면적·신규 필터가 공고에 따라 붙었다 빠진다 — 고정 2열 그리드 대신 줄바꿈으로 흐른다 */
 /* 첫 줄은 늘 쓰는 검색·자치구·「조건」 토글만. 나머지 조건은 아래 접이식 칸으로 내렸다(사용자 요청 2026-09-09) */
 .cx-tools { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); }
@@ -676,8 +677,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cx-legend { position: absolute; z-index: 5; left: 12px; top: 12px; margin: 0; display: flex; align-items: center; gap: 6px;
   padding: 6px 11px; border-radius: 999px; background: rgba(255, 255, 255, 0.94); box-shadow: var(--shadow-overlay);
   font-weight: 700; font-size: 11px; color: var(--mut); }
-.cx-legend .lg { width: 9px; height: 9px; border-radius: 50%; background: var(--acc); }
-.cx-legend .lg.new { background: var(--soon); }
+/* 핀 색은 lib/brand.ts와 같은 값이다 — SDK 마커가 CSS 변수를 못 읽어 양쪽에 리터럴로 둔다 */
+.cx-legend .lg { width: 9px; height: 9px; border-radius: 50%; background: #79808f; }
+.cx-legend .lg.new { background: var(--acc); }
 .cx-legend .lg:not(:first-child) { margin-left: 6px; }
 .cx-count { margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--dim); border-bottom: 1px solid var(--line); }
 .cx-count { display: flex; align-items: center; gap: 8px; }
@@ -750,7 +752,7 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* ── 상세 요약 스트립 ─────────────────────────────────────
    "중요한 정보가 뭔지 알기 어렵다"는 지적(2026-09-09)에 대한 답. 표를 읽기 전에 다섯 칸이 먼저 답한다.
    값이 없는 칸도 지우지 않고 「준비 중」으로 남긴다 — 빈칸은 왜 없는지 말해 주지 않는다. */
-.kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 1px; margin: 0 var(--pad); background: var(--line);
+.kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 1px; margin: 20px var(--pad) 0; background: var(--line);
   border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
 .kpi-i { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; background: var(--bg); min-width: 0; }
 .kpi-i > span { font-weight: 800; font-size: 10px; line-height: 1; letter-spacing: 0.1em; color: var(--dim); }
@@ -794,11 +796,32 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 
 /* ── 용어 링크와 설명 (lib/glossary.ts) ────────────────────
    툴팁이 아니라 페이지 안 앵커다 — 모바일에는 호버가 없고, 크롤러도 설명 본문을 읽어야 한다. */
-.term { color: inherit; border-bottom: 1px dashed var(--line2); cursor: help; }
+/* 용어 링크 — 누르면 페이지 밑 「용어 설명」이 펴지면서 그 항목으로 내려간다.
+   앞의 작은 물음표가 "눌러 볼 수 있다"를 말한다. 커서도 클릭 커서다(사용자 요청 2026-09-09). */
+.term { color: inherit; border-bottom: 1px dashed var(--line2); cursor: pointer; }
+.term::before { content: "?"; display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px;
+  margin-right: 3px; vertical-align: 1px; border-radius: 50%; background: var(--sub); color: var(--dim);
+  font-size: 9px; font-weight: 900; line-height: 1; transition: background 200ms var(--ease), color 200ms var(--ease); }
 .term:hover { color: var(--acc); border-bottom-color: var(--acc); }
+.term:hover::before { background: var(--acc-soft); color: var(--acc); }
+
+/* 「용어 설명」은 접힌 채로 시작한다 — 페이지 끝에 사전이 늘 펼쳐져 있을 이유가 없다(사용자 요청 2026-09-09) */
+.gloss > h2 { margin-bottom: 0; }
+.gloss.on > h2 { margin-bottom: 14px; }
+.gloss-t { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; cursor: pointer; }
+.gloss-t em { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 999px; background: var(--sub); color: var(--dim); font-style: normal; font-weight: 800; font-size: 11px; letter-spacing: 0; }
+.gloss-t i { width: 8px; height: 8px; border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim); border-radius: 1px;
+  transform: translateY(-2px) rotate(45deg); transition: transform 240ms var(--sp); }
+.gloss.on .gloss-t i { transform: translateY(1px) rotate(225deg); }
+.gloss-t:hover em { background: var(--acc-soft); color: var(--acc); }
+.gloss-l[hidden] { display: none; }   /* 작성자 규칙(display:grid)이 UA의 [hidden]을 이긴다 — 명시해야 접힌다 */
 .gloss-l { display: grid; gap: 1px; margin: 0; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--line); overflow: hidden; }
 .gloss-l > div { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 14px; padding: 13px 16px; background: var(--bg); scroll-margin-top: 74px; }
-.gloss-l > div:target { background: var(--acc-soft); }
+.gloss-l > div:target, .gloss-l > div.hit { background: var(--acc-soft); }
+.gloss-l > div.hit { animation: gloss-hit 1.8s var(--ease) both; }
+@keyframes gloss-hit { 0%, 62% { background: var(--acc-soft); } 100% { background: var(--bg); } }
 .gloss-l dt { margin: 0; font-weight: 800; font-size: 13px; letter-spacing: -0.02em; color: var(--ink); }
 .gloss-l dd { margin: 0; font-weight: 500; font-size: 12.5px; line-height: 1.75; color: var(--mut); }
 @container (max-width: 640px) { .gloss-l > div { grid-template-columns: 1fr; gap: 4px; } }
@@ -859,9 +882,14 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   .aside { border-left: 0; border-top: 1px solid var(--line); }
   .aside-in { position: static; }
   .d-title { font-size: 30px; }
-  .cx { grid-template-columns: 1fr; }
-  .cx-map-wrap { position: static; order: -1; height: 400px; }
-  .cx-panel { height: 480px; }
+  .cx { grid-template-columns: minmax(0, 1fr); }
+  .cx-map-wrap { position: static; order: -1; min-width: 0; height: 400px; }
+  /* 패널 높이를 고정하면 「조건」을 펼 때마다 목록이 그만큼 짧아진다 — 목록만 높이를 갖는다 */
+  .cx-panel { height: auto; }
+  .cx-list { flex: none; height: min(56dvh, 420px); }
+  /* 「전용면적 직접 입력」 라벨과 입력 두 칸이 한 줄에 안 들어간다 — 라벨을 윗줄로 */
+  .cx-range { flex-wrap: wrap; }
+  .cx-range > span { flex-basis: 100%; }
   /* 좁아지면 레일을 목록 위 가로 줄로 눕힌다 — 세로 레일이 목록 폭을 다 먹는다 */
   .list-stage { grid-template-columns: 1fr; }
   .rail { border-right: 0; border-bottom: 1px solid var(--line); }

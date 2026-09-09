@@ -6,7 +6,7 @@
 // 선택 핀은 화면 밖일 때만 panTo, 줌은 건드리지 않는다(휙휙 이동 방지).
 
 import { useEffect, useRef, useState } from "react";
-import { BRAND_ACC, BRAND_NEW, bubbleMarkerHtml, MARKER_H, MARKER_W, markerHtml } from "@/lib/brand";
+import { BRAND_ACC, BRAND_MUTED, bubbleMarkerHtml, MARKER_H, MARKER_W, markerHtml } from "@/lib/brand";
 import { hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
 import { usePanorama } from "@/lib/use-panorama";
 
@@ -15,9 +15,9 @@ import { usePanorama } from "@/lib/use-panorama";
 export type MapItem = { id: number; address: string; title: string; sub: string;
   /** 금회 신규 공급 단지. 핀 색이 갈린다(사용자 요청 2026-09-09) */ isNew?: boolean };
 
-/** 핀 색 — 신규 공급은 청록, 재공급은 액센트 파랑 */
-function pinFill(it: { isNew?: boolean } | undefined): string {
-  return it?.isNew ? BRAND_NEW : BRAND_ACC;
+/** 핀 색 — 신규와 재공급이 섞인 공고에서만 갈린다. 신규는 액센트, 재공급은 중성 회색 */
+function pinFill(it: { isNew?: boolean } | undefined, split: boolean): string {
+  return !split || it?.isNew ? BRAND_ACC : BRAND_MUTED;
 }
 
 type Props = {
@@ -30,6 +30,8 @@ type Props = {
   onSelect: (id: number) => void;
   /** 로드뷰 패널 열림 여부(부모가 토글). 닫기는 지도 위 선택 카드가 맡는다 */
   roadview: boolean;
+  /** 신규와 재공급이 한 공고에 섞여 있나. 섞였을 때만 핀 색을 가른다 */
+  split: boolean;
   center: LatLng;
   zoom: number;
   ariaLabel: string;
@@ -43,7 +45,7 @@ function inset(w: number, h: number) {
   return { left: Math.min(80, w * 0.14), right: Math.min(80, w * 0.14), top: Math.min(90, h * 0.16), bottom: Math.min(70, h * 0.14) };
 }
 
-export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSelect, roadview, center, zoom, ariaLabel }: Props) {
+export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSelect, roadview, split, center, zoom, ariaLabel }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const panoEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -100,7 +102,7 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
       const pos = new maps.LatLng(c.lat, c.lng);
       const marker = new maps.Marker({
         position: pos, map, title: it.title, zIndex: 100,
-        icon: { content: markerHtml(pinFill(it)), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) },
+        icon: { content: markerHtml(pinFill(it, split)), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) },
       });
       maps.Event.addListener(marker, "click", () => cb.current.onSelect(it.id));
       maps.Event.addListener(marker, "mouseover", () => cb.current.onFocus(it.id));
@@ -125,7 +127,7 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
     const ro = el.current ? new ResizeObserver(() => maps.Event.trigger(map, "resize")) : null;
     if (ro && el.current) ro.observe(el.current);
     return () => ro?.disconnect();
-  }, [items, coords, mapReady]);
+  }, [items, coords, split, mapReady]);
 
   // 3) 선택 → 그 핀만 이름 라벨로, 나머지는 브랜드 핀. 호버 → 핀 살짝 확대. 선택 핀이 화면 밖이면 그때만 panTo
   useEffect(() => {
@@ -139,7 +141,7 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
         const it = byId.get(id);
         m.marker.setIcon(sel && it
           ? { content: bubbleMarkerHtml(it.title, it.sub), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) }
-          : { content: markerHtml(pinFill(it)), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) });
+          : { content: markerHtml(pinFill(it, split)), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) });
         m.selected = sel;
       }
       m.marker.setZIndex(sel ? 950 : id === focusId ? 900 : 100);
@@ -150,7 +152,7 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
         if (reduce) map.setCenter(m.pos); else map.panTo(m.pos, PAN);
       }
     }
-  }, [items, focusId, selectedId, coords, mapReady]);
+  }, [items, focusId, selectedId, coords, split, mapReady]);
 
   // 4) 로드뷰 — 선택 단지 좌표에서 가장 가까운 파노라마(SDK가 반경 300m 탐색). 없으면 "로드뷰 없음"
   const selAddress = selectedId === null ? null : (items.find((i) => i.id === selectedId)?.address ?? null);

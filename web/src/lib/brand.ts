@@ -3,8 +3,9 @@
 // 색은 design/README.md 토큰값과 같다 — SDK 마커·SVG 파일은 CSS 변수를 못 읽어 리터럴로 둔다.
 export const BRAND_ACC = "#3d5afe"; // --acc
 export const BRAND_INK = "#0f1216"; // --ink
-// 금회 신규 공급 단지 핀. 재공급 핀(액센트 파랑)과 한눈에 갈려야 한다(사용자 요청 2026-09-09)
-export const BRAND_NEW = "#0f766e"; // --soon
+// 신규와 재공급이 섞인 공고의 핀 색 — 신규는 액센트 파랑(목록의 「신규」 칩과 같은 색),
+// 재공급은 중성 회색. 초록 핀은 폐기했다(사용자 요청 2026-09-09). 섞이지 않은 공고는 전부 액센트로 찍는다.
+export const BRAND_MUTED = "#79808f";
 export const BRAND_TILE_RADIUS = 16; // 64 기준 25%
 
 /**
