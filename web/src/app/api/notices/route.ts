@@ -4,8 +4,8 @@ import { API_CACHE_CONTROL, PAGE_SIZE } from "@/lib/constants";
 import { parseNoticeFilters } from "@/lib/notice-filters";
 import { listNoticesPage } from "@/lib/queries";
 
-// route handler는 레이아웃 상속과 별개로 명시해 둔다 — DB(싱가포르)와 리전을 맞춘다.
-export const preferredRegion = "sin1";
+// route handler는 레이아웃 상속과 별개로 명시해 둔다 — DB(us-east-1)와 리전을 맞춘다.
+export const preferredRegion = "iad1";
 
 export async function GET(req: Request) {
   const u = new URL(req.url);

@@ -10,8 +10,9 @@ import { ROUTES } from "@/lib/routes";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
-// DB(Neon ap-southeast-1, 싱가포르)와 함수 리전을 맞춘다. 미지정 시 기본 리전(미국)이라 왕복마다 태평양을 건넌다.
-export const preferredRegion = "sin1";
+// DB를 Neon us-east-1(버지니아)로 옮겼다 — Hobby 플랜은 함수 리전이 iad1 고정이라 preferredRegion을 못 바꾼다(2026-09-09 실측).
+// 지금은 no-op이지만 Pro로 올리면 이 값이 실제로 먹으니 DB 리전과 맞춰 둔다.
+export const preferredRegion = "iad1";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

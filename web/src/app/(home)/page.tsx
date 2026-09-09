@@ -11,8 +11,8 @@ import type { Sector } from "@/types/notice";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
-// DB(싱가포르)와 리전을 맞춘다 — layout.tsx와 같은 값 유지
-export const preferredRegion = "sin1";
+// DB(us-east-1)와 리전을 맞춘다 — layout.tsx와 같은 값 유지
+export const preferredRegion = "iad1";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
