@@ -536,7 +536,8 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 /* 「2026.09.14 (월)」이 20px로는 160px 칸을 넘겼다(사용자 지적 2026-09-09) — 칸을 넓히고 글자를 한 단 줄인다 */
 .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(184px, 1fr)); gap: 10px; }
 .step { min-width: 0; padding: 15px 16px; border-radius: var(--r-card); background: var(--bg); border: 1px solid var(--line); }
-.step span { display: block; font-weight: 800; font-size: 9.5px; line-height: 1; letter-spacing: 0.14em; color: var(--dim); margin-bottom: 9px; }
+/* 라벨은 칸의 직계 자식만 — `.step span`으로 두면 날짜를 감싼 <b><span>까지 9.5px 라벨로 눌러버린다(2026-09-09 회귀) */
+.step > span { display: block; font-weight: 800; font-size: 9.5px; line-height: 1; letter-spacing: 0.14em; color: var(--dim); margin-bottom: 9px; }
 /* 날짜와 시각은 따로 온다 — 각각은 안 쪼개지되 둘 사이에서는 줄이 바뀐다. 「2026.09.30 (수) 17:00」이 칸을 넘기던 자리 */
 .step b { display: block; font-weight: 800; font-size: 16px; line-height: 1.2; letter-spacing: -0.035em; color: var(--mut); }
 .step b > span, .step em > span { white-space: nowrap; }
@@ -549,9 +550,9 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 /* 접수 시작·마감은 사람이 달력에 적는 두 날짜다 — 나머지 단계보다 크고 진하게(사용자 지적 2026-09-09) */
 .step.key { border-color: var(--line-strong); }
 .step.key b { font-size: 20px; color: var(--ink); }
-.step.key span { color: var(--mut); }
+.step.key > span { color: var(--mut); }
 .step.on { background: var(--acc-soft); border-color: var(--acc); }
-.step.on span { color: var(--acc); }
+.step.on > span { color: var(--acc); }
 .step.on b { color: var(--ink); }
 /* 보증금·임대료 표 — 기본(headline) · pay(납부 구성, 들여쓴 하위 항목) · max(범위 위쪽 끝, 강조색) 세 그룹을 톤으로 구분한다.
    라벨을 짧게 줄이고(계약금·중도금·잔금) note는 <small>로 옆에 붙여, 예전처럼 길어서 잘려 보이던(nowrap+ellipsis) 문제를 없앤다. */
