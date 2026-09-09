@@ -662,12 +662,15 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .supply .stack b { display: block; font-weight: 700; color: var(--ink); }
 .supply .stack small { display: block; margin-top: 2px; font-weight: 600; font-size: 10.5px; color: var(--dim); }
 
-/* 열이 8~9개까지 늘어나는 동호수별 표는 좁은 화면에서 가로로 스크롤할 수밖에 없다 — 스크롤해도
-   어느 동/호였는지 잊어버린다는 지적(2026-09-09)이라 첫 열(동/호)만 고정해 따라오게 한다 */
-.supply th:first-child, .supply td:first-child { position: sticky; left: 0; z-index: 1; background: var(--bg); box-shadow: 1px 0 0 var(--line); }
-.supply thead th:first-child { background: var(--sub); }
-.supply tbody tr:hover td:first-child { background: var(--sub); }
-.ut-dong { display: inline-block; margin-right: 4px; padding: 1px 5px; border-radius: 5px; background: var(--sub); font-size: 10px; font-weight: 700; color: var(--mut); }
+/* 열이 많은 표는 좁은 화면에서 가로로 스크롤할 수밖에 없다 — 스크롤하면 어느 행인지 잊어버린다는
+   지적(2026-09-09, 동호수별 표)이라 .tbl 안 모든 표의 첫 열을 고정해 따라오게 한다. 처음엔 .supply(동호수별·
+   공급현황)만 스코프였는데, 소득기준표 등 다른 넓은 표도 같은 문제가 있어 .tbl 전체로 넓혔다(사용자 요청
+   "불편한 표는 전부 개선"). 열이 화면에 다 들어가는 좁은 표는 스크롤이 안 생겨 sticky가 있어도 티가 안 난다. */
+.tbl table th:first-child, .tbl table td:first-child { position: sticky; left: 0; z-index: 1; background: var(--bg); box-shadow: 1px 0 0 var(--line); }
+.tbl table thead th:first-child { background: var(--sub); }
+.tbl table tbody tr:hover td:first-child { background: var(--sub); }
+/* 첫 열 안에 상위 구분을 작은 배지로 얹을 때 쓴다(동/호, 공급대상/공급유형처럼 두 값을 한 칸에 묶을 때) */
+.tc-tag { display: inline-block; margin-right: 4px; padding: 1px 5px; border-radius: 5px; background: var(--sub); font-size: 10px; font-weight: 700; color: var(--mut); }
 
 /* 보증금과 임대료 — 공급대상 × 공급유형마다 전세전환 / 기본 / 월세전환 세 줄(components/convert-table.tsx) */
 .ctable { display: grid; gap: 12px; }

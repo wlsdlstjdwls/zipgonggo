@@ -53,8 +53,9 @@ export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
       <table className="supply">
         <thead>
           <tr>
-            {hasClass && <th>공급대상</th>}
-            <th>공급유형</th>
+            {/* 공급대상·공급유형이 각자 열이면 스크롤할 때 유형 열이 먼저 사라진다(사용자 요청
+                2026-09-09: "불편한 표는 전부 개선") — 첫 열 하나에 묶어 sticky 하나로 둘 다 딸려온다 */}
+            <th>{hasClass ? "공급대상/공급유형" : "공급유형"}</th>
             <th className="num">공급호수</th>
             {hasSplit && (
               <th className="num">
@@ -70,8 +71,10 @@ export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
         <tbody>
           {supply.map((s) => (
             <tr key={s.id}>
-              {hasClass && <td className="tc-key"><TermText>{classLabel(s)}</TermText></td>}
-              <td className="tc-key"><TermText>{typeLabel(s)}</TermText></td>
+              <td className="tc-key">
+                {hasClass && <span className="tc-tag"><TermText>{classLabel(s)}</TermText></span>}
+                <TermText>{typeLabel(s)}</TermText>
+              </td>
               <td className="num strong">{s.units_total != null ? num(s.units_total, "호") : "—"}</td>
               {hasSplit && (
                 <td className="num stack">

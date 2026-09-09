@@ -113,7 +113,7 @@ export function UnitTable({ units }: Props) {
               <tr key={u.id}>
                 <td className="tc-key">
                   {dongs.length > 0 && (
-                    <span className="ut-dong" title={groupOf(u) ?? undefined}>
+                    <span className="tc-tag" title={groupOf(u) ?? undefined}>
                       {byDong ? (u.building ?? "—") : addrShort(groupOf(u) ?? "—")}
                     </span>
                   )}
