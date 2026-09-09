@@ -224,3 +224,23 @@ export function carRuleText(t: SupplyType): string | null {
 export function regionRuleText(t: SupplyType): string | null {
   return t.region_limit === "서울" ? "서울 거주자만 신청 가능" : null;
 }
+
+/** 유형 하나를 카드로 그릴 때 쓰는 라벨-문구 줄. 표(가로 스크롤)보다 카드가 모바일에서 읽기 쉽다는
+ *  지적(2026-09-09)에 따라, 공고상세 신청자격은 표가 아니라 이 줄들을 쌓은 카드로 그린다. */
+export function ruleLines(t: SupplyType): { label: string; text: string }[] {
+  const lines: { label: string; text: string }[] = [{ label: "나이", text: ageRuleText(t) }];
+  const marital = maritalRuleText(t);
+  if (marital) lines.push({ label: t.marital === "미혼" ? "혼인" : "혼인기간", text: marital });
+  const cls = classRuleText(t);
+  if (cls) lines.push({ label: "계층", text: cls });
+  lines.push({ label: "무주택", text: `${t.homeless_scope} 기준 무주택이어야 한다` });
+  lines.push({ label: "소득", text: incomeRuleText(t) ?? "소득 기준 없음" });
+  const asset = assetRuleText(t);
+  const car = carRuleText(t);
+  if (asset) lines.push({ label: "자산", text: asset });
+  if (car) lines.push({ label: "자동차", text: car });
+  if (!asset && !car) lines.push({ label: "자산", text: "자산/자동차 기준 없음" });
+  const region = regionRuleText(t);
+  if (region) lines.push({ label: "거주지", text: region });
+  return lines;
+}

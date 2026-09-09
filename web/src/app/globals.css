@@ -1038,6 +1038,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-out h2 small { font-weight: 700; font-size: 11px; color: var(--dim); }
 .elig-none { margin: 0; padding: 18px; border: 1px dashed var(--line2); border-radius: var(--r-card); font-size: 13px; color: var(--mut); }
 
+/* 공고상세 「신청자격」도 이 카드를 쓴다(2026-09-09) — 표 대신 카드라 유형 열이 좁은 화면에서 안 밀려난다 */
+.elig-sub { margin: 20px 0 10px; font-weight: 800; font-size: 13px; color: var(--mut); }
+
 /* 좁은 목록보다 2열이 한눈에 더 잘 들어온다는 지적(2026-09-09) — 카드 폭이 좁아지면 자동으로 1열로 접는다 */
 .elig-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .elig-card { padding: 13px 15px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }

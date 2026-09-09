@@ -12,10 +12,8 @@ import { SaveButton } from "@/components/save-button";
 import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
-import {
-  ageRuleText, assetRuleText, carRuleText, classRuleText, incomeRuleText, maritalRuleText, regionRuleText,
-} from "@/lib/eligibility";
-import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, NO_DATE, num, won, wonShort } from "@/lib/format";
+import { HOUSEHOLD_MAX, ruleLines } from "@/lib/eligibility";
+import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, NO_DATE, num, won, wonKo, wonShort } from "@/lib/format";
 import { moveInLabel } from "@/lib/notice-view";
 import {
   getAmendChain, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeSupply,
@@ -82,6 +80,14 @@ export default async function NoticePage({ params }: Params) {
   // 아직 파싱 전이라(eligibility 테이블 0건) 제도 일반 기준으로 대신 보여준다. 유형마다 조건 종류가 달라
   // null인 항목은 그 유형에서 안 보는 기준이라 화면에서도 뺀다.
   const eligTypes = eligRules.types.filter((t) => t.housing_type === n.housing_type);
+  // 신청자격에 실제로 쓰인 %만 열로 추린다 — 8종 전부 보여주면 모바일에서 표가 너무 넓어진다
+  const incomePcts = [...new Set(eligTypes.map((t) => t.income_pct).filter((p): p is number => p !== null))].sort((a, b) => a - b);
+  const incomeRows = incomePcts.length
+    ? Array.from({ length: HOUSEHOLD_MAX }, (_, i) => i + 1).map((h) => ({
+        household: h,
+        values: incomePcts.map((pct) => eligRules.income.find((r) => r.household === h && r.pct === pct)?.monthly_won ?? null),
+      }))
+    : [];
   // 매입임대 별첨(호실 단위)이면 호수·면적·금액 열을 더 보여준다
   const hasUnits = complexes.some((c) => c.unit_count != null);
   const unitTotal = complexes.reduce((a, c) => a + (c.unit_count ?? 0), 0);
@@ -235,30 +241,51 @@ export default async function NoticePage({ params }: Params) {
                 {L.originalDoc}에서 확인하세요.{" "}
                 <Link href={ROUTES.eligibility}>내 조건으로 신청 가능한 유형 진단하기 →</Link>
               </p>
-              <div className="tbl">
-                <table>
-                  <thead>
-                    <tr><th>유형</th><th>나이/혼인</th><th>소득기준</th><th>자산/자동차</th><th>비고</th></tr>
-                  </thead>
-                  <tbody>
-                    {eligTypes.map((t) => {
-                      const marital = maritalRuleText(t);
-                      const asset = assetRuleText(t);
-                      const car = carRuleText(t);
-                      const note2 = [classRuleText(t), regionRuleText(t), t.note].filter(Boolean).join(" | ");
-                      return (
-                        <tr key={t.code}>
-                          <td>{t.name}</td>
-                          <td>{ageRuleText(t)}{marital && <><br />{marital}</>}</td>
-                          <td>{incomeRuleText(t) ?? "소득 무관"}</td>
-                          <td>{[asset, car].filter(Boolean).join(" | ") || "자산/자동차 무관"}</td>
-                          <td>{note2 || "—"}</td>
+              {/* 표(가로 스크롤)는 좁은 화면에서 유형 열이 밀려나 안 보인다는 지적(2026-09-09) — 자가진단
+                  카드(elig-card/elig-why)와 같은 모양으로 유형 하나당 카드 하나씩 쌓는다 */}
+              <ul className="elig-list">
+                {eligTypes.map((t) => (
+                  <li key={t.code} className="elig-card">
+                    <div className="elig-card-h">
+                      <b>{t.category}</b>
+                      <span>{t.name}</span>
+                      {t.ranking_method && <span className="elig-card-r"><small>{t.ranking_method}</small></span>}
+                    </div>
+                    <ul className="elig-why">
+                      {ruleLines(t).map((l) => (
+                        <li key={l.label}><span>{l.label}</span><p>{l.text}</p></li>
+                      ))}
+                    </ul>
+                    {t.note && <p className="elig-memo">{t.note}</p>}
+                  </li>
+                ))}
+              </ul>
+
+              {incomeRows.length > 0 && (
+                <>
+                  <h3 className="elig-sub">가구원수별 월평균소득 기준 ({eligRules.incomeYear}년)</h3>
+                  <div className="tbl">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>가구원수</th>
+                          {incomePcts.map((pct) => <th key={pct} className="num">{pct}%</th>)}
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody>
+                        {incomeRows.map((row) => (
+                          <tr key={row.household}>
+                            <td>{row.household}인</td>
+                            {row.values.map((v, i) => (
+                              <td key={incomePcts[i]} className="num">{v != null ? wonKo(v) : "—"}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </section>
           )}
 
