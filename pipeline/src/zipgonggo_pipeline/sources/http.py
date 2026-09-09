@@ -46,6 +46,10 @@ class ThrottledHttp:
         if wait > 0:
             time.sleep(wait)
 
+    def post(self, url: str, *, data: dict[str, Any], label: str = "") -> httpx.Response:
+        """POST 폼 전송. i-sh 게시판 목록이 GET 파라미터를 안 받고 mainform POST만 받는다."""
+        return self._request("POST", url, data=data, label=label)
+
     def get(
         self, url: str, *, params: dict[str, Any] | None = None, label: str = "", accept_redirect: bool = False
     ) -> httpx.Response:
@@ -53,13 +57,25 @@ class ThrottledHttp:
 
         accept_redirect=True면 3xx도 그대로 돌려준다(Location을 읽어야 할 때. 클라이언트가 follow_redirects=False일 것).
         """
+        return self._request("GET", url, params=params, label=label, accept_redirect=accept_redirect)
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+        label: str = "",
+        accept_redirect: bool = False,
+    ) -> httpx.Response:
         backoff = 1.0
         for attempt in range(1, self.max_retries + 1):
             self._throttle()
             self._last_call_at = time.monotonic()
             self.call_count += 1
             try:
-                resp = self._http.get(url, params=params)
+                resp = self._http.request(method, url, params=params, data=data)
                 if resp.status_code in RETRYABLE_STATUS:
                     raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
                 if accept_redirect and resp.is_redirect:

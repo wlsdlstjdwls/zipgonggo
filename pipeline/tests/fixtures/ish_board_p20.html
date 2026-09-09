@@ -1,0 +1,1235 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- <script type="text/javascript" src="/main/js/sh/netfunnel.js" charset="UTF-8"></script> -->
+<script
+    src="https://netf.i-sh.co.kr/content/netfunnel-statics/agents/client/javascript/netfunnel-javascript-agent.js"
+    data-nf-server-url="https://netf.i-sh.co.kr"
+    data-nf-setting-url="https://netf.i-sh.co.kr/assets/nf-setting/1/nf-setting.json"
+    data-nf-vwr-page-url="https://netf.i-sh.co.kr/content/netfunnel-statics/assets/vwr-page/1/index.html"
+    data-nf-error-page-url="https://netf.i-sh.co.kr/content/netfunnel-statics/assets/vwr-page/error/errorPage.html"
+    data-nf-retry-count="0"
+    data-nf-network-timeout="3000"
+></script>
+<!-- <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script> -->
+<script type="text/javascript">
+//<![CDATA[
+    $(document).ready(function(){
+    	$('#srchWord').on('keydown', function(event) {
+    		if (event.keyCode == '13') { 
+    			goSearch();
+    		}
+    	});
+    	//searchFormChange($('#notType1').val());
+    	
+    	console.log('');
+		if('' != null && '' != ''){
+			alert('');
+			
+		}
+		
+		/* $("#srchFr").next().children().attr('alt', '검색 시작일');
+		$("#srchTo").next().children().attr('alt', '검색 종료일');
+		$(".ui-datepicker-today a").attr('title', '오늘');
+		//$(".ui-datepicker-today a").attr('style', 'color: red !important');
+		
+		$(".ui-state-highlight").attr('title', '오늘'); */
+    });
+    
+	/**
+	 * 페이징
+	 */
+	function getPaging(pageNo, param) {
+		if (pageNo) {
+			$('#page').val(pageNo);
+		}
+		var f = document.mainform;
+		f.submit();
+	}
+	
+	
+	
+	/** 상세 이동 */
+	function getDetailView(seq){
+		
+		/* NetFunnel_Action({action_id:'main'}, function(ev,ret){ 
+			//location.href='http://127.0.0.1/main/lay2/program/S1T294C296/www/brd/m_244/list.do?multi_itm_seq=1';});
+			var f = document.mainform;
+			f.seq.value = seq;
+			f.action = "view.do";
+			f.submit();
+			f.action = "list.do";
+		}); */
+		
+		nfStart({
+			projectKey: "service_1",
+			segmentKey: "main"
+		}, function(response) {
+			// TODO: response에 따라 상황에 맞는 콜백 함수를 구현합니다.
+			if(response.status === "Success" || response.status === "Error" || response.status === "NetworkError") {
+				//location.href='http://127.0.0.1/main/lay2/program/S1T294C296/www/brd/m_244/list.do?multi_itm_seq=1';});
+				var f = document.mainform;
+				f.seq.value = seq;
+				f.action = "view.do";
+				f.submit();
+				f.action = "list.do";	
+			}
+		});
+	}
+	
+	/** 검색 */
+	function goSearch(){
+		$("#page").val(1);
+		var f = document.mainform;
+		f.submit();
+	}
+	
+	
+	/** 목록 건수 이동 */
+	function goList(){
+		var f = document.mainform;
+		f.submit();
+	}
+	function searchFormReset(){
+		$('#splyTy').val('');
+		$('#annType1All').attr('checked',true);
+		$('#annType2All').attr('checked',true);
+		$('#srchFr').val('');
+		$('#srchTo').val('');
+		$('#recSrchFr').val('');
+		$('#recSrchTo').val('');
+		$('select[name=srchTp]').val('0');
+		$('#srchWord').val('');
+		
+	}
+	function searchFormChange(par){
+		//검색 옵션 초기화 함수 넣어야함 
+		//검색 폼 변경
+		switch(par){
+		case '0': //전체
+		case '1': //주택분양
+			$('#splyTy').hide();
+			$('#annTypeTr').show();
+			$('#searchCaption').text('공지분류, 공지유형, 등록기간, 검색어 항목을 가진 검색 옵션 표');
+			$('#searchColgroup').html('<col style="width:120px;"><col>');
+			$('#notType1Tr').removeAttr('colspan');
+			$('#srchTd').removeAttr('colspan');
+			break;
+			break;
+		case '2': //주택임대
+			$('#splyTy').show();
+			$('#annTypeTr').show();
+			$('#searchCaption').text('공지분류, 공지유형, 모집공고상태, 등록기간, 공고일, 검색어 항목을 가진 검색 옵션 표');
+			$('#searchColgroup').html('<col style="width:120px;"><col style="width:340px;"><col style="width:120px;"><col>');
+			$('#notType1Tr').attr('colspan',3);
+			$('#srchTd').attr('colspan',3);
+			break;
+		default: //나머지 
+			$('#splyTy').hide();
+			$('#annTypeTr').hide();
+			$('#searchCaption').text('공지분류, 등록기간, 검색어 항목을 가진 검색 옵션 표');
+			$('#searchColgroup').html('<col style="width:120px;"><col>');
+			$('#notType1Tr').removeAttr('colspan');
+			$('#srchTd').removeAttr('colspan');
+			break;
+		}
+		
+		//숨김 처리
+		
+
+
+		var txt1 ='';
+
+		txt1 += '<th scope="row" id="annTypeTh1">공지유형</th>                                         ' ;
+		txt1 += '<td id="annTypeTd1">                                                              ' ;
+		txt1 += '	<div class="checkBox">                                                         ';
+		txt1 += '		<span class="bg-chk">                                                      ';
+		txt1 += '			<input type="radio" id="annType1All" name="annType1" checked="checked">';
+		txt1 += '			<label for="annType1All">전체공고</label>                                  ';
+		txt1 += '		</span>                                                                    ';
+		txt1 += '		                                                                           ';
+		txt1 += '		<span class="bg-chk">                                                      ';
+		txt1 += '			<input type="radio" id="annType1Now" name="annType1">                  ';
+		txt1 += '			<label for="annType1Now">모집공고</label>                                  ';
+		txt1 += '		</span>                                                                    ';
+		txt1 += '	</div>                                                                         ';
+		txt1 += '</td>                                                                             ' ;
+		if(par == '2'){
+			txt1 += '<th scope="row" id="annTypeTh2">모집공고상태</th>                                      ' ;
+			txt1 += '<td id="annTypeTd2" >                                                             ' ;
+			txt1 += '	<div class="checkBox">                                                         ';
+			txt1 += '		<span class="bg-chk">                                                      ';
+			txt1 += '			<input type="radio" id="annType2All" name="recrnotiState" value="" checked>    ';
+			txt1 += '			<label for="annType2All">전체</label>                                    ';
+			txt1 += '		</span>                                                                    ';
+			txt1 += '		                                                                           ';
+			txt1 += '		<span class="bg-chk">                                                      ';
+			txt1 += '			<input type="radio" id="annType2Now" name="recrnotiState" value="now"> ';
+			txt1 += '			<label for="annType2Now">진행중인 모집공고</label>                            ';
+			txt1 += '		</span>                                                                    ';
+			txt1 += '		                                                                           ';
+			txt1 += '		<span class="bg-chk">                                                      ';
+			txt1 += '			<input type="radio" id="annType2Suc" name="recrnotiState" value="suc"> ';
+			txt1 += '			<label for="annType2Suc">완료된 모집공고</label>                             ';
+			txt1 += '		</span>                                                                    ';
+			txt1 += '	</div>                                                                         ';
+			txt1 += '</td>';
+		}
+		
+		$('#annTypeTr').html(txt1);
+		
+		var txt2 ='';
+
+		txt2 += '<th scope="row" id="srchTh">등록기간</th>                                                                                                                                                                               ';   
+		txt2 += '<td>                                                                                                                                                                                                                ' ;
+		txt2 += '	<div class="datepicker">                                                                                                                                                                                         ' ;
+		txt2 += '		<span><input id="srchFr" name="srchFr" type="text" title="등록기간 시작 년월일 입력. 예) 2021-01-01" placeholder="" ></span>              ';
+		txt2 += '		<span><input id="srchTo" name="srchTo" type="text" title="등록기간 끝 년월일 입력. 예) 2021-01-01" placeholder=""  ></span>             ';
+		txt2 += '	</div>                                                                                                                                                                                                           ' ;
+		txt2 += '</td>                                                                                                                                                                                                               ' ;
+		if(par == '2'){
+			txt2 += '<th scope="row" id="recSrchTh" >공고일</th>                                                                                                ';
+			txt2 += '<td id="recSrchTd">                                                                                                                    ' ;
+			txt2 += '	<div class="datepicker">                                                                                                                                                                                         ' ;
+			txt2 += '		<span><input id="recSrchFr" name="recSrchFr" type="text" title="공고기간 시작 년월일 입력. 예) 2021-01-01" placeholder=""></span>  ';
+			txt2 += '		<span><input id="recSrchTo" name="recSrchTo" type="text" title="공고기간 끝 년월일 입력. 예) 2021-01-01" placeholder=""></span>';
+			txt2 += '	</div>                                                                                                                                                                                                           ' ;
+			txt2 += '</td>      '; 
+		}
+		$('#srchTimeTr').html(txt2);
+		
+		if($('.datepicker').length > 0){
+			
+			$('.datepicker span input').fn_datepicker();
+			// readonly, disabled 일때 기능을 제외한 디자인적인 요소 변경
+			setTimeout(function(){
+				$(".datepicker input[readonly]").each(function(){
+					$(this).closest(".datepicker").addClass("readonly");
+					$(this).closest(".datepicker").find('button').attr('title', '읽기전용. 날짜 변경 불가')
+				});
+				
+				$(".datepicker input[disabled]").each(function(){
+					$(this).closest(".datepicker").addClass("disabled");
+					$(this).closest(".datepicker").find('button').attr('disabled', true)
+				});
+			},1);
+		}
+		
+		
+		
+	}
+	function appendSearch(){
+		
+		
+		//날짜 유효성 체크
+		
+		var srchFr = $('#srchFr').val();
+		var srchTo = $('#srchTo').val();
+		
+		if(srchFr != '' && srchTo != '' && srchFr > srchTo ){
+			alert('등록기간 검색 시작일자는 검색 종료일자보다 빨라야합니다.');
+			return;	
+		}
+		
+		var recSrchFr = $('#recSrchFr').val();
+		var recSrchTo = $('#recSrchTo').val();
+		
+		if(recSrchFr != '' && recSrchTo != '' && recSrchFr > recSrchTo ){
+			alert('공고기간 검색 시작일자는 검색 종료일자보다 빨라야합니다.');
+			return;	
+		}
+		
+		
+		$('input[name="itm_seq_1"]').val('');
+		$('input[name="multi_itm_seq"]').val('');
+		$('input[name="multi_itm_seqsStr"]').val('');
+		$('#itm_seq_2').val('');
+		
+		var par = $('#notType1').val();
+		
+		var itmSeq2 = $('#splyTy').val();
+		
+		//링크 보낼 곳
+		var actStr = '';
+		
+		//hidden 값 변경 
+		switch(par){
+			case '1' : //주택분양
+				actStr = '/main/lay2/program/S1T294C296/www/brd/m_244/list.do?multi_itm_seq=1';
+				break;
+			case '2' : //주택임대
+				actStr = '/main/lay2/program/S1T297C4476/www/brd/m_247/list.do?multi_itm_seq=2';
+				break;
+			case '3' : //주택매입
+				actStr = '/main/lay2/program/S1T294C3379/www/brd/m_247/list.do?multi_itm_seq=512';
+				break;
+			case '4' : //입주안내
+				actStr = '/main/lay2/program/S1T294C298/www/brd/m_248/list.do?multi_itm_seq=4';
+				break;
+			case '5' : // 토지
+				actStr = '/main/lay2/program/S1T294C299/www/brd/m_255/list.do?multi_itm_seq=8';
+				break;
+			case '6' : // 상가,공장 
+				actStr = '/main/lay2/program/S1T294C300/www/brd/m_256/list.do?multi_itm_seq=16';
+				break;
+			case '7' : // 보상,이주
+				actStr = '/main/lay2/program/S1T294C301/www/brd/m_257/list.do?multi_itm_seq=32';
+				break;
+			case '8' : //현상설계
+				actStr = '/main/lay2/program/S1T294C302/www/brd/m_258/list.do?multi_itm_seq=64';
+				break;
+			case '9' : //기타
+				actStr = '/main/lay2/program/S1T294C304/www/brd/m_260/list.do?multi_itm_seq=256';
+				break;
+			case '0' : //전체 처리
+			default  :
+				actStr = '/main/lay2/program/S1T294C295/www/brd/m_241/list.do?multi_itm_seqs=1,2,4,8,16,32,64,128,256,512,1024';
+				break;
+		}
+		
+		var isRecrnoti = '';
+
+		var recrnotiState = $('input:radio[name="recrnotiState"]:checked').val();
+		var recSrchFr = $('#recSrchFr').val();
+		var recSrchTo = $('#recSrchTo').val();
+		
+		if( (recrnotiState != null &&recrnotiState != '' )|| ( recSrchFr != null && recSrchFr != '' )|| ( recSrchTo!=null && recSrchTo!='' ) ){
+			isRecrnoti = 'Y';
+		}
+		
+		$('#isRecrnoti').val(isRecrnoti);
+		
+		if($('#annType1Now').is(':checked')){
+			$('#itm_seq_1').val('1');
+		} else {
+			$('#itm_seq_1').val('0');
+		}
+		
+		
+		
+		$('#mainform').attr('action',actStr);
+		goSearch();
+	}
+//]]>
+</script>
+
+
+
+	
+
+	<form name="mainform" id="mainform" action="./list.do" method="post" onSubmit="$('#page').val(1); return true;">
+		<input type="hidden" name="page" id="page" value="20" />
+		<input type="hidden" name="seq" id="seq" value="" />
+		<input type="hidden" name="itm_seq_1" id="itm_seq_1" value="0" />
+		
+		<input type="hidden" name="multi_itm_seq" value="0" />
+		<input type="hidden" name="multi_itm_seqsStr" value="" />
+		<input type="hidden" name="isRecrnoti" id="isRecrnoti" value="Y" />
+		
+
+ 			
+				<!--보도자료, 해명자료 등록일자로 검색하도록 추가 -->
+				
+				<!-- 공고및 공지 -->
+				
+				<!-- 검색 옵션 -->
+				<div class="box-toggle on">
+					<div class="tit">
+						<button type="button" class="toggle">검색옵션 닫기</button>
+					</div>
+						
+					<div class="cont" style="display: block;">
+						<div class="board-form">
+							<!-- 주택임대 선택시 -->
+							<table>
+								<caption id="searchCaption">공지분류, 공지유형, 등록기간, 검색어 항목을 가진 검색 옵션 표</caption>
+								<colgroup id="searchColgroup">
+									
+									<col style="width:120px;">
+									<col>
+								</colgroup>
+								<tbody>
+									<tr>
+										<th scope="row">공지분류</th>
+										<td id="notType1Tr"   >
+											<select id="notType1" name="notType1" title="공지분류 선택" class="sel01" onchange="searchFormReset();searchFormChange($(this).val());">
+												<option value="0"  selected >전체</option>
+												<option value="1" >주택분양</option>
+												<option value="2" >주택임대</option>
+												<option value="3" >주택매입</option>
+												<option value="4" >입주안내</option>
+												<option value="5" >토지</option>
+												<option value="6" >상가/공장</option>
+												<option value="7" >보상/이주</option>
+												<option value="8" >현상설계</option>
+												<option value="9" >기타</option>
+											</select>
+											
+											<select id="splyTy" name="splyTy" title="주택임대 종류 선택" class="sel01"   style='display:none' >
+												<option value="">전체</option>
+												
+													<option value="02" >국민공공임대주택</option>
+												
+													<option value="03" >장기전세주택</option>
+												
+													<option value="04" >매입임대주택</option>
+												
+													<option value="05" >장기안심주택</option>
+												
+													<option value="06" >희망하우징</option>
+												
+													<option value="07" >행복주택</option>
+												
+													<option value="10" >청년안심주택</option>
+												
+													<option value="20" >전세임대</option>
+												
+													<option value="22" >영구임대주택</option>
+												
+													<option value="23" >재개발임대주택</option>
+												
+													<option value="11" >두레주택</option>
+												
+													<option value="12" >사회주택</option>
+												
+													<option value="13" >도시형생활주택</option>
+												
+													<option value="14" >수요자맞춤형</option>
+												
+											</select>
+										</td>
+									</tr>
+									<tr id="annTypeTr" >
+										<th scope="row" id="annTypeTh1">공지유형</th>
+										<td id="annTypeTd1">
+											<div class="checkBox">
+												<span class="bg-chk">
+													<input type="radio" id="annType1All" name="annType1" checked="checked">
+													<label for="annType1All">전체공고</label>
+												</span>
+												
+												<span class="bg-chk">
+													<input type="radio" id="annType1Now" name="annType1"   >
+													<label for="annType1Now">모집공고</label>
+												</span>
+											</div>
+										</td>
+									
+									</tr>
+									<tr id="srchTimeTr">
+										<th scope="row" id="srchTh">등록기간</th>
+										<td>
+											<div class="datepicker">
+												<span><input id="srchFr" name="srchFr" type="text" title="등록기간 시작 년월일 입력. 예) 2021-01-01" placeholder="" ></span>
+												<span><input id="srchTo" name="srchTo" type="text" title="등록기간 끝 년월일 입력. 예) 2021-01-01" placeholder=""   ></span>
+											</div>
+										</td>
+																		
+									</tr>									
+									<tr>
+										<th scope="row">검색어</th>
+										<td id="srchTd"  >
+											<div class="srch srch100">
+												<select name="srchTp" id="s_keyword" title="검색목록선택" >
+													<option value="0" >제목</option>
+													<option value="1" >내용</option>
+													<option value="3" >담당부서</option>
+													<option value="10" >전체</option>
+												</select>
+												<input type="text" value="" name="srchWord" id="srchWord" title="검색어 입력" placeholder="검색어 입력"  class="input-text"/>
+											</div>
+										</td>
+									</tr>
+								</tbody>
+							</table>
+							<!--// 주택임대 검색시 -->
+							
+							<div class="btn-area">
+								<a href="javascript:void(0);" class="btn btnGreen" onclick="appendSearch();">조회</a>
+								<a href="javascript:void(0);" class="btn btnGray" onclick="searchFormReset();">초기화</a>
+							</div>
+						</div>
+					</div>
+
+				</div>
+				<!--// 검색 옵션 -->
+				
+				<!-- faq만 따로 -->
+				
+				<!--// 검색 영역 -->
+	
+				<!-- 테이블 탑 -->
+				<div class="topTxt">
+					<div class="mentcount">총 <strong class="cBrown bold">449</strong> 건 [20/45페이지]</div>
+					
+					</div>
+				
+		</form>
+				<!--// 테이블 탑 -->
+				
+					
+						<!-- 테이블 영역 -->
+						<div id="listTb" class="listTable colRm">
+							<table>
+								<!-- 캡션 -->
+								<caption>		
+										
+											
+									
+									
+									
+									
+									
+									
+									공고 및 공지 목록
+								</caption>
+								
+								
+									
+								
+								 
+								 
+								 
+								 
+								 
+								 
+								
+								
+								
+									<!-- 번호 -->
+									
+								
+								
+								
+								
+								
+								
+								<!-- 제목 -->
+								
+								
+								
+								
+									<!-- 부서명 -->
+									
+								
+								
+								
+									<!-- 등록일  -->
+									
+								
+								
+									<!-- 조회수  -->
+									 <!-- 조회수는 글번호와 같이 빠진다  -->
+								
+								
+								
+								
+								
+								<!-- 반응형으로 삭제되는 컬럼 지정 -->								
+								 
+									
+									
+									
+										
+										
+										
+										
+										
+											
+											<script>$(function(){ $("#listTb").addClass("col1  col4 col5   col3"); });</script>
+											
+											
+												
+												 
+													 
+														
+														<script>$(function(){ $("#listTb").removeClass("col4"); });</script>
+													
+																										
+													
+												
+												
+											
+										
+									
+								
+								
+								<colgroup>
+								
+									
+										<col style="width :10%" />
+									<!-- 번호 -->
+									
+									
+									
+									
+									
+									<col style="width: auto" />
+									<!-- 제목 -->
+									
+									
+									
+										<col style="width :160px" />
+									<!-- 부서명 -->
+									
+									
+									
+										<col style="width :100px" />
+									<!-- 작성일 -->
+									
+									
+										<col style="width :80px" />
+									<!-- 조회수 -->
+									
+									
+									
+									
+								
+								
+								</colgroup>
+								<thead>
+								
+									<tr>
+										
+											<th scope="col">번호</th>
+										<!-- 번호 -->
+										
+										
+										
+										
+										
+											<th scope="col">제목</th>
+										<!-- 제목 -->
+																				
+										<!-- bckang 리스트에서 첨부파일 삭제 -->
+										
+										
+											<th scope="col">담당부서</th>
+										<!-- 부서명 -->
+										
+										
+										
+										
+											<th scope="col">등록일</th>
+										<!-- 작성일 -->
+										
+										
+											<th scope="col">조회수</th>
+										<!-- 조회수 -->
+										
+										
+										
+									</tr>
+								
+									
+								</thead>
+								<tbody>
+								<!-- 공지여부 -->
+								
+								
+								
+									<tr>
+										
+											<td>259</td>
+											<!-- 번호 -->
+										
+										
+										
+										
+										
+										<td class="txtL">
+											
+												<a href="#" class="ellipsis " onclick="javascript:getDetailView('219390');return false;">
+											
+												
+											제37차 장기전세주택 모집공고(19.07.31.) 예비4차 입주대상자 발표
+											
+												</a>
+											
+										</td>
+										<!-- 제목 -->
+										
+										<!-- 첨부파일 Start -->
+										
+										<!-- 첨부파일 End -->
+										
+											<td>
+												공공주택부
+											</td>
+											<!-- 부서명 -->
+										
+										
+										
+										
+											
+												
+													<td class="num">
+														
+															
+															2020-08-14
+														
+													</td>
+												
+											
+											
+										
+										
+											<td class="num">20079</td>
+											<!-- 조회수 -->
+										
+										
+										
+									</tr>
+									
+									
+								
+								
+									<tr>
+										
+											<td>258</td>
+											<!-- 번호 -->
+										
+										
+										
+										
+										
+										<td class="txtL">
+											
+												<a href="#" class="ellipsis " onclick="javascript:getDetailView('218884');return false;">
+											
+												
+											2020년 1차 역세권청년주택(공공임대) 입주자모집 공고
+											
+												</a>
+											
+										</td>
+										<!-- 제목 -->
+										
+										<!-- 첨부파일 Start -->
+										
+										<!-- 첨부파일 End -->
+										
+											<td>
+												청신호주택부
+											</td>
+											<!-- 부서명 -->
+										
+										
+										
+										
+											
+												
+													<td class="num">
+														
+															
+															2020-07-31
+														
+													</td>
+												
+											
+											
+										
+										
+											<td class="num">79652</td>
+											<!-- 조회수 -->
+										
+										
+										
+									</tr>
+									
+									
+								
+								
+									<tr>
+										
+											<td>257</td>
+											<!-- 번호 -->
+										
+										
+										
+										
+										
+										<td class="txtL">
+											
+												<a href="#" class="ellipsis " onclick="javascript:getDetailView('217789');return false;">
+											
+												
+											2020년 공공·주거환경임대주택 입주자 모집공고(2020.07.03.)
+											
+												</a>
+											
+										</td>
+										<!-- 제목 -->
+										
+										<!-- 첨부파일 Start -->
+										
+										<!-- 첨부파일 End -->
+										
+											<td>
+												공공주택부
+											</td>
+											<!-- 부서명 -->
+										
+										
+										
+										
+											
+												
+													<td class="num">
+														
+															
+															2020-07-03
+														
+													</td>
+												
+											
+											
+										
+										
+											<td class="num">60287</td>
+											<!-- 조회수 -->
+										
+										
+										
+									</tr>
+									
+									
+								
+								
+									<tr>
+										
+											<td>256</td>
+											<!-- 번호 -->
+										
+										
+										
+										
+										
+										<td class="txtL">
+											
+												<a href="#" class="ellipsis " onclick="javascript:getDetailView('217490');return false;">
+											
+												
+											2020년 1차 행복주택 모집 공고(2020. 6. 25.)
+											
+												</a>
+											
+										</td>
+										<!-- 제목 -->
+										
+										<!-- 첨부파일 Start -->
+										
+										<!-- 첨부파일 End -->
+										
+											<td>
+												공공주택부
+											</td>
+											<!-- 부서명 -->
+										
+										
+										
+										
+											
+												
+													<td class="num">
+														
+															
+															2020-06-25
+														
+													</td>
+												
+											
+											
+										
+										
+											<td class="num">184798</td>
+											<!-- 조회수 -->
+										
+										
+										
+									</tr>
+									
+									
+								
+								
+									<tr>
+										
+											<td>255</td>
+											<!-- 번호 -->
+										
+										
+										
+										
+										
+										<td class="txtL">
+											
+												<a href="#" class="ellipsis " onclick="javascript:getDetailView('217379');return false;">
+											
+												
+											2020년 2차 청년 매입임대주택 입주자 모집공고(2020.06.22.)
+											
+												</a>
+											
+										</td>
+										<!-- 제목 -->
+										
+										<!-- 첨부파일 Start -->
+										
+										<!-- 첨부파일 End -->
+										
+											<td>
+												맞춤주택부
+											</td>
+											<!-- 부서명 -->
+										
+										
+										
+										
+											
+												
+													<td class="num">
+														
+															
+															2020-06-22
+														
+													</td>
+												
+											
+											
+										
+										
+											<td class="num">58825</td>
+											<!-- 조회수 -->
+										
+										
+										
+									</tr>
+									
+									
+								
+								
+									<tr>
+										
+											<td>254</td>
+											<!-- 번호 -->
+										
+										
+										
+										
+										
+										<td class="txtL">
+											
+												<a href="#" class="ellipsis " onclick="javascript:getDetailView('217036');return false;">
+											
+												
+											제37차 장기전세주택 모집공고(19.07.31.) 예비3차 입주대상자 발표
+											
+												</a>
+											
+										</td>
+										<!-- 제목 -->
+										
+										<!-- 첨부파일 Start -->
+										
+										<!-- 첨부파일 End -->
+										
+											<td>
+												공공주택부
+											</td>
+											<!-- 부서명 -->
+										
+										
+										
+										
+											
+												
+													<td class="num">
+														
+															
+															2020-06-12
+														
+													</td>
+												
+											
+											
+										
+										
+											<td class="num">33459</td>
+											<!-- 조회수 -->
+										
+										
+										
+									</tr>
+									
+									
+								
+								
+									<tr>
+										
+											<td>253</td>
+											<!-- 번호 -->
+										
+										
+										
+										
+										
+										<td class="txtL">
+											
+												<a href="#" class="ellipsis " onclick="javascript:getDetailView('217023');return false;">
+											
+												
+											2020년 청년창업인 임대주택 입주자 모집(2020. 6. 12.공고)
+											
+												</a>
+											
+										</td>
+										<!-- 제목 -->
+										
+										<!-- 첨부파일 Start -->
+										
+										<!-- 첨부파일 End -->
+										
+											<td>
+												개발금융운영부
+											</td>
+											<!-- 부서명 -->
+										
+										
+										
+										
+											
+												
+													<td class="num">
+														
+															
+															2020-06-12
+														
+													</td>
+												
+											
+											
+										
+										
+											<td class="num">10359</td>
+											<!-- 조회수 -->
+										
+										
+										
+									</tr>
+									
+									
+								
+								
+									<tr>
+										
+											<td>252</td>
+											<!-- 번호 -->
+										
+										
+										
+										
+										
+										<td class="txtL">
+											
+												<a href="#" class="ellipsis " onclick="javascript:getDetailView('217022');return false;">
+											
+												
+											2020년 제2차 청년음악인 임대주택 입주자 모집(2020. 6. 12)
+											
+												</a>
+											
+										</td>
+										<!-- 제목 -->
+										
+										<!-- 첨부파일 Start -->
+										
+										<!-- 첨부파일 End -->
+										
+											<td>
+												개발금융운영부
+											</td>
+											<!-- 부서명 -->
+										
+										
+										
+										
+											
+												
+													<td class="num">
+														
+															
+															2020-06-12
+														
+													</td>
+												
+											
+											
+										
+										
+											<td class="num">7865</td>
+											<!-- 조회수 -->
+										
+										
+										
+									</tr>
+									
+									
+								
+								
+									<tr>
+										
+											<td>251</td>
+											<!-- 번호 -->
+										
+										
+										
+										
+										
+										<td class="txtL">
+											
+												<a href="#" class="ellipsis " onclick="javascript:getDetailView('216571');return false;">
+											
+												
+											고덕강일 공공주택지구 8, 14단지 입주자모집공고
+											
+												</a>
+											
+										</td>
+										<!-- 제목 -->
+										
+										<!-- 첨부파일 Start -->
+										
+										<!-- 첨부파일 End -->
+										
+											<td>
+												분양수납부
+											</td>
+											<!-- 부서명 -->
+										
+										
+										
+										
+											
+												
+													<td class="num">
+														
+															
+															2020-06-02
+														
+													</td>
+												
+											
+											
+										
+										
+											<td class="num">152622</td>
+											<!-- 조회수 -->
+										
+										
+										
+									</tr>
+									
+									
+								
+								
+									<tr>
+										
+											<td>250</td>
+											<!-- 번호 -->
+										
+										
+										
+										
+										
+										<td class="txtL">
+											
+												<a href="#" class="ellipsis " onclick="javascript:getDetailView('216362');return false;">
+											
+												
+											2020년 제1차 국민임대주택 입주자 모집공고(2020.5.28.공고)
+											
+												</a>
+											
+										</td>
+										<!-- 제목 -->
+										
+										<!-- 첨부파일 Start -->
+										
+										<!-- 첨부파일 End -->
+										
+											<td>
+												공공주택부
+											</td>
+											<!-- 부서명 -->
+										
+										
+										
+										
+											
+												
+													<td class="num">
+														
+															
+															2020-05-28
+														
+													</td>
+												
+											
+											
+										
+										
+											<td class="num">166643</td>
+											<!-- 조회수 -->
+										
+										
+										
+									</tr>
+									
+									
+								
+								
+								</tbody>
+							</table>
+						</div>
+						<!--// 테이블 영역 -->
+					
+					
+				
+ 
+				<!-- 페이징 영역 -->
+				<div class="pagingWrap">
+					<div class="inner"><a href="#none" onclick="getPaging(1,null);return false" class="btnFirst">첫페이지</a>
+<a href="#none" onclick="getPaging(15,null);return false" class="btnPrev">이전페이지</a>
+<div class="page"><a href="#none" onclick="getPaging(16,null);return false">16</a>
+<a href="#none" onclick="getPaging(17,null);return false">17</a>
+<a href="#none" onclick="getPaging(18,null);return false">18</a>
+<a href="#none" onclick="getPaging(19,null);return false">19</a>
+<strong>20</strong>
+</div><a href="#none" onclick="getPaging(21,null);return false" class="btnNext">다음페이지</a>
+<a href="#none" onclick="getPaging(45,null);return false" class="btnLast">마지막페이지</a></div>
+
+				</div>
+				
+				<!--// 페이징 영역 -->
+				
+<script type="text/javascript">
+	$(document).ready(function(){	
+		/* NetFunnel_Complete(); */
+		nfStop({
+			projectKey: "service_1",
+			segmentKey: "main"
+		});
+	});	
+</script>
