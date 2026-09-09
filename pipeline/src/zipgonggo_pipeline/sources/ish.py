@@ -5,7 +5,9 @@
 - 그 링크는 302 → `/main/skin/doc.html?fn={fn}&rs={rs}`. 뷰어(Synap)는 페이지 텍스트를
   `{rs}{fn}.files/{fn}_{page}.xml` 에서 읽는다. page는 1부터, 없는 번호는 `/error/error.html`로 302.
 - XML은 글자 단위 `<text l t w h>글자</text>`. 줄·칸 복원은 좌표로 한다(page_rows).
-- robots.txt: `Disallow: /upload`는 루트 경로만이다. `/main/upload/…`는 허용.
+- 경로 프리픽스가 둘이다: 최근 게시판은 `/main/…`, 구 게시판(2020년 등)은 `/app/…`. rs·미리보기 링크 모두 해당.
+- robots.txt: `Disallow: /upload`는 루트 경로만이다. `/main/upload/…`·`/app/upload/…`는 허용.
+- User-Agent가 문자열 `curl/…`이면 307 → /error/error.html. 그 외(기본 UA 포함)는 정상. 조사 때 curl로 죽었다고 오판하지 말 것.
 - PDF 파일 자체(existFile JS 다운로드)는 받지 않는다 — CLAUDE.md 「하지 말 것 5」. 텍스트 XML도 data/raw 캐시에만 둔다.
 """
 
@@ -26,9 +28,9 @@ from .http import ThrottledHttp
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://www.i-sh.co.kr"
-PREVIEW_RE = re.compile(r'href="(/main/com/util/htmlConverter\.do\?[^"]+)"')
+PREVIEW_RE = re.compile(r'href="(/(?:main|app)/com/util/htmlConverter\.do\?[^"]+)"')
 ATTACH_ROW_RE = re.compile(
-    r'<a[^>]+class="btnAttach[^"]*"[^>]*>\s*(?P<name>[^<]+?)\s*</a>.*?href="(?P<preview>/main/com/util/htmlConverter\.do\?[^"]+)"',
+    r'<a[^>]+class="btnAttach[^"]*"[^>]*>\s*(?P<name>[^<]+?)\s*</a>.*?href="(?P<preview>/(?:main|app)/com/util/htmlConverter\.do\?[^"]+)"',
     re.S,
 )
 TEXT_RE = re.compile(r"<text l='([\d.]+)' t='([\d.]+)' w='([\d.]+)' h='([\d.]+)'\s*>(.*?)</text>", re.S)

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from zipgonggo_pipeline.parsers.sh_complex import ROAD_ADDR_RE, parse_location_table
-from zipgonggo_pipeline.sources.ish import find_attachments, group_rows, page_rows, parse_chars
+from zipgonggo_pipeline.sources.ish import SynapDoc, find_attachments, group_rows, page_rows, parse_chars
 
 FIX = Path(__file__).parent / "fixtures" / "ish_309467"
 PAGES = [(n, (FIX / f"p{n}.xml").read_text(encoding="utf-8")) for n in (49, 50, 51, 52)]
@@ -86,3 +86,20 @@ def test_find_attachments_from_markup():
     assert len(atts) == 1
     assert atts[0].name == "제51차 장기전세 입주자 모집공고.pdf"
     assert atts[0].preview_url == "https://www.i-sh.co.kr/main/com/util/htmlConverter.do?brd_id=GS0401&seq=309467&data_tp=A&file_seq=1"
+
+
+def test_find_attachments_old_board_app_prefix():
+    """구 게시판(2020년 등)은 /app/ 프리픽스를 쓴다 — /main/만 받으면 아카이브 백필이 통째로 비어 나온다."""
+    html = """
+    <tr><td><a href="#" class="btnAttach" onclick="existFile('0'); return false;">2020 행복주택 매입형 공고문.pdf</a></td>
+    <td><a href="/app/com/util/htmlConverter.do?brd_id=JI1901&amp;seq=1234&amp;data_tp=A&amp;file_seq=1">미리보기</a></td></tr>
+    """
+    atts = find_attachments(html)
+    assert len(atts) == 1
+    assert atts[0].preview_url.endswith("/app/com/util/htmlConverter.do?brd_id=JI1901&seq=1234&data_tp=A&file_seq=1")
+
+
+def test_synap_doc_page_url_keeps_rs_prefix():
+    """rs는 302 Location에 실려 오는 값이라 /app/이든 /main/이든 그대로 써야 한다."""
+    doc = SynapDoc(rs="/app/upload/bbs/JI1901/html/", fn="20200625112039731")
+    assert doc.page_url(1) == "https://www.i-sh.co.kr/app/upload/bbs/JI1901/html/20200625112039731.files/20200625112039731_1.xml"
