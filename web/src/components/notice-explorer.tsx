@@ -22,9 +22,10 @@ type Props = {
 };
 
 export function NoticeExplorer({ initial }: Props) {
-  const { f, sido, ready, reset } = useListState();
-  const serverKey = feedParams({ sido });
-  const key = feedParams({ ...f, sido });
+  const { f, pathSido, ready, reset } = useListState();
+  // 서버가 렌더해 준 첫 페이지의 조건 — 홈은 무필터, /area/{시도}는 그 시도만
+  const serverKey = feedParams({ sido: pathSido });
+  const key = feedParams(f);
 
   const [page, setPage] = useState<NoticePage>(initial);
   const [items, setItems] = useState<NoticeListItem[]>(initial.items);

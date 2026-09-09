@@ -1,7 +1,8 @@
 "use client";
 
 // 스코프 바 — 부문(공공/민간)+시도. 헤더 바로 아래 상시 노출, 필터(FilterBar)보다 상위 범위.
-// 부문은 이제 URL에 남지 않는다(ListStateProvider가 들고 localStorage에 저장) — 시도만 경로(/area/{시도})다.
+// 부문도 시도도 URL에 남지 않는다 — ListStateProvider가 들고 localStorage에 저장한다(사용자 요청 2026-09-09).
+// 목록 화면(홈, /area/{시도})에서만 보인다. 공고 상세에선 스코프를 바꿀 일이 없어 감춘다.
 // "부문은 갈림길 페이지를 만들지 않는다"(6차 결정, 민간임대 0건이라 카드 2장이면 절반이 빈 문)는 그대로다.
 import { AREA_MIN_COUNT } from "@/lib/constants";
 import { SECTORS, type FilterOption, type Sector } from "@/types/notice";
@@ -11,7 +12,9 @@ import { Select } from "./select";
 type Props = { sidoOptions: FilterOption[]; sectorOptions: FilterOption[] };
 
 export function ScopeBar({ sidoOptions, sectorOptions }: Props) {
-  const { f, sido, set, goSido } = useListState();
+  const { f, isList, set, setSido } = useListState();
+  if (!isList) return null;
+  const sido = f.sido;
 
   const total = sidoOptions.reduce((a, o) => a + o.count, 0);
   const countOf = (s: Sector) => sectorOptions.find((o) => o.value === s)?.count ?? 0;
@@ -41,7 +44,7 @@ export function ScopeBar({ sidoOptions, sectorOptions }: Props) {
       <Select
         value={sido ?? ""}
         options={sidoOptions.filter((o) => o.count >= AREA_MIN_COUNT).map((o) => ({ value: o.value, label: o.value, count: o.count }))}
-        onChange={(v) => goSido(v || undefined)}
+        onChange={(v) => setSido(v || undefined)}
         placeholder="전국"
         ariaLabel="시도"
       />
