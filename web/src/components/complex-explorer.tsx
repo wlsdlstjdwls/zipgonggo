@@ -12,6 +12,7 @@ import { geocodeAll, hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-m
 import { num, wonExact, wonKo, wonShort } from "@/lib/format";
 import type { NoticeComplex } from "@/types/notice";
 import { ComplexMap, type MapItem } from "./complex-map";
+import { Select } from "./select";
 
 type Props = { items: NoticeComplex[]; hasUnits: boolean; noticeSlug: string };
 type Phase = "loading" | "ready" | "failed" | "no-key";
@@ -118,10 +119,13 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug }: Props) {
     <div className="cx">
       <div className="cx-panel">
         <div className="cx-tools">
-          <select value={gu} onChange={(e) => { setGu(e.target.value); setSelected(null); }} aria-label="자치구" className={`sel${gu ? " on" : ""}`}>
-            <option value="">자치구 전체</option>
-            {gus.map(([g, n]) => <option key={g} value={g}>{g} ({n})</option>)}
-          </select>
+          <Select
+            value={gu}
+            options={gus.map(([g, n]) => ({ value: g, label: g, count: n }))}
+            onChange={(v) => { setGu(v); setSelected(null); }}
+            placeholder="자치구 전체"
+            ariaLabel="자치구"
+          />
           <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setSelected(null); }} placeholder="단지명, 주소 검색" aria-label="단지명, 주소 검색" className="fld" />
         </div>
         <p className="cx-count"><b>{visible.length}</b> / {items.length}{hasUnits ? "단지" : "곳"}</p>

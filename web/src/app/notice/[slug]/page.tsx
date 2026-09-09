@@ -8,7 +8,7 @@ import { NaverMap } from "@/components/naver-map";
 import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
-import { count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonShort } from "@/lib/format";
+import { applyPhase, count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonShort } from "@/lib/format";
 import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
@@ -69,6 +69,9 @@ export default async function NoticePage({ params }: Params) {
   const lo = n.min_rent != null ? n.min_rent : n.min_deposit;
   const range_ = hi != null && lo != null && hi > lo ? wonShort(hi) : null;
   const hasSchedule = Boolean(n.apply_start_at || n.apply_end_at || n.announce_at);
+  const ph = applyPhase(n);
+  // 헤드라인에서 뺀 금액 — 제원 패널 한 줄로. 범위가 있으면 "최소~최대"
+  const moneyRow = m ? (range_ ? `${m.main}~${range_}` : `${m.main}부터`) : null;
 
   const steps: { label: string; value: string | null; on?: boolean }[] = [
     { label: "공고일", value: dateK(n.posted_at, true) },
@@ -96,20 +99,12 @@ export default async function NoticePage({ params }: Params) {
               {n.amends_source_key && <span className="tag acc">정정공고</span>}
             </div>
             <h1 className="d-title">{n.title}</h1>
-            {m ? (
-              <>
-                <span className="jumbo-label">{m.label}</span>
-                <b className="jumbo">{range_ ? `${m.main}~${range_}` : m.main}</b>
-                {!range_ && <span className="jumbo-from">부터</span>}
-                {m.sub && <span className="jumbo-sub">{m.sub} 부터, 공고 최소값</span>}
-                {range_ && <span className="jumbo-sub">단지별 면적별 {m.label} 범위, 첨부 공고문 공급현황 표</span>}
-              </>
-            ) : (
-              <>
-                <span className="jumbo-label">보증금과 임대료</span>
-                <span className="jumbo-sub" style={{ marginTop: 0 }}>목록 데이터에 금액이 없습니다. {L.originalDoc}의 표를 확인하세요.</span>
-              </>
-            )}
+            {/* 헤드라인은 금액이 아니라 접수 상태다(사용자 요청 2026-09-09). 금액은 우측 제원 패널과 단지 목록에 남는다 */}
+            <div className={`d-apply tone-${ph.tone}`}>
+              <span className="d-apply-k">접수</span>
+              <b>{ph.label}</b>
+              {ph.note && <span className="d-apply-s">{ph.note}</span>}
+            </div>
           </header>
 
           {complexes.length > 0 && (
@@ -202,10 +197,10 @@ export default async function NoticePage({ params }: Params) {
         </div>
 
         <DetailAside
-          tone={d.tone}
-          ddayLabel={d.days === null || d.days < 0 ? "접수" : `${d.unit}까지`}
+          tone={ph.tone}
+          ddayLabel={d.unit}
           ddayNum={d.num}
-          ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)} ${d.days !== null && d.days < 0 ? "마감됨" : "마감"}` : (n.source_status ?? "일정 미정")}
+          ddayNote={ph.note ?? ph.label}
           cta={
             <>
               <ExternalLink className="btn acc lg" href={n.source_url}>{L.original}</ExternalLink>
@@ -214,6 +209,8 @@ export default async function NoticePage({ params }: Params) {
             </>
           }
           rows={[
+            { label: m ? m.label : "금액", value: moneyRow ?? "원문 확인" },
+            ...(m?.sub ? [{ label: "보증금", value: `${m.sub.replace("보증금 ", "")}부터` }] : []),
             { label: "공급기관", value: n.agency },
             { label: "공급유형", value: n.housing_type },
             { label: "지역", value: region },

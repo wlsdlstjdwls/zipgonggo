@@ -45,16 +45,6 @@ export function writeScope(s: Scope): void {
   }
 }
 
-/** "전국 전체"로 되돌릴 때(헤더 로고). */
-export function clearScope(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(SCOPE_STORAGE_KEY);
-  } catch {
-    // 무시
-  }
-}
-
 /** 목록 상태 → 경로. sido가 있으면 /area/{시도}, 없으면 "/". 나머지는 쿼리로. */
 export function scopePath(s: Scope): string {
   return s.sido ? areaPath(s.sido, s) : homePath(s);

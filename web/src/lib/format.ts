@@ -60,6 +60,8 @@ export function ddayChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_a
   }
   if (toEnd < 0) return { num: "마감", unit: "종료", tone: "soft", days: toEnd };
   if (toStart !== null && toStart > 0) return { num: `D-${toStart}`, unit: "접수 시작", tone: "acc", days: toStart };
+  // 오늘 접수가 열린 날은 마감 D-day보다 이 사실이 먼저다(사용자 요청 2026-09-09)
+  if (toStart === 0) return { num: "오늘", unit: "접수 시작", tone: "acc", days: toEnd };
   if (toEnd === 0) return { num: "오늘", unit: "마감", tone: "hot", days: 0 };
   return { num: `D-${toEnd}`, unit: "마감", tone: toEnd <= DDAY_URGENT_DAYS ? "hot" : toEnd <= DDAY_SOON_DAYS ? "warn" : "soft", days: toEnd };
 }
@@ -116,4 +118,31 @@ export function num(n: number | null | undefined, unit = ""): string {
 /** 건수 표기 "1,234건". 0도 표시한다. */
 export function count(n: number, unit = "건"): string {
   return `${n.toLocaleString(KO)}${unit}`;
+}
+
+/**
+ * 접수 상태 — 상세 헤드라인과 목록 행이 같은 문장을 쓴다(사용자 요청 2026-09-09: 접수 시작을 위에서 강조).
+ * label은 크게 쓰는 한 마디, note는 그 밑 날짜 줄, live는 목록 행에 붙는 짧은 표식(없으면 null).
+ */
+export type ApplyPhase = {
+  kind: "before" | "today-open" | "open" | "today-close" | "closed" | "none";
+  label: string;
+  note: string | null;
+  live: string | null;
+  tone: "hot" | "warn" | "acc" | "soft";
+};
+export function applyPhase(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "source_status">): ApplyPhase {
+  const toStart = daysUntil(n.apply_start_at);
+  const toEnd = daysUntil(n.apply_end_at);
+  const span = n.apply_start_at || n.apply_end_at ? `${dateK(n.apply_start_at, true)} ~ ${dateK(n.apply_end_at, true)}` : null;
+  const endNote = n.apply_end_at ? `${dateK(n.apply_end_at, true)} 마감` : null;
+
+  if (toStart === 0) return { kind: "today-open", label: "오늘 접수 시작", note: span, live: "오늘 시작", tone: "acc" };
+  if (toStart !== null && toStart > 0) return { kind: "before", label: `${toStart}일 뒤 접수 시작`, note: span, live: `D-${toStart} 시작`, tone: "acc" };
+  if (toEnd === 0) return { kind: "today-close", label: "오늘 접수 마감", note: span, live: "오늘 마감", tone: "hot" };
+  if (toEnd !== null && toEnd > 0) {
+    return { kind: "open", label: `접수 중, ${toEnd}일 남음`, note: endNote, live: "접수 중", tone: toEnd <= DDAY_URGENT_DAYS ? "hot" : toEnd <= DDAY_SOON_DAYS ? "warn" : "acc" };
+  }
+  if (toEnd !== null && toEnd < 0) return { kind: "closed", label: "접수 마감", note: endNote, live: null, tone: "soft" };
+  return { kind: "none", label: n.source_status ?? "접수 일정 미정", note: "접수 기간은 기관 원문을 확인하세요", live: null, tone: "soft" };
 }

@@ -133,12 +133,12 @@ small { font-size: 12px; }
   /* 배경·경계선은 화면 폭 전체, 내용은 .shell(=--maxw)과 같은 선에 맞춘다 — 좌우 패딩으로 가운데 정렬(overflow-x와 공존) */
   padding: 10px calc(var(--pad) + max(0px, (100% - var(--maxw)) / 2));
   position: sticky; top: 60px; z-index: 10; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px);
-  overflow-x: auto; scrollbar-width: none; }
-.sbar::-webkit-scrollbar { display: none; }
+  /* 가로 스크롤을 쓰지 않는다 — 셀렉트 목록(.selmenu)이 잘린다. 항목이 적어 줄바꿈이면 충분 */
+  flex-wrap: wrap; row-gap: 8px; }
 .sbar-txt { flex: none; margin: 0 4px 0 0; font-weight: 700; font-size: 12.5px; color: var(--dim); white-space: nowrap; }
 .sbar-txt b { font-weight: 900; color: var(--ink); }
 .sbar-txt span { color: var(--dim); }
-.sbar .sel { flex: none; }
+.sbar .selw { flex: none; }
 
 /* ── 버튼 · 칩 · 세그먼트 ────────────────────────────────── */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 18px; border-radius: var(--r-btn); border: 1px solid var(--line2); background: var(--bg); color: var(--mut); font-weight: 800; font-size: 13px; white-space: nowrap; cursor: pointer;
@@ -166,13 +166,32 @@ small { font-size: 12px; }
 .sel, .fld { height: 38px; border: 1px solid var(--line2); border-radius: var(--r-chip); background: var(--bg); font: inherit; font-weight: 800; font-size: 12.5px; color: var(--mut); min-width: 0; cursor: pointer;
   transition: transform 240ms var(--sp), background 220ms var(--ease), color 220ms var(--ease), border-color 220ms var(--ease), box-shadow 220ms var(--ease); }
 .sel { padding: 0 32px 0 13px; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1.5 1.5l4 4 4-4' fill='none' stroke='%235f6672' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+.sel { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; text-align: left; }
+.sel > .sel-v { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel > small { font-weight: 700; font-size: 11px; color: var(--dim); flex: none; }
+.sel.on > small { color: rgba(255, 255, 255, 0.78); }
+.sel.open { border-color: var(--line-strong); }
 .sel:hover, .fld:hover { transform: translateY(-1.5px); border-color: var(--line-strong); background-color: var(--sub); }
 .sel:hover { background-color: var(--sub); }
 .sel:focus-visible, .fld:focus-visible { transform: none; }
 /* 값이 걸린 셀렉트는 활성 칩과 같은 잉크 반전 — 어떤 필터가 켜졌는지 한눈에 */
 .sel.on { background-color: var(--ink); border-color: var(--ink); color: #fff; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1.5 1.5l4 4 4-4' fill='none' stroke='%23ffffff' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 .sel.on:hover { background-color: var(--ink); }
-.sel > option { color: var(--ink); background: var(--bg); font-weight: 600; }
+/* 셀렉트 목록 — OS 드롭다운 대신 사이트 톤으로. 버튼 바로 아래 붙고, 스크롤하면 닫힌다(components/select.tsx) */
+.selw { position: relative; display: inline-flex; flex: none; min-width: 0; }
+.selmenu { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 100%; max-width: 320px; max-height: 320px; overflow-y: auto; overscroll-behavior: contain;
+  list-style: none; margin: 0; padding: 5px; background: var(--bg); border: 1px solid var(--line2); border-radius: var(--r-panel); box-shadow: var(--shadow-float);
+  animation: mo-pop 180ms var(--sp) both; }
+.selmenu.end { left: auto; right: 0; }
+.selmenu li { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: var(--radius-sm); cursor: pointer;
+  font-weight: 700; font-size: 13px; color: var(--mut); white-space: nowrap; }
+.selmenu li > span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.selmenu li > small { flex: none; font-weight: 700; font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.selmenu li.cur { background: var(--sub); color: var(--ink); }
+.selmenu li.on { color: var(--acc); font-weight: 800; }
+.selmenu li.on.cur { background: var(--acc-soft); }
+.selmenu li.on::after { content: "✓"; flex: none; font-size: 11px; }
+@keyframes mo-pop { from { opacity: 0; transform: translateY(-4px) scale(0.985); } to { opacity: 1; transform: none; } }
 .fld { padding: 0 13px; font-weight: 600; font-size: 13px; color: var(--ink); cursor: text; }
 .fld::placeholder { color: var(--dim); font-weight: 600; }
 .fld::-webkit-search-cancel-button { cursor: pointer; }
@@ -204,12 +223,11 @@ small { font-size: 12px; }
 .kpi .u { font-weight: 700; font-size: 11.5px; color: var(--dim); }
 
 /* ── 필터 행 ─────────────────────────────────────────────── */
-.fbar { display: flex; align-items: center; gap: 8px; padding: 14px var(--pad); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
-.fbar::-webkit-scrollbar { display: none; }
+.fbar { display: flex; align-items: center; gap: 8px; row-gap: 8px; flex-wrap: wrap; padding: 14px var(--pad); border-bottom: 1px solid var(--line); }
 /* top: 120px = 헤더(60) + 스코프 바(60, .sbar와 같은 칩 높이라 고정값으로 겹침 없이 쌓인다) */
 .fbar.sticky { position: sticky; top: 120px; z-index: 9; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px); }
 .fbar .grow { margin-left: auto; }
-.fbar .sel { flex: none; }
+.fbar .selw { flex: none; }
 .fbar .reset { display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: var(--r-chip); font-weight: 700; font-size: 12px; color: var(--acc); white-space: nowrap; }
 
 /* ── 탐색기: 좌 목록 / 우 지도 ───────────────────────────── */
@@ -268,6 +286,12 @@ small { font-size: 12px; }
 .row-dday.soft, .tone-soft { background: var(--sub); color: var(--mut); }
 .row-body { min-width: 0; }
 .row-meta { display: block; font-weight: 700; font-size: 11px; letter-spacing: 0.02em; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 접수 중·오늘 시작 표식 — 마감 D-day만으론 "지금 넣을 수 있다"가 안 보인다(사용자 요청 2026-09-09) */
+.row-meta .live { display: inline-flex; align-items: center; height: 17px; padding: 0 7px; margin-right: 7px; border-radius: 6px; font-weight: 800; font-size: 10px; letter-spacing: 0; vertical-align: 1px; }
+.row-meta .live.acc { background: var(--acc-soft); color: var(--acc); }
+.row-meta .live.hot { background: var(--hot-soft); color: var(--hot); }
+.row-meta .live.warn { background: var(--warn-soft); color: var(--warn); }
+.row-meta .live.soft { background: var(--sub); color: var(--mut); }
 .row-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-top: 5px; font-weight: 800; font-size: 16px; line-height: 1.35; letter-spacing: -0.03em; color: var(--ink); overflow: hidden; }
 .row-dates { display: block; margin-top: 8px; font-weight: 600; font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row-money { display: block; text-align: right; }
@@ -346,6 +370,11 @@ small { font-size: 12px; }
 .jumbo { font-weight: 900; font-size: 56px; line-height: 1; letter-spacing: -0.06em; color: var(--ink); }
 .jumbo-from { font-weight: 800; font-size: 15px; color: var(--mut); margin-left: 4px; }
 .jumbo-sub { display: block; margin-top: 12px; font-weight: 700; font-size: 12.5px; color: var(--dim); }
+/* 공고 상세 헤드라인 — 금액 대신 접수 상태. tone-*(hot/warn/acc/soft)는 D-day 칩과 같은 색 규칙을 쓴다 */
+.d-apply { display: inline-flex; flex-direction: column; gap: 8px; padding: 16px 20px 17px; border-radius: var(--r-panel); }
+.d-apply-k { font-weight: 800; font-size: 10px; line-height: 1; letter-spacing: 0.18em; opacity: 0.75; }
+.d-apply b { font-weight: 900; font-size: 32px; line-height: 1.05; letter-spacing: -0.05em; }
+.d-apply-s { font-weight: 700; font-size: 12.5px; opacity: 0.82; font-variant-numeric: tabular-nums; }
 .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
 .step { min-width: 0; padding: 15px 16px; border-radius: var(--r-card); background: var(--bg); border: 1px solid var(--line); }
 .step span { display: block; font-weight: 800; font-size: 9.5px; line-height: 1; letter-spacing: 0.14em; color: var(--dim); margin-bottom: 9px; }
@@ -425,12 +454,13 @@ small { font-size: 12px; }
 
 /* ── 공급 단지 탐색기(components/complex-explorer.tsx) — 좌 목록 / 우 지도 ── */
 .cx { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 14px; align-items: start; }
-.cx-panel { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--bg); overflow: hidden; }
+.cx-panel { position: relative; z-index: 1; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--bg); }
 .cx-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); }
+.cx-tools .selw, .cx-tools .sel { width: 100%; }
 .cx-tools .fld { grid-column: 1 / -1; }
 .cx-count { margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--dim); border-bottom: 1px solid var(--line); }
 .cx-count b { color: var(--ink); }
-.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: 520px; overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
+.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: 520px; border-radius: 0 0 var(--r-panel) var(--r-panel); overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
 .cx-list li { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
 .cx-list li:last-child { border-bottom: 0; }
 .cx-list > li > button { display: flex; flex: 1; min-width: 0; gap: 10px; align-items: flex-start; padding: 11px 12px; background: none; border: 0; border-left: 3px solid transparent; text-align: left; font: inherit; color: var(--ink); cursor: pointer; transition: background 200ms var(--ease), transform 300ms var(--sp); }
@@ -482,6 +512,7 @@ small { font-size: 12px; }
   .aside-in { position: static; }
   .d-title, .list-hero h1 { font-size: 30px; }
   .jumbo { font-size: 42px; }
+  .d-apply b { font-size: 26px; }
   .cx { grid-template-columns: 1fr; }
   .cx-map-wrap { position: static; order: -1; }
   .cx-map { height: 320px; }
@@ -499,7 +530,6 @@ small { font-size: 12px; }
    .sbar(스코프 바)는 layout.tsx에서 .shell 밖(헤더 바로 아래)에 있어 @container가 안 먹는다 — 일반 @media로.
    모바일에선 가로 스크롤 대신 줄바꿈으로. 두 바가 겹쳐 쌓이는 sticky(top:120px)도 높이가 가변이라 깨지므로 해제. */
 @media (max-width: 640px) {
-  .sbar, .fbar { flex-wrap: wrap; overflow-x: visible; }
   .sbar-txt { display: none; } /* 칩·셀렉트의 .on 상태가 이미 현재 스코프를 보여준다 */
   .fbar .grow { margin-left: 0; }
   .sbar { position: static; }
