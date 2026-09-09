@@ -7,9 +7,32 @@
 
 ---
 
-## 지금 상태 (2026-09-09, 19차 세션)
+## 지금 상태 (2026-09-09, 20차 세션)
 
-브랜치 `main`. 공고 상세 지도 확대 조정 + 지도 페이드인 버그 수정. 커밋·푸시 완료.
+브랜치 `main`. DB를 고쳐도 화면에 안 보이던 문제 — `/api/revalidate` 웹훅을 새로 놓았다. 커밋·푸시 완료.
+
+### 20차 세션에서 손댄 것
+
+**"DB 반영했는데 화면 반영 안 됨"의 근본 원인**: `listNoticesPage`·`getEligibilityRules` 등이
+`unstable_cache(REVALIDATE_SEC=1시간)`로 감싸여 있어, 파이프라인이 DB를 갱신해도 최대 1시간은
+옛 값을 계속 보여준다(19차까지는 dev에서 `.next/cache`를 수동으로 지워야 했던 그 문제의 production판).
+`getEligibilityRules`는 태그조차 없어 `revalidateTag`로도 못 지웠다.
+
+- `web/src/app/api/revalidate/route.ts` 추가 — `POST`, `x-revalidate-secret` 헤더(또는 `?secret=`)로
+  인증. `revalidateTag(...)` + `revalidatePath("/", "layout")`을 같이 불러 태그 캐시와 이미 렌더된
+  페이지(Full Route Cache) 둘 다 비운다. 시크릿 없거나(501) 틀리면(401) 아무것도 안 하고 거절한다
+- `CACHE_TAG_ELIGIBILITY` 태그를 새로 만들어 `getEligibilityRules`에 붙였다(`lib/constants.ts`,`lib/queries.ts`)
+- 파이프라인: `stages/common.py`에 `notify_web_revalidate()` 추가, `stage_main`이 성공(dry-run 아님)한
+  뒤 자동으로 부른다. `WEB_REVALIDATE_URL`·`REVALIDATE_SECRET` 둘 다 없으면 조용히 건너뛴다(로컬 개발
+  배려) — 실패해도 파이프라인은 안 막는다(최악의 경우 예전처럼 1시간 뒤 자연 반영)
+- 새 키 `REVALIDATE_SECRET`(web·pipeline 공통)·`WEB_REVALIDATE_URL`(pipeline)을
+  `vercel env add`로 Production/Preview/Development 세 곳에 다 등록해 뒀다. `.env.example` 양쪽,
+  `docs/data-sources.md` 필요한 키 표에도 적었다
+- **동작 확인**: dev 서버 대상으로 인증 실패(401)·성공(200, `{"revalidated":[...]}）·시크릿 미설정(501)
+  세 경로 전부 curl로 확인했고, 파이프라인 쪽 `notify_web_revalidate()`도 미설정 시 조용히 건너뛰기·
+  성공·실패(경고만, 예외 안 던짐) 세 경로를 직접 호출해 확인했다. **아직 프로덕션에 배포되지 않아서
+  `https://zipgonggo.com/api/revalidate`는 이 커밋이 배포되기 전까진 404다** — 배포되면 다음 파이프라인
+  실행부터 자동으로 걸린다
 
 ### 19차 세션에서 손댄 것
 
@@ -188,7 +211,9 @@
   touch로는 안 풀린다 — dev를 내리고 `.next/server .next/static .next/cache`를 지운 뒤 다시 띄운다
 - 마이그레이션 뒤 `column does not exist`는 스키마가 아니라 오래 켜 둔 dev의 옛 커넥션 탓이다
 - `unstable_cache`(예: `getEligibilityRules`, 1시간)로 감싼 쿼리는 **DB를 고쳐도 dev가 계속 옛 값을 보여준다.**
-  dev 재시작만으론 안 풀린다(파일시스템에 캐시가 남는다) — `.next/cache`를 지우고 나서 재시작해야 반영된다(2026-09-09)
+  dev 재시작만으론 안 풀린다(파일시스템에 캐시가 남는다) — `.next/cache`를 지우고 나서 재시작해야 반영된다(2026-09-09).
+  프로덕션은 `.next/cache`를 못 지우니 20차에서 `POST /api/revalidate`(`x-revalidate-secret` 헤더)를
+  만들었다 — DB를 고친 뒤(수동이든 파이프라인이든) 이걸 부르면 즉시 반영된다. 값은 `docs/data-sources.md`
 
 ### 파이프라인
 

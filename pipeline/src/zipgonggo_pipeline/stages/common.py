@@ -13,7 +13,12 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
+
+from ..config import settings
 from ..repo import insert_ingest_log, upsert_notice
+
+log = logging.getLogger("stage.common")
 
 
 @dataclass
@@ -76,6 +81,29 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def notify_web_revalidate(tags: list[str] | None = None) -> None:
+    """DB를 갱신한 직후 web의 unstable_cache(REVALIDATE_SEC=1시간)를 즉시 비운다.
+
+    URL·SECRET 둘 다 없으면 조용히 건너뛴다(로컬엔 배포된 웹이 없을 수 있다).
+    실패해도 파이프라인을 막지 않는다 — 최악의 경우 예전처럼 1시간 안에 자연 반영된다(2026-09-09).
+    """
+    s = settings()
+    if not s.web_revalidate_url or not s.revalidate_secret:
+        log.debug("WEB_REVALIDATE_URL/REVALIDATE_SECRET 미설정 — 캐시 즉시 갱신 건너뜀")
+        return
+    try:
+        r = httpx.post(
+            s.web_revalidate_url,
+            headers={"x-revalidate-secret": s.revalidate_secret},
+            json={"tags": tags} if tags else {},
+            timeout=10.0,
+        )
+        r.raise_for_status()
+        log.info("웹 캐시 갱신 요청 %s", r.json())
+    except Exception as exc:  # noqa: BLE001 — 웹훅 실패로 수집 자체를 실패 처리하지 않는다
+        log.warning("웹 캐시 갱신 요청 실패(무시): %s", exc)
+
+
 def stage_main(
     description: str,
     run: Callable[[argparse.Namespace], Stats],
@@ -97,4 +125,6 @@ def stage_main(
     )
     stats = run(args)
     print(json.dumps(stats.__dict__, ensure_ascii=False, indent=1))
+    if not args.dry_run and stats.ok:
+        notify_web_revalidate()
     return 0 if stats.ok else 1

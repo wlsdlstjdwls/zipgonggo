@@ -14,6 +14,8 @@ export const TOAST_MS = 2100;
 // ISR·unstable_cache 갱신 주기. 파이프라인이 DB를 갱신해도 이 시간 안엔 반영된다
 export const REVALIDATE_SEC = 3600;
 export const CACHE_TAG_NOTICE = "notice";
+// getEligibilityRules 전용 — 이전엔 태그가 없어 revalidateTag로 못 지웠다(2026-09-09, /api/revalidate 추가하며 같이 붙임)
+export const CACHE_TAG_ELIGIBILITY = "eligibility";
 // /api/notices 응답 캐시. s-maxage는 REVALIDATE_SEC와 맞춘다
 export const API_CACHE_CONTROL = `public, s-maxage=${REVALIDATE_SEC}, stale-while-revalidate=600`;
 

@@ -5,7 +5,7 @@ import { unstable_cache } from "next/cache";
 import type { EligibilityRules, IncomeStandard, RegionTier, SupplyType } from "@/types/eligibility";
 import { cache } from "react";
 import { query } from "./db";
-import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
+import { CACHE_TAG_ELIGIBILITY, CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { todayKST } from "./format";
 import type { Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, Sector } from "@/types/notice";
 
@@ -319,7 +319,8 @@ export const listSitemapNotices = unstable_cache(
 
 
 /* ── 자격진단 사양 (0020) ────────────────────────────────
-   공고와 무관한 제도 규칙이라 공고 캐시 태그를 쓰지 않는다. 파이프라인 시드가 바뀌는 빈도도 훨씬 낮다. */
+   공고와 무관한 제도 규칙이라 공고 캐시 태그(CACHE_TAG_NOTICE)를 쓰지 않는다 — 따로 태그를 둔다.
+   전엔 태그가 아예 없어 시간이 차기 전엔 revalidateTag로도 못 지웠다(2026-09-09, /api/revalidate 추가) */
 
 export const getEligibilityRules = unstable_cache(
   async (): Promise<EligibilityRules> => {
@@ -340,5 +341,5 @@ export const getEligibilityRules = unstable_cache(
     return { types, income, tiers, incomeYear: income[0]?.year ?? 0 };
   },
   ["eligibility-rules"],
-  { revalidate: REVALIDATE_SEC },
+  { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_ELIGIBILITY] },
 );
