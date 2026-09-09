@@ -10,7 +10,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { readScope, writeScope } from "@/lib/scope";
 import { ROUTES } from "@/lib/routes";
-import { isSector, type NoticeClosing, type NoticeFilters, type NoticeSort } from "@/types/notice";
+import { VIEW_STORAGE_KEY } from "@/lib/constants";
+import { isNoticeView, isSector, type NoticeClosing, type NoticeFilters, type NoticeSort, type NoticeView } from "@/types/notice";
 
 export type ListFilters = NoticeFilters;
 
@@ -22,6 +23,9 @@ type Ctx = {
   isList: boolean;
   /** 저장값·레거시 쿼리 흡수가 끝났는가. 끝나기 전엔 목록이 서버가 준 첫 페이지를 그대로 쓴다 */
   ready: boolean;
+  /** 목록 보기 모드. 조회 조건이 아니라 화면 취향이라 필터와 따로 논다 */
+  view: NoticeView;
+  setView: (v: NoticeView) => void;
   set: (patch: Partial<ListFilters>) => void;
   reset: () => void;
   /** 시도 변경. /area/{시도}에 서 있었다면 경로와 화면이 어긋나므로 홈으로 옮기고 상태만 이어 간다 */
@@ -49,6 +53,7 @@ export function ListStateProvider({ children }: { children: React.ReactNode }) {
   const pathSido = sidoFromPath(pathname);
   const isList = pathname === ROUTES.home || Boolean(pathSido);
   const [f, setF] = useState<ListFilters>({});
+  const [view, setViewState] = useState<NoticeView>("list");
   const [ready, setReady] = useState(false);
   const booted = useRef(false);
 
@@ -76,6 +81,12 @@ export function ListStateProvider({ children }: { children: React.ReactNode }) {
     } else {
       setF({ ...saved, sido: pathSido ?? saved.sido });
     }
+    try {
+      const v = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (isNoticeView(v)) setViewState(v);
+    } catch {
+      // 프라이빗 모드 등 저장 실패는 화면 동작에 영향 없음
+    }
     setReady(true);
     // 마운트 1회 — pathSido는 그때 값으로 충분하다. 저장된 시도로 옮기는 라우팅은 하지 않는다(주소창을 건드리지 않는다)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -87,6 +98,10 @@ export function ListStateProvider({ children }: { children: React.ReactNode }) {
     writeScope(f);
   }, [ready, isList, f]);
 
+  const setView = useCallback((v: NoticeView) => {
+    setViewState(v);
+    try { window.localStorage.setItem(VIEW_STORAGE_KEY, v); } catch { /* 저장 실패는 무시 */ }
+  }, []);
   const set = useCallback((patch: Partial<ListFilters>) => setF((cur) => ({ ...cur, ...patch })), []);
   const reset = useCallback(() => {
     setF({});
@@ -98,6 +113,6 @@ export function ListStateProvider({ children }: { children: React.ReactNode }) {
     if (pathSido && next !== pathSido) router.replace(ROUTES.home);
   }, [pathSido, router]);
 
-  const value = useMemo<Ctx>(() => ({ f, pathSido, isList, ready, set, reset, setSido }), [f, pathSido, isList, ready, set, reset, setSido]);
+  const value = useMemo<Ctx>(() => ({ f, pathSido, isList, ready, view, setView, set, reset, setSido }), [f, pathSido, isList, ready, view, setView, set, reset, setSido]);
   return <ListCtx.Provider value={value}>{children}</ListCtx.Provider>;
 }

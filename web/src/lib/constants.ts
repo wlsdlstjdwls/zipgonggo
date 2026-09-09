@@ -34,6 +34,8 @@ export const SH_SIDO = "서울특별시";
 // 목록 상태(부문·시도·유형·마감·정렬) 기억 localStorage 키. 서버 렌더(ISR)엔 절대 반영하지 않는다 —
 // "/"의 캐시 한 장을 크롤러·공유 링크 수신자를 포함해 모두가 공유한다(6차 설계).
 export const SCOPE_STORAGE_KEY = "zipgonggo.scope.v1";
+// 목록 보기 모드(카드/목록/간략). 조회 조건과 섞이지 않게 키를 따로 둔다
+export const VIEW_STORAGE_KEY = "zipgonggo.view.v1";
 // /area/{시도} 발행 최소 공고 수 — 얇은 페이지 방지 규칙(CLAUDE.md 4: 지역은 3건 이상)
 export const AREA_MIN_COUNT = 3;
 

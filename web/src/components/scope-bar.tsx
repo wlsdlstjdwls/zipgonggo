@@ -4,6 +4,7 @@
 // 부문도 시도도 URL에 남지 않는다 — ListStateProvider가 들고 localStorage에 저장한다(사용자 요청 2026-09-09).
 // 목록 화면(홈, /area/{시도})에서만 보인다. 공고 상세에선 스코프를 바꿀 일이 없어 감춘다.
 // "부문은 갈림길 페이지를 만들지 않는다"(6차 결정, 민간임대 0건이라 카드 2장이면 절반이 빈 문)는 그대로다.
+import { useEffect, useRef } from "react";
 import { AREA_MIN_COUNT } from "@/lib/constants";
 import { SECTORS, type FilterOption, type Sector } from "@/types/notice";
 import { useListState } from "./list-state";
@@ -13,6 +14,21 @@ type Props = { sidoOptions: FilterOption[]; sectorOptions: FilterOption[] };
 
 export function ScopeBar({ sidoOptions, sectorOptions }: Props) {
   const { f, isList, set, setSido } = useListState();
+  const bar = useRef<HTMLDivElement>(null);
+
+  // 필터 바가 이 바 바로 밑에 붙어 sticky로 쌓인다. 높이를 상수(120px)로 박아 뒀더니
+  // 칩 높이·줄바꿈에 따라 1~2px이 어긋나 그 틈으로 뒷배경이 비쳤다(사용자 지적 2026-09-09).
+  // 실제 높이를 재서 --sbar-h로 넘긴다 — 줄바꿈이 생겨도 딱 붙는다.
+  useEffect(() => {
+    const el = bar.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const push = () => document.documentElement.style.setProperty("--sbar-h", `${Math.round(el.getBoundingClientRect().height)}px`);
+    push();
+    const ro = new ResizeObserver(push);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isList]);
+
   if (!isList) return null;
   const sido = f.sido;
 
@@ -21,7 +37,7 @@ export function ScopeBar({ sidoOptions, sectorOptions }: Props) {
   const countOf = (s: Sector) => sectorOptions.find((o) => o.value === s)?.count ?? 0;
 
   return (
-    <div className="sbar">
+    <div className="sbar" ref={bar}>
       <button type="button" className={`chip-f${!f.sector ? " on" : ""}`} aria-pressed={!f.sector} onClick={() => set({ sector: undefined })}>
         전체 <small>{total}</small>
       </button>

@@ -24,7 +24,7 @@ type Props = {
 };
 
 export function NoticeExplorer({ initial, title }: Props) {
-  const { f, pathSido, ready, reset } = useListState();
+  const { f, pathSido, ready, reset, view } = useListState();
   // 서버가 렌더해 준 첫 페이지의 조건 — 홈은 무필터, /area/{시도}는 그 시도만
   const serverKey = feedParams({ sido: pathSido });
   const key = feedParams(f);
@@ -115,7 +115,7 @@ export function NoticeExplorer({ initial, title }: Props) {
   return (
     <div className={`ex-list${swapping ? " swapping" : ""}`} aria-busy={swapping}>
       {head}
-      <ul className="rows" key={applied.current}>
+      <ul className={`rows v-${view}`} key={applied.current}>
         {items.map((n, i) => (
           <NoticeRow key={n.id} n={n} stagger={(i % PAGE_SIZE) * ROW_STAGGER_MS} />
         ))}

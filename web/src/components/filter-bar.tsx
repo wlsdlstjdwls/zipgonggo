@@ -3,7 +3,7 @@
 // 필터 행 — 좌: 칩(마감 7일 내) + 유형 셀렉트 / 우: 정렬 세그먼트.
 // 값은 URL이 아니라 ListStateProvider가 들고 있다(사용자 요청 2026-09-09) — 목록은 /api/notices로 갈아끼운다.
 // 부문·시도는 스코프(스코프 바) 담당. 여긴 스코프 안에서 좁히는 2층 필터만 다룬다(6차 설계).
-import type { FilterOption } from "@/types/notice";
+import { NOTICE_VIEWS, type FilterOption, type NoticeView } from "@/types/notice";
 import { useListState } from "./list-state";
 import { Select } from "./select";
 
@@ -14,8 +14,10 @@ type Props = {
   sticky?: boolean;
 };
 
+const VIEW_LABEL: Record<NoticeView, string> = { card: "카드", list: "목록", compact: "간략" };
+
 export function FilterBar({ options, closing7, sticky }: Props) {
-  const { f, set } = useListState();
+  const { f, set, view, setView } = useListState();
 
   return (
     <div className={`fbar${sticky ? " sticky" : ""}`}>
@@ -42,6 +44,15 @@ export function FilterBar({ options, closing7, sticky }: Props) {
         <button type="button" onClick={() => set({ sort: "deadline" })} className={f.sort === "deadline" ? "on" : ""} aria-pressed={f.sort === "deadline"}>마감 임박순</button>
         <button type="button" onClick={() => set({ sort: "posted" })} className={f.sort !== "deadline" ? "on" : ""} aria-pressed={f.sort !== "deadline"}>최신 공고순</button>
       </nav>
+
+      {/* 보기 전환 — 카드/목록/간략. 조회는 그대로고 그리기만 바뀐다(사용자 요청 2026-09-09) */}
+      <div className="viewsw" role="group" aria-label="목록 보기">
+        {NOTICE_VIEWS.map((v) => (
+          <button key={v} type="button" className={view === v ? "on" : ""} aria-pressed={view === v} onClick={() => setView(v)}>
+            {VIEW_LABEL[v]}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

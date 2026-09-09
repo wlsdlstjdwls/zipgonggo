@@ -66,7 +66,7 @@
   --ease-standard: var(--ease);
   --ease-out-emph: var(--sp);
 
-  --maxw: 1280px;
+  --maxw: 1120px;
   --pad: 18px;
   --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif;
 }
@@ -215,8 +215,9 @@ small { font-size: 12px; }
 
 /* ── 필터 행 ─────────────────────────────────────────────── */
 .fbar { display: flex; align-items: center; gap: 8px; row-gap: 8px; flex-wrap: wrap; padding: 14px var(--pad); border-bottom: 1px solid var(--line); }
-/* top: 120px = 헤더(60) + 스코프 바(60, .sbar와 같은 칩 높이라 고정값으로 겹침 없이 쌓인다) */
-.fbar.sticky { position: sticky; top: 120px; z-index: 9; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px); }
+/* 헤더(60) + 스코프 바 실측 높이(--sbar-h, components/scope-bar.tsx가 ResizeObserver로 넣는다).
+   상수로 박으면 칩 높이·줄바꿈에 따라 1~2px이 벌어져 그 틈으로 뒷배경이 비친다. 1px 겹쳐 이음매를 지운다. */
+.fbar.sticky { position: sticky; top: calc(59px + var(--sbar-h, 59px)); z-index: 9; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px); }
 .fbar .grow { margin-left: auto; }
 .fbar .selw { flex: none; }
 .fbar .reset { border: 0; background: none; font-family: inherit; cursor: pointer; display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: var(--r-chip); font-weight: 700; font-size: 12px; color: var(--acc); white-space: nowrap; }
@@ -261,6 +262,11 @@ small { font-size: 12px; }
 .pano .canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
 
+.viewsw { display: flex; gap: 3px; padding: 3px; border-radius: 999px; background: var(--sub); flex: none; }
+.viewsw button { border: 0; background: none; font: inherit; font-weight: 800; font-size: 12px; color: var(--dim); padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  transition: background 200ms var(--ease), color 200ms var(--ease); }
+.viewsw button.on { background: #fff; color: var(--ink); box-shadow: 0 2px 8px -3px rgba(15, 18, 22, 0.3); }
+
 /* ── 결과 행 ─────────────────────────────────────────────── */
 .rows { list-style: none; margin: 0; padding: 0; }
 .row { display: grid; grid-template-columns: 56px minmax(0, 1fr) 170px auto; gap: 18px; align-items: center; padding: 18px var(--pad); border-bottom: 1px solid var(--line); color: var(--ink);
@@ -297,6 +303,31 @@ small { font-size: 12px; }
 .row-narrow b { font-weight: 900; font-size: 17px; line-height: 1; letter-spacing: -0.045em; color: var(--ink); }
 .row-narrow span { font-weight: 700; font-size: 10.5px; color: var(--dim); }
 .row-act { display: flex; align-items: center; gap: 12px; }
+
+/* ── 보기 모드: 간략 ─────────────────────────────────────── 행 높이를 줄이고 날짜·금액 보조줄을 감춘다 */
+.rows.v-compact .row { padding: 11px var(--pad); gap: 14px; }
+.rows.v-compact .row-dday { width: 46px; height: 40px; border-radius: var(--r-chip); }
+.rows.v-compact .row-dday b { font-size: 14px; }
+.rows.v-compact .row-dday span { font-size: 8px; margin-top: 3px; }
+.rows.v-compact .row-title { font-size: 14px; -webkit-line-clamp: 1; margin-top: 3px; }
+.rows.v-compact .row-dates { display: none; }
+.rows.v-compact .row-money b { font-size: 17px; }
+.rows.v-compact .row-money span { display: none; }
+
+/* ── 보기 모드: 카드 ─────────────────────────────────────── 행을 세로로 세워 격자에 깐다 */
+.rows.v-card { display: grid; grid-template-columns: repeat(auto-fill, minmax(288px, 1fr)); gap: 12px; padding: 4px var(--pad) 10px; }
+.rows.v-card .row { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 0; height: 100%;
+  padding: 16px; border: 1px solid var(--line); border-radius: var(--r-panel); }
+.rows.v-card .row:hover { transform: translateY(-2px); background: var(--bg); border-color: var(--line2); box-shadow: var(--shadow-float); }
+.rows.v-card .row-dday { flex-direction: row; align-items: baseline; gap: 6px; width: auto; height: 28px; padding: 0 10px; border-radius: var(--r-chip); }
+.rows.v-card .row-dday b { font-size: 13px; }
+.rows.v-card .row-dday span { margin-top: 0; }
+.rows.v-card .row-body { width: 100%; margin-top: 12px; flex: 1; }
+.rows.v-card .row-title { font-size: 15px; }
+.rows.v-card .row-money { width: 100%; text-align: left; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.rows.v-card .row-money b { font-size: 20px; }
+.rows.v-card .row-act { position: absolute; top: 12px; right: 12px; }
+.rows.v-card .row-act .arrow { display: none; }
 .save { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 0; border-radius: var(--r-chip); background: var(--sub); color: var(--dim); font-weight: 900; font-size: 15px; line-height: 1; cursor: pointer;
   transition: transform 280ms var(--sp), color 220ms linear, background 220ms linear; }
 .save:hover { transform: scale(1.08); }
@@ -459,7 +490,7 @@ small { font-size: 12px; }
 .cx-tools .fld { grid-column: 1 / -1; }
 .cx-count { margin: 0; padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--dim); border-bottom: 1px solid var(--line); }
 .cx-count b { color: var(--ink); }
-.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: 620px; border-radius: 0 0 var(--r-panel) var(--r-panel); overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
+.cx-list { position: relative; list-style: none; margin: 0; padding: 0; max-height: min(620px, calc(100vh - 200px)); border-radius: 0 0 var(--r-panel) var(--r-panel); overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
 .cx-list li { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
 .cx-list li:last-child { border-bottom: 0; }
 .cx-list > li > button { display: flex; flex: 1; min-width: 0; gap: 10px; align-items: flex-start; padding: 11px 12px; background: none; border: 0; border-left: 3px solid transparent; text-align: left; font: inherit; color: var(--ink); cursor: pointer; transition: background 200ms var(--ease), transform 300ms var(--sp); }
@@ -481,7 +512,7 @@ small { font-size: 12px; }
 .cx-list li.on .cx-go:hover { color: #fff; }
 .cx-empty { display: block; padding: 24px 12px; color: var(--dim); font-size: 13px; text-align: center; }
 .cx-map-wrap { position: sticky; top: 72px; }
-.cx-map { width: 100%; height: 700px; border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--sub); overflow: hidden; position: relative; z-index: 0; }
+.cx-map { width: 100%; height: min(700px, calc(100vh - 108px)); border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--sub); overflow: hidden; position: relative; z-index: 0; }
 .cx-map .canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; } /* SDK가 position을 relative로 덮어써도 크기가 남게 width/height 명시 */
 /* 지도 위 선택 카드 — 로드뷰 토글과 단지 상세 진입. 로드뷰 패널(z 6)보다 위.
    bottom은 NAVER 로고·축척 바를 가리지 않는 높이 — 로고는 항상 보여야 한다(이용약관) */
@@ -522,17 +553,18 @@ small { font-size: 12px; }
   transition: transform 240ms var(--sp), background 200ms var(--ease); }
 .calc-fab:hover { transform: translateY(-2px); }
 .calc-fab.on { background: var(--acc); border-color: var(--acc); }
-.calc-panel { width: min(360px, calc(100vw - 32px)); max-height: min(76vh, 660px); overflow-y: auto; overscroll-behavior: contain;
+.calc-panel { display: flex; flex-direction: column; width: min(360px, calc(100vw - 32px)); height: min(74vh, 520px);
   border: 1px solid var(--line2); border-radius: var(--r-frame); background: var(--bg); box-shadow: var(--shadow-frame);
-  animation: mo-pop 240ms var(--sp); }
-.calc-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  overflow: hidden; animation: mo-pop 240ms var(--sp); }
+.calc-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 12px 12px 10px; background: var(--bg); border-bottom: 1px solid var(--line); }
 .calc-seg { flex: 1; }
 .calc-seg button { flex: 1; }
 .calc-x { flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 9px;
   background: none; color: var(--dim); font-family: inherit; font-size: 12px; cursor: pointer; }
 .calc-x:hover { background: var(--sub); color: var(--ink); }
-.calc-body { padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+.calc-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+.calc-note { margin-top: auto; }
 .calc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .calc-f { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .calc-f > span:first-child { font-weight: 800; font-size: 11px; color: var(--dim); }
@@ -565,6 +597,8 @@ small { font-size: 12px; }
   .row { grid-template-columns: 56px minmax(0, 1fr) auto; }
   .row-money { display: none; }
   .row-narrow { display: flex; }
+  .rows.v-card .row-money { display: block; }
+  .rows.v-card .row-narrow { display: none; }
   .detail { grid-template-columns: 1fr; }
   .aside { border-left: 0; border-top: 1px solid var(--line); }
   .aside-in { position: static; }

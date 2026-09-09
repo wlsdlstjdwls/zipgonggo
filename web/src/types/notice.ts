@@ -110,6 +110,13 @@ export type NoticeComplex = {
 // closed: 마감 공고 포함 여부. 기본(undefined)은 감춘다 — 백필로 2004년치까지 들어와 목록이 마감으로 덮인다(사용자 요청 2026-09-09)
 export type NoticeFilters = { sido?: string; type?: string; sector?: Sector; sort?: NoticeSort; closing?: NoticeClosing; closed?: boolean };
 
+/** 목록 보기 모드. 필터가 아니라 화면 취향이라 조회 조건에 섞지 않는다(사용자 요청 2026-09-09) */
+export type NoticeView = "card" | "list" | "compact";
+export const NOTICE_VIEWS: readonly NoticeView[] = ["card", "list", "compact"];
+export function isNoticeView(v: unknown): v is NoticeView {
+  return typeof v === "string" && (NOTICE_VIEWS as readonly string[]).includes(v);
+}
+
 /** 홈 KPI 스트립. 전부 서비스 전체 집계(필터 무관) */
 /** 목록 화면이 쓰는 집계. 히어로와 KPI를 걷어낸 뒤로 남은 건 필터 칩의 마감 임박 건수뿐이다(2026-09-09) */
 export type HomeStats = { closing7: number };

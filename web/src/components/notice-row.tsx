@@ -29,7 +29,8 @@ export function NoticeRow({ n, stagger }: Props) {
   const meta = [n.agency, regionShort(n), n.housing_type].filter(Boolean).join(" | ");
   const dates = n.announce_at ? `${periodLabel(n)}, 발표 ${dateMD(n.announce_at)}` : periodLabel(n);
   const style = stagger === undefined ? undefined : ({ "--stagger": `${stagger}ms` } as CSSProperties);
-  const moneySub = [qty, m?.label ?? null, m?.sub ?? null].filter(Boolean).join(" | ");
+  // 보조줄은 호수만 — "보증금"·"월임대료" 라벨은 금액 옆에 붙어 겹쳐 읽혔다(사용자 요청 2026-09-09)
+  const moneySub = qty;
 
   return (
     <li>
