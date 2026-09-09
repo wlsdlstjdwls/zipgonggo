@@ -5,12 +5,10 @@ import { ComplexExplorer } from "@/components/complex-explorer";
 import { DetailAside } from "@/components/detail-aside";
 import { ExternalLink } from "@/components/external-link";
 import { NaverMap } from "@/components/naver-map";
-import { PriceTable } from "@/components/price-table";
 import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
 import { count, dateK, dateMD, daysUntil, ddayChip, moneyOf, num, won, wonShort } from "@/lib/format";
-import { priceRows } from "@/lib/notice-view";
 import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
@@ -64,7 +62,6 @@ export default async function NoticePage({ params }: Params) {
   const m = moneyOf(n);
   const L = agencyLabels(n);
   const showAreaTable = areas.length > 1 || (areas.length === 1 && areas[0].supply_count != null && !n.address);
-  const hasMoney = n.min_deposit != null || n.min_rent != null || (n.min_down_payment ?? 0) > 0 || (n.min_balance ?? 0) > 0;
   const region = regionLabel(n) || "전국";
   const period = n.apply_start_at || n.apply_end_at ? `${dateMD(n.apply_start_at)}–${dateMD(n.apply_end_at)}` : null;
   // 상한(첨부 공급현황 표)이 하한과 다를 때만 범위 표기. 월임대료 공고는 월임대료 범위, 전세형은 보증금 범위
@@ -142,20 +139,6 @@ export default async function NoticePage({ params }: Params) {
             {hasSchedule && n.source_status && <p className="note">모집 상태 {n.source_status}</p>}
             {hasSchedule && n.schedule_source === "attachment" && <p className="note">일정은 첨부 공고문의 「입주자 모집 절차 및 일정」에서 읽었습니다. 순위별 세부 일정은 원문을 확인하세요.</p>}
           </section>
-
-          {hasMoney && (
-            <section className="dsec">
-              <h2>보증금과 임대료</h2>
-              <PriceTable rows={priceRows(n)} />
-              <p className="note">단지별 호실별 금액은 {L.originalDoc}의 표를 따릅니다.</p>
-              {n.min_rent != null && (
-                <p className="note">
-                  표에 나온 금액은 공고문이 정한 기준(표준)값입니다. 계약 시 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있는 경우가 많습니다(임대금액 상호전환).
-                  정확한 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
-                </p>
-              )}
-            </section>
-          )}
 
           {complexes.length > 0 && (
             <section className="dsec">

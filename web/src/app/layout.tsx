@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
-import { BrandMark } from "@/components/brand-mark";
+import { HomeLink } from "@/components/home-link";
 import { SaveProvider } from "@/components/save-context";
 import { ScopeBar } from "@/components/scope-bar";
+import { ScopeRestore } from "@/components/scope-restore";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
 import { listFilterOptions } from "@/lib/queries";
-import { ROUTES } from "@/lib/routes";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
@@ -38,12 +37,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <header className="site-header">
             <div className="bar">
               <div className="left">
-                <Link href={ROUTES.home} className="logo"><BrandMark size={22} />{SITE_NAME}</Link>
+                <HomeLink />
               </div>
             </div>
           </header>
           {/* usePathname·useSearchParams를 쓰는 클라이언트 조각이라 Suspense로 감싸 나머지 트리의 정적 렌더를 지킨다 */}
           <Suspense fallback={null}>
+            <ScopeRestore />
             <ScopeBar sidoOptions={options.sido} sectorOptions={options.sector} />
           </Suspense>
           <main className="shell">{children}</main>

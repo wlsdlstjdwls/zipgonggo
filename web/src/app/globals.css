@@ -129,7 +129,9 @@ small { font-size: 12px; }
 .site-footer p { margin: 0; }
 
 /* ── 스코프 바(부문+시도) ────────────────────────────────── 헤더 바로 아래 상시 노출, 필터 행보다 상위 범위 */
-.sbar { display: flex; align-items: center; gap: 8px; padding: 10px var(--pad); border-bottom: 1px solid var(--line);
+.sbar { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line);
+  /* 배경·경계선은 화면 폭 전체, 내용은 .shell(=--maxw)과 같은 선에 맞춘다 — 좌우 패딩으로 가운데 정렬(overflow-x와 공존) */
+  padding: 10px calc(var(--pad) + max(0px, (100% - var(--maxw)) / 2));
   position: sticky; top: 60px; z-index: 10; background: rgba(255, 255, 255, 0.93); backdrop-filter: blur(6px);
   overflow-x: auto; scrollbar-width: none; }
 .sbar::-webkit-scrollbar { display: none; }
