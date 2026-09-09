@@ -17,6 +17,7 @@ import { NaverMap } from "@/components/naver-map";
 import { ConvertTable } from "@/components/convert-table";
 import { Pending } from "@/components/pending";
 import { PriceTable } from "@/components/price-table";
+import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
 import { UnitTable } from "@/components/unit-table";
@@ -281,6 +282,7 @@ export default async function ComplexPage({ params }: Params) {
             <>
               <Link className="btn acc lg" href={noticePath(n.slug)}>공고 전체 단지 지도</Link>
               <ExternalLink className="btn lg" href={n.source_url}>{L.original}</ExternalLink>
+              <ShareButton title={c.name} text={n.title} />
             </>
           }
           /* 공급 구분은 태그 줄이, 입주 시작은 요약 스트립이 이미 센다 — 여기서 또 쓰지 않는다 */

@@ -9,6 +9,7 @@ import { ExternalLink } from "@/components/external-link";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
 import { SaveButton } from "@/components/save-button";
+import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
 import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, NO_DATE, num, won, wonShort } from "@/lib/format";
@@ -265,7 +266,10 @@ export default async function NoticePage({ params }: Params) {
             <>
               <ExternalLink className="btn acc lg" href={n.source_url}>{L.original}</ExternalLink>
               {n.portal_url && <ExternalLink className="btn lg" href={n.portal_url}>{L.portal}</ExternalLink>}
-              <SaveButton id={n.id} variant="panel" />
+              <div className="cta-row">
+                <SaveButton id={n.id} variant="panel" />
+                <ShareButton title={n.title} text={`${n.agency} | ${n.housing_type}`} />
+              </div>
             </>
           }
           rows={[

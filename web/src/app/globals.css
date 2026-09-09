@@ -436,6 +436,14 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .save.on:hover { background: var(--acc); color: #fff; }
 .save.on { background: var(--acc-soft); color: var(--acc); }
 .save.pop { animation: mo-pop 420ms var(--sp); }
+
+/* ── 공유 버튼 (components/share-button.tsx) ────────────── */
+.share { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 0; border-radius: var(--r-chip); background: var(--sub); color: var(--dim); font-weight: 900; font-size: 15px; line-height: 1; cursor: pointer; }
+.share:hover { background: var(--line); color: var(--ink); }
+.share.on { background: var(--acc-soft); color: var(--acc); }
+/* 저장·공유를 한 줄에 나란히 — 나머지 CTA 버튼(원문·포털)은 위에서 이미 세로로 쌓인다 */
+.cta-row { display: flex; gap: 10px; }
+.cta-row > * { flex: 1; }
 .arrow { font-weight: 900; font-size: 16px; line-height: 1; color: var(--acc); opacity: 0; transform: translateX(-5px); transition: transform 320ms var(--sp), opacity 200ms linear; }
 .row:hover .arrow { opacity: 1; transform: translateX(0); }
 
