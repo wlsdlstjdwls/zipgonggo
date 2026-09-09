@@ -5,7 +5,6 @@ import { NoticeExplorer } from "@/components/notice-explorer";
 import { AREA_MIN_COUNT, PAGE_SIZE } from "@/lib/constants";
 import { getHomeStats, listFilterOptions, listNoticesPage } from "@/lib/queries";
 import { areaPath, ROUTES } from "@/lib/routes";
-import type { Sector } from "@/types/notice";
 
 // 스코프 착지 페이지 — 시도 경로 한 장. 유형·마감·정렬·부문은 URL이 아니라 클라이언트 상태다(2026-09-09).
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
@@ -52,17 +51,11 @@ export default async function AreaPage({ params }: Params) {
   const match = options.sido.find((o) => o.value === sido);
   if (!match) notFound();
   if (match.count < AREA_MIN_COUNT) permanentRedirect(ROUTES.home);
-  const countOf = (s: Sector) => options.sector.find((o) => o.value === s)?.count ?? 0;
 
   return (
     <div className="stage">
-      <div className="list-hero">
-        <p className="eyebrow">전국 공공임대 {countOf("공공임대")} | 공공지원민간임대 {countOf("민간임대")} 중 {sido}</p>
-        <h1>{sido} 입주자모집공고 {match.count}건</h1>
-        <p>LH, SH, 지방공사 공고를 모읍니다. 보증금과 월임대료는 공고에 적힌 최소값입니다.</p>
-      </div>
       <FilterBar options={{ type: options.type }} closing7={stats.closing7} sticky />
-      <NoticeExplorer initial={page} />
+      <NoticeExplorer initial={page} title={`${sido} 입주자모집공고`} />
     </div>
   );
 }

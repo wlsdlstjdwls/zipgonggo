@@ -8,7 +8,7 @@ import { NaverMap } from "@/components/naver-map";
 import { SaveButton } from "@/components/save-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
-import { applyPhase, count, dateK, dateMD, daysUntil, ddayChip, deadlineChip, moneyOf, num, won, wonShort } from "@/lib/format";
+import { applyPhase, count, dateK, dateMD, daysUntil, deadlineChip, moneyOf, num, won, wonShort } from "@/lib/format";
 import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
@@ -54,11 +54,9 @@ export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
   const [areas, chain, complexes] = await Promise.all([getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id)]);
-  const newCount = complexes.filter((c) => c.is_new).length;
   // 매입임대 별첨(호실 단위)이면 호수·면적·금액 열을 더 보여준다
   const hasUnits = complexes.some((c) => c.unit_count != null);
   const unitTotal = complexes.reduce((a, c) => a + (c.unit_count ?? 0), 0);
-  const d = ddayChip(n);
   const m = moneyOf(n);
   const L = agencyLabels(n);
   const showAreaTable = areas.length > 1 || (areas.length === 1 && areas[0].supply_count != null && !n.address);
@@ -83,16 +81,16 @@ export default async function NoticePage({ params }: Params) {
 
   return (
     <article className="stage">
+      {/* 뒤로가기 한 개만 — 「공고 | 지역 | 유형」 줄은 아래 태그와 겹쳐 뺐다(사용자 요청 2026-09-09) */}
       <div className="crumb">
-        <Link href={ROUTES.home} className="back">← 지도</Link>
-        <span>공고 | {region} | {n.housing_type}</span>
+        <Link href={ROUTES.home} className="back">← 목록</Link>
       </div>
 
       <div className="detail">
         <div className="detail-main">
           <header className="d-head">
             <div className="d-tags">
-              <span className={`tag ${d.tone}`}>{d.num} {d.unit}</span>
+              {/* D-day는 오른쪽 카드가 크게 센다 — 여기서 또 세지 않는다 */}
               <span className="tag type">{n.housing_type}</span>
               <span className="tag">{n.agency}</span>
               {n.sector === "민간임대" && <span className="tag">{n.sector}</span>}
@@ -110,11 +108,6 @@ export default async function NoticePage({ params }: Params) {
           {complexes.length > 0 && (
             <section className="dsec lead">
               <h2>공급 단지 {count(complexes.length, "곳")}{hasUnits && ` | ${count(unitTotal, "호")}`}</h2>
-              <p className="note" style={{ margin: "0 0 12px" }}>
-                {hasUnits
-                  ? "첨부 공고문의 「주택목록」(호실 단위)을 단지별로 묶은 목록입니다. 보증금과 월임대료는 단지 안 최소값이고, 호별 금액은 원문 표를 확인하세요. 단지를 고르면 지도 위에서 로드뷰와 단지 상세로 갈 수 있습니다."
-                  : `첨부 공고문의 「주택 위치 안내」 표를 재구성한 목록입니다.${newCount > 0 ? ` 이번 공고 신규 단지 ${newCount}곳.` : ""} 단지별 면적과 호수, 금액은 원문 표를 확인하세요.`}
-              </p>
               <ComplexExplorer items={complexes} hasUnits={hasUnits} noticeSlug={n.slug} />
             </section>
           )}
@@ -201,7 +194,6 @@ export default async function NoticePage({ params }: Params) {
           ddayLabel={dl.unit}
           ddayNum={dl.num}
           ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)} 마감` : (n.source_status ?? "일정 미정")}
-          ddayExtra={ph.kind === "today-open" || ph.kind === "before" ? ph.label : null}
           cta={
             <>
               <ExternalLink className="btn acc lg" href={n.source_url}>{L.original}</ExternalLink>

@@ -4,7 +4,7 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { query } from "./db";
-import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC, SH_SIDO } from "./constants";
+import { CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { todayKST } from "./format";
 import type { FilterOption, HomeStats, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, Sector } from "@/types/notice";
 
@@ -156,22 +156,16 @@ export const listFilterOptions = cache(unstable_cache(
   CACHE_OPTS,
 ));
 
-/** 홈 KPI. 전체·서울·7일 내 마감·중위 월임대료(금액 있는 공고 기준).
- * 필터와 무관하지만 **마감은 뺀다** — 목록이 기본으로 마감을 감추는데 KPI만 266건이라고 하면 숫자가 어긋난다(2026-09-09). */
+/** 필터 칩 「마감 7일 내」의 건수. **마감은 뺀다** — 목록이 기본으로 마감을 감추는데
+ * 칩만 다른 수를 말하면 어긋난다(2026-09-09). 히어로·KPI를 걷어내며 나머지 집계는 뺐다. */
 export const getHomeStats = unstable_cache(
   async (): Promise<HomeStats> => {
-    const rows = await query<{ total: number; seoul: number; closing7: number; median_rent: number | null }>(
-      `SELECT count(*)::int AS total,
-              count(*) FILTER (WHERE sido = $1)::int AS seoul,
-              count(*) FILTER (WHERE ${CLOSING_7D})::int AS closing7,
-              percentile_cont(0.5) WITHIN GROUP (ORDER BY min_rent)::bigint AS median_rent
-       FROM notice WHERE ${NOT_CLOSED}`,
-      [SH_SIDO],
+    const rows = await query<{ closing7: number }>(
+      `SELECT count(*) FILTER (WHERE ${CLOSING_7D})::int AS closing7 FROM notice WHERE ${NOT_CLOSED}`,
     );
-    const r = rows[0];
-    return { total: r?.total ?? 0, seoul: r?.seoul ?? 0, closing7: r?.closing7 ?? 0, medianRent: r?.median_rent ?? null };
+    return { closing7: rows[0]?.closing7 ?? 0 };
   },
-  ["notice-home-stats-v2"],
+  ["notice-home-stats-v3"],
   CACHE_OPTS,
 );
 

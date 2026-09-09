@@ -4,7 +4,7 @@
 // 보증금·임대료는 감추지 않는다(CLAUDE.md 하지 말 것 3) — 금액 열이 곧 헤드라인이다.
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { applyPhase, dateK, dateMD, ddayChip, moneyOf, num } from "@/lib/format";
+import { dateK, dateMD, ddayChip, moneyOf, num } from "@/lib/format";
 import { noticePath } from "@/lib/routes";
 import { regionShort } from "@/lib/sido";
 import type { NoticeListItem } from "@/types/notice";
@@ -24,7 +24,6 @@ export function periodLabel(n: Pick<NoticeListItem, "apply_start_at" | "apply_en
 
 export function NoticeRow({ n, stagger }: Props) {
   const d = ddayChip(n);
-  const ph = applyPhase(n);
   const m = moneyOf(n);
   const qty = n.supply_count != null ? num(n.supply_count, "호") : null;
   const meta = [n.agency, regionShort(n), n.housing_type].filter(Boolean).join(" | ");
@@ -44,8 +43,8 @@ export function NoticeRow({ n, stagger }: Props) {
           <span>{d.unit}</span>
         </span>
         <span className="row-body">
+          {/* 접수 상태는 왼쪽 D-day 칩이 이미 말한다 — 메타 줄에 「접수 중」을 겹쳐 쓰지 않는다(사용자 지적 2026-09-09) */}
           <span className="row-meta">
-            {ph.live && <b className={`live ${ph.tone}`}>{ph.live}</b>}
             {meta} | 공고 {dateK(n.posted_at)}{n.amends_source_key && " | 정정"}
           </span>
           <span className="row-title">{n.title}</span>

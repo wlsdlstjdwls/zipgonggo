@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import { FilterBar } from "@/components/filter-bar";
-import { KpiStrip } from "@/components/kpi-strip";
 import { NoticeExplorer } from "@/components/notice-explorer";
-import { LIST_HERO_LEAD, LIST_HERO_TITLE, PAGE_SIZE } from "@/lib/constants";
+import { PAGE_SIZE } from "@/lib/constants";
 import { getHomeStats, listFilterOptions, listNoticesPage } from "@/lib/queries";
 import { ROUTES } from "@/lib/routes";
-import type { Sector } from "@/types/notice";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
@@ -25,19 +23,13 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   // 서버는 필터 없는 첫 페이지만 만든다 — 필터가 걸리면 NoticeExplorer가 /api/notices로 갈아끼운다
   const [page, options, stats] = await Promise.all([listNoticesPage({}, null, PAGE_SIZE), listFilterOptions(undefined), getHomeStats()]);
-  const countOf = (s: Sector) => options.sector.find((o) => o.value === s)?.count ?? 0;
 
-  // 홈은 목록만 — 지도는 공고 상세의 공급 단지 탐색기에 있다(사용자 결정 2026-09-08)
+  // 홈은 목록만 — 히어로 문구와 KPI 스트립은 뺐다(사용자 요청 2026-09-09). 머리글은 제목 한 줄 + 총 건수뿐이다.
+  // 지도는 공고 상세의 공급 단지 탐색기에 있다(사용자 결정 2026-09-08)
   return (
     <div className="stage">
-      <div className="list-hero">
-        <p className="eyebrow">공공임대 {countOf("공공임대")} | 공공지원민간임대 {countOf("민간임대")}</p>
-        <h1>{LIST_HERO_TITLE}</h1>
-        <p>{LIST_HERO_LEAD}</p>
-      </div>
-      <KpiStrip stats={stats} />
       <FilterBar options={{ type: options.type }} closing7={stats.closing7} sticky />
-      <NoticeExplorer initial={page} />
+      <NoticeExplorer initial={page} title="입주자모집공고" />
     </div>
   );
 }

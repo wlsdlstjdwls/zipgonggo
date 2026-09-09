@@ -19,9 +19,11 @@ import { SkeletonRows } from "./skeleton";
 type Props = {
   /** 서버가 준 첫 페이지 — 필터 없이 스코프(시도)만 걸린 상태 */
   initial: NoticePage;
+  /** 목록 머리의 h1. 총 건수는 필터가 바뀌면 이 컴포넌트가 다시 센다 */
+  title: string;
 };
 
-export function NoticeExplorer({ initial }: Props) {
+export function NoticeExplorer({ initial, title }: Props) {
   const { f, pathSido, ready, reset } = useListState();
   // 서버가 렌더해 준 첫 페이지의 조건 — 홈은 무필터, /area/{시도}는 그 시도만
   const serverKey = feedParams({ sido: pathSido });
@@ -89,21 +91,30 @@ export function NoticeExplorer({ initial }: Props) {
     return () => io.disconnect();
   }, [cursor, loadMore]);
 
+  const head = (
+    <div className="list-top">
+      <h1>{title}</h1>
+      <span>{count(page.total)}</span>
+    </div>
+  );
+
   if (!swapping && items.length === 0) {
     return (
-      <EmptyState
-        lead={f.sector === "민간임대"
-          ? "민간임대는 청년안심주택 등 수집을 준비 중입니다. 지역이나 유형을 넓혀 보세요."
-          : "지역이나 유형을 넓히거나, 마감 임박 필터를 풀어 보세요."}
-        onReset={reset}
-      />
+      <>
+        {head}
+        <EmptyState
+          lead={f.sector === "민간임대"
+            ? "민간임대는 청년안심주택 등 수집을 준비 중입니다. 지역이나 유형을 넓혀 보세요."
+            : "지역이나 유형을 넓히거나, 마감 임박 필터를 풀어 보세요."}
+          onReset={reset}
+        />
+      </>
     );
   }
 
-  const loadLabel = !cursor ? "모두 표시했습니다" : loading ? "불러오는 중…" : `더 보기 +${Math.min(PAGE_SIZE, page.total - items.length)}`;
-
   return (
     <div className={`ex-list${swapping ? " swapping" : ""}`} aria-busy={swapping}>
+      {head}
       <ul className="rows" key={applied.current}>
         {items.map((n, i) => (
           <NoticeRow key={n.id} n={n} stagger={(i % PAGE_SIZE) * ROW_STAGGER_MS} />
@@ -115,10 +126,14 @@ export function NoticeExplorer({ initial }: Props) {
           {error} <button type="button" className="btn" onClick={loadMore}>다시 시도</button>
         </p>
       )}
-      <div className="more-bar">
-        <span className="cnt">{count(page.total)} 중 {count(items.length)} 표시</span>
-        <button type="button" className="btn ink lg" onClick={loadMore} disabled={!cursor || loading}>{loadLabel}</button>
-      </div>
+      {/* 무한 스크롤이 기본. 버튼은 관찰자가 안 먹는 환경의 폴백이라 남은 게 있을 때만 둔다 */}
+      {cursor && (
+        <div className="more-bar">
+          <button type="button" className="btn ink lg" onClick={loadMore} disabled={loading}>
+            {loading ? "불러오는 중…" : `더 보기 +${Math.min(PAGE_SIZE, page.total - items.length)}`}
+          </button>
+        </div>
+      )}
       {cursor && <div ref={sentinel} className="feed-sentinel" aria-hidden="true" />}
     </div>
   );

@@ -84,16 +84,16 @@ export default async function ComplexPage({ params }: Params) {
 
   return (
     <article className="stage">
+      {/* 뒤로가기 한 개만 — 「단지 | 지역 | 유형」 줄은 아래 태그와 겹쳐 뺐다(사용자 요청 2026-09-09) */}
       <div className="crumb">
         <Link href={noticePath(n.slug)} className="back">← 공고</Link>
-        <span>단지 | {regionShort(c)} | {n.housing_type}</span>
       </div>
 
       <div className="detail">
         <div className="detail-main">
           <header className="d-head">
             <div className="d-tags">
-              <span className={`tag ${d.tone}`}>{d.num} {d.unit}</span>
+              {/* D-day는 오른쪽 카드가 크게 센다 — 여기서 또 세지 않는다 */}
               <span className="tag type">{n.housing_type}</span>
               <span className="tag">{regionShort(c)}</span>
               {c.is_new && <span className="tag acc">신규 공급</span>}
@@ -108,10 +108,7 @@ export default async function ComplexPage({ params }: Params) {
                 </b>
                 {priceMax == null && <span className="jumbo-from">부터</span>}
                 {c.min_rent != null && c.min_deposit != null && (
-                  <span className="jumbo-sub" title={wonExact(c.min_deposit)}>보증금 {wonKo(c.min_deposit)} 부터, 이 단지 최소값</span>
-                )}
-                {priceMax != null && (
-                  <span className="jumbo-sub">공급유형별 범위입니다. 아래 「보증금과 임대료」 표를 확인하세요.</span>
+                  <span className="jumbo-sub" title={wonExact(c.min_deposit)}>보증금 {wonKo(c.min_deposit)} 부터</span>
                 )}
               </>
             ) : (
@@ -126,11 +123,9 @@ export default async function ComplexPage({ params }: Params) {
             <section className="dsec">
               <h2>보증금과 임대료</h2>
               <PriceTable rows={priceBreak} />
-              <p className="note">공급대상과 공급유형(전용면적)에 따른 값입니다. 세부는 아래 공급현황 표를 확인하세요.</p>
               {hasRent && (
                 <p className="note">
-                  표에 나온 금액은 공고문이 정한 기준(표준)값입니다. 계약 시 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있는 경우가 많습니다(임대금액 상호전환).
-                  정확한 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
+                  공고문 기준값입니다. 계약 때 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있습니다. 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
                 </p>
               )}
             </section>
@@ -138,31 +133,19 @@ export default async function ComplexPage({ params }: Params) {
 
           <section className="dsec">
             <h2>단지 제원</h2>
+            {/* 단지명·주소·지역·금액은 머리글이 이미 말했다 — 여기선 겹치지 않는 값만(사용자 요청 2026-09-09) */}
             <SpecList>
-              <Spec label="단지명" value={c.name} />
               <Spec label="공급 호실" value={c.unit_count != null ? num(c.unit_count, "호") : null} />
               <Spec label="전용면적" value={area} />
               <Spec label="공용면적" value={supply.length ? m2(commonArea(supply[0])) : null} />
               <Spec label="계약면적" value={supply[0]?.area_total != null ? m2(supply[0].area_total) : null} />
-              <Spec label={hasRent ? "임대보증금" : "전세금"} value={c.min_deposit != null ? <span title={wonExact(c.min_deposit)}>{wonKo(c.min_deposit)} 부터</span> : null} />
-              <Spec label="월 임대료" value={c.min_rent != null ? <span title={wonExact(c.min_rent)}>{wonKo(c.min_rent)} 부터</span> : null} />
-              <Spec label="지역" value={`${sidoShort(c.sido)} ${c.sigungu}`} />
               <Spec label="난방" value={c.heating} />
               {hasReserve && <Spec label="현재 공가" value={`${num(vacantTotal, "호")}`} />}
               {hasReserve && <Spec label="예비자 모집" value={`${num(reserveTotal, "호")}`} />}
               <Spec label="입주 시작" value={moveIn} />
               <Spec label="주택 유형" value={supply.length ? (supply.some((s) => s.is_new) ? "신규 공급" : "재공급") : null} />
-              <Spec label="단지 코드" value={c.complex_code} />
-              <Spec label="주소" value={full} wide />
             </SpecList>
-            <p className="note">
-              {supply.length > 0
-                ? "첨부 공고문 「공급현황」 표에서 읽은 값입니다. 호수는 공급유형과 공급대상마다 한 칸이라 중복해 세지 않았습니다."
-                : c.unit_count != null
-                ? "첨부 공고문 별첨 「주택목록」의 이 단지 행을 묶은 값입니다. 금액은 단지 안 최소값이고, 호별 금액과 층·동호는 원문 표를 확인하세요."
-                : "첨부 공고문 「주택 위치 안내」 표에서 읽은 값입니다. 면적과 호수, 금액은 원문 표를 확인하세요."}
-              {c.source_page != null && ` 원문 ${c.source_page}쪽.`}
-            </p>
+            {c.source_page != null && <p className="note">원문 {c.source_page}쪽.</p>}
           </section>
 
           {supply.length > 0 && (
@@ -170,7 +153,7 @@ export default async function ComplexPage({ params }: Params) {
               <h2>공급 {count(supply.length, "건")}{unitTotal > 0 && ` | ${num(unitTotal, "호")}`}</h2>
               <SupplyTable supply={supply} hasReserve={hasReserve} hasRent={hasRent} hasClass={hasClass} />
               <p className="note">
-                {hasReserve && "공급호수는 공가(우선과 일반)와 예비입주자 모집분을 더한 값입니다. "} 계약면적은 주거전용에 주거공용과 기타공용을 더한 세대별 면적입니다.
+                {hasReserve && "공급호수는 공가(우선과 일반)와 예비입주자 모집분을 더한 값입니다."}
                 {supply[0]?.source_page != null && ` 원문 ${supply[0].source_page}쪽.`}
               </p>
             </section>
@@ -179,27 +162,14 @@ export default async function ComplexPage({ params }: Params) {
           <section className="dsec">
             <h2>위치</h2>
             <div className="d-map"><NaverMap address={full} title={c.name} sub={mapSub} /></div>
-            <p className="note">지도 위치는 도로명주소 기준 근사치입니다. 핀이나 로드뷰 버튼을 누르면 거리뷰가 열립니다. {full}</p>
+            <p className="note">지도 위치는 도로명주소 기준 근사치입니다. 핀이나 로드뷰 버튼을 누르면 거리뷰가 열립니다.</p>
           </section>
 
-          <section className="dsec">
-            <h2>이 단지가 속한 공고</h2>
-            <ul className="amend-list">
-              <li>
-                <Link href={noticePath(n.slug)}>
-                  <span className="chip amend">{n.agency}</span> {n.title} <small>{dateK(n.posted_at)}</small>
-                </Link>
-              </li>
-            </ul>
-            <ul className="link-list" style={{ marginTop: 10 }}>
-              <li><ExternalLink href={n.source_url}>{L.originalListItem} ↗</ExternalLink></li>
-              {n.portal_url && <li><ExternalLink href={n.portal_url}>{L.portalListItem} ↗</ExternalLink></li>}
-            </ul>
-            <div className="notice-bar" style={{ margin: "16px 0 0" }}>
-              <span className="i">i</span>
-              <span>본 자료는 참고용입니다. 정확한 내용과 최종 조건은 {n.agency}의 공식 공고문을 반드시 확인하세요.</span>
-            </div>
-          </section>
+          {/* 공고와 원문 링크는 오른쪽 카드가 이미 준다 — 고지 한 줄만 남긴다 */}
+          <div className="notice-bar">
+            <span className="i">i</span>
+            <span>본 자료는 참고용입니다. 정확한 내용과 최종 조건은 {n.agency}의 공식 공고문을 반드시 확인하세요.</span>
+          </div>
 
           {(prev || next) && (
             <nav className="pager" aria-label="같은 공고의 다른 단지">
@@ -230,13 +200,11 @@ export default async function ComplexPage({ params }: Params) {
           }
           rows={[
             { label: "공급기관", value: n.agency },
-            { label: "공급유형", value: n.housing_type },
             { label: "공고일", value: dateK(n.posted_at) },
             { label: "접수 마감", value: n.apply_end_at ? dateK(n.apply_end_at) : null },
             { label: "문의처", value: n.contact },
           ]}
           updatedNote={`갱신 ${n.updated_at} | ${L.updatedVia}`}
-          footNote="이 페이지는 공고 지도에서 들어오는 앵커입니다. 검색 색인은 하지 않습니다."
         />
       </div>
     </article>

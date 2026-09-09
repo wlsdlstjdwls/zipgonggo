@@ -110,7 +110,6 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug }: Props) {
   const onPick = useCallback((id: number) => setSelected((cur) => (cur === id ? null : id)), []);
   const onPinFocus = useCallback((id: number | null) => setFocus(id), []);
 
-  const found = visible.filter((c) => coords.get(fullAddress(c))).length;
   // 지도 위 선택 카드 — 로드뷰 토글과 상세 이동을 지도 안에서 끝낸다(사용자 요청 2026-09-08)
   const picked = selected === null ? null : (visible.find((c) => c.id === selected) ?? null);
   const pickedPin = picked ? Boolean(coords.get(fullAddress(picked))) : false;
@@ -198,13 +197,6 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug }: Props) {
             </div>
           )}
         </div>
-        <p className="cx-status">
-          {phase === "loading"
-            ? `주소 찾는 중 ${progress}/${items.length}`
-            : phase === "ready"
-              ? `${found}/${visible.length}곳 표시. 위치는 도로명주소 기준 근사치입니다. 목록이나 핀을 누르면 이름이 보이고, 로드뷰를 열 수 있습니다.`
-              : "위치는 도로명주소 기준 근사치입니다."}
-        </p>
       </div>
     </div>
   );

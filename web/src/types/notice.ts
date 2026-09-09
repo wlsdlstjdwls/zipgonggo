@@ -111,7 +111,8 @@ export type NoticeComplex = {
 export type NoticeFilters = { sido?: string; type?: string; sector?: Sector; sort?: NoticeSort; closing?: NoticeClosing; closed?: boolean };
 
 /** 홈 KPI 스트립. 전부 서비스 전체 집계(필터 무관) */
-export type HomeStats = { total: number; seoul: number; closing7: number; medianRent: number | null };
+/** 목록 화면이 쓰는 집계. 히어로와 KPI를 걷어낸 뒤로 남은 건 필터 칩의 마감 임박 건수뿐이다(2026-09-09) */
+export type HomeStats = { closing7: number };
 
 export type NoticePage = { items: NoticeListItem[]; nextCursor: string | null; total: number };
 

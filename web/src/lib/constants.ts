@@ -4,13 +4,6 @@ export const SITE_NAME = "집공고";
 export const SITE_TITLE = `${SITE_NAME} — 공공임대 모집공고 지도`;
 export const SITE_DESCRIPTION = "LH, SH, 지방공사 공공임대 입주자모집공고를 지역별 단지별로 모아 보증금과 임대료, 마감일을 한눈에.";
 
-// 홈 KPI 스트립 라벨 — page.tsx와 loading.tsx가 같은 순서로 그린다(스트리밍 폴백이 본문과 어긋나면 안 됨)
-export const KPI_LABELS = ["전체 공고", "서울", "7일 내 마감", "중위 월임대료"] as const;
-// 목록 뷰(?view=list) 히어로
-export const LIST_HERO_TITLE = "수백 페이지 표를 호실 단위로.";
-export const LIST_HERO_LEAD = "LH, SH, 지방공사 공고를 한곳에 모읍니다. 보증금과 월임대료는 공고에 적힌 최소값입니다.";
-// KPI 카운트업 길이(ms). 경과 시간 기준 보간, 끝에서 실제 값으로 스냅
-export const KPI_COUNT_MS = 800;
 // 저장(★) 목록 localStorage 키. 서버 저장 없음 — 사용자 식별이 생기면 옮긴다
 export const SAVED_STORAGE_KEY = "zipgonggo.saved.v1";
 export const TOAST_MS = 2100;
