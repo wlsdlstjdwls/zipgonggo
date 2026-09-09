@@ -68,6 +68,8 @@ export function UnitTable({ units }: Props) {
   // 전세전환·월세전환 열은 값이 있을 때만 — 장기전세형 별첨에는 없다
   const hasSwap = units.some((u) => u.deposit_jeonse != null || u.deposit_wolse != null);
   const hasRent = units.some((u) => u.rent != null);
+  // 호 + 전용면적/구조/승강기/보증금(+월임대료)(+전세전환/월세전환) — colSpan은 실제로 그리는 열 수와 맞춰야 한다
+  const colCount = 4 + (hasRent ? 2 : 1) + (hasSwap ? 2 : 0);
 
   const Chips = ({ label, list, value, set, labelize }: { label: string; list: [string, number][]; value: string; set: (v: string) => void; labelize?: (v: string) => string }) =>
     list.length < 2 ? null : (
@@ -94,8 +96,9 @@ export function UnitTable({ units }: Props) {
         <table className="supply">
           <thead>
             <tr>
-              {dongs.length > 0 && <th>{groupLabel}</th>}
-              <th>호</th>
+              {/* 동 열을 따로 두면 좁은 화면에서 스크롤할 때 어느 동인지 잊어버린다(사용자 지적
+                  2026-09-09) — 호 열 하나에 합쳐 sticky로 고정한다(globals.css) */}
+              <th>{dongs.length > 0 ? `${groupLabel}/호` : "호"}</th>
               <th className="num">전용면적</th>
               <th>구조</th>
               <th>승강기</th>
@@ -108,8 +111,14 @@ export function UnitTable({ units }: Props) {
           <tbody>
             {visible.map((u) => (
               <tr key={u.id}>
-                {dongs.length > 0 && <td className="tc-key" title={groupOf(u) ?? undefined}>{byDong ? (u.building ?? "—") : addrShort(groupOf(u) ?? "—")}</td>}
-                <td className="tc-key">{hoText(u.room)}{u.floor != null && <small> {u.floor}층</small>}</td>
+                <td className="tc-key">
+                  {dongs.length > 0 && (
+                    <span className="ut-dong" title={groupOf(u) ?? undefined}>
+                      {byDong ? (u.building ?? "—") : addrShort(groupOf(u) ?? "—")}
+                    </span>
+                  )}
+                  {hoText(u.room)}{u.floor != null && <small> {u.floor}층</small>}
+                </td>
                 <td className="num">{u.area_m2 != null ? `${u.area_m2}㎡` : "—"}</td>
                 <td>{u.room_layout ?? "—"}</td>
                 <td>{u.elevator ?? "—"}</td>
@@ -130,7 +139,7 @@ export function UnitTable({ units }: Props) {
               </tr>
             ))}
             {visible.length === 0 && (
-              <tr><td colSpan={9} className="ut-empty">조건에 맞는 호실이 없습니다.</td></tr>
+              <tr><td colSpan={colCount} className="ut-empty">조건에 맞는 호실이 없습니다.</td></tr>
             )}
           </tbody>
         </table>
