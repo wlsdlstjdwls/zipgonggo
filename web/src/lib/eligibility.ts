@@ -2,6 +2,7 @@
 //
 // 여기서 나오는 답은 **안내**지 심사 결과가 아니다. 실제 자격은 공고문과 기관 심사가 정한다.
 // 그래서 통과/미달을 이유까지 다 적어 돌려준다 — "왜 안 되는지"를 보여야 사용자가 다음 수를 둘 수 있다.
+import { wonKo } from "@/lib/format";
 import type { EligibilityRules, IncomeStandard, RegionTier, SupplyType } from "@/types/eligibility";
 
 /** 예비신혼부부(혼인신고 예정)는 미혼도 기혼도 아닌 별도 상태다 — 신혼부부 유형 상당수가 이 상태를 받아 준다 */
@@ -179,4 +180,47 @@ export function diagnose(t: SupplyType, p: Profile, rules: EligibilityRules): Ve
 
 export function diagnoseAll(p: Profile, rules: EligibilityRules): Verdict[] {
   return rules.types.map((t) => diagnose(t, p, rules));
+}
+
+// 공고상세용 — 프로필 없이 유형 사양 자체를 문구로 보여준다. diagnose()의 조건 계산과 같은 기준을 쓰되
+// 통과/미달을 매기지 않는다. null이면 그 항목은 이 유형에서 안 보는 기준이라 화면에서도 뺀다.
+
+export function ageRuleText(t: SupplyType): string {
+  const bounded = t.age_min > 0 || t.age_max < 999;
+  if (!bounded) return "나이 제한 없음";
+  const range = `${t.age_min}~${t.age_max === 999 ? "제한 없음" : `${t.age_max}세`}`;
+  return t.age_exempt.length ? `${range} (${t.age_exempt.join("/")}은 면제)` : range;
+}
+
+export function maritalRuleText(t: SupplyType): string | null {
+  if (t.marital === "무관") return null;
+  if (t.marital === "미혼") return "미혼만 신청 가능";
+  const yr = t.marital_max_yr ? `혼인 ${t.marital_max_yr}년 이내` : "혼인기간 제한 없음";
+  const newborn = t.newborn_exempt ? ", 2세 이하 자녀가 있으면 기간 면제" : "";
+  return `${yr}${newborn} (예비신혼부부/한부모/신생아 가구 포함)`;
+}
+
+export function classRuleText(t: SupplyType): string | null {
+  return t.required_class.length ? `${t.required_class.join("/")} 중 하나 해당` : null;
+}
+
+export function incomeRuleText(t: SupplyType): string | null {
+  if (t.income_pct === null) return null;
+  const scope = t.income_scope === "본인+부모" ? "본인+부모(세대 합산으로 갈음)" : t.income_scope;
+  return `${scope} 도시근로자 월평균소득 ${t.income_pct}% 이하`;
+}
+
+export function assetRuleText(t: SupplyType): string | null {
+  if (t.asset_limit_man === null) return null;
+  return `${t.asset_scope} 총자산 ${wonKo(t.asset_limit_man * MAN)} 이하`;
+}
+
+export function carRuleText(t: SupplyType): string | null {
+  if (t.car_limit_man === null) return null;
+  if (t.car_limit_man === 0) return "자동차 소유 불가";
+  return `자동차가액 ${wonKo(t.car_limit_man * MAN)} 이하`;
+}
+
+export function regionRuleText(t: SupplyType): string | null {
+  return t.region_limit === "서울" ? "서울 거주자만 신청 가능" : null;
 }

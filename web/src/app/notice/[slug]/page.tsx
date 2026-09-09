@@ -12,9 +12,14 @@ import { SaveButton } from "@/components/save-button";
 import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
+import {
+  ageRuleText, assetRuleText, carRuleText, classRuleText, incomeRuleText, maritalRuleText, regionRuleText,
+} from "@/lib/eligibility";
 import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, NO_DATE, num, won, wonShort } from "@/lib/format";
 import { moveInLabel } from "@/lib/notice-view";
-import { getAmendChain, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeSupply } from "@/lib/queries";
+import {
+  getAmendChain, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeSupply,
+} from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
 import type { NoticeListItem } from "@/types/notice";
@@ -70,9 +75,13 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
 export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
-  const [areas, chain, complexes, supply] = await Promise.all([
-    getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id), getNoticeSupply(n.id),
+  const [areas, chain, complexes, supply, eligRules] = await Promise.all([
+    getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id), getNoticeSupply(n.id), getEligibilityRules(),
   ]);
+  // supply_type.housing_type이 notice.housing_type과 잇는 고리(0020 마이그레이션) — 공고 개별 문구는
+  // 아직 파싱 전이라(eligibility 테이블 0건) 제도 일반 기준으로 대신 보여준다. 유형마다 조건 종류가 달라
+  // null인 항목은 그 유형에서 안 보는 기준이라 화면에서도 뺀다.
+  const eligTypes = eligRules.types.filter((t) => t.housing_type === n.housing_type);
   // 매입임대 별첨(호실 단위)이면 호수·면적·금액 열을 더 보여준다
   const hasUnits = complexes.some((c) => c.unit_count != null);
   const unitTotal = complexes.reduce((a, c) => a + (c.unit_count ?? 0), 0);
@@ -217,6 +226,41 @@ export default async function NoticePage({ params }: Params) {
               <p className="note" style={{ marginTop: 0 }}>공고일 {dateK(n.posted_at, true)}. 접수 기간은 {L.originalDoc}에서 확인하세요.</p>
             )}
           </section>
+
+          {eligTypes.length > 0 && (
+            <section className="dsec">
+              <h2>신청자격</h2>
+              <p className="note" style={{ margin: "0 0 12px" }}>
+                {n.housing_type} 제도의 유형별 일반 기준입니다. 이 공고에서 실제로 모집하는 유형과 세부 조건은{" "}
+                {L.originalDoc}에서 확인하세요.{" "}
+                <Link href={ROUTES.eligibility}>내 조건으로 신청 가능한 유형 진단하기 →</Link>
+              </p>
+              <div className="tbl">
+                <table>
+                  <thead>
+                    <tr><th>유형</th><th>나이/혼인</th><th>소득기준</th><th>자산/자동차</th><th>비고</th></tr>
+                  </thead>
+                  <tbody>
+                    {eligTypes.map((t) => {
+                      const marital = maritalRuleText(t);
+                      const asset = assetRuleText(t);
+                      const car = carRuleText(t);
+                      const note2 = [classRuleText(t), regionRuleText(t), t.note].filter(Boolean).join(" | ");
+                      return (
+                        <tr key={t.code}>
+                          <td>{t.name}</td>
+                          <td>{ageRuleText(t)}{marital && <><br />{marital}</>}</td>
+                          <td>{incomeRuleText(t) ?? "소득 무관"}</td>
+                          <td>{[asset, car].filter(Boolean).join(" | ") || "자산/자동차 무관"}</td>
+                          <td>{note2 || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
           {showAreaTable && areas.length > 0 && (
             <section className="dsec">
