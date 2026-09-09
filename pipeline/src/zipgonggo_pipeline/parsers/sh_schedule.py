@@ -19,9 +19,12 @@ from datetime import date
 from ..sources.ish import group_rows, parse_chars, row_segments
 
 RANK_APPLY_RE = re.compile(r"(\d)\s*(?:[・·.]\s*\d\s*)?순위\s*(?:청약)?\s*접수")
+# 재개발임대주택(310041)은 "청약신청접수" 칸 헤더와 "1순위"/"2순위" 라벨이 따로 떨어진 상자다(2026-09-09,
+# 두 상자 t간격이 STACK_PX보다 넓어 _stacked_labels가 못 붙인다). 접수 문구 없이 순위만 있는 상자도 받는다.
+RANK_BARE_RE = re.compile(r"^(\d)\s*(?:[・·.]\s*\d\s*)?순위$")
 APPLY_RE = re.compile(r"^(?:신청\s*접수|청약\s*접수|접수\s*기간|신청접수\(인터넷\))")
 ANNOUNCE_RE = re.compile(r"당첨자.{0,8}발표")
-HEADING_RE = re.compile(r"모집\s*절차\s*및\s*일정|공급\s*일정|모집\s*일정")
+HEADING_RE = re.compile(r"모집\s*(?:공고\s*)?절차\s*및\s*일정|공급\s*일정|모집\s*일정")
 
 # 흐름도에서 접수·당첨자발표 말고 더 읽는 단계. 위에서부터 먼저 맞는 하나만 쓴다(라벨이 서로 겹친다:
 # 「서류심사대상자서류제출」은 발표 패턴에도 걸리므로 제출을 먼저 본다).
@@ -37,6 +40,10 @@ WEEKDAY = "월화수목금토일"
 SPACED_RE = re.compile(rf"(?:(\d{{2}}|\d{{4}})\s+)?(\d{{1,2}})\s+(\d{{1,2}})\s*\(([{WEEKDAY}])\)")
 # 붙은 날짜: 260914(월) · 20260914(월) · 2026928(월) · 0915(화) · 928(월)
 COMPACT_RE = re.compile(rf"(\d{{3,8}})\s*\(([{WEEKDAY}])\)")
+# 요일이 아예 다른 칸으로 떨어져 나온 날짜(재개발임대주택 310041 「당첨자발표」 '27330 다음 줄에 (화)만,
+# 2026-09-09) — 칸 전체가 숫자뿐일 때만 받는다. 문장 속에 섞인 숫자(모집세대의 200% 등)까지 날짜로
+# 오인하지 않도록 텍스트 전체가 매치되는 경우로 좁힌다.
+BARE_COMPACT_RE = re.compile(r"^(\d{4,8})$")
 YEAR_ONLY_RE = re.compile(r"^(20\d{2})$")
 BELOW_PX = 150   # 라벨 아래 이만큼 안에서 날짜를 찾는다(매입임대는 마감 날짜가 142px 아래)
 CHAIN_PX = 60    # 날짜를 하나 찾으면 그 밑으로 이만큼 더 본다 — 「2026 / 8 31(월) / 10:00 / ~ 9 2(수)」처럼
@@ -163,6 +170,13 @@ def _dates_in(text: str, ref_year: int | None, ref: date | None) -> list[tuple[d
         if d:
             out.append((d, m.group(2)))
             ref, ref_year = d, d.year
+    if out:
+        return out
+    m = BARE_COMPACT_RE.match(t)
+    if m:
+        d = _pick(_compact_candidates(m.group(1), ref_year), ref)
+        if d:
+            out.append((d, WEEKDAY[d.weekday()]))
     return out
 
 
@@ -271,7 +285,7 @@ def parse_schedule_page(xml: str, ref_year: int | None = None) -> Schedule | Non
     plain: list[_Box] = []
     announce_labels: list[_Box] = []
     for b in labels:
-        m = RANK_APPLY_RE.search(b.text)
+        m = RANK_APPLY_RE.search(b.text) or RANK_BARE_RE.match(b.text.replace(" ", ""))
         if m:
             ranked.append((int(m.group(1)), b))
         elif APPLY_RE.match(b.text.replace(" ", "")):
@@ -317,12 +331,30 @@ def parse_schedule_page(xml: str, ref_year: int | None = None) -> Schedule | Non
 
 
 def parse_schedule(pages: list[tuple[int, str]], ref_year: int | None = None) -> Schedule | None:
-    """앞쪽 12쪽 안에서 일정 흐름도를 찾는다. 표지(1쪽)에도 같은 그림이 있어 먼저 잡히면 그걸 쓴다."""
+    """앞쪽 12쪽 안에서 일정 흐름도를 찾는다. 표지(1쪽)에도 같은 그림이 있어 먼저 잡히면 그걸 쓴다.
+
+    표지 요약판엔 접수 시작·마감만 있고 당첨자 발표·단계는 본문 흐름도(예: 8쪽)에만 있는 양식이 있다
+    (재개발임대주택 310041, 2026-09-09). 그런 경우 접수일은 먼저 찾은 쪽 값을 그대로 쓰고,
+    발표일만 없으면 뒤쪽 쪽에서 마저 찾는다 — 접수일 자체가 이미 있으면 더 뒤져도 안 바꾼다."""
+    result: Schedule | None = None
     for page, xml in pages[:12]:
         s = parse_schedule_page(xml, ref_year)
-        if s and (s.apply_start or s.apply_end):
-            return Schedule(s.apply_start, s.apply_end, s.announce, page,
-                            steps=s.steps,
-                            apply_start_time=s.apply_start_time,
-                            apply_end_time=s.apply_end_time)
-    return None
+        if not s:
+            continue
+        if result is None:
+            if not (s.apply_start or s.apply_end):
+                continue
+            result = Schedule(s.apply_start, s.apply_end, s.announce, page,
+                              steps=s.steps,
+                              apply_start_time=s.apply_start_time,
+                              apply_end_time=s.apply_end_time)
+            if result.announce:
+                break
+            continue
+        if not result.announce and s.announce:
+            result = Schedule(result.apply_start, result.apply_end, s.announce, result.page,
+                              steps=result.steps or s.steps,
+                              apply_start_time=result.apply_start_time,
+                              apply_end_time=result.apply_end_time)
+            break
+    return result

@@ -27,7 +27,9 @@ ROAD_ADDR_RE = re.compile(
 )
 NEW_RE = re.compile(r"^\[?\s*신\s*규\s*\]?\s*")
 HEADER_KEYS = ("단지명", "소재지")
-HEADER_ALL = ("자치구", "지구명", "단지명", "소재지")
+HEADER_ALL = ("자치구", "지구명", "단지명", "소재지", "도로명주소")
+# 재개발임대주택 표는 주소 칸 이름이 "소재지" 대신 "도로명주소"다(2026-09-09, seq=310041)
+ADDR_LABELS = frozenset({"소재지", "도로명주소"})
 DISTRICT_COL = "지구명"
 NO_DISTRICT = "-"       # 지구에 안 묶인 단독 단지 표시
 
@@ -56,8 +58,8 @@ def _match_addr(text: str) -> re.Match[str] | None:
 
 
 def is_header_row(segs: list[Segment]) -> bool:
-    texts = [s.text.replace(" ", "") for s in segs]
-    return all(any(k == t for t in texts) for k in HEADER_KEYS)
+    texts = {s.text.replace(" ", "") for s in segs}
+    return "단지명" in texts and bool(texts & ADDR_LABELS)
 
 
 def header_bands(rows_y: list[tuple[float, list[Segment]]]) -> dict[str, tuple[float, float]]:
