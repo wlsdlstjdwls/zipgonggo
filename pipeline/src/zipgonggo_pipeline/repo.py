@@ -20,10 +20,25 @@ NOTICE_COLS = [
 # 재수집 시 갱신하지 않는 것: slug(URL 불변), source, source_key, publish, created_at
 _UPDATE_COLS = [c for c in NOTICE_COLS if c not in ("slug", "source", "source_key")]
 
+# 목록에 없는 칸을 NULL로 덮지 않는다. S3이 첨부 공고문에서 읽어 넣은 값을
+# 매시 도는 목록 수집이 지우고 있었다 — 화면에 접수기간 대신 「원문 확인」이 뜬 원인(2026-09-10).
+# 목록이 값을 들고 왔을 때만 갈아 끼운다. 목록 쪽이 최신이라는 판단은 그대로 지킨다.
+_KEEP_IF_NULL = {
+    "apply_start_at", "apply_end_at", "announce_at",
+    "supply_count", "min_deposit", "min_rent", "min_down_payment", "min_interim", "min_balance",
+}
+
+
+def _assign(col: str) -> str:
+    if col in _KEEP_IF_NULL:
+        return f"{col} = COALESCE(EXCLUDED.{col}, notice.{col})"
+    return f"{col} = EXCLUDED.{col}"
+
+
 UPSERT_SQL = (
     f"INSERT INTO notice ({', '.join(NOTICE_COLS)}) VALUES ({', '.join('%(' + c + ')s' for c in NOTICE_COLS)}) "
     "ON CONFLICT (source_key) DO UPDATE SET "
-    + ", ".join(f"{c} = EXCLUDED.{c}" for c in _UPDATE_COLS)
+    + ", ".join(_assign(c) for c in _UPDATE_COLS)
     + ", updated_at = now() RETURNING id, (xmax = 0) AS inserted"
 )
 
