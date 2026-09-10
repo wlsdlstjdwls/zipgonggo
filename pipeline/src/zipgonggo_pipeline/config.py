@@ -16,6 +16,7 @@ load_dotenv(PIPELINE_ROOT / ".env")
 class Settings:
     data_go_kr_key: str
     database_url: str
+    juso_search_api_key: str
     scrape_delay_sec: float
     attachment_dir: Path
     juso_summary_db_path: Path
@@ -35,6 +36,8 @@ def settings() -> Settings:
     return Settings(
         data_go_kr_key=_required("DATA_GO_KR_KEY"),
         database_url=_required("DATABASE_URL"),
+        # 지번주소 표준화에만 쓴다. 좌표제공 API는 안 쓴다(CLAUDE.md 하지 말 것 1)
+        juso_search_api_key=os.environ.get("JUSO_SEARCH_API_KEY", "").strip(),
         scrape_delay_sec=float(os.environ.get("SCRAPE_DELAY_SEC", "1.0")),
         attachment_dir=PIPELINE_ROOT / os.environ.get("ATTACHMENT_DIR", "./data/attachments/"),
         juso_summary_db_path=PIPELINE_ROOT / os.environ.get("JUSO_SUMMARY_DB_PATH", "./data/juso/"),

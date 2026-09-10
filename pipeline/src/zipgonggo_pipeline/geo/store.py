@@ -49,6 +49,10 @@ _SELECT = (
     f"SELECT {_COLS} FROM entrance WHERE road_name = ? AND main_no = ? AND sub_no = ? AND underground = ?"
 )
 _SELECT_MAIN = f"SELECT {_COLS} FROM entrance WHERE road_name = ? AND main_no = ? AND underground = 0"
+# 도로명코드로 곧장 찾는다 — 기본키라 동명이도로를 가릴 필요가 없다
+_SELECT_CODE = (
+    f"SELECT {_COLS} FROM entrance WHERE road_code = ? AND underground = ? AND main_no = ? AND sub_no = ?"
+)
 
 
 class EntranceStore:
@@ -93,6 +97,23 @@ class EntranceStore:
             if hit is not None:
                 return _match(hit, "road", "road_main")
         return None
+
+    def lookup_road_code(
+        self, road_code: str, underground: bool, main_no: int, sub_no: int, *, matched_by: str = "road_addr"
+    ) -> Match | None:
+        """도로명코드로 출입구를 찾는다. 검색 API가 표준화해 준 주소를 좌표로 바꾸는 자리다.
+
+        좌표는 여전히 요약DB에서만 나온다(CLAUDE.md 하지 말 것 1) — API는 열쇠만 준다.
+        """
+        row = self.conn.execute(_SELECT_CODE, (road_code, int(underground), main_no, sub_no)).fetchone()
+        if row is None and sub_no:
+            # 부번이 다른 같은 본번 출입구로 대신한다. 아파트 단지는 부번이 흔들린다
+            row = self.conn.execute(
+                _SELECT_CODE.replace("sub_no = ?", "sub_no = 0"), (road_code, int(underground), main_no)
+            ).fetchone()
+            if row is not None:
+                return _match(row, "road", matched_by)
+        return None if row is None else _match(row, "building", matched_by)
 
     def lookup_dong_address(self, address: str | None, *, sido: str | None = None) -> Match | None:
         """지번주소만 있는 단지의 마지막 수단. 정확도는 dong이라 색인 대상이 아니다."""

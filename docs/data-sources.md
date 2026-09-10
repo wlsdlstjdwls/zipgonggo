@@ -173,6 +173,14 @@
 
 **채택: 위치정보 요약DB를 내려받아 자체 좌표 테이블로 보유하고 주소를 오프라인 조인한다.**
 
+> **지번주소는 검색 API로 한 번 표준화한다** (2026-09-10 구현). SH 공고문 소재지의 4분의 1이 지번으로만
+> 적혀 있고(재개발 매입분·리츠분), 요약DB에는 지번 칸이 없어 그대로는 못 맞춘다. `business.juso.go.kr`
+> 검색 API(`addrLinkApi.do`)에 지번을 물으면 `rnMgtSn`+`udrtYn`+`buldMnnm`+`buldSlno`가 오는데,
+> 이게 요약DB `entrance`의 기본키다. **이 API는 좌표를 주지 않고 좌표제공 API는 쓰지 않는다** —
+> 저장하는 좌표는 여전히 요약DB에서만 나오므로 「하지 말 것 1」에 걸리지 않는다.
+> 구현은 `pipeline/src/zipgonggo_pipeline/geo/juso_search.py`, 스위치는 `s6_geocode --juso-api`.
+> 실측(2026-09-10): 못 맞춘 168건 중 157건을 채웠다.
+
 > **포털에서의 실제 명칭은 「도로명주소 출입구 정보」다** (확인됨). `business.juso.go.kr` → 주소정보 자료제공 → 주소정보 다운로드 →
 > **「제공하는 주소 (도형, 좌표)」 탭**(기본 탭 아님). 스키마 19개 컬럼 중 좌표는 `ENTRC_POINT_X` / `ENTRC_POINT_Y`,
 > 조인 키는 `ADR_MNG_NO`(26자리) 또는 `ROAD_NEW_CD`+`BULD_SE_CD`+`BULD_MNNM`+`BULD_SLNO` 복합키다.

@@ -143,10 +143,12 @@ jobs:
           done
           echo "fail=$fail" >> "$GITHUB_OUTPUT"
 
+      # --juso-api: 지번으로만 적힌 소재지를 검색 API로 표준화해 다시 맞춘다.
+      # 좌표는 그래도 요약DB에서만 나온다 — API는 도로명코드만 준다(CLAUDE.md 하지 말 것 1)
       - name: S6 주소-좌표 조인
         run: |
           set -o pipefail
-          python -m zipgonggo_pipeline.stages.s6_geocode --db data/juso/entrance-capital.sqlite > s6.json
+          python -m zipgonggo_pipeline.stages.s6_geocode --db data/juso/entrance-capital.sqlite --juso-api > s6.json
           cat s6.json
           jq -r '"- 좌표 \(.updated)건 채움 / 못 맞춤 \(.skipped | to_entries | map(.value) | add // 0)건"' s6.json \
             >> "$GITHUB_STEP_SUMMARY"
