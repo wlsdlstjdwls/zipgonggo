@@ -109,15 +109,43 @@
 테이블을 새로 두면 그걸 갱신할 책임이 생기고, 워크플로가 죽거나 손으로 돌렸을 때 실제와 어긋난다.
 `ingest_log`는 파이프라인이 회차마다 이미 남기고 있고, 「지금 도는 중인가」는 GitHub 자신의 상태다.
 
-### 준비
+### 준비 — 끝난 것
 
-1. Vercel env에 `CRON_TRIGGER_SECRET` · `GITHUB_DISPATCH_TOKEN`(PAT, `actions:write` 하나면 된다) ·
-   `GITHUB_REPO` 를 넣는다. 셋 중 하나라도 없으면 라우트가 501로 답하고 아무 일도 안 한다
-2. 무료 uptime 모니터에 `https://zipgonggo.com/api/cron/collect?secret=…` 를 5~15분 간격으로 건다
-3. 순찰은 `/api/cron/patrol` 로 같이 건다. 20시간 간격 판정이 있어 하루 1회로 수렴한다
+Vercel env 셋(`CRON_TRIGGER_SECRET` · `GITHUB_DISPATCH_TOKEN` · `GITHUB_REPO`)은 production·preview·
+development 전부 들어갔다(2026-09-10). 셋 중 하나라도 없으면 라우트가 501로 답하고 아무 일도 안 한다.
+
+**env는 빌드 시점에 박힌다.** 값을 넣거나 고친 뒤엔 재배포해야 붙는다 —
+`vercel redeploy <배포 URL>`이면 소스 업로드 없이 된다. 처음에 이걸 안 해서 501이 계속 나왔다.
+
+> `vercel deploy`를 CLI로 직접 돌리지 마라. Root Directory가 `web`이라 저장소 루트에서 올려야 하는데,
+> 그러면 `pipeline/data/`까지 1.8GB를 올리다 100MB 제한에 걸린다. **배포는 git push(Git 연동)로 한다.**
+
+방아쇠는 **Windows 예약 작업** `zipgonggo-cron`이 10분마다 당긴다.
+스크립트는 `~/.zipgonggo/cron-trigger.ps1`(시크릿이 들어 있어 저장소 밖에 둔다), 로그는 같은 폴더의
+`cron-trigger.log`. collect·patrol을 차례로 때리고 응답을 그대로 적는다.
+
+```powershell
+schtasks /Query /TN "zipgonggo-cron" /FO LIST     # 다음 회차 확인
+schtasks /Run   /TN "zipgonggo-cron"              # 지금 한 번
+Get-Content "$HOME\.zipgonggo\cron-trigger.log" -Tail 10
+```
+
+**약점: PC가 켜져 있을 때만 돈다.** PC 독립으로 돌리려면 무료 uptime 모니터(UptimeRobot 등)에
+`https://zipgonggo.com/api/cron/collect?secret=…` 를 5~15분 간격으로 걸면 된다. 겹쳐도 안전하다.
 
 **PAT는 Vercel env에만 둔다.** 외부 크론 서비스에 토큰을 넘기는 방식(`repository_dispatch`)을 안 고른
 이유가 이거다 — 남의 서비스에 저장소 쓰기 권한을 맡기지 않는다.
+
+### 실측 (2026-09-10)
+
+| 확인 | 결과 |
+|---|---|
+| 잘못된 시크릿 | 401 |
+| 모르는 잡 | 404 |
+| `collect` 첫 호출 | **202** `dispatched: collect.yml`, `ageMin: 126` |
+| 실제 워크플로 | 같은 초에 회차 생성 → `completed success` (run 34455885407) |
+| 연타 3회 | 200 `skipped: fresh` — 감시 잡이 곧바로 `ingest_log`를 남겨 1분 안에 차단이 걸린다 |
+| `patrol` | 200 `skipped: fresh`, `ageMin: 128 / needMin: 1200` |
 
 ## 왜 Actions인가
 

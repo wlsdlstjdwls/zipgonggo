@@ -28,9 +28,19 @@ GitHub 상태 페이지에 오늘 Actions 장애 없음(최근 인시던트 09-0
 `ingest_log` 최신 행으로 「마지막 실행이 얼마나 됐나」, GitHub 실행 목록으로 「지금 도는 중인가」.
 「마지막 실행 시각」 테이블을 새로 두면 갱신 책임이 생기고 손으로 돌렸을 때 실제와 어긋난다.
 
-읽기 경로는 실측으로 확인했다 — 워크플로를 파일명(`collect.yml`)으로 지정 가능,
-`status=in_progress|queued` 필터 동작, `ingest_log` 최신 `S1/sh_scrape` 06:27:54Z 조회됨.
-**dispatch 경로는 아직 못 돌려 봤다** — PAT가 없어서다. env를 넣고 한 번 때려 봐야 완결이다.
+**전 구간 실측 완료(08:34 UTC).** `/api/cron/collect` 호출 → 202 `dispatched` → **같은 초에 회차 생성**
+→ `completed success`(run 34455885407). 401(잘못된 시크릿)·404(모르는 잡)·연타 3회 `skipped: fresh`·
+patrol `ageMin 128 / needMin 1200`까지 다 확인했다. 감시 잡이 곧바로 `ingest_log`를 남겨서
+**1분 안에 중복 차단이 걸린다** — 회차가 끝나길 기다릴 필요가 없다.
+
+방아쇠는 **Windows 예약 작업 `zipgonggo-cron`**이 10분마다 당긴다
+(`~/.zipgonggo/cron-trigger.ps1`, 로그 같은 폴더). PC가 켜져 있을 때만 도는 게 약점이라,
+PC 독립이 필요하면 무료 uptime 모니터를 겹쳐 걸면 된다.
+
+**배포에 함정 둘.** ① Vercel env는 **빌드 시점에 박힌다** — 넣은 뒤 재배포해야 붙는다
+(`vercel redeploy <URL>`이면 업로드 없이 된다). 이걸 안 해서 501이 계속 나왔다.
+② `vercel deploy`를 CLI로 직접 돌리면 안 된다 — Root Directory가 `web`이라 저장소 루트에서 올려야 하는데
+`pipeline/data/` 1.8GB가 딸려 가 100MB 제한에 걸린다. **배포는 git push(Git 연동)로 한다.**
 
 Vercel Cron으로 안 간 이유: **Hobby는 최소 하루 1회**고 `17 * * * *`는 **배포 자체가 실패**한다
 (공식 문서 2026-09-10 확인). 정밀도도 ±59분이라 GitHub과 다를 게 없다.
@@ -39,8 +49,12 @@ Vercel Cron으로 안 간 이유: **Hobby는 최소 하루 1회**고 `17 * * * *
 
 ### 다음에 할 일 (31차에서 새로 남긴 것)
 
-- **env 세 개 넣고 dispatch 경로를 실제로 한 번 때려 본다.** 202와 함께 Actions에 회차가 떠야 한다
-- 모니터를 걸면 하루쯤 뒤 `event=schedule`이 아니라 `workflow_dispatch`로 매시가 채워지는지 본다
+- **`GITHUB_DISPATCH_TOKEN`을 갈아야 한다.** 지금 들어 있는 건 classic PAT인데 스코프가 전부 달렸다
+  (`delete_repo`·`admin:org` 포함). 테스트를 위해 사용자 판단으로 그대로 썼다.
+  Fine-grained PAT(대상 `zipgonggo` 하나, 권한 **Actions: Read and write** 하나)로 바꾸고
+  `vercel env rm/add` 후 **재배포**한다. 옛 토큰은 github.com/settings/tokens 에서 Delete
+- 하루쯤 뒤 `workflow_dispatch`로 매시가 실제로 채워지는지 본다 (`gh run list`의 시각 간격)
+- PC 독립이 필요해지면 무료 uptime 모니터에 `/api/cron/collect`·`/api/cron/patrol`을 겹쳐 건다
 - GitHub 크론이 나중에 저절로 살아나도 그대로 둔다. 겹쳐도 안전하게 만들어 놨다
 
 ---
