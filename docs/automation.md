@@ -178,6 +178,22 @@ curl -H "x-cron-secret: <시크릿>" https://zipgonggo-cron.<계정>.workers.dev
 
 무료 플랜으로 충분하다 — 크론 트리거는 횟수 제한이 없고 하루 144회는 요청 한도(10만/일)에 한참 못 미친다.
 
+**배포 전에 로컬로 발화시켜 볼 수 있다.** Cloudflare 로그인 없이 된다:
+
+```bash
+cd worker
+printf 'CRON_TRIGGER_SECRET=<시크릿>
+' > .dev.vars   # 저장소 밖으로 새지 않게 gitignore돼 있다
+npx wrangler dev --test-scheduled                      # 8787로 뜬다
+curl "http://127.0.0.1:8787/__scheduled?cron=*/10+*+*+*+*"   # 크론과 같은 경로로 발화
+curl -H "x-cron-secret: <시크릿>" http://127.0.0.1:8787/     # 응답 본문까지 본다
+```
+
+> **함정: `scheduled()`에서 `ctx.waitUntil()`로 던지면 안 된다.** 핸들러가 먼저 끝나면서 작업이
+> 통째로 버려진다. 2026-09-10 로컬 발화에서 응답이 **34ms에 끝나고 로그가 0줄**로 잡혔다.
+> `await runAll(env)`로 붙들자 1380ms에 두 잡 다 200이 돌아왔다. 크론은 조용히 실패하면
+> 아무도 모르니, 배포 전에 이 테스트를 꼭 한 번 돌린다.
+
 **② Windows 예약 작업 `zipgonggo-cron` (보조).** 같은 PC에서 10분마다 당긴다.
 스크립트는 `~/.zipgonggo/cron-trigger.ps1`(시크릿이 들어 있어 저장소 밖에 둔다), 로그는 같은 폴더의
 `cron-trigger.log`. **PC가 켜져 있을 때만 도는 게 약점**이라 Worker를 주 방아쇠로 올렸다.

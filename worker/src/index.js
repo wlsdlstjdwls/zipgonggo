@@ -54,8 +54,10 @@ async function runAll(env) {
 
 export default {
   /** 크론 트리거 — wrangler.toml 의 crons */
-  async scheduled(event, env, ctx) {
-    ctx.waitUntil(runAll(env));
+  async scheduled(event, env) {
+    // await로 붙든다. ctx.waitUntil로 던지면 핸들러가 먼저 끝나면서 작업이 버려진다
+    // (2026-09-10 `wrangler dev --test-scheduled`에서 34ms 만에 로그 0줄로 확인)
+    await runAll(env);
   },
 
   /**

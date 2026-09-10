@@ -48,7 +48,9 @@ patrol `ageMin 128 / needMin 1200`까지 다 확인했다. 감시 잡이 곧바�
 `x-cron-secret` 헤더로 때린다. **PC와 무관.** ② Windows 예약 작업 `zipgonggo-cron`
 (`~/.zipgonggo/cron-trigger.ps1`, 로그 같은 폴더) — PC 켜져 있을 때만 도는 보조.
 
-**Worker는 아직 배포 안 됐다.** 코드·설정만 올려 뒀다. `cd worker && npx wrangler secret put
+**Worker는 로컬 검증까지 끝냈고 배포만 남았다.** `wrangler dev --test-scheduled`로 크론 경로를
+발화시켜 프로덕션 두 잡 다 200을 받는 걸 확인했다(이때 `ctx.waitUntil` 버그를 잡아 `await`로 고쳤다).
+배포가 막힌 건 Cloudflare 인증뿐이다 — `wrangler login`이 브라우저 OAuth라 세션에서 못 친다. `cd worker && npx wrangler secret put
 CRON_TRIGGER_SECRET && npx wrangler deploy` 한 번이면 붙는다(시크릿은 Vercel env와 같은 값).
 
 **배포에 함정 둘.** ① Vercel env는 **빌드 시점에 박힌다** — 넣은 뒤 재배포해야 붙는다
@@ -67,7 +69,8 @@ Vercel Cron으로 안 간 이유: **Hobby는 최소 하루 1회**고 `17 * * * *
   (`delete_repo`·`admin:org` 포함). 테스트를 위해 사용자 판단으로 그대로 썼다.
   Fine-grained PAT(대상 `zipgonggo` 하나, 권한 **Actions: Read and write** 하나)로 바꾸고
   `vercel env rm/add` 후 **재배포**한다. 옛 토큰은 github.com/settings/tokens 에서 Delete
-- **Worker를 배포한다** — `cd worker && npx wrangler secret put CRON_TRIGGER_SECRET && npx wrangler deploy`.
+- **Worker를 배포한다** — `cd worker && npx wrangler login` (브라우저 승인) 뒤
+  `npx wrangler secret put CRON_TRIGGER_SECRET && npx wrangler deploy`.
   이거 하기 전엔 PC 끄면 수집이 멈춘다(데이터 유실은 없다 — 목록 전체를 보고 없는 것만 잡으니
   다음 회차가 밀린 걸 통째로 주워 온다). 붙은 뒤 `npx wrangler tail`로 10분 안에 한 줄 뜨는지 확인
 - 스케줄이 저절로 살아났는지 한 줄로 본다:
