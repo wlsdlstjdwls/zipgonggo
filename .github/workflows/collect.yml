@@ -91,7 +91,8 @@ jobs:
   ingest:
     name: 상세 — 첨부 파싱과 좌표
     needs: watch
-    if: needs.watch.outputs.count != '0' || inputs.force
+    # 빈 문자열(jq가 헛돈 회차)을 「신규 있음」으로 읽지 않게 숫자로 견준다
+    if: ${{ fromJSON(needs.watch.outputs.count || '0') > 0 || inputs.force }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     defaults:
