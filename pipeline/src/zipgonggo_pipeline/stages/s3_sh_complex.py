@@ -49,9 +49,13 @@ SOURCE = "sh_attach"
 CACHE_ROOT = PIPELINE_ROOT / "data" / "ish"
 SEQ_RE = re.compile(r"[?&]seq=(\d+)")
 
+# source 제한은 「무더기로 훑을 때」만이다. 게시판 백필분(`ish_board`, 2003년까지 449건)까지
+# 자동으로 파싱하면 남의 서버를 며칠 두드리게 된다. 다만 slug을 콕 집어 주면 그건 사람이
+# 고른 것이므로 source를 가리지 않는다 — 순찰이 m_241에서 주워 온 신규분이 여기로 온다.
 SELECT_SQL = """
 SELECT id, slug, title, source_url, posted_at FROM notice
-WHERE source IN ('sh_scrape', 'ish_247') AND source_url LIKE '%%i-sh.co.kr%%'
+WHERE source_url LIKE '%%i-sh.co.kr%%'
+  AND (%(slug)s::text IS NOT NULL OR source IN ('sh_scrape', 'ish_247'))
   AND (%(slug)s::text IS NULL OR slug = %(slug)s)
 ORDER BY posted_at DESC, id DESC
 LIMIT %(limit)s

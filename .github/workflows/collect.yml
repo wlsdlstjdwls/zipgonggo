@@ -162,5 +162,5 @@ jobs:
           gh issue create \
             --title "수집 실패 — $(date -u +%Y-%m-%d\ %H:%M)Z" \
             --label "수집" \
-            --body "신규 ${{ needs.watch.outputs.count }}건 중 일부가 파싱되지 않았다.\n\n$RUN" \
+            --body "신규 ${{ needs.watch.outputs.count }}건 중 일부가 파싱되지 않았다. $RUN" \
             || echo "이슈 생성 실패(라벨 없음?) — 무시"
