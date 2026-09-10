@@ -26,7 +26,8 @@ from ..config import PIPELINE_ROOT, settings
 from ..db import connect
 from ..parsers.sh_attach import merge_teukhwa, parse_attachment, teukhwa_facts
 from ..repo import replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts
-from ..sources.ish import IshClient, find_attachments
+from ..sources.ish import IshClient, find_attachments, is_missing_page
+from ..sources.ish_board import BOARDS, IshBoardClient, find_seq_by_title
 from .common import Stats, finish_ingest, stage_main, utc_now
 
 log = logging.getLogger("s3.sh")
@@ -277,6 +278,26 @@ def iter_cached_pages(seq_dir: Path):
         yield page, f.read_text(encoding="utf-8")
 
 
+def _recover_url(cur, notice, *, dry_run: bool) -> tuple[str, str] | None:
+    """어긋난 i-sh seq를 제목으로 되찾아 notice.source_url까지 고친다. 돌려주는 값은 (URL, seq).
+
+    고쳐 두지 않으면 다음 실행에서 또 게시판을 뒤진다(요청 낭비). 화면의 「원문 보기」 링크도 죽어 있다.
+    두 게시판을 차례로 본다 — 매입임대 일부는 m_247에만 있다(sources.ish_board 참고).
+    """
+    for key in ("241", "247"):
+        board = BOARDS[key]
+        client = IshBoardClient(board=board, delay_sec=settings().scrape_delay_sec)
+        seq = find_seq_by_title(client, notice["title"])
+        if seq is None:
+            continue
+        url = board.view_url.format(seq=seq)
+        if not dry_run:
+            cur.execute("UPDATE notice SET source_url = %s WHERE id = %s", (url, notice["id"]))
+        log.info("%s source_url 고침 → %s", notice["slug"], url)
+        return url, seq
+    return None
+
+
 def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) -> Stats:
     cfg = settings()
     client = IshClient(delay_sec=cfg.scrape_delay_sec)
@@ -305,7 +326,16 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                         att_name = "(캐시)"
                         extras = [list(iter_cached_pages(d)) for d in sorted(seq_dir.glob("att*")) if d.is_dir()]
                     else:
-                        html = client.fetch_notice_html(n["source_url"])
+                        url = n["source_url"]
+                        html = client.fetch_notice_html(url)
+                        if is_missing_page(html):
+                            # 포털이 준 seq가 정정공고 때문에 어긋났다. 제목으로 게시판을 뒤져 되찾는다
+                            found = _recover_url(cur, n, dry_run=dry_run)
+                            if found is None:
+                                stats.skip("seq_not_found")
+                                continue
+                            url, seq = found
+                            html = client.fetch_notice_html(url)
                         atts = rank_attachments(find_attachments(html))
                         if not atts:
                             stats.skip("no_attachment")

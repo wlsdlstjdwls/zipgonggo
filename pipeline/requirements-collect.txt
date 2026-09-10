@@ -1,0 +1,11 @@
+# 목록 수집(S1)만 도는 경량 묶음 — GitHub Actions의 「감시」 잡 전용.
+#
+# 매시 도는 잡이라 설치 시간이 곧 비용이다. pandas·pyarrow·pdfplumber·pyhwp를 빼면
+# 설치가 1분대에서 10초대로 떨어진다. 첨부를 파싱하는 잡은 requirements.txt를 그대로 쓴다.
+# 버전은 requirements.txt와 같아야 한다 — 한쪽만 올리지 말 것.
+
+httpx==0.28.1
+selectolax==0.3.27
+tenacity==9.0.0
+psycopg[binary]==3.2.3
+python-dotenv==1.0.1

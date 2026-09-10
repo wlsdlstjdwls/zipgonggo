@@ -1,0 +1,165 @@
+name: 공고 수집
+
+# 매시 목록을 보고, 새 공고가 있을 때만 첨부를 파싱한다.
+#
+# 두 잡으로 나눈 이유는 무료 한도다. private 저장소 Free는 월 2,000분인데 매시 = 월 730회다.
+# 신규가 없는 회차(대부분)는 「감시」에서 끝나 1분을 안 넘긴다. 무거운 의존성(pdfplumber·pyhwp·
+# pandas)과 주소 요약DB 내려받기는 신규가 있을 때만 한다.
+#
+# 준비물은 docs/automation.md 참고. Secrets 6개와 juso-data 릴리스가 있어야 돈다.
+
+on:
+  schedule:
+    # UTC. 정각은 GitHub이 붐벼 10~20분씩 밀리므로 비켜 둔다. 분 단위 정확도는 기대하지 않는다
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "신규가 없어도 상세 파싱까지 돌린다"
+        type: boolean
+        default: false
+      slugs:
+        description: "이 공고만 파싱 (공백으로 구분). 비우면 이번에 새로 들어온 것"
+        type: string
+        default: ""
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+  JUSO_SEARCH_API_KEY: ${{ secrets.JUSO_SEARCH_API_KEY }}
+  WEB_REVALIDATE_URL: ${{ secrets.WEB_REVALIDATE_URL }}
+  REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+  # 남의 서버다. 동시 요청을 걸지 않고 간격을 지킨다(CLAUDE.md 하지 말 것 7)
+  SCRAPE_DELAY_SEC: "1.5"
+  PYTHONPATH: src
+  PYTHONUTF8: "1"
+
+jobs:
+  watch:
+    name: 감시 — 목록 수집
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: pipeline
+    outputs:
+      slugs: ${{ steps.s1.outputs.slugs }}
+      count: ${{ steps.s1.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pipeline/requirements-collect.txt
+
+      - run: pip install -r requirements-collect.txt
+
+      - name: S1 서울주거포털 목록
+        id: s1
+        run: |
+          set -o pipefail
+          python -m zipgonggo_pipeline.stages.s1_sh --max-pages 2 > stats.json
+          cat stats.json
+          echo "slugs=$(jq -c '.new_slugs' stats.json)" >> "$GITHUB_OUTPUT"
+          echo "count=$(jq '.new_slugs | length' stats.json)" >> "$GITHUB_OUTPUT"
+
+      - name: 요약
+        if: always()
+        run: |
+          {
+            echo "## 감시"
+            if [ -f stats.json ]; then
+              echo "- 신규 **$(jq '.new_slugs | length' stats.json)건** / 갱신 $(jq '.updated' stats.json)건"
+              jq -r '.new_slugs[] | "  - `\(.)`"' stats.json
+              jq -e '.errors | length > 0' stats.json >/dev/null \
+                && jq -r '"- 오류\n```\n" + (.errors | join("\n")) + "\n```"' stats.json || true
+            else
+              echo "- 목록 수집이 실패했다"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ingest:
+    name: 상세 — 첨부 파싱과 좌표
+    needs: watch
+    if: needs.watch.outputs.count != '0' || inputs.force
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: 주소 요약DB 내려받기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/juso
+          gh release download juso-data --pattern 'entrance-capital.sqlite.gz' --clobber --dir data/juso
+          gunzip -f data/juso/entrance-capital.sqlite.gz
+          ls -la data/juso
+
+      - name: S3 첨부 공고문 파싱
+        id: s3
+        run: |
+          SLUGS='${{ inputs.slugs }}'
+          if [ -z "$SLUGS" ]; then
+            SLUGS=$(echo '${{ needs.watch.outputs.slugs }}' | jq -r '.[]')
+          fi
+          echo "## 상세" >> "$GITHUB_STEP_SUMMARY"
+          fail=0
+          for slug in $SLUGS; do
+            echo "::group::$slug"
+            if python -m zipgonggo_pipeline.stages.s3_sh_complex --slug "$slug" > "s3-$slug.json"; then
+              cat "s3-$slug.json"
+              jq -r --arg s "$slug" \
+                '"- `\($s)` 단지 \(.inserted + .updated)건" + (if (.skipped | length) > 0 then " (건너뜀 \(.skipped))" else "" end)' \
+                "s3-$slug.json" >> "$GITHUB_STEP_SUMMARY"
+            else
+              cat "s3-$slug.json" || true
+              echo "- \`$slug\` **파싱 실패**" >> "$GITHUB_STEP_SUMMARY"
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          echo "fail=$fail" >> "$GITHUB_OUTPUT"
+
+      - name: S6 주소-좌표 조인
+        run: |
+          set -o pipefail
+          python -m zipgonggo_pipeline.stages.s6_geocode --db data/juso/entrance-capital.sqlite > s6.json
+          cat s6.json
+          jq -r '"- 좌표 \(.updated)건 채움 / 못 맞춤 \(.skipped | to_entries | map(.value) | add // 0)건"' s6.json \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      # 첨부를 못 읽어도 목록은 이미 들어가 있다 — 조용히 빈 상세 페이지가 생기는 게 제일 위험하다.
+      # 사람이 볼 자리를 만든다(handoff 함정 §4가 풀릴 때까지 여기가 계속 울릴 수 있다).
+      - name: 실패하면 이슈
+        if: failure() || steps.s3.outputs.fail == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --title "수집 실패 — $(date -u +%Y-%m-%d\ %H:%M)Z" \
+            --label "수집" \
+            --body "신규 ${{ needs.watch.outputs.count }}건 중 일부가 파싱되지 않았다.\n\n$RUN" \
+            || echo "이슈 생성 실패(라벨 없음?) — 무시"

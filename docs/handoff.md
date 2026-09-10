@@ -7,6 +7,37 @@
 
 ---
 
+## 지금 상태 (2026-09-10, 28차 세션)
+
+브랜치 `main`. 사용자 요청은 하나였다 — "공고 가져오는 거 자동화 안 되나. 한 시간에 한 번,
+신규 있으면 돌게."
+
+**GitHub Actions로 붙였다.** [`docs/automation.md`](automation.md)에 전문.
+Vercel Cron은 못 쓴다 — Hobby는 최소 간격이 하루 1회고 `0 * * * *`는 배포 자체가 실패한다(문서 확인).
+파이프라인이 Python(pyhwp·pdfplumber)이라 요금제를 올려도 함수로 옮기는 값이 더 크다.
+
+- `.github/workflows/collect.yml` — 매시 17분(UTC). 감시 잡이 `s1_sh`로 목록만 보고,
+  **신규가 있을 때만** 상세 잡이 뜬다. 신규 없는 회차는 1분 안에 끝나 월 2,000분 무료 한도에 든다
+- `stages/common.py` `Stats.new_slugs` — 이번 실행에서 처음 들어온 slug. 감시 잡이 상세 잡에 넘긴다
+- `pipeline/requirements-collect.txt` — 감시 잡 전용 경량 묶음(pandas·pdfplumber·pyhwp 뺌)
+- `pipeline/scripts/make_capital_juso.py` — 주소 요약DB에서 수도권만 추린다.
+  641만 행 1.16GB → **173만 행 301MB(gz 48MB)**. 전국본과 매칭 결과가 완전히 같음을 실측으로 확인
+  (1,226행 중 1,060 매칭·미스 166, 양쪽 동일). `juso-data` 릴리스에 올려 뒀다
+- Secrets 5개(`DATABASE_URL` `DATA_GO_KR_KEY` `JUSO_SEARCH_API_KEY` `WEB_REVALIDATE_URL`
+  `REVALIDATE_SECRET`)를 `pipeline/.env` 값으로 설정 완료
+
+**자동화를 붙이다 §4·§5가 풀렸다.** 첫 회차를 흉내 내 봤더니 신규 1건(`sh-2026-310046-maeip`)이
+잡혔는데 S3이 `no_attachment`로 튕겼다. 파고드니 「본문이 안 온다」가 아니라 **포털이 준 seq가
+정정공고로 어긋나 있었다**(310046 → 실제 310107). 자세한 건 아래 §4.
+
+### 다음에 할 일 (28차에서 새로 남긴 것)
+
+- **첫 실 회차를 지켜본다.** Actions 탭 「공고 수집」. 크론은 정각 뒤 5~20분 밀린다
+- **단지 0건 공고 280건 백필**(§5b). 이제 seq 되찾기가 붙었으니 얼마나 살아나는지 나눠서 훑을 것
+- private 저장소는 60일 무커밋이면 GitHub이 크론을 끈다. 메일 오면 Actions 탭에서 다시 켠다
+
+---
+
 ## 지금 상태 (2026-09-10, 27차 세션)
 
 브랜치 `main`. 사용자가 i-sh 게시판 링크(`brd/m_247/view.do`)를 주며 "새로 또 공고 올라왔던데 확인해줘" —
@@ -519,16 +550,36 @@
 - 손댈 파일: `pipeline/src/zipgonggo_pipeline/parsers/sh_units.py` `parse_unit_row`
 - 검산: 공고문 별첨 헤더의 「133단지 476호」와 대조
 
-### 4. i-sh `view.do`가 본문 없이 온다
+### 4. ~~i-sh `view.do`가 본문 없이 온다~~ — 28차에서 해결
 
-`https://www.i-sh.co.kr/main/lay2/program/S1T294C295/www/brd/m_241/view.do?seq=309403`을 GET하면
-166KB가 오는데 본문·첨부 마크업이 없다(`find_attachments` 0건). 세션이나 POST 경로가 필요해 보인다.
-지금은 `s3_sh_complex --cached`로 우회 중이라 **새 공고는 수집이 막혀 있다.**
+진단이 틀렸었다. **본문이 안 오는 게 아니라 그 seq의 글이 없었다.**
 
-### 5. `sh-2026-309403-maeip`(2026년 2차 장기미임대) 공급현황 미파싱
+포털(housing.seoul.go.kr) 목록이 주는 i-sh 링크는 **정정공고가 나면 어긋난다.**
+i-sh는 정정본을 새 글로 다시 올려 seq가 바뀌는데 포털은 옛 seq를 그대로 들고 있다
+(「2026년 2차 장기미임대」 포털 `310046` → 실제 `310107`).
 
-`notice_supply` 행이 0건이라 단지 상세의 「공급 정보」 표도, 공고 상세 탐색기의 「공급대상」 필터(신혼부부·청년 등)도
-비어 있다. 위 「함정 §4」(i-sh `view.do`가 본문 없이 옴)와 얽힌 공고라 `--cached` 첨부부터 확인.
+여기에 응답 모양이 겹쳐 오진했다 — 긴 경로(`lay2/program/…/brd/m_241/view.do`)는 없는 seq에
+**게시판 목록 페이지 166KB를 조용히 돌려준다.** 짧은 경로(`/main/brd/m_241/view.do`)는
+`alert('해당 데이터를 찾을 수 없습니다')` 197바이트라 판정이 분명하다.
+
+고친 것:
+- `sources/ish.py` `short_view_url` — 상세 URL을 늘 짧은 경로로 줄여 친다. `is_missing_page`로 없음을 가린다
+- `sources/ish_board.py` `find_seq_by_title` — 게시판 앞 5쪽에서 제목이 가장 닮은 글의 seq
+  (`title_key`가 `(정정)` 머리표·괄호 날짜·공백을 걷어낸다)
+- `stages/s3_sh_complex.py` `_recover_url` — 없으면 되찾아 `notice.source_url`까지 고쳐 둔다.
+  안 그러면 다음 실행에서 또 게시판을 뒤진다
+
+### 5. ~~`sh-2026-309403-maeip`(2026년 2차 장기미임대) 공급현황 미파싱~~ — 28차에서 해결
+
+§4와 같은 병이었다. 되찾은 `310107`로 파싱해 **114단지 425호실** 적재(2026-09-10).
+접수 2026-09-28~09-30. slug은 옛 seq를 쓴 `sh-2026-310046-maeip` 그대로다(URL 삭제 금지).
+
+### 5b. 단지 0건 공고 280건 — 얼마나 같은 병인지 안 세어 봤다
+
+`notice_complex`가 비어 있는 i-sh 공고가 280건이다. 이 중 몇이 seq 어긋남이고 몇이
+양식 미지원인지 구분하지 않았다. §4 고친 뒤 백필로 한 번 훑을 것 —
+`s3_sh_complex --slug`을 돌리면 이제 알아서 되찾는다. 다만 되찾기가 게시판 5쪽을 읽으므로
+280건을 한꺼번에 돌리지 말고 나눠서(요청 간격 준수).
 
 ### 6b. 재개발임대주택(310041) 마무리 — 22차에서 남긴 것
 

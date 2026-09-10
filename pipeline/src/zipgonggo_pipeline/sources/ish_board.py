@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from difflib import SequenceMatcher
 from selectolax.parser import HTMLParser
 
 from .http import ThrottledHttp
@@ -144,3 +145,35 @@ class IshBoardClient:
                     continue  # 새 공고가 올라오면 쪽 경계가 밀려 같은 행이 두 번 온다
                 seen.add(r.seq)
                 yield r
+
+
+# ── 어긋난 seq 되찾기 ───────────────────────────────────────────────────────────
+#
+# 포털(housing.seoul.go.kr) 목록이 주는 i-sh 링크는 정정공고가 나면 옛 seq에 머문다.
+# i-sh는 정정본을 새 글로 올려 seq가 바뀌므로 그 링크는 「해당 데이터를 찾을 수 없습니다」가 된다.
+# 제목으로 게시판 앞쪽을 뒤져 되찾는다. 날짜 검색(srchFr/srchTo)은 등록일이 아닌 다른 날짜를 보는지
+# 같은 날 글도 안 걸려(실측 2026-09-10) 쓰지 않는다.
+
+_NOISE_RE = re.compile(r"\[[^\]]*\]|\([^)]*\)|[\s.·・,]|^NEW")
+_PREFIX_RE = re.compile(r"^(정정|수정|재)공고?\s*")
+
+
+def title_key(title: str) -> str:
+    """제목 비교용 열쇠. 괄호 안 날짜·[정정] 같은 머리표·공백을 걷어낸다."""
+    t = _PREFIX_RE.sub("", title.strip())
+    return _NOISE_RE.sub("", t)
+
+
+def find_seq_by_title(client: "IshBoardClient", title: str, *, max_pages: int = 5, cutoff: float = 0.72) -> str | None:
+    """게시판 앞쪽에서 제목이 가장 비슷한 글의 seq. 닮은 정도가 cutoff 미만이면 None."""
+    want = title_key(title)
+    best: tuple[float, str, str] | None = None
+    for row in client.iter_notices(max_pages=max_pages):
+        score = SequenceMatcher(None, want, title_key(row.title)).ratio()
+        if best is None or score > best[0]:
+            best = (score, row.seq, row.title)
+    if best is None or best[0] < cutoff:
+        log.info("i-sh 게시판에서 못 찾음(%.2f): %s", best[0] if best else 0.0, title[:50])
+        return None
+    log.info("i-sh seq 되찾음 %s (%.2f) — %s", best[1], best[0], best[2][:50])
+    return best[1]

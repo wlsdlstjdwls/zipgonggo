@@ -30,6 +30,8 @@ class Stats:
     skipped: dict[str, int] = field(default_factory=dict)
     unmapped_types: dict[str, int] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
+    # 이번 실행에서 처음 들어온 공고 slug. 자동 수집이 「신규만 상세 파싱」을 고르는 근거다
+    new_slugs: list[str] = field(default_factory=list)
 
     def skip(self, reason: str) -> None:
         self.skipped[reason] = self.skipped.get(reason, 0) + 1
@@ -62,6 +64,9 @@ def upsert_guarded(cur, stats: Stats, key: str, notice: dict[str, Any], areas: l
     try:
         if upsert_notice(cur, notice, areas):
             stats.inserted += 1
+            slug = notice.get("slug")
+            if slug:
+                stats.new_slugs.append(slug)
         else:
             stats.updated += 1
         cur.execute("RELEASE SAVEPOINT grp")

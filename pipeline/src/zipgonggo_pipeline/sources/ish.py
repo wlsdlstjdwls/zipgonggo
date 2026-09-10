@@ -35,6 +35,16 @@ ATTACH_ROW_RE = re.compile(
 )
 TEXT_RE = re.compile(r"<text l='([\d.]+)' t='([\d.]+)' w='([\d.]+)' h='([\d.]+)'\s*>(.*?)</text>", re.S)
 
+# 상세 URL이 두 모양으로 돌아다닌다.
+#   짧은 것  /main/brd/m_241/view.do?seq=N
+#   긴 것    /main/lay2/program/S1T294C295/www/brd/m_241/view.do?seq=N   ← 포털 목록이 주는 모양
+# 둘 다 같은 문서를 주지만 **없는 seq일 때 응답이 다르다**(실측 2026-09-10).
+# 긴 쪽은 게시판 목록 페이지(166KB)를 조용히 돌려줘 「첨부 0건」과 구별되지 않는다.
+# 짧은 쪽은 alert('해당 데이터를 찾을 수 없습니다') 197바이트라 판정이 분명하다. 그래서 짧은 쪽으로 통일한다.
+VIEW_URL_RE = re.compile(r"^(https?://[^/]+)/(main|app)/(?:.*/)?brd/(m_\d+)/view\.do")
+MISSING_RE = re.compile(r"찾을 수 없습니다")
+
+
 
 @dataclass(frozen=True)
 class Attachment:
@@ -75,6 +85,26 @@ class Segment:
     l: float
     r: float
     text: str
+
+
+def short_view_url(url: str) -> str:
+    """긴 lay2 경로를 짧은 게시판 경로로 줄인다. 모양이 다르면 그대로 돌려준다."""
+    m = VIEW_URL_RE.match(url)
+    if not m:
+        return url
+    host, prefix, board = m.groups()
+    query = url.split("?", 1)[1] if "?" in url else ""
+    return f"{host}/{prefix}/brd/{board}/view.do" + (f"?{query}" if query else "")
+
+
+def is_missing_page(page_html: str) -> bool:
+    """그 seq의 글이 게시판에 없다. 첨부가 0건인 것과 다르다 — 다른 seq를 찾아야 한다는 뜻이다.
+
+    포털 목록의 i-sh 링크는 **정정공고가 나면 어긋난다**(실측 2026-09-10):
+    i-sh는 정정본을 새 seq로 다시 올리는데 포털은 옛 seq를 그대로 들고 있다
+    (「2026년 2차 장기미임대」 포털 310046 → 실제 310107).
+    """
+    return len(page_html) < 2000 and bool(MISSING_RE.search(page_html))
 
 
 def find_attachments(page_html: str) -> list[Attachment]:
@@ -196,7 +226,7 @@ class IshClient:
         return self._http.call_count
 
     def fetch_notice_html(self, url: str) -> str:
-        return self._http.get(url, label="i-sh 공고", accept_redirect=False).text
+        return self._http.get(short_view_url(url), label="i-sh 공고", accept_redirect=False).text
 
     def resolve_preview(self, preview_url: str) -> SynapDoc | None:
         """미리보기 링크 → 뷰어 302 Location에서 rs·fn. 변환이 안 된 첨부면 None."""
