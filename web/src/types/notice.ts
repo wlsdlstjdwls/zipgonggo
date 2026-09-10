@@ -33,6 +33,10 @@ export type NoticeListItem = {
   status: NoticeStatus;
   source_status: string | null;
   amends_source_key: string | null;
+  /** 이 공고의 정본 id. null이면 자기 자신이 정본이다(S2가 채운다) */
+  canonical_id?: number | null;
+  /** 정본의 slug. canonical_id가 있을 때만 온다 */
+  canonical_slug?: string | null;
   source_url: string;
   /** 상세 위치 지도용. SH 목록엔 없다(null) */
   address: string | null;

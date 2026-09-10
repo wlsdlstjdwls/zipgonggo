@@ -107,6 +107,13 @@ jobs:
           echo "::endgroup::"
 
           # 상세로 넘길 건 i-sh 공고뿐이다. 마이홈분(LH 전국)은 첨부 양식이 달라 S3이 못 읽는다
+          # 게시판은 정정공고를 원 공고와 따로 준다 — 주워 온 다음 정본을 다시 매긴다
+          echo "::group::정본 묶기"
+          python -m zipgonggo_pipeline.stages.s2_dedupe > dedupe.json || fail=1
+          cat dedupe.json
+          jq -r '"- 정본 묶음 \(.groups)건"' dedupe.json >> "$GITHUB_STEP_SUMMARY" || true
+          echo "::endgroup::"
+
           slugs=$(jq -rs '[.[] | .new_slugs[]?] | join(" ")' board-247.json board-241.json 2>/dev/null || echo "")
           echo "slugs=$slugs" >> "$GITHUB_OUTPUT"
           echo "fail=$fail" >> "$GITHUB_OUTPUT"

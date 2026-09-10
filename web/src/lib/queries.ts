@@ -17,7 +17,7 @@ const LIST_COLS = `
   status::text AS status, source_status, amends_source_key, source_url, address, source_rank`;
 
 function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
-  const where: string[] = [];
+  const where: string[] = [CANONICAL_ONLY];
   if (f.sector) {
     params.push(f.sector);
     where.push(`sector = $${params.length}::rental_sector`);
@@ -34,6 +34,10 @@ function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
   if (!f.closed) where.push(NOT_CLOSED);
   return where;
 }
+
+// 정본만. 같은 공고가 기관 seq 여러 개로 들어와도 목록엔 한 번만 나온다(S2가 canonical_id를 채운다).
+// 딸림 글의 URL은 살아 있고 상세도 열린다 — 목록에서만 뺀다(CLAUDE.md 하지 말 것 6).
+const CANONICAL_ONLY = `canonical_id IS NULL`;
 
 // 마감 7일 내: 오늘 포함 7일 안에 접수 마감. KPI·칩 카운트·목록 필터가 같은 식을 쓴다
 const CLOSING_7D = `apply_end_at >= CURRENT_DATE AND apply_end_at < CURRENT_DATE + 7`;
@@ -142,7 +146,7 @@ export const listFilterOptions = cache(unstable_cache(
     const params: unknown[] = [];
     const where = whereSql(buildWhere({ sector }, params));
     const rows = await query<{ kind: string; value: string; count: number }>(
-      `SELECT 'sector' AS kind, sector::text AS value, count(*)::int AS count FROM notice WHERE ${NOT_CLOSED} GROUP BY 2
+      `SELECT 'sector' AS kind, sector::text AS value, count(*)::int AS count FROM notice WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED} GROUP BY 2
        UNION ALL
        SELECT 'sido', sido, count(*)::int FROM notice ${where} GROUP BY 2
        UNION ALL
@@ -208,6 +212,8 @@ export async function getNoticeBySlug(slug: string): Promise<Notice | null> {
             max_deposit, max_rent, schedule_source, schedule_steps,
             to_char(apply_start_tm, 'HH24:MI') AS apply_start_tm,
             to_char(apply_end_tm, 'HH24:MI') AS apply_end_tm,
+            canonical_id,
+            (SELECT c.slug FROM notice c WHERE c.id = notice.canonical_id) AS canonical_slug,
             to_char(updated_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') AS updated_at
      FROM notice WHERE slug = $1`,
     [slug],
@@ -310,7 +316,7 @@ export const listSitemapNotices = unstable_cache(
     query<SitemapNotice>(
       `SELECT slug, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
               (status = '접수마감' OR (apply_end_at IS NOT NULL AND apply_end_at < CURRENT_DATE)) AS closed
-       FROM notice ORDER BY posted_at DESC, id DESC LIMIT $1`,
+       FROM notice WHERE canonical_id IS NULL ORDER BY posted_at DESC, id DESC LIMIT $1`,
       [limit],
     ),
   ["notice-sitemap"],

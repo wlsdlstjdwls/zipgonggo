@@ -44,7 +44,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title: `${n.title} — ${n.housing_type} ${supply} 보증금/임대료/접수일정`.replace(/\s+/g, " "),
     description: `${n.agency} ${n.title}. 접수 ${dateK(n.apply_start_at)}~${dateK(n.apply_end_at)}${dday}. ${regionLabel(n)} ${supply}. 최소 보증금 ${won(n.min_deposit)}, 최소 월임대료 ${won(n.min_rent)}.`,
-    alternates: { canonical: noticePath(n.slug) },
+    // 같은 공고가 기관 seq 여러 개로 들어온 경우 정본을 가리킨다. URL은 살려 두고 색인만 하나로 모은다
+    alternates: { canonical: noticePath(n.canonical_slug ?? n.slug) },
   };
 }
 
@@ -180,6 +181,14 @@ export default async function NoticePage({ params }: Params) {
               {n.amends_source_key && <span className="tag acc">정정공고</span>}
             </div>
             <h1 className="d-title">{n.title}</h1>
+            {/* 같은 공고가 기관 seq 여러 개로 올라온 경우. URL은 살려 두고(하지 말 것 6)
+                최신 글로 보내 준다 — 여기 남은 값은 옛 회차의 것일 수 있다 */}
+            {n.canonical_slug && (
+              <p className="d-canon">
+                이 공고는 <Link href={noticePath(n.canonical_slug)}>최신 공고문</Link>으로 대체됐습니다.
+                아래 내용은 이 회차 기준입니다.
+              </p>
+            )}
             {/* 헤드라인은 금액이 아니라 접수 상태다. 다만 한 줄로 — 본론은 아래 단지 목록과 지도다(사용자 요청 2026-09-09) */}
             <p className="d-when">
               <b className={`when ${ph.tone}`}>{ph.label}</b>

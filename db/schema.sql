@@ -44,6 +44,7 @@ CREATE TABLE notice (
   source          text        NOT NULL,         -- myhome_api · myhome_file · lh_scrape · sh_scrape · youth_scrape
   source_key      text        UNIQUE,           -- 출처 내 고유키. 마이홈 API는 'pblancId:houseSn'
   amends_source_key text,                       -- 정정공고가 대체하는 원 공고의 source_key (API beforePblancId)
+  canonical_id    bigint REFERENCES notice(id) ON DELETE SET NULL,  -- 이 공고의 정본. NULL이면 자기 자신 (0022, S2가 채운다)
   agency          text        NOT NULL,         -- LH · SH · GH · HUG
   title           text        NOT NULL,
   housing_type    housing_type NOT NULL,        -- 공급유형 (API suplyTyNm)
@@ -95,6 +96,7 @@ CREATE INDEX idx_notice_posted      ON notice (posted_at DESC);
 CREATE INDEX idx_notice_pnu         ON notice (pnu) WHERE pnu IS NOT NULL;
 CREATE INDEX idx_notice_sector_end  ON notice (sector, apply_end_at);
 CREATE INDEX idx_notice_fingerprint ON notice (fingerprint);
+CREATE INDEX idx_notice_canonical ON notice (canonical_id) WHERE canonical_id IS NOT NULL;
 
 -- 공고 상태 변경 이력. "정정됨" 배지와 변경 타임라인의 근거
 CREATE TABLE notice_event (
