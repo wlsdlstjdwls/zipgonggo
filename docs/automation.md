@@ -76,11 +76,48 @@
 
 ## 크론이 회차를 건너뛴다 — 바깥 방아쇠
 
-**GitHub 스케줄은 못 믿는다.** 2026-09-10 실측에서 `17 * * * *`가 06:17·07:17 **두 회차를 통째로
-건너뛰었다.** 저장소 쪽엔 걸릴 게 없었다 — main에 있고, 워크플로 state `active`, YAML·BOM·크론 문법
-정상, Actions 사용량 150/2000분, GitHub 상태 페이지에 장애 없음. 스케줄 이벤트는 SLA 없는 최선노력
-배송이고, **버려진 사실은 어디에도 안 남는다.** API에 뜨는 건 실제로 만들어진 실행뿐이라 밖에서
-원인을 확인할 방법이 없다.
+**GitHub 스케줄은 이 저장소에서 한 번도 발화하지 않았다.** 2026-09-10 08:43 UTC 기준
+`event=schedule` 실행 **0건**이다. 워크플로가 main에 올라간 05:37 UTC 이후 지나간 `:17` 슬롯 세 개
+(06:17 · 07:17 · 08:17)가 전부 비었다.
+
+### 배제한 원인 (전부 증거 있음)
+
+| 의심 | 확인 | 결과 |
+|---|---|---|
+| push 안 됨 | `git ls-tree origin/main`, Contents API blob sha | 파일 둘 다 있음, sha 일치 |
+| 워크플로 비활성 | `actions/workflows` | 둘 다 `state: active` |
+| Actions 꺼짐 | `actions/permissions` | `enabled: true` |
+| fork / 비기본브랜치 | `repo view` | fork 아님, 기본 `main` |
+| 분 소진 | 08:34 UTC dispatch가 success | 분 남아 있음. 없으면 dispatch도 못 돈다 |
+| 앞 회차 적체 | `status=queued/pending/waiting` | 전부 0건 |
+| YAML · BOM · 크론 문법 | 원바이트 확인 (`name`으로 시작, `on:` 블록에 `^M` 없음) | 정상 |
+| GitHub 장애 | status API components + incidents | Actions `operational`, 당일 사건 0건 |
+| **`on:` 미등록** | **dispatch 5/5 성공** | **파싱됐다 (아래)** |
+
+마지막 줄이 결정적이다. GitHub은 `on:` 블록에 `workflow_dispatch`가 없으면 dispatch API를 422로
+거절한다. 우리 dispatch는 다섯 번 다 실행을 만들었다 — 즉 `on:` 블록은 정상 파싱됐고, **같은 블록 안의
+`schedule: - cron: "17 * * * *"`도 함께 등록됐다.** 등록은 됐는데 배송만 안 온다.
+
+### 우리만의 문제가 아니다
+
+같은 증상 — **새 private 저장소, `workflow_dispatch`는 되는데 `schedule`만 절대 안 옴** — 신고가
+GitHub 커뮤니티에 쌓여 있고, 확인한 것 전부 **GitHub 직원 답변 없이 미해결**이다.
+
+- [community#202034](https://github.com/orgs/community/discussions/202034) — private 저장소 2곳, 최소 재현 케이스까지 만들었는데 schedule만 안 옴
+- [community#201436](https://github.com/orgs/community/discussions/201436) — 새 private 저장소, dispatch 2회 성공했는데도 10시간 · 슬롯 8개 전부 유실
+- [community#203822](https://github.com/orgs/community/discussions/203822) · [#199267](https://github.com/orgs/community/discussions/199267) · [#185355](https://github.com/orgs/community/discussions/185355) — 같은 패턴
+
+공통 보고는 「새 저장소는 스케줄 큐에서 후순위로 밀리고 첫 발화까지 12~48시간, 영영 안 오기도 한다」이고
+유일한 해법은 GitHub Support 티켓이다. 공식 문서도 보증하지 않는다 —
+[events-that-trigger-workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)는
+*"부하가 충분히 높으면 큐에 든 잡 일부가 버려질 수 있다"*고만 적는다. SLA 없고, 첫 발화 시점 명시 없고,
+**버려진 사실은 어디에도 안 남는다.** API에 뜨는 건 실제로 만들어진 실행뿐이라 밖에서 캘 방법이 없다.
+
+우리 저장소는 09-04 생성 · 워크플로 첫 push 09-10으로 신고 사례의 조건과 겹친다
+(계정은 2019년생이라 계정 나이 탓은 아니다).
+
+**결론: GitHub 스케줄을 방아쇠로 쓰지 않는다.** 지금 안 오는 것도, 나중에 붙었다가 조용히 끊기는 것도
+우리가 관측할 수 없다. 워크플로의 `schedule:`은 지우지 않고 그대로 둔다 — 어쩌다 돌면 그것대로 이득이다.
 
 그래서 시각을 지키는 일을 GitHub 밖으로 뺐다.
 
@@ -120,9 +157,31 @@ development 전부 들어갔다(2026-09-10). 셋 중 하나라도 없으면 라�
 > `vercel deploy`를 CLI로 직접 돌리지 마라. Root Directory가 `web`이라 저장소 루트에서 올려야 하는데,
 > 그러면 `pipeline/data/`까지 1.8GB를 올리다 100MB 제한에 걸린다. **배포는 git push(Git 연동)로 한다.**
 
-방아쇠는 **Windows 예약 작업** `zipgonggo-cron`이 10분마다 당긴다.
+### 방아쇠 둘 — 겹쳐 둔다
+
+**① Cloudflare Worker (주 방아쇠, PC 무관).** `worker/`. 10분마다 `collect`와 `patrol`을 차례로 때린다.
+시크릿은 Worker secret에 두고 **`x-cron-secret` 헤더로** 보낸다 — URL 쿼리로 안 넘기는 건 남의 로그에
+평문으로 남지 않게 하기 위해서다.
+
+```bash
+cd worker
+npx wrangler secret put CRON_TRIGGER_SECRET   # Vercel env와 같은 값
+npx wrangler deploy
+npx wrangler tail                              # 실행 로그를 실시간으로
+```
+
+배포한 Worker에는 손으로 확인할 구멍도 있다(같은 헤더로 잠가 둔다):
+
+```bash
+curl -H "x-cron-secret: <시크릿>" https://zipgonggo-cron.<계정>.workers.dev/
+```
+
+무료 플랜으로 충분하다 — 크론 트리거는 횟수 제한이 없고 하루 144회는 요청 한도(10만/일)에 한참 못 미친다.
+
+**② Windows 예약 작업 `zipgonggo-cron` (보조).** 같은 PC에서 10분마다 당긴다.
 스크립트는 `~/.zipgonggo/cron-trigger.ps1`(시크릿이 들어 있어 저장소 밖에 둔다), 로그는 같은 폴더의
-`cron-trigger.log`. collect·patrol을 차례로 때리고 응답을 그대로 적는다.
+`cron-trigger.log`. **PC가 켜져 있을 때만 도는 게 약점**이라 Worker를 주 방아쇠로 올렸다.
+Worker가 붙은 뒤엔 지워도 되지만, 겹쳐도 안전하니 그냥 둔다.
 
 ```powershell
 schtasks /Query /TN "zipgonggo-cron" /FO LIST     # 다음 회차 확인
@@ -130,8 +189,10 @@ schtasks /Run   /TN "zipgonggo-cron"              # 지금 한 번
 Get-Content "$HOME\.zipgonggo\cron-trigger.log" -Tail 10
 ```
 
-**약점: PC가 켜져 있을 때만 돈다.** PC 독립으로 돌리려면 무료 uptime 모니터(UptimeRobot 등)에
-`https://zipgonggo.com/api/cron/collect?secret=…` 를 5~15분 간격으로 걸면 된다. 겹쳐도 안전하다.
+겹쳐도 안전한 근거는 라우트의 가드 넷이다 — 시크릿, 람다 인메모리 최근호출, `ingest_log` 나이,
+GitHub 실행 상태. 다 뚫려도 워크플로의 `concurrency` 그룹이 줄을 세우고 파이프라인은 upsert다.
+남는 좁은 창은 dispatch 직후 GitHub이 회차를 `queued`로 만들기까지 몇 초뿐이고,
+그때 겹쳐 봐야 손해는 Actions 분 몇 개다.
 
 **PAT는 Vercel env에만 둔다.** 외부 크론 서비스에 토큰을 넘기는 방식(`repository_dispatch`)을 안 고른
 이유가 이거다 — 남의 서비스에 저장소 쓰기 권한을 맡기지 않는다.
@@ -146,6 +207,7 @@ Get-Content "$HOME\.zipgonggo\cron-trigger.log" -Tail 10
 | 실제 워크플로 | 같은 초에 회차 생성 → `completed success` (run 34455885407) |
 | 연타 3회 | 200 `skipped: fresh` — 감시 잡이 곧바로 `ingest_log`를 남겨 1분 안에 차단이 걸린다 |
 | `patrol` | 200 `skipped: fresh`, `ageMin: 128 / needMin: 1200` |
+| **`x-cron-secret` 헤더** | **`collect` 200 · `patrol` 200** — Worker가 쓸 경로. 헤더 없음 401, 틀린 값 401, 모르는 잡 404 |
 
 ## 왜 Actions인가
 

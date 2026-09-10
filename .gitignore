@@ -36,3 +36,7 @@ pipeline/data/ish/
 
 # OG 생성용 글꼴 — 필요할 때 내려받는다(design/brand/README.md)
 design/brand/Pretendard-*.otf
+
+# Cloudflare Worker 부산물
+.wrangler/
+worker/.dev.vars
