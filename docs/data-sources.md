@@ -297,6 +297,9 @@ LH 이용약관(`lh.or.kr/menu.es?mid=a10802000000`) 제1~12조와 부칙을 훑
 | `JUSO_SEARCH_API_KEY` | business.juso.go.kr API 신청 (2026-09-08 발급) | 공고 주소 → 표준 도로명주소 정규화. 검색 API만, 좌표 API 안 씀 |
 | `REVALIDATE_SECRET` | 직접 생성(무작위 문자열) | web `/api/revalidate` 인증. web·pipeline·Vercel(production/preview/development) 전부 같은 값이어야 한다 |
 | `WEB_REVALIDATE_URL` | 배포된 web의 URL | pipeline이 DB 갱신 직후 웹 캐시를 즉시 비우는 웹훅 주소. 비우면 예전처럼 최대 1시간 뒤 자연 반영 |
+| `CRON_TRIGGER_SECRET` | 직접 생성(무작위 문자열) | web `/api/cron/{잡}` 인증. 이 URL을 때리는 쪽(uptime 모니터 등)과 같은 값 |
+| `GITHUB_DISPATCH_TOKEN` | GitHub PAT — `actions:write` 하나면 된다 | 위 라우트가 워크플로를 부를 때 쓴다. **Vercel env에만 둔다** — 외부 서비스에 넘기지 않는다 |
+| `GITHUB_REPO` | `owner/repo` | 부를 저장소. `wlsdlstjdwls/zipgonggo` |
 
 ## 미해결
 
