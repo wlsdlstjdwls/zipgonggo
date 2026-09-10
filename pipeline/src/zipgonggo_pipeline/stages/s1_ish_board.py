@@ -1,6 +1,13 @@
-"""S1-ISH — i-sh.co.kr 모집공고 게시판 → notice 적재(과거 공고 백필).
+"""S1-ISH — i-sh.co.kr 게시판 → notice 적재.
 
     python -m zipgonggo_pipeline.stages.s1_ish_board [--dry-run] [--max-pages N] [--since-year 2015]
+    python -m zipgonggo_pipeline.stages.s1_ish_board --board 247 [--max-pages 3]
+
+게시판이 둘이다(sources.ish_board 참고).
+- `--board 241`(기본) — 모집공고 게시판. 2003년까지 거슬러 가는 **과거 공고 백필**용이라 status를 「접수마감」으로 둔다.
+- `--board 247` — 인터넷청약시스템 공고 게시판. 운영기관 위탁 물건(특화형 매입임대 등)이 **여기에만** 올라온다.
+  지금 접수 중인 공고라 status를 포털과 같은 규칙(derive_status_sh)으로 매기고, 접수기간은 S3 첨부 파싱이 채운다.
+  잡글이 많은 게시판이라 앞쪽 몇 쪽만 훑는다(기본 3쪽).
 
 서울주거포털(S1-SH)은 2024-09 이후 81건뿐이다. 그 이전 공고는 SH 자체 게시판에만 남아 있고
 연도별 아카이브가 검색 자산이라(CLAUDE.md 「하지 말 것 6」) 여기서 메운다.
@@ -24,8 +31,11 @@ from ..housing import derive_sector, slug_code
 from ..normalize import fingerprint, parse_ymd
 from ..parsers.ish_title import amendment_base, derive_housing_type, is_notice
 from ..repo import link_related_post, queue_unmapped
-from ..sources.ish_board import BoardNotice, IshBoardClient
+from ..normalize import today_kst
+from ..sources.ish_board import BOARDS, Board, BoardNotice, IshBoardClient
 from .common import Stats, finish_ingest, stage_main, upsert_guarded, utc_now
+# 247 게시판 공고는 지금 접수 중이라 포털과 같은 상태 규칙을 쓴다 — 규칙이 갈리면 목록에서 같은 공고가 다르게 보인다
+from .s1_sh import derive_status_sh
 
 log = logging.getLogger("s1.ish_board")
 
@@ -35,15 +45,22 @@ AGENCY = "SH"
 SIDO = "서울특별시"
 
 
-def map_board(row: BoardNotice, housing_type: str) -> dict[str, Any]:
+def source_name(board: Board) -> str:
+    """247 게시판은 별도 source로 남긴다 — S3 첨부 파싱 대상을 백필분과 갈라야 한다."""
+    return SOURCE if board.key == "241" else f"ish_{board.key}"
+
+
+def map_board(row: BoardNotice, housing_type: str, board: Board = BOARDS["241"]) -> dict[str, Any]:
     posted = parse_ymd(row.posted)
     if posted is None:
         raise ValueError(f"등록일 없음: {row.title}")
+    # 백필(241)은 이미 끝난 공고다. 247은 지금 올라오는 공고라 상태를 실제로 도출한다.
+    status = "접수마감" if board.key == "241" else derive_status_sh("", row.title, None, today_kst())
     return {
         # 포털(S1-SH)과 같은 slug 규칙 — 같은 공고가 양쪽에서 오면 URL이 갈리면 안 된다
         "slug": f"sh-{posted.year}-{row.seq}-{slug_code(housing_type)}",
         "fingerprint": fingerprint(AGENCY, row.title, posted),
-        "source": SOURCE,
+        "source": source_name(board),
         "source_key": f"ish:{row.seq}",
         "amends_source_key": None,
         "agency": AGENCY,
@@ -68,14 +85,14 @@ def map_board(row: BoardNotice, housing_type: str) -> dict[str, Any]:
         "apply_start_at": None,
         "apply_end_at": None,
         "announce_at": None,
-        # 게시판에는 모집상태 열이 없다. 과거 공고라 전부 마감으로 두고, 접수기간은 S3가 첨부에서 채운다
-        "status": "접수마감",
+        # 게시판에는 모집상태 열이 없다. 접수기간·발표일은 S3가 첨부 공고문에서 채운다
+        "status": status,
         "source_status": None,
         "source_url": row.url,
         "portal_url": None,
         "contact": f"SH {row.dept}" if row.dept else None,
         "source_rank": None,
-        "raw": {"ish_board_row": row.as_dict()},
+        "raw": {"ish_board_row": row.as_dict(), "ish_board": board.key},
     }
 
 
@@ -84,15 +101,17 @@ def existing_ish_keys(cur) -> set[str]:
     return {r["source_key"] for r in cur.fetchall()}
 
 
-def run(*, dry_run: bool, max_pages: int | None, since_year: int | None) -> Stats:
+def run(*, dry_run: bool, max_pages: int | None, since_year: int | None, board_key: str = "241") -> Stats:
     cfg = settings()
-    client = IshBoardClient(delay_sec=cfg.scrape_delay_sec)
+    board = BOARDS[board_key]
+    client = IshBoardClient(board=board, delay_sec=cfg.scrape_delay_sec)
     started = utc_now()
     stats = Stats()
 
-    rows = list(client.iter_notices(max_pages=max_pages or 60))
+    default_pages = 60 if board.key == "241" else 3
+    rows = list(client.iter_notices(max_pages=max_pages or default_pages))
     stats.fetched_rows = len(rows)
-    log.info("i-sh 게시판 %d행 · 요청 %d회", len(rows), client.call_count)
+    log.info("i-sh m_%s 게시판 %d행 · 요청 %d회", board.key, len(rows), client.call_count)
 
     conn = None if dry_run else connect()
     try:
@@ -125,7 +144,7 @@ def run(*, dry_run: bool, max_pages: int | None, since_year: int | None) -> Stat
                 continue
             stats.groups += 1
             try:
-                mapped = map_board(row, housing_type)
+                mapped = map_board(row, housing_type, board)
             except Exception as exc:  # noqa: BLE001
                 stats.error("map_error", row.seq, exc)
                 continue
@@ -133,7 +152,7 @@ def run(*, dry_run: bool, max_pages: int | None, since_year: int | None) -> Stat
                 continue
             upsert_guarded(cur, stats, row.seq, mapped, [{"sido": SIDO, "sigungu": None, "supply_count": None}])
         if conn and cur:
-            finish_ingest(cur, stage=STAGE, source=SOURCE, stats=stats, started=started, calls=client.call_count)
+            finish_ingest(cur, stage=STAGE, source=source_name(board), stats=stats, started=started, calls=client.call_count)
             conn.commit()
     finally:
         if conn:
@@ -144,10 +163,12 @@ def run(*, dry_run: bool, max_pages: int | None, since_year: int | None) -> Stat
 def main(argv: list[str] | None = None) -> int:
     def add_args(ap):
         ap.add_argument("--since-year", type=int, default=None, help="이 해부터만 적재(예: 2015)")
+        ap.add_argument("--board", choices=sorted(BOARDS), default="241",
+                        help="241=모집공고 게시판(백필) · 247=인터넷청약시스템 공고 게시판(위탁 물건)")
 
     return stage_main(
-        "S1 i-sh 게시판 과거 공고 백필",
-        lambda a: run(dry_run=a.dry_run, max_pages=a.max_pages, since_year=a.since_year),
+        "S1 i-sh 게시판 공고 적재",
+        lambda a: run(dry_run=a.dry_run, max_pages=a.max_pages, since_year=a.since_year, board_key=a.board),
         add_args=add_args, argv=argv,
     )
 

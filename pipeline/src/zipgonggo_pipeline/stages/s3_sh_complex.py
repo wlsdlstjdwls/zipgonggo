@@ -5,7 +5,7 @@
 --cached를 주면 네트워크를 아예 쓰지 않고 pipeline/data/ish/{seq}/ 에 이미 받아 둔 쪽 XML만 다시 읽는다.
 파서를 고친 뒤 되돌려 넣을 때 쓴다 — 게시판 본문 마크업이 바뀌어 첨부 링크를 못 찾는 공고도 캐시로는 살아 있다(실측 2026-09-09).
 
-대상: source='sh_scrape'이고 원문이 i-sh.co.kr인 공고. 첨부 미리보기(Synap 뷰어)의 쪽 XML을 1초 간격으로 받고
+대상: source가 'sh_scrape'·'ish_247'이고 원문이 i-sh.co.kr인 공고(m_241 백필분은 아직 안 태운다). 첨부 미리보기(Synap 뷰어)의 쪽 XML을 1초 간격으로 받고
 「주택 위치 안내」 표(단지명·소재지)를 파싱한다. 받은 XML은 pipeline/data/ish/{seq}/ 에 캐시(커밋 금지).
 표가 없는 공고(매입임대 등 다른 양식)는 0건으로 기록만 남긴다 — 양식별 파서는 이후 추가.
 
@@ -24,7 +24,7 @@ from pathlib import Path
 
 from ..config import PIPELINE_ROOT, settings
 from ..db import connect
-from ..parsers.sh_attach import parse_attachment
+from ..parsers.sh_attach import merge_teukhwa, parse_attachment, teukhwa_facts
 from ..repo import replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts
 from ..sources.ish import IshClient, find_attachments
 from .common import Stats, finish_ingest, stage_main, utc_now
@@ -50,20 +50,21 @@ SEQ_RE = re.compile(r"[?&]seq=(\d+)")
 
 SELECT_SQL = """
 SELECT id, slug, title, source_url, posted_at FROM notice
-WHERE source = 'sh_scrape' AND source_url LIKE '%%i-sh.co.kr%%'
+WHERE source IN ('sh_scrape', 'ish_247') AND source_url LIKE '%%i-sh.co.kr%%'
   AND (%(slug)s::text IS NULL OR slug = %(slug)s)
 ORDER BY posted_at DESC, id DESC
 LIMIT %(limit)s
 """
 
 
-def pick_attachment(atts, title: str):
-    """공고문 본체 첨부 1개. 이름에 '공고'가 든 PDF 우선, 없으면 첫 미리보기."""
+def rank_attachments(atts) -> list:
+    """읽을 순서대로 첨부. 이름에 '공고'가 든 PDF가 먼저다.
+
+    특화형 매입임대는 **첨부 하나가 주택 한 채**라 여러 개를 다 읽어야 한다(309807은 두 채, 2026-09-10).
+    """
     pdfs = [a for a in atts if a.name.lower().endswith(".pdf")]
-    for a in pdfs:
-        if "공고" in a.name:
-            return a
-    return (pdfs or atts or [None])[0]
+    ranked = [a for a in pdfs if "공고" in a.name] + [a for a in pdfs if "공고" not in a.name]
+    return ranked or list(atts)
 
 
 
@@ -124,6 +125,69 @@ def _jeonse_row(l) -> dict:
         "move_in_from": l.move_in_from,
         "source_page": l.page,
     }
+
+
+def _teukhwa_supply_row(h, tenant_class: str) -> dict:
+    """특화형 주택 한 채 → notice_supply 한 줄. 공급유형 코드는 다른 양식과 같이 전용면적 반올림이다."""
+    return {
+        "complex_name": h.name,
+        "supply_type": str(round(h.area_exclusive)) if h.area_exclusive else "0",
+        "accessible": False,
+        "tenant_class": tenant_class,
+        "income_option": None,
+        "is_new": True,
+        "units_total": h.units,
+        "units_priority": None,
+        "units_general": h.units,
+        "units_reserve": None,
+        "deposit": h.deposit,
+        # 계약금 10%는 공고문 본문에만 있다("②계약금(보증금10%)필수지참", 4쪽) — 표에 없는 값은 만들지 않는다
+        "down_payment": None,
+        "balance": None,
+        "rent": h.rent,
+        "area_exclusive": h.area_exclusive,
+        "area_common": h.area_common,
+        "area_etc": None,
+        "area_total": h.area_total,
+        "move_in_from": h.move_in.isoformat() if h.move_in else None,
+        "source_page": h.page,
+    }
+
+
+def _teukhwa_unit_rows(houses) -> list[dict]:
+    """특화형 주택 → unit 행. 이 양식은 공고 한 건이 호실 한 채라 별첨 목록 없이 여기서 만든다.
+
+    unit은 면적·보증금·임대료가 NOT NULL이다 — Synap 유실로 못 읽은 채는 호실 페이지를 만들지 않는다.
+    """
+    rows = []
+    for h in houses:
+        if h.area_exclusive is None or h.deposit is None or h.rent is None:
+            log.warning("특화형 %s: 면적·금액이 비어 호실 행을 건너뛴다", h.address)
+            continue
+        rows.append({
+            "complex_code": h.road_address,   # 단지 행과 같은 열쇠 — replace_units가 이걸로 이어 붙인다
+            "unit_key": h.room,
+            "road_address": h.road_address,
+            "complex_name": h.name,
+            "building": None,
+            "room": h.room,
+            "floor": _floor(h.room.replace("호", "")),
+            "sido": h.sido,
+            "sigungu": h.sigungu,
+            "area_m2": h.area_exclusive,
+            "deposit": h.deposit,
+            "rent": h.rent,
+            "deposit_jeonse": None,
+            "rent_jeonse": None,
+            "deposit_wolse": None,
+            "rent_wolse": None,
+            "room_layout": h.room_layout,
+            "elevator": None,
+            "has_elevator": None,
+            "seq": None,
+            "source_page": h.page,
+        })
+    return rows
 
 
 _FLOOR_RE = re.compile(r"^(\d{1,2})\d{2}$")
@@ -234,30 +298,45 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                 try:
                     if cached:
                         seq_dir = CACHE_ROOT / seq
-                        if not seq_dir.is_dir():
-                            stats.skip("no_cache")
-                            continue
-                        att_name = "(캐시)"
-                        pages = list(iter_cached_pages(seq_dir))
+                        pages = list(iter_cached_pages(seq_dir)) if seq_dir.is_dir() else []
                         if not pages:
                             stats.skip("no_cache")
                             continue
+                        att_name = "(캐시)"
+                        extras = [list(iter_cached_pages(d)) for d in sorted(seq_dir.glob("att*")) if d.is_dir()]
                     else:
                         html = client.fetch_notice_html(n["source_url"])
-                        att = pick_attachment(find_attachments(html), n["title"])
-                        if att is None:
+                        atts = rank_attachments(find_attachments(html))
+                        if not atts:
                             stats.skip("no_attachment")
                             log.info("%s 첨부 없음", n["slug"])
                             continue
-                        doc = client.resolve_preview(att.preview_url)
+                        doc = client.resolve_preview(atts[0].preview_url)
                         if doc is None:
                             stats.skip("preview_unresolved")
                             continue
-                        att_name = att.name
+                        att_name = atts[0].name
                         pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq))
+                        extras = []
                     facts = parse_attachment(pages, ref_year=n["posted_at"].year if n["posted_at"] else None)
+                    # 특화형은 첨부 하나가 주택 한 채다 — 나머지 첨부까지 읽어 한 공고로 합친다.
+                    # 다른 양식은 첨부 하나가 공고문 전체라 첫 첨부만 읽는다(요청 수를 늘리지 않는다)
+                    if facts.kind == "teukhwa":
+                        if not cached:
+                            for k, att in enumerate(atts[1:], 2):
+                                doc = client.resolve_preview(att.preview_url)
+                                if doc is None:
+                                    continue
+                                extras.append(list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq / f"att{k}")))
+                        for extra in extras:
+                            more = teukhwa_facts(extra)
+                            if more is not None:
+                                facts = merge_teukhwa(facts, more)
                     kind, rows, units = facts.kind, facts.complexes, facts.units
                     supply_rows = [_supply_row(l) for l in facts.supply_lines] + [_jeonse_row(l) for l in facts.jeonse_lines]
+                    if facts.kind == "teukhwa":
+                        supply_rows = [_teukhwa_supply_row(h, facts.tenant_class) for h in facts.teukhwa_houses]
+                        units = []   # unit 행은 별첨 주택목록(UnitRow)이 아니라 아래에서 따로 만든다
                 except Exception as exc:  # noqa: BLE001
                     stats.error("fetch_error", n["slug"], exc)
                     continue
@@ -292,6 +371,8 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                     # 파서는 예전부터 읽고 있었는데 적재를 안 해 unit이 0건이었다(실측 2026-09-09)
                     if units:
                         replace_units(cur, n["id"], _unit_rows(units))
+                    elif facts.kind == "teukhwa":
+                        replace_units(cur, n["id"], _teukhwa_unit_rows(facts.teukhwa_houses))
                     # 공급현황 줄은 단지 행 다음에 넣는다 — complex_id를 같은 공고의 단지에서 이름으로 찾는다
                     replace_notice_supply(cur, n["id"], supply_rows)
                     update_notice_attach_facts(

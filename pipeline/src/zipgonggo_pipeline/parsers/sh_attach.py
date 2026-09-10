@@ -4,7 +4,8 @@
 1. 장기전세: 「주택 위치 안내」 표 (parsers/sh_complex) — 단지명·소재지. 신규공급 단지는 「공급현황」 표(parsers/sh_jeonse_supply)에서 호수·전세금·면적·난방까지
 2. 행복주택·국민임대: 「단지별 주소」 표 (parsers/sh_addr_table) — 공급구분·공급단지·사업주체·주소·난방방식
 3. 매입임대: 「[별첨1] 주택목록」 회전 표 (parsers/sh_units) — 호실 단위 → 단지코드로 묶음
-전부 0건이면 빈 목록. 새 양식이 나오면 여기 4번으로 붙인다.
+4. 특화형 매입임대(운영기관 위탁): 1쪽 「Ⅱ. 공급주택」 한 줄짜리 표 (parsers/sh_teukhwa) — 공고 1건 = 호실 1채
+전부 0건이면 빈 목록. 새 양식이 나오면 여기 5번으로 붙인다.
 
 공고 단위(양식과 무관하게 항상 시도):
 - 접수 시작·마감·당첨자 발표 — 「입주자 모집 절차 및 일정」 흐름도 (parsers/sh_schedule)
@@ -27,6 +28,7 @@ from .sh_supply import SupplySummary, parse_supply
 from .sh_jeonse_supply import JeonseLine, parse_jeonse_supply
 from .sh_jaegaebal_supply import parse_jaegaebal_supply
 from .sh_supply_lines import SupplyLine, parse_supply_lines
+from .sh_teukhwa import TeukhwaHouse, parse_teukhwa
 from .sh_units import UnitRow, group_units, parse_unit_pages
 
 log = logging.getLogger(__name__)
@@ -43,6 +45,10 @@ class AttachmentFacts:
     jeonse_lines: list[JeonseLine] = field(default_factory=list)
     #: 공고 단위 금액·호수. 「공급현황」 줄이 있으면 그걸로 채운다 — 요약(parse_supply)보다 정확하다
     totals: dict[str, int | None] = field(default_factory=dict)
+    #: 특화형 매입임대 양식에서 읽은 공급주택(호실 단위). S3이 unit·notice_supply 행으로 편다
+    teukhwa_houses: list[TeukhwaHouse] = field(default_factory=list)
+    #: 특화형 공급대상 계층(공고문 제목의 「[청년]」)
+    tenant_class: str = "일반공급"
 
 
 def _norm_name(s: str) -> str:
@@ -155,7 +161,55 @@ def totals_from_supply_lines(lines: list[SupplyLine]) -> dict[str, int | None]:
     }
 
 
+def teukhwa_facts(pages: list[tuple[int, str]]) -> AttachmentFacts | None:
+    """특화형 매입임대 양식이면 AttachmentFacts로. 아니면 None.
+
+    이 양식은 공고 한 건이 호실 한 채라 단지·공급현황·일정이 모두 1쪽 표 하나에서 나온다.
+    다른 양식 파서를 태우면 「공급현황」 요약이 엉뚱한 숫자를 읽으므로(2026-09-10 실측: 보증금 36억) 먼저 가른다.
+    """
+    facts = parse_teukhwa(pages)
+    if facts is None or not facts.houses:
+        return None
+    out = AttachmentFacts("teukhwa", [
+        # 단지코드 자리에 주소를 넣는다 — 이 양식엔 코드가 없고, 호실 행을 단지에 잇는 열쇠가 이것뿐이다
+        {"name": h.name, "sido": h.sido, "sigungu": h.sigungu, "road_address": h.road_address,
+         "is_new": True, "source_page": h.page, "complex_code": h.road_address, "heating": None,
+         "unit_count": h.units, "min_deposit": h.deposit, "min_rent": h.rent,
+         "area_min": h.area_exclusive, "area_max": h.area_exclusive}
+        for h in facts.houses
+    ])
+    out.schedule = (Schedule(apply_start=facts.apply_start, apply_end=facts.apply_end, announce=None,
+                             page=facts.houses[0].page)
+                    if facts.apply_start else None)
+    out.totals = {
+        "min_deposit": min((h.deposit for h in facts.houses if h.deposit), default=None),
+        "max_deposit": max((h.deposit for h in facts.houses if h.deposit), default=None),
+        "min_rent": min((h.rent for h in facts.houses if h.rent), default=None),
+        "max_rent": max((h.rent for h in facts.houses if h.rent), default=None),
+        "supply_count": sum(h.units for h in facts.houses if h.units) or None,
+    }
+    out.teukhwa_houses = facts.houses
+    out.tenant_class = facts.tenant_class
+    return out
+
+
+def merge_teukhwa(base: AttachmentFacts, more: AttachmentFacts) -> AttachmentFacts:
+    """특화형 공고는 첨부 하나가 주택 한 채다(309807은 두 채) — 첨부별 결과를 한 공고로 합친다."""
+    base.complexes += more.complexes
+    base.teukhwa_houses += more.teukhwa_houses
+    base.schedule = base.schedule or more.schedule
+    for key, pick in (("min_deposit", min), ("max_deposit", max), ("min_rent", min), ("max_rent", max)):
+        vals = [v for v in (base.totals.get(key), more.totals.get(key)) if v is not None]
+        base.totals[key] = pick(vals) if vals else None
+    counts = [v for v in (base.totals.get("supply_count"), more.totals.get("supply_count")) if v]
+    base.totals["supply_count"] = sum(counts) or None
+    return base
+
+
 def parse_attachment(pages: list[tuple[int, str]], *, ref_year: int | None = None) -> AttachmentFacts:
+    teukhwa = teukhwa_facts(pages)
+    if teukhwa is not None:
+        return teukhwa
     rows = parse_location_table(pages)
     facts: AttachmentFacts
     if rows:
