@@ -6,7 +6,7 @@ name: 공고 수집
 # 신규가 없는 회차(대부분)는 「감시」에서 끝나 1분을 안 넘긴다. 무거운 의존성(pdfplumber·pyhwp·
 # pandas)과 주소 요약DB 내려받기는 신규가 있을 때만 한다.
 #
-# 준비물은 docs/automation.md 참고. Secrets 6개와 juso-data 릴리스가 있어야 돈다.
+# 준비물은 docs/automation.md 참고. Secrets 5개와 juso-data 릴리스가 있어야 돈다.
 
 on:
   schedule:
@@ -152,7 +152,7 @@ jobs:
             >> "$GITHUB_STEP_SUMMARY"
 
       # 첨부를 못 읽어도 목록은 이미 들어가 있다 — 조용히 빈 상세 페이지가 생기는 게 제일 위험하다.
-      # 사람이 볼 자리를 만든다(handoff 함정 §4가 풀릴 때까지 여기가 계속 울릴 수 있다).
+      # 사람이 볼 자리를 만든다 — 양식이 처음 보는 공고면 여기가 울린다.
       - name: 실패하면 이슈
         if: failure() || steps.s3.outputs.fail == '1'
         env:
