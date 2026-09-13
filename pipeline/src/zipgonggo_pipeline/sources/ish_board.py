@@ -118,7 +118,7 @@ def parse_board_list(html: str, board: Board = BOARD_241) -> list[BoardNotice]:
 
 class IshBoardClient:
     def __init__(self, *, board: Board = BOARD_241, delay_sec: float = 1.0, timeout_sec: float = 30.0,
-                 max_retries: int = 3, http: httpx.Client | None = None):
+                 max_retries: int = 4, http: httpx.Client | None = None):
         self.board = board
         self._http = ThrottledHttp(delay_sec=delay_sec, timeout_sec=timeout_sec, max_retries=max_retries, follow_redirects=True, http=http)
 

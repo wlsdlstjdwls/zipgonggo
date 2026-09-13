@@ -217,7 +217,7 @@ def page_rows_y(xml: str) -> list[tuple[float, list[Segment]]]:
 
 
 class IshClient:
-    def __init__(self, *, delay_sec: float = 1.0, timeout_sec: float = 30.0, max_retries: int = 3, http: httpx.Client | None = None):
+    def __init__(self, *, delay_sec: float = 1.0, timeout_sec: float = 30.0, max_retries: int = 4, http: httpx.Client | None = None):
         # 302 Location을 직접 읽어야 하므로 리다이렉트를 따라가지 않는다
         self._http = ThrottledHttp(delay_sec=delay_sec, timeout_sec=timeout_sec, max_retries=max_retries, follow_redirects=False, http=http)
 

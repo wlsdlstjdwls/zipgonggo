@@ -109,7 +109,7 @@ def last_page(html: str) -> int:
 
 
 class SHClient:
-    def __init__(self, *, delay_sec: float = 1.0, timeout_sec: float = 30.0, max_retries: int = 3, http: httpx.Client | None = None):
+    def __init__(self, *, delay_sec: float = 1.0, timeout_sec: float = 30.0, max_retries: int = 4, http: httpx.Client | None = None):
         self._http = ThrottledHttp(
             delay_sec=delay_sec, timeout_sec=timeout_sec, max_retries=max_retries, follow_redirects=True, http=http
         )

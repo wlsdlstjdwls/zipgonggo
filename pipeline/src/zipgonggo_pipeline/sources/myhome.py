@@ -42,7 +42,7 @@ class MyHomeClient:
         *,
         delay_sec: float = 1.0,
         timeout_sec: float = 30.0,
-        max_retries: int = 3,
+        max_retries: int = 4,
         page_size: int = 1000,
         http: httpx.Client | None = None,
     ):

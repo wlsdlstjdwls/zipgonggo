@@ -7,6 +7,7 @@ CLAUDE.md 「하지 말 것 7」: 순차 호출, 요청 간격(SCRAPE_DELAY_SEC)
 from __future__ import annotations
 
 import logging
+import random
 import time
 from typing import Any
 
@@ -19,24 +20,37 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 USER_AGENT = "Mozilla/5.0 (compatible; zipgonggo-pipeline/0.1; +https://zipgonggo.com)"
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+# 연결이 안 되는 건 대개 서버가 잠깐 막아 둔 것이다. 오래 기다리지 말고 끊고 다시 건다.
+CONNECT_TIMEOUT_SEC = 10.0
+# 첫 재시도 대기. 이후 3배씩 늘린다(5 → 15 → 45초). i-sh가 1~2분 안 받는 일이 있어
+# 1초부터 2배씩으로는 세 번 두드려도 10초 안에 끝나 버렸다.
+BACKOFF_START_SEC = 5.0
+BACKOFF_FACTOR = 3.0
 
 
 class ThrottledHttp:
-    """GET 전용. 호출 간 delay_sec 보장, 일시 오류는 지수 백오프로 max_retries 회."""
+    """GET 전용. 호출 간 delay_sec 보장, 일시 오류는 지수 백오프로 max_retries 회.
+
+    connect는 timeout_sec을 따로 쓰지 않고 CONNECT_TIMEOUT_SEC을 쓴다. 기관 서버가 가끔
+    몇십 초씩 SYN을 안 받는데, 그걸 30초씩 기다려 봐야 답이 오지 않는다. 빨리 포기하고
+    대신 백오프를 길게 잡아 여러 번 나눠 두드리는 쪽이 같은 시간에 성공 확률이 높다.
+    """
 
     def __init__(
         self,
         *,
         delay_sec: float = 1.0,
         timeout_sec: float = 30.0,
-        max_retries: int = 3,
+        max_retries: int = 4,
         follow_redirects: bool = False,
         http: httpx.Client | None = None,
     ):
         self.delay_sec = delay_sec
         self.max_retries = max_retries
         self._http = http or httpx.Client(
-            timeout=timeout_sec, follow_redirects=follow_redirects, headers={"User-Agent": USER_AGENT}
+            timeout=httpx.Timeout(timeout_sec, connect=CONNECT_TIMEOUT_SEC),
+            follow_redirects=follow_redirects,
+            headers={"User-Agent": USER_AGENT},
         )
         self.call_count = 0
         self._last_call_at = 0.0
@@ -69,7 +83,7 @@ class ThrottledHttp:
         label: str = "",
         accept_redirect: bool = False,
     ) -> httpx.Response:
-        backoff = 1.0
+        backoff = BACKOFF_START_SEC
         for attempt in range(1, self.max_retries + 1):
             self._throttle()
             self._last_call_at = time.monotonic()
@@ -88,7 +102,9 @@ class ThrottledHttp:
                     raise
                 if attempt == self.max_retries:
                     raise
-                log.warning("%s 재시도 %d/%d: %s", label or url, attempt, self.max_retries, exc)
-                time.sleep(backoff)
-                backoff *= 2
+                # 지터 — 크론이 정각에 몰려 같은 초에 다시 두드리는 일을 흩는다
+                wait = backoff * random.uniform(0.8, 1.3)
+                log.warning("%s 재시도 %d/%d (%.0f초 뒤): %s", label or url, attempt, self.max_retries, wait, exc)
+                time.sleep(wait)
+                backoff *= BACKOFF_FACTOR
         raise AssertionError("unreachable")
