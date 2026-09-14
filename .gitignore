@@ -40,3 +40,6 @@ design/brand/Pretendard-*.otf
 # Cloudflare Worker 부산물
 .wrangler/
 worker/.dev.vars
+
+# 도면 자산 — 원본 zip이 수백 MB다
+pipeline/data/plans/
