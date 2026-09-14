@@ -810,16 +810,16 @@ Vercel Cron은 못 쓴다 — Hobby는 최소 간격이 하루 1회고 `0 * * * 
 
 ## 다음에 할 일 (우선순위)
 
-### 0. 배포에 단지 사진 켜기 — 스토리지 + 환경변수 (36차)
+### 0. ~~배포에 단지 사진 켜기~~ — 36차에서 해결 (Vercel Blob)
 
-지금 production은 갤러리를 아예 안 그린다(`NEXT_PUBLIC_SH_HOUSE_BASE` 비어 있음). 로컬 `web/public/sh-house`
-약 300MB(153단지 1,381장)는 gitignore라 저장소에 못 넣는다.
-
-- 스토리지 하나 고른다 — Vercel Blob(공개 버킷)이 가장 짧다. `pipeline/scripts/collect_sh_house_assets.py`에
-  `upload` 명령을 더해 `{bizns_cd}/{file_name}` 그대로 올린다(키는 `BLOB_READ_WRITE_TOKEN`, `.env.example`에 자리만)
-- Vercel env `NEXT_PUBLIC_SH_HOUSE_BASE=https://…public.blob.vercel-storage.com` → 재배포. 이 값 하나로 갤러리가 켜진다
-- SH주택정보 이미지의 공개 게시 가부는 사용자가 판단한다(`docs/data-sources.md` 2c의 허락 블록을 사용자가 지운 상태 —
-  36차 「주의」 참조)
+- 스토어 `zipgonggo-sh-house`(public, icn1, `store_7RK03A9qVljTxNQ3`)를 CLI로 만들어 프로젝트에 연결했다.
+  `BLOB_READ_WRITE_TOKEN`은 `vercel env pull`로 `web/.env.local`에 온다.
+- 올리는 건 `web/scripts/upload-sh-house.mjs`(`npm run upload:sh-house`). 경로 = `{biznsCd}/{file_name}` 그대로.
+  긴 변 1,600px 넘는 것만 줄인다 — **작은 PNG를 다시 인코딩하면 10배로 분다**(실측 103KB→1MB). 이미 있는 경로는 건너뛴다.
+- `NEXT_PUBLIC_SH_HOUSE_BASE=https://7rk03a9qvljtxnq3.public.blob.vercel-storage.com` — production·preview env에 넣었다.
+- 새 단지를 수집하면: `collect_sh_house_assets.py fetch/load` → `npm run upload:sh-house`. 두 번째가 빠지면 배포에서 그 단지만 액박.
+- Hobby 플랜은 초과 시 과금 없이 Blob이 30일 막힌다. Pro(월 $20)는 저장 5GB·전송 100GB 포함, 초과 종량제(전송 GB당 $0.05).
+  애드센스가 붙어 있어 Hobby 「비상업」 조건에도 걸린다 — Pro 전환은 사용자 판단.
 - 남은 미연결 SH 단지 433행은 신규 미준공(SH주택정보 미등록)이거나 이름·주소가 크게 다른 것. `match`가 실패 목록을 찍어 준다
 
 ### 1. 지도를 DB 좌표로 갈아 끼우기 — 15차부터 밀린 것

@@ -372,6 +372,7 @@ LH 이용약관(`lh.or.kr/menu.es?mid=a10802000000`) 제1~12조와 부칙을 훑
 | `GITHUB_DISPATCH_TOKEN` | GitHub PAT — `actions:write` 하나면 된다 | 위 라우트가 워크플로를 부를 때 쓴다. **Vercel env에만 둔다** — 외부 서비스에 넘기지 않는다 |
 | `GITHUB_REPO` | `owner/repo` | 부를 저장소. `wlsdlstjdwls/zipgonggo` |
 | `NEXT_PUBLIC_SH_HOUSE_BASE` | 스토리지(Vercel Blob 등) 공개 URL | SH 단지 사진·도면 파일 자리. **비우면 배포에서 갤러리를 그리지 않는다** — `web/public/sh-house`는 gitignore라 Vercel에 안 올라간다. 스토리지에 올린 뒤 그 공개 URL을 넣는다 |
+| `BLOB_READ_WRITE_TOKEN` | Vercel 대시보드 Storage → Blob 스토어 | `web/scripts/upload-sh-house.mjs`가 사진을 올릴 때만. 웹 런타임은 안 쓴다 |
 
 ## 미해결
 
