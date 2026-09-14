@@ -56,6 +56,8 @@ export type EligIncomeTable = {
   households: number[];
   rows: { pct: number; won: (number | null)[] }[];
   verified?: boolean;
+  /** 검산에 쓴 통계연도. 2025년 공고(제49차)는 2024년 통계다 — 없으면 화면은 income_standard 최신 연도로 후퇴 */
+  base_year?: number;
 };
 export type EligSelection = {
   title: string;

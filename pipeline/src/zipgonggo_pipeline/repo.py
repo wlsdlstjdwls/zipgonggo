@@ -460,13 +460,18 @@ def replace_region_tiers(cur, rows: list[dict[str, Any]]) -> int:
 # ─────────────────────────────────────────────────────────────
 
 
-def income_base100(cur) -> dict[int, int]:
-    """가구원수 → 최신 연도 100% 기준액(원). 공고문 소득표 검산에 쓴다."""
-    cur.execute(
-        "SELECT household, monthly_won FROM income_standard "
-        "WHERE pct = 100 AND year = (SELECT max(year) FROM income_standard)"
-    )
+def income_base100(cur, year: int | None = None) -> dict[int, int]:
+    """가구원수 → 그 통계연도의 100% 기준액(원). 공고문 소득표 검산에 쓴다. year가 없으면 최신 연도."""
+    if year is None:
+        cur.execute("SELECT household, monthly_won FROM income_standard WHERE pct = 100 AND year = (SELECT max(year) FROM income_standard)")
+    else:
+        cur.execute("SELECT household, monthly_won FROM income_standard WHERE pct = 100 AND year = %s", (year,))
     return {r["household"]: r["monthly_won"] for r in cur.fetchall()}
+
+
+def income_years(cur) -> list[int]:
+    cur.execute("SELECT DISTINCT year FROM income_standard ORDER BY year DESC")
+    return [r["year"] for r in cur.fetchall()]
 
 
 def upsert_notice_eligibility(cur, notice_id: int, *, source: str, source_pages: list[int], data: dict[str, Any], verified: bool) -> None:

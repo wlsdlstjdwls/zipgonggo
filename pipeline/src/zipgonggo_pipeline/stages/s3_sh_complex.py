@@ -27,7 +27,7 @@ from ..db import connect
 from ..parsers.sh_attach import merge_teukhwa, parse_attachment, teukhwa_facts
 from ..parsers.sh_eligibility import parse_eligibility, verify_income_table
 from ..repo import (
-    income_base100, replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts,
+    income_base100, income_years, replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts,
     upsert_notice_eligibility,
 )
 from ..sources.ish import IshClient, find_attachments, is_missing_page
@@ -437,11 +437,21 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                         # 소득표는 100% 기준액으로 검산한 뒤에만 금액을 싣는다(Synap 글자 유실)
                         verified = False
                         if elig.income_table is not None:
-                            checked = verify_income_table(elig.income_table, income_base100(cur))
+                            # 공고는 「통계청 발표 전년도」 값을 쓴다 — 2026년 공고는 2025년 통계. 연초 공고는 그 전 해일 수 있어
+                            # 한 해 더 앞선 기준액으로 한 번 더 대본다. 검산이 통과한 연도를 base_year로 싣는다(화면 라벨)
+                            years = income_years(cur)
+                            posted_year = n["posted_at"].year if n["posted_at"] else None
+                            candidates = [y for y in ((posted_year - 1, posted_year - 2) if posted_year else ()) if y in years] or years[:1]
+                            checked = None
+                            for base_year in candidates:
+                                checked = verify_income_table(elig.income_table, income_base100(cur, base_year))
+                                checked["base_year"] = base_year
+                                if checked["verified"]:
+                                    break
                             elig.income_table = checked
                             verified = checked["verified"]
                             if not verified:
-                                log.warning("%s 소득표 검산 실패: %s", n["slug"], checked["mismatches"][:3])
+                                log.warning("%s 소득표 검산 실패(통계 %s년): %s", n["slug"], checked["base_year"], checked["mismatches"][:3])
                         upsert_notice_eligibility(cur, n["id"], source=SOURCE, source_pages=elig.source_pages,
                                                   data=elig.as_json(), verified=verified)
                     cur.execute("RELEASE SAVEPOINT nc")

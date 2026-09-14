@@ -52,7 +52,9 @@ def run(args: argparse.Namespace) -> Stats:
         data = json.loads(args.seed.read_text(encoding="utf-8"))
 
     types, income, tiers = data["supply_types"], data["income_standard"], data["region_tiers"]
-    stats.fetched_rows = len(types) + len(income) + len(tiers)
+    # 이전 통계연도 100% 기준액 — 2025년 공고(제49차 장기전세 등)의 소득표 검산용. 화면(/eligibility)은 최신 연도만 쓴다
+    prior = data.get("income_standard_prior", {}).get("rows", [])
+    stats.fetched_rows = len(types) + len(income) + len(tiers) + len(prior)
     if args.dry_run:
         stats.skipped["dry_run"] = stats.fetched_rows
         log.info("유형 %d · 소득기준 %d · 지역 %d", len(types), len(income), len(tiers))
@@ -63,6 +65,8 @@ def run(args: argparse.Namespace) -> Stats:
         with conn.cursor() as cur:
             stats.updated += replace_supply_types(cur, types)
             stats.updated += replace_income_standard(cur, income, year=data.get("income_year", args.year))
+            for year in sorted({r["year"] for r in prior}):
+                stats.updated += replace_income_standard(cur, [r for r in prior if r["year"] == year], year=year)
             stats.updated += replace_region_tiers(cur, tiers)
             finish_ingest(cur, stage=STAGE, source=SOURCE, stats=stats, started=started,
                           supply_types=len(types), income_standard=len(income), region_tiers=len(tiers))

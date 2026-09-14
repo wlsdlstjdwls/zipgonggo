@@ -234,7 +234,7 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
         <>
           <h3 className="elig-sub">
             가구원수별 가구당 월평균소득 기준
-            <small>{incomeYear}년 소득 통계 기준{noticeYear ? `, ${noticeYear}년 공고에 적용` : ""}</small>
+            <small>{income.base_year ?? incomeYear}년 소득 통계 기준{noticeYear ? `, ${noticeYear}년 공고에 적용` : ""}</small>
           </h3>
           <p className="ne-lead">공고문은 통계청이 발표한 전년도 도시근로자 가구당 월평균소득을 씁니다. 연도가 공고보다 한 해 앞서는 이유입니다.</p>
           <div className="tbl ne-tbl">

@@ -49,3 +49,6 @@ pipeline/data/sh-house/
 
 # PoC 동안 SH 이미지를 여기로 복사해 지면에서 읽는다. 발행 때 스토리지로 옮긴다
 web/public/sh-house/
+
+# setuptools 편집 설치 부산물
+*.egg-info/

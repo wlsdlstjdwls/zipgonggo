@@ -11,7 +11,8 @@
 - 7쪽 「출생자녀에 따른 소득 및 자산요건 가산 적용」 ①②③ 조건 + 「소득 가산 적용」 표(기본 | ① | ②③ | 맞벌이).
 - 8쪽 「자산 가산 적용」 표(총자산·자동차 × 기본 | ① | ②③), 「가구원수별 가구당 월평균소득 표」(% × 1~6인).
   소득표는 Synap 글자 유실이 있어(90% 줄) 구멍 난 칸은 None으로 두고 stage가 100% 기준액으로 검산·보충한다.
-- 30~31쪽 「동일순위 경쟁 시 입주자 선정 기준」: 「➜ 일반공급(일반)」 「➜ 일반공급(주거약자)」 「➜ 우선공급」 세 표.
+- 30~31쪽 「동일순위 경쟁 시 입주자 선정 기준」: 「➜ 일반공급(일반)」 「➜ 일반공급(주거약자)」 「➜ 우선공급」 세 표
+  (글머리는 차수마다 다르다 — 51차 ➜, 49차 사설 영역 글자·▶. BULLET_RE).
   열은 구분(x<182: 유형 + 면적) | 선정순서(화살표로 이어진 단계) | 비고(x ≥ 비고 헤더 - 60, 표 전체에 걸친 병합 칸).
 - 31~32쪽 「가감점 배점표」: 5점~1점 표(일반공급(일반)·우선공급), 3점~1점 표(주거약자), 감점표(가·나·다).
   항목은 ①~⑤ 표시로 시작하고 칸 글은 두 줄(「7년 이상」/「10년 미만」)로 흩어진다.
@@ -32,6 +33,7 @@ POINT_RE = re.compile(r"^(\d+)\s*점$")
 MINUS_POINT_RE = re.compile(r"^-\s*(\d+)\s*점$")
 ITEM_RE = re.compile(r"^[①②③④⑤⑥⑦⑧⑨⑩]")
 HOUSEHOLD_RE = re.compile(r"^(\d)인가구$")
+BULLET_RE = re.compile(r"^[➜▶►-]")   # 표 이름 글머리. 51차 ➜, 49차는 사설 영역 글자()와 ▶
 MANWON_RE = re.compile(r"^([\d,]+)\s*만원")
 
 RANK_HEADING = "소득기준 및 신청순위"
@@ -41,7 +43,7 @@ ASSET_BONUS_HEADING = "자산 가산 적용"
 INCOME_TABLE_HEADING = "가구원수별 가구당 월평균소득 표"
 SELECTION_HEADING = "동일순위 경쟁 시 입주자 선정 기준"
 SCORE_HEADING = "감점 배점표"
-SCORE_END_HEADING = "감점 항목 기재 요령"
+SCORE_END_HEADINGS = ("감점 항목 기재 요령", "가점 항목 기재 요령")   # 49·50차는 「* 가점 항목 기재 요령」
 PENALTY_HEADING = "감점 기준"
 
 # 열 경계(px). 6~7쪽 순위 표 실측 — 면적 79~145, 순위 153~207, 소득 241~371, 소득 외 399~708
@@ -65,6 +67,9 @@ HEADER_PX = 95         # 쪽 머리글 y(80.7) 아래, 본문 첫 줄(121) 위
 FOOTER_PX = 1050       # 쪽 번호 y(1062) 위
 SCORE_NOTE_END_W = 400 # 배점표 아래 「※ ③사회취약계층의 …」 각주는 폭이 넓다(529). 칸 안의 ※ 주석은 210
 GROUP_MIN_L = 110      # 배점표 구분 열(일반공급/우선공급)은 x 127~180. 그 왼쪽 「가점 기준」은 표 이름
+GROUP_JOIN_PX = 22     # 선정 표 구분 열의 병합 칸 라벨(「공사」「건설형」「서울」「리츠3호」) 조각 사이 간격
+GROUP_JOIN_SHORT_PX = 40   # 짧은 조각(4자 이하)끼리는 더 벌어져도 한 라벨 — 50차는 「건설형」과 「서울」 사이가 34
+LABEL_JOIN_PX = 12     # %줄 바로 위아래(9px)에 놓인 신청자 라벨·감점 라벨 조각은 그 줄의 것
 
 
 @dataclass
@@ -175,6 +180,10 @@ def _find(lines: list[Line], needle: str, start: int = 0) -> int | None:
         if 0 <= _squash(text).find(needle) <= HEADING_LEAD and not re.search(r"\d\s*$", text):
             return i
     return None
+
+
+def _is_bullet(text: str) -> bool:
+    return bool(BULLET_RE.match(text))
 
 
 def _squash(text: str) -> str:
@@ -366,7 +375,8 @@ def _parse_bonus_matrix(lines: list[Line], start: int) -> dict[str, Any] | None:
     cols: list[tuple[str, float]] = []
     rows: list[dict[str, Any]] = []
     area_frags: list[tuple[float, str]] = []
-    for ln in lines[start + 1:start + 12]:
+    applicant_frags: list[tuple[float, str]] = []   # 49·50차는 「공사 건설형」/「1・2순위 신청자」가 %줄 위아래 딴 줄
+    for ln in lines[start + 1:start + 16]:
         if not cols:
             cols = _header_columns(ln, names)
             if len(cols) >= 3:
@@ -380,13 +390,14 @@ def _parse_bonus_matrix(lines: list[Line], start: int) -> dict[str, Any] | None:
             key = s.text.replace(" ", "")
             if re.fullmatch(r"\d+㎡(?:이하|초과|미만|이상)?|이하|초과|미만|이상", key):
                 area_frags.append((ln.y, key))
+            else:
+                applicant_frags.append((ln.y, s.text))
         if len(pct_segs) >= 3:
-            applicant = " ".join(s.text for s in label_segs if not re.fullmatch(r"\d+㎡(?:이하|초과|미만|이상)?|이하|초과|미만|이상", s.text.replace(" ", "")))
             vals: dict[str, int | None] = {n: None for n, _ in cols}
             centers = [c for _, c in cols]
             for s in pct_segs:
                 vals[cols[_nearest(s.cx, centers)][0]] = _pct(s.text)
-            rows.append({"y": ln.y, "applicant": _clean(applicant), "pcts": [vals[n] for n, _ in cols]})
+            rows.append({"y": ln.y, "applicant": "", "pcts": [vals[n] for n, _ in cols]})
         elif rows and not pct_segs and not label_segs:
             break
     if not rows:
@@ -402,6 +413,7 @@ def _parse_bonus_matrix(lines: list[Line], start: int) -> dict[str, Any] | None:
             buf = []
     for r in rows:
         y = r.pop("y")
+        r["applicant"] = _clean(" ".join(t for fy, t in applicant_frags if abs(fy - y) <= LABEL_JOIN_PX))
         hit = next((a for a in areas if a[0] - 12 <= y <= a[1] + 12), None)
         if hit is None and areas:
             hit = min(areas, key=lambda a: min(abs(a[0] - y), abs(a[1] - y)))
@@ -578,7 +590,7 @@ def _steps(cells: list[str]) -> list[str]:
 
 
 def _parse_selection_table(lines: list[Line]) -> dict[str, Any] | None:
-    title = _clean(lines[0].text().lstrip("➜ ").strip())
+    title = _clean(BULLET_RE.sub("", lines[0].text()).strip())
     header = next((ln for ln in lines[1:] if any(s.text == "비고" for s in ln.segs)), None)
     if header is None:
         return None
@@ -586,6 +598,10 @@ def _parse_selection_table(lines: list[Line]) -> dict[str, Any] | None:
     body = [ln for ln in lines[lines.index(header) + 1:]]
 
     groups: list[tuple[float, float, str]] = []   # 구분 열의 유형 라벨(병합 칸) — y 범위
+    last_frag = ""
+    # 면적 라벨이 있는 표(일반공급)만 구분 칸이 여러 행에 걸친다. 우선공급 표는 구분 = 행 라벨이라 줄을 잇지 않는다
+    # (50차는 「국가유공자 등」과 「장애인」이 22px 간격 — 병합 칸 조각 간격과 같다)
+    has_areas = any(AREA_RE.match(s.text.replace(" ", "")) for ln in body for s in ln.segs if s.l < LABEL_MAX_L)
     remarks: list[tuple[float, str]] = []
     rows_src: list[tuple[float, list[Seg], list[str]]] = []   # (y, 단계 조각, 면적 라벨)
     for ln in body:
@@ -597,11 +613,14 @@ def _parse_selection_table(lines: list[Line]) -> dict[str, Any] | None:
         areas = [s.text.replace(" ", "") for s in label if AREA_RE.match(s.text.replace(" ", ""))]
         for s in label:
             if not AREA_RE.match(s.text.replace(" ", "")):
-                if groups and ln.y - groups[-1][1] <= 22:
+                # 병합 칸 라벨은 짧은 조각이 세로로 이어진다. 우선공급 표의 「국가유공자 등」「장애인」은 행 라벨이라 안 잇는다
+                join = GROUP_JOIN_SHORT_PX if len(_squash(last_frag)) <= 4 and len(_squash(s.text)) <= 4 else GROUP_JOIN_PX
+                if groups and has_areas and ln.y - groups[-1][1] <= join:
                     y0, _, t = groups.pop()
                     groups.append((y0, ln.y, f"{t} {s.text}"))
                 else:
                     groups.append((ln.y, ln.y, s.text))
+                last_frag = s.text
         if step or areas:
             rows_src.append((ln.y, step, areas))
 
@@ -634,7 +653,7 @@ def _parse_selection_table(lines: list[Line]) -> dict[str, Any] | None:
         segs = sorted(c["segs"], key=lambda s: (s.l, s.y))
         # 세로로 흩어진 한 칸의 글을 잇되, 다른 묶음(위 표의 단계 → 아래 단계)은 y순을 지킨다
         steps = _steps(_cells_by_x_grouped(segs))
-        group = _group_for(c["y"], groups)
+        group = _group_for(c["y"], groups, body_top=body[0].y - 10 if body else header.y)
         rows.append({"group": _clean(group) if group else None, "area": _clean(" ".join(c["areas"])) or None, "steps": steps})
     tie = _clean(" ".join(t for _, t in sorted(remarks)))
     return {"title": title, "rows": rows, "tie_break": tie or None}
@@ -658,15 +677,17 @@ def _cells_by_x_grouped(segs: list[Seg]) -> list[str]:
     return out
 
 
-def _group_for(y: float, groups: list[tuple[float, float, str]]) -> str | None:
+def _group_for(y: float, groups: list[tuple[float, float, str]], *, body_top: float) -> str | None:
+    """병합 칸 라벨은 칸 한가운데 놓인다 → 칸 아랫변 = 2 × 라벨 중심 − 칸 윗변. 첫 칸 윗변은 표 몸통 위.
+    라벨 사이 중간점으로 가르면 49·50차 「85㎡ 초과」(건설형 마지막 행)가 매입형으로 넘어간다 — 매입형 라벨이 두 줄뿐이라 중심이 높다."""
     if not groups:
         return None
-    if len(groups) == 1:
-        return groups[0][2]
-    # 병합 칸 사이의 중간점으로 가른다
-    for (y0, y1, t), (n0, _, _) in zip(groups, groups[1:]):
-        if y < (y1 + n0) / 2:
+    top = body_top
+    for y0, y1, t in groups[:-1]:
+        bottom = 2 * (y0 + y1) / 2 - top
+        if y < bottom:
             return t
+        top = bottom
     return groups[-1][2]
 
 
@@ -679,7 +700,7 @@ def parse_selection(lines: list[Line]) -> tuple[list[dict[str, Any]], list[int]]
     tables: list[list[Line]] = []
     for ln in span:
         f = ln.first()
-        if f.startswith("➜"):
+        if _is_bullet(f):
             tables.append([ln])
         elif tables:
             if f.startswith("*") or f.startswith("※"):
@@ -765,7 +786,7 @@ def parse_scores(lines: list[Line]) -> tuple[list[dict[str, Any]], dict[str, Any
     start = _find(lines, _squash(SCORE_HEADING))
     if start is None:
         return [], None, []
-    end = _find(lines, _squash(SCORE_END_HEADING), start + 1) or len(lines)
+    end = next((e for e in (_find(lines, _squash(h), start + 1) for h in SCORE_END_HEADINGS) if e is not None), len(lines))
     span = _relines(lines[start + 1:end], gap=10.0)
     # 표 헤더(5점 4점 …)마다 블록. 블록은 다음 헤더·감점 헤더·「※」 각주에서 끝난다
     blocks: list[list[Line]] = []
@@ -798,17 +819,29 @@ def parse_scores(lines: list[Line]) -> tuple[list[dict[str, Any]], dict[str, Any
 def _parse_penalties(lines: list[Line]) -> dict[str, Any] | None:
     rows: list[dict[str, Any]] = []
     notes: list[str] = []
+    pending: list[tuple[float, str]] = []   # 「-n점」보다 먼저 온 라벨 조각(49·50차 「다. … 있는」 / -2점 / 「경우」 세 줄)
     for ln in lines:
+        f = ln.first()
         pt = next((s for s in ln.segs if MINUS_POINT_RE.match(s.text.replace(" ", ""))), None)
+        label = " ".join(s.text for s in ln.segs if s is not pt and s.l >= SCORE_ITEM_MIN_L)
         if pt is not None:
-            label = " ".join(s.text for s in ln.segs if s is not pt and s.l >= SCORE_ITEM_MIN_L)
-            rows.append({"label": _clean(label), "points": -int(MINUS_POINT_RE.match(pt.text.replace(" ", "")).group(1))})
-        elif ln.first().startswith("※"):
+            parts = [t for y, t in pending if ln.y - y <= LABEL_JOIN_PX] + ([label] if label else [])
+            pending = []
+            rows.append({"label": _clean(" ".join(parts)), "points": -int(MINUS_POINT_RE.match(pt.text.replace(" ", "")).group(1)), "y": ln.y})
+        elif f.startswith("※"):
             notes.append(_clean(ln.text().lstrip("※ ")))
-        elif notes and rows and ln.segs[0].l >= SCORE_ITEM_MIN_L and not ln.first().startswith(("*", "➜", "○")):
-            notes[-1] = _clean(notes[-1] + " " + ln.text())
-        elif rows and ln.first().startswith(("*", "➜", "○")):
-            break
+        elif f.startswith(("*", "○")) or _is_bullet(f):
+            if rows:
+                break
+        elif label and ln.segs[0].l >= SCORE_ITEM_MIN_L:
+            if notes and rows:
+                notes[-1] = _clean(notes[-1] + " " + ln.text())
+            elif rows and ln.y - rows[-1]["y"] <= LABEL_JOIN_PX:
+                rows[-1]["label"] = _clean(rows[-1]["label"] + " " + label)
+            else:
+                pending.append((ln.y, label))
+    for r in rows:
+        r.pop("y")
     return {"rows": rows, "notes": notes} if rows else None
 
 

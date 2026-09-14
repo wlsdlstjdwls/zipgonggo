@@ -223,3 +223,66 @@ def test_no_middle_dot_in_display_strings(elig):
     import json
     blob = json.dumps(elig.as_json(), ensure_ascii=False)
     assert "·" not in blob and "・" not in blob
+
+
+# ── 제49차(297335, 2025-12) — 같은 양식, 다른 조판 ─────────────────
+# 51차와 다른 점: 표 이름 글머리가 사설 영역 글자()·▶, 배점표 끝이 「* 가점 항목 기재 요령」, 감점 다목 라벨이
+# 「-2점」 위아래 세 줄, 소득 가산 표의 신청자 라벨이 %줄 위아래 딴 줄, 건설형 면적 행이 넷(50㎡ 미만부터),
+# 매입형 라벨이 두 줄뿐이라 병합 칸 중심이 높다(라벨 중간점으로 가르면 「85㎡ 초과」가 매입형으로 넘어갔다).
+
+
+@pytest.fixture(scope="module")
+def elig49():
+    e = parse_eligibility(pages("297335", [6, 7, 8, 29, 30, 31]))
+    assert e is not None
+    return e
+
+
+def test_49_source_pages_and_matrix(elig49):
+    assert elig49.source_pages == [6, 7, 8, 29, 30, 31]
+    m = elig49.income_matrix
+    assert [(r["area"], r["applicant"], r["pcts"]) for r in m["rows"]] == [
+        ("60㎡ 이하", "공사 건설형 1,2순위 신청자", [70, 80, 90, None]),
+        ("60㎡ 이하", "공사 건설형 3,4순위 서울시 매입형 신청자", [105, 115, 125, 140]),
+        ("60㎡ 초과", "", [150, 160, 170, 200]),
+    ]
+    assert elig49.asset["rows"][0] == {"label": "총자산", "values_man": [64000, 70400, 76800]}
+
+
+def test_49_income_table_is_2024_statistics(elig49):
+    """2025년 공고는 2024년 통계를 쓴다. 2025년 기준액으로 검산하면 어긋나고 2024년으로는 맞아야 한다."""
+    t = elig49.income_table
+    assert t["households"] == [1, 2, 3, 4, 5, 6]
+    assert t["rows"][0] == {"pct": 70, "won": [2518715, 3833902, 5338881, 6004662, 6321734, 6813160]}
+    base_2025 = {1: 3813363, 2: 5866270, 3: 8168429, 4: 8802202, 5: 9326985, 6: 9906263}
+    assert not verify_income_table(t, base_2025)["verified"]
+    base_2024 = {1: 3598164, 2: 5477003, 3: 7626973, 4: 8578088, 5: 9031048, 6: 9733086}
+    v = verify_income_table(t, base_2024)
+    assert v["verified"] and not v["mismatches"]
+    assert v["rows"][0]["won"] == [2518715, 3833902, 5338881, 6004662, 6321734, 6813160]
+    assert v["rows"][2]["won"][0] == 3238348   # 1인 90%: XML에 없는 칸을 기댓값으로 채운다
+
+
+def test_49_selection_bullets_and_group_boundary(elig49):
+    assert [t["title"] for t in elig49.selection] == ["일반공급(일반)", "일반공급(주거약자)", "우선공급"]
+    gen = elig49.selection[0]
+    assert [(r["group"], r["area"]) for r in gen["rows"]] == [
+        ("공사 건설형 서울 리츠 3호", "50㎡ 미만"),
+        ("공사 건설형 서울 리츠 3호", "50㎡ 이상 60㎡ 이하"),
+        ("공사 건설형 서울 리츠 3호", "60㎡ 초과 85㎡ 이하"),
+        ("공사 건설형 서울 리츠 3호", "85㎡ 초과"),
+        ("서울시 매입형", "50㎡ 미만"),
+        ("서울시 매입형", "50㎡ 이상 85㎡ 이하"),
+    ]
+    assert gen["rows"][0]["steps"][:3] == [
+        "도시근로자 가구원수별 가구당 월평균소득 70% 이하", "주택청약종합저축 (청약저축) 순위", "배점합산",
+    ]
+    assert [r["group"] for r in elig49.selection[2]["rows"]] == ["국가유공자 등", "장애인", "그 외 우선공급계층"]
+
+
+def test_49_scores_end_at_가점_요령_and_penalty_label_spans_lines(elig49):
+    assert [len(t["items"]) for t in elig49.score_tables] == [5, 5]
+    p = elig49.penalties
+    assert [r["points"] for r in p["rows"]] == [-6, -4, -2]
+    assert p["rows"][2]["label"] == "다. 당첨자발표일기준가목및나목이외의장기전세주택임대차계약사실이있는 경우"
+    assert p["notes"][0].startswith("신청자 및 배우자(분리배우자 포함)가 계약한 사실이 있는 경우")
