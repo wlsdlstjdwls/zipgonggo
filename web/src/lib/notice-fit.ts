@@ -494,9 +494,8 @@ export function fitCheongnyeon(d: NoticeEligibilityData, p: FitProfile, seed: In
 
 export type ComplexPick = {
   c: NoticeComplex;
-  /** 이 단지에서 내 순위(우선공급 1순위 등). 없으면 null */
-  tag: string | null;
-  tone: "acc" | "soft";
+  /** 이 단지에서 내 순위 태그. 행복주택은 우선공급과 일반공급 두 트랙을 따로 단다(트랙이 섞여 보인다는 사용자 지적 2026-09-14) */
+  tags: { text: string; tone: "acc" | "soft" }[];
   /** 정렬 열쇠 — 작을수록 위 */
   order: number;
   /** 면적·금액 한 줄 */

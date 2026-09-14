@@ -1229,7 +1229,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .fit-row-main b { font-weight: 800; font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fit-row-main small { flex: none; font-weight: 600; font-size: 11px; color: var(--dim); }
 .fit-row-sub { grid-area: sub; margin-top: 2px; font-size: 12px; color: var(--mut); }
-.fit-rows .tag { grid-area: tag; align-self: center; }
+.fit-tags { grid-area: tag; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.fit-tags .tag { height: 24px; padding: 0 9px; }
+.fit-open[aria-expanded="true"] { margin-bottom: 14px; }
 /* 단지 상세: 보고 있는 단지 — 한 줄 판정과 목록 맨 위 강조 */
 .fit-tracks { margin: 10px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--mut); }
 .fit-tracks b { color: var(--ink); }
