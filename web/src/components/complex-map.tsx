@@ -54,6 +54,9 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
   const markers = useRef<Map<number, { marker: any; pos: any; selected: boolean }>>(new Map());
   const cb = useRef({ onFocus, onSelect, selectedId });
   cb.current = { onFocus, onSelect, selectedId };
+  // 마지막으로 pan해 준 선택. 선택이 그대로인데 호버·좌표 갱신으로 효과가 다시 돌 때는 지도를 건드리지 않는다 —
+  // 사용자가 끌어서 핀을 화면 밖으로 보낸 뒤 핀에 마우스만 스쳐도 도로 당겨 왔다(사용자 지적 2026-09-14: "제멋대로 계속 움직여")
+  const panned = useRef<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [mapReady, setMapReady] = useState(false);
 
@@ -147,12 +150,15 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
     return () => ro?.disconnect();
   }, [items, coords, split, mapReady]);
 
-  // 3) 선택 → 그 핀만 이름 라벨로, 나머지는 브랜드 핀. 호버 → 핀 살짝 확대. 선택 핀이 화면 밖이면 그때만 panTo
+  // 3) 선택 → 그 핀만 이름 라벨로, 나머지는 브랜드 핀. 호버 → 핀 살짝 확대.
+  //    선택이 새로 잡혔고 그 핀이 화면 밖일 때만 panTo — 그 뒤로는 사용자가 어디로 끌든 따라가지 않는다
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
     const maps = window.naver.maps;
     const byId = new Map(items.map((it) => [it.id, it]));
+    const newlySelected = selectedId !== panned.current;
+    panned.current = selectedId;
     for (const [id, m] of markers.current) {
       const sel = id === selectedId;
       if (sel !== m.selected) {
@@ -165,7 +171,7 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
       m.marker.setZIndex(sel ? 950 : id === focusId ? 900 : 100);
       const wrap: HTMLElement | null = m.marker.getElement?.()?.querySelector(".zg-mk") ?? null;
       wrap?.classList.toggle("is-focus", id === focusId);
-      if (sel && !map.getBounds().hasLatLng(m.pos)) {
+      if (sel && newlySelected && !map.getBounds().hasLatLng(m.pos)) {
         const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
         if (reduce) map.setCenter(m.pos); else map.panTo(m.pos, PAN);
       }

@@ -100,6 +100,20 @@ function toItem(c: NoticeComplex): MapItem {
   return { id: c.id, address: fullAddress(c), title: c.name, sub, isNew: c.is_new };
 }
 
+// 단지 상세에 갔다가 뒤로가기로 돌아오면 이 컴포넌트가 다시 마운트돼 조건이 다 풀렸다(사용자 지적 2026-09-14).
+// URL에 싣지 않는 건 홈 목록과 같은 결정(주소가 지저분해지고 ISR 캐시가 갈린다) — 탭 안에서만 사는 sessionStorage에 공고별로 둔다.
+type Saved = { gu: string; cls: string; band: string; areaLo: string; areaHi: string; dep: string; rent: string; onlyNew: boolean; q: string; more: boolean; selected: number | null };
+const saveKey = (slug: string) => `zg:cx:${slug}`;
+function readSaved(slug: string): Saved | null {
+  try {
+    const raw = window.sessionStorage.getItem(saveKey(slug));
+    return raw ? (JSON.parse(raw) as Saved) : null;
+  } catch { return null; }
+}
+function writeSaved(slug: string, v: Saved) {
+  try { window.sessionStorage.setItem(saveKey(slug), JSON.stringify(v)); } catch { /* 사생활 모드 등 — 못 저장하면 그만 */ }
+}
+
 const numOrNull = (s: string) => {
   const n = Number(s);
   return s.trim() !== "" && Number.isFinite(n) && n >= 0 ? n : null;
@@ -123,6 +137,22 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
   const [q, setQ] = useState("");
   const [more, setMore] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
+  // 복원 직후의 첫 저장은 건너뛴다. 같은 커밋에서 저장 효과가 빈 초기값을 먼저 써 버리면 StrictMode 이중 마운트의
+  // 두 번째 마운트가 그 빈 값을 읽어 복원이 헛돈다(실측 2026-09-14: 저장본이 전부 빈 값으로 덮여 있었다)
+  const skipWrite = useRef(false);
+
+  // 0) 저장된 조건 복원 — 서버 HTML(무필터)과 어긋나지 않게 마운트 뒤에
+  useEffect(() => {
+    skipWrite.current = true;
+    const s = readSaved(noticeSlug);
+    if (!s) return;
+    setGu(s.gu); setCls(s.cls); setBand(s.band); setAreaLo(s.areaLo); setAreaHi(s.areaHi); setDep(s.dep); setRent(s.rent);
+    setOnlyNew(s.onlyNew); setQ(s.q); setMore(s.more); setSelected(s.selected);
+  }, [noticeSlug]);
+  useEffect(() => {
+    if (skipWrite.current) { skipWrite.current = false; return; }
+    writeSaved(noticeSlug, { gu, cls, band, areaLo, areaHi, dep, rent, onlyNew, q, more, selected });
+  }, [noticeSlug, gu, cls, band, areaLo, areaHi, dep, rent, onlyNew, q, more, selected]);
 
   const gus = useMemo(() => tally(items, (c) => [guLabel(c)]), [items]);
   // 아래 넷은 데이터가 있는 공고에서만 나타난다(사용자 요청 2026-09-09: "있는 경우만")
