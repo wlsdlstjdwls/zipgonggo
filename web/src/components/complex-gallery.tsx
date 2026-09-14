@@ -22,6 +22,9 @@ const OTHERS_TAB = "다른 주택형";
 // 이만큼 움직여야 「끈 것」으로 친다. 3px은 클릭 중 손 떨림에 걸려 사진 열기를 통째로 삼켰다(사용자 지적 2026-09-14)
 const DRAG_SLOP_PX = 6;
 
+// 개발 화면에서만 계측 줄을 그린다
+const DEV = process.env.NODE_ENV !== "production";
+
 function Strip({
   images, biznsCd, complexName, mixed, active, onOpen,
 }: {
@@ -44,6 +47,10 @@ function Strip({
   // fits는 「재 봤더니 안 넘친다」다. over의 반대가 아니라 **재기 전에는 둘 다 false**여야 한다 —
   // 재기 전에 가운데로 모아 두면, 넘치는 줄에서 첫 칸이 왼쪽으로 밀려 나가 스크롤로도 못 돌아온다
   const [edge, setEdge] = useState({ left: false, right: false, over: false, fits: false });
+  // 개발 화면 전용 계측. 끌기가 **어디서** 죽는지 사용자 브라우저에서 직접 읽으려고 둔다.
+  // 프로덕션 빌드에는 한 줄도 안 들어간다(DEV로 가른다). 원인을 잡으면 지운다
+  const [trace, setTrace] = useState("");
+  const tally = useRef({ pm: 0, mm: 0, cancel: 0, dragstart: 0, from: 0 });
 
   const measure = useCallback(() => {
     const el = ref.current;
@@ -63,61 +70,66 @@ function Strip({
     return () => window.removeEventListener("resize", measure);
   }, [measure, images, active]);
 
-  // 끌기는 window에서 받되 **pointerdown 안에서 곧장 붙인다.** useEffect로 달면 안 된다 —
-  // effect는 비동기라 등록되기 전에 pointermove가 지나가고, 그러면 줄이 한 방향으로 간 뒤 안 돌아온다
-  // (실측: 왼쪽 490px은 먹고 오른쪽 500px은 통째로 유실 = 「맨 끝에서 고정」).
-  //
-  // 줄에 setPointerCapture는 걸지 않는다. 크롬이 그 뒤의 마우스 이벤트를 잡은 요소로 돌려서
-  // click이 칸의 <button>에 닿지 않는다. 캡처 없이 window로 받으면 커서가 줄 밖으로 나가도 끌린다.
-  const drag = useRef<(() => void) | null>(null);
-  useEffect(() => () => drag.current?.(), []);
-
-  const beginDrag = (x0: number, left0: number) => {
-    drag.current?.();
-    const el = ref.current;
-    if (!el) return;
-    const move = (x: number) => {
-      const dx = x - x0;
-      const before = el.scrollLeft;
-      el.scrollLeft = left0 - dx;
-      // 문턱을 포인터 이동만으로 잡으면 더 갈 데가 없는 끝에서 헛손질까지 「끈 것」이 된다.
-      // 실제로 줄이 움직였을 때만 클릭을 삼킨다
-      if (Math.abs(dx) > DRAG_SLOP_PX && el.scrollLeft !== before) dragged.current = true;
-    };
-    const onPointer = (e: PointerEvent) => move(e.clientX);
-    // pointermove가 끊겨도(브라우저가 제 나름의 드래그를 시작하는 등) mousemove로 이어 간다.
-    // 둘 다 와도 같은 자리를 두 번 셈할 뿐이라 해가 없다
-    const onMouse = (e: MouseEvent) => move(e.clientX);
-    const end = () => {
-      // capture로 걸었으면 뗄 때도 capture여야 한다
-      window.removeEventListener("pointermove", onPointer, true);
-      window.removeEventListener("mousemove", onMouse, true);
-      window.removeEventListener("pointerup", end, true);
-      window.removeEventListener("mouseup", end, true);
-      window.removeEventListener("pointercancel", end, true);
-      drag.current = null;
-      setDragging(false);
-    };
-    // capture 단계로 듣는다 — 중간 어디선가 stopPropagation을 걸어도 끌기가 죽지 않게
-    window.addEventListener("pointermove", onPointer, true);
-    window.addEventListener("mousemove", onMouse, true);
-    window.addEventListener("pointerup", end, true);
-    window.addEventListener("mouseup", end, true);
-    window.addEventListener("pointercancel", end, true);
-    drag.current = end;
-    setDragging(true);
-  };
+  // 끌기는 **fitin-app의 useSwipeCommit과 같은 뼈대**로 받는다 — 그쪽 데스크탑 예약 화면에서
+  // 실제로 굴러가는 방식이다(사용자 지시 2026-09-14). window에 capture 리스너를 달던 옛 방식은
+  // 내 쪽 브라우저에서는 멀쩡한데 사용자 브라우저에서 계속 죽었다. 요점 셋:
+  //  1. 이벤트는 줄(ul) 자신에게서 받는다 — 중간에 끼어들 계층이 없다
+  //  2. setPointerCapture를 **움직인 뒤에** 건다. 누르자마자 걸면 click이 칸에 닿지 않아 사진 열기가 죽고,
+  //     끝까지 안 걸면 커서가 줄 밖으로 나가는 순간 끌기가 끊긴다. 8px 움직여 가로로 확정된 뒤가 답이다
+  //  3. 마우스는 pointerdown에서 preventDefault — 글자 선택과 그림 끌기(고스트)를 처음부터 막는다
+  const drag = useRef({ id: -1, x0: 0, y0: 0, left0: 0, active: false, axis: null as null | "x" | "y" });
 
   const onPointerDown = (e: React.PointerEvent<HTMLUListElement>) => {
-    const li = (e.target as HTMLElement | null)?.closest?.("li");
-    pressed.current = li ? [...(ref.current?.children ?? [])].indexOf(li) : null;
-    dragged.current = false;
-    // 터치는 브라우저 기본 스크롤이 낫다(관성이 있다). 마우스는 그게 안 돼서 직접 민다
-    if (e.pointerType === "touch") return;
     const el = ref.current;
-    // 넘치지 않는 줄은 끌 것이 없다. 칸이 남는 폭을 나눠 가지므로(globals.css) 이런 줄은 애초에 빈 띠가 없다
+    const li = (e.target as HTMLElement | null)?.closest?.("li");
+    pressed.current = li ? [...(el?.children ?? [])].indexOf(li) : null;
+    dragged.current = false;
+    if (DEV) {
+      tally.current = { pm: 0, mm: 0, cancel: 0, dragstart: 0, from: el?.scrollLeft ?? 0 };
+      setTrace(`down ${e.pointerType}/btn${e.button}/primary${e.isPrimary ? 1 : 0} | 줄 ${el?.scrollWidth ?? 0}/${el?.clientWidth ?? 0}`
+        + (e.pointerType === "touch" ? " | 터치는 브라우저에 맡김" : "")
+        + (el && el.scrollWidth <= el.clientWidth ? " | 안 넘쳐서 끌 것 없음" : ""));
+    }
+    // 마우스는 좌클릭만, 손가락이 여럿이면 첫 손가락만
+    if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
+    // 터치는 브라우저 기본 스크롤이 낫다(관성이 붙는다). 마우스는 그게 안 돼서 직접 민다
+    if (e.pointerType === "touch") return;
     if (!el || el.scrollWidth <= el.clientWidth) return;
-    beginDrag(e.clientX, el.scrollLeft);
+    e.preventDefault();
+    drag.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, left0: el.scrollLeft, active: true, axis: null };
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLUListElement>) => {
+    const d = drag.current;
+    const el = ref.current;
+    if (!d.active || !el || e.pointerId !== d.id) return;
+    if (DEV) tally.current.pm += 1;
+    const dx = e.clientX - d.x0;
+    const dy = e.clientY - d.y0;
+    // 축이 정해지기 전에는 아무것도 하지 않는다 — 세로로 그으면 지면 스크롤을 뺏지 않고 물러난다
+    if (d.axis === null) {
+      if (Math.abs(dx) < DRAG_SLOP_PX && Math.abs(dy) < DRAG_SLOP_PX) return;
+      d.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      if (d.axis === "y") { d.active = false; return; }
+      try { el.setPointerCapture(e.pointerId); } catch { /* 이미 뗀 포인터 — 캡처 없이도 계속 간다 */ }
+      setDragging(true);
+    }
+    el.scrollLeft = d.left0 - dx;
+    // 끌고 나서 손을 떼면 click이 따라온다. 그걸 사진 열기로 오해하지 않게 표시해 둔다
+    dragged.current = true;
+  };
+
+  const onPointerEnd = (e: React.PointerEvent<HTMLUListElement>) => {
+    const d = drag.current;
+    const el = ref.current;
+    if (DEV && d.active) {
+      const t = tally.current;
+      setTrace(`끝 ${e.type} | 축 ${d.axis ?? "미정"} | pointermove ${t.pm} | dragstart ${t.dragstart} | scrollLeft ${t.from}→${el?.scrollLeft ?? 0}`);
+    }
+    if (!d.active) return;
+    d.active = false;
+    try { if (el?.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId); } catch { /* 이미 풀렸다 */ }
+    setDragging(false);
   };
 
   // 열기는 칸의 <button>이 아니라 **줄**에서 받는다. 캡처를 걷어냈어도 click의 target은 브라우저와
@@ -139,11 +151,13 @@ function Strip({
     <div className="gal-rail">
       <ul
         className={`gal-strip${edge.over ? " over" : ""}${edge.fits ? " fits" : ""}${dragging ? " dragging" : ""}`} ref={ref} onScroll={measure}
-        onPointerDown={onPointerDown} onClick={onClick}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+        onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} onLostPointerCapture={onPointerEnd}
+        onClick={onClick}
         // 누른 채 움직이면 크롬이 제 드래그(고스트)를 시작하고 그 순간 pointermove가 끊긴다.
         // mousedown을 막으면 그게 안 일어난다 — click은 그대로 난다(막히는 건 선택·포커스뿐)
         onMouseDown={(e) => { if (e.button === 0) e.preventDefault(); }}
-        onDragStart={(e) => e.preventDefault()}
+        onDragStart={(e) => { tally.current.dragstart += 1; e.preventDefault(); }}
       >
         {images.map((img, i) => {
           const text = caption(img, mixed);
@@ -163,6 +177,7 @@ function Strip({
           );
         })}
       </ul>
+      {DEV && trace && <p className="gal-trace">{trace}</p>}
       {(edge.left || edge.right) && (
         <>
           <button type="button" className="gal-arrow prev" onClick={() => nudge(-1)} disabled={!edge.left} aria-label="왼쪽으로">‹</button>
