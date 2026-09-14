@@ -9,6 +9,9 @@ export const SITE_DESCRIPTION = "LH, SH, 지방공사 공공임대 입주자모�
 
 // 저장(★) 목록 localStorage 키. 서버 저장 없음 — 사용자 식별이 생기면 옮긴다
 export const SAVED_STORAGE_KEY = "zipgonggo.saved.v1";
+// 「내 조건에 맞는 단지」 입력값 localStorage 키. 공고를 오가도 내 조건은 그대로다(사용자 요청 2026-09-14) —
+// 공고마다 다른 항목(공급 구분·면적·계층·신청유형)은 읽을 때 그 공고에 있는 값인지 확인해 없으면 기본값으로 돌린다
+export const FIT_STORAGE_KEY = "zipgonggo.fit.v1";
 export const TOAST_MS = 2100;
 
 // ISR·unstable_cache 갱신 주기. 파이프라인이 DB를 갱신해도 이 시간 안엔 반영된다

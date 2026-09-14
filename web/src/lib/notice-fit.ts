@@ -362,7 +362,7 @@ export function fitHaengbok(d: NoticeEligibilityData, p: FitProfile, seed: Incom
   return {
     ok,
     rank,
-    rankLabel: rank != null ? `일반 ${rank}순위` : "신청 가능",
+    rankLabel: rank != null ? `일반공급 ${rank}순위` : "신청 가능",
     priorityRank,
     score: isSeoul(p.gu) ? haengbokScore(key, p) : null,
     reasons,

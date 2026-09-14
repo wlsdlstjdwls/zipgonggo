@@ -19,6 +19,7 @@ import { DetailHeadBar } from "@/components/detail-headbar";
 import { ExternalLink } from "@/components/external-link";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
+import { NoticeFit } from "@/components/notice-fit";
 import { ConvertTable } from "@/components/convert-table";
 import { Pending } from "@/components/pending";
 import { PriceTable } from "@/components/price-table";
@@ -30,7 +31,7 @@ import { agencyLabels } from "@/lib/agency";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
 import { applyPhase, count, dateK, deadlineChip, NO_DATE, num, wonKo } from "@/lib/format";
 import { areaText, classLabel, commonArea, complexPriceGroups, complexPriceRows, CONVERT_HINT, m2, moveInLabel, typeLabel, unitPriceRows } from "@/lib/notice-view";
-import { getComplexImages, getComplexSupply, getComplexUnits, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
+import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply } from "@/lib/queries";
 import { ComplexGallery } from "@/components/complex-gallery";
 import { imagesEnabled, shownImages } from "@/lib/complex-images";
 import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
@@ -42,7 +43,7 @@ export const revalidate = 3600;
 
 type Params = { params: Promise<{ slug: string; complex: string }> };
 
-type Found = { n: Notice; c: NoticeComplex };
+type Found = { n: Notice; c: NoticeComplex; siblings: NoticeComplex[] };
 
 async function load(params: Params["params"]): Promise<Found | null> {
   const { slug, complex } = await params;
@@ -52,7 +53,7 @@ async function load(params: Params["params"]): Promise<Found | null> {
   const seg = decodeURIComponent(complex);
   // 코드까지 맞는 행이 정답. 코드가 붙기 전에 나간 링크(이름만)도 살려 준다(URL을 삭제하지 않는다 — CLAUDE.md 6)
   const c = siblings.find((x) => complexSegment(x) === seg) ?? siblings.find((x) => x.name === seg);
-  return c ? { n, c } : null;
+  return c ? { n, c, siblings } : null;
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -87,13 +88,17 @@ function Kpi({ label, value, sub }: { label: string; value: string | null; sub?:
 export default async function ComplexPage({ params }: Params) {
   const f = await load(params);
   if (!f) notFound();
-  const { n, c } = f;
-  const [supply, units, images] = await Promise.all([
+  const { n, c, siblings } = f;
+  const [supply, units, images, noticeElig] = await Promise.all([
     getComplexSupply(n.id, c.id, c.name),
     getComplexUnits(c.id),
     // 파일 자리가 안 정해진 배포에서는 질의도 하지 않는다 — 행만 있으면 액박이 된다(lib/complex-images 머리글)
     imagesEnabled ? getComplexImages(c.sh_bizns_cd) : Promise.resolve([]),
+    getNoticeEligibility(n.id),
   ]);
+  // 「내 조건에 맞는 단지」를 단지 상세에도(사용자 요청 2026-09-14) — 공고 상세와 같은 자격 묶음·공급현황으로 판정하고
+  // 이 단지가 드는지 먼저 말한다. 자격 묶음이 있는 공고만 질의한다
+  const [noticeSupply, eligRules] = noticeElig ? await Promise.all([getNoticeSupply(n.id), getEligibilityRules()]) : [[], null];
   // 호수는 (공급유형, 공급대상)마다 한 칸이다 — 청년 소득있음/없음 두 줄이 같은 칸을 나눠 써 두 번 세면 안 된다
   const counted = new Map(supply.filter((s) => s.units_total != null).map((s) => [`${s.supply_type}|${s.tenant_class}`, s]));
   const unitTotal = [...counted.values()].reduce((a, s) => a + (s.units_total ?? 0), 0);
@@ -323,6 +328,16 @@ export default async function ComplexPage({ params }: Params) {
             <section className="dsec">
               <h2>{unitLabel} | {num(units.length, "호")}</h2>
               <UnitTable units={units} />
+            </section>
+          )}
+
+          {noticeElig && eligRules && (
+            <section className="dsec lead" id="fit">
+              <h2>내 조건에 맞는 단지</h2>
+              <p className="note" style={{ margin: "0 0 12px" }}>
+                이 공고문의 소득과 자산, 순위 기준에 내 조건을 대 보고 이 단지가 드는지, 같은 공고의 다른 단지는 어디가 맞는지 추립니다. 값은 어디로도 보내지 않습니다.
+              </p>
+              <NoticeFit data={noticeElig.data} complexes={siblings} supply={noticeSupply} income={eligRules.income} tiers={eligRules.tiers} noticeSlug={n.slug} currentId={c.id} />
             </section>
           )}
 

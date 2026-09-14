@@ -4,8 +4,12 @@
 // ayounghome의 「내 조건으로 노려볼 만한 단지 찾기」(계층·자치구·배점·거주기간 입력 → 과거 커트라인으로 정렬)에서 착안(사용자 제안 2026-09-14).
 // 과거 경쟁률·커트라인은 아직 결과 표가 1건뿐이라 못 쓴다 — 지금은 자격 판정(순위·배점)과 단지 조건(자치구·면적·금액)으로 고른다.
 // 값은 전부 브라우저 안에만 있다(자가진단과 같은 약속). 양식마다 묻는 게 다르다(lib/notice-fit.ts 머리말).
+// 입력값·예산·펼침 상태는 localStorage(FIT_STORAGE_KEY)에 둔다 — 단지 상세로 갔다 돌아오면 초기화되던 것(사용자 지적 2026-09-14).
+// 마운트 뒤에 읽는다(서버 HTML은 접힌 기본 상태라 하이드레이션이 어긋나지 않게). 단지 상세(currentId)에서는 같은 판정을 돌리고
+// 이 단지가 드는지 한 줄로 먼저 말한 뒤 목록 맨 위에 「이 단지」로 띄운다.
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FIT_STORAGE_KEY } from "@/lib/constants";
 import { num, wonShort } from "@/lib/format";
 import {
   areaBand, classKey, complexFacts, fitCheongnyeon, fitHaengbok, fitJanggi, fitMaeip, isSeoul, janggiAreas, MAN, seoulGus,
@@ -23,7 +27,32 @@ type Props = {
   income: IncomeStandard[];
   tiers: RegionTier[];
   noticeSlug: string;
+  /** 단지 상세에서 넘기는 지금 보고 있는 단지 id. 있으면 이 단지의 판정을 먼저 말하고 목록 맨 위에 둔다 */
+  currentId?: number;
 };
+
+type Stored = { p: Partial<FitProfile>; budgetMan: number; open: boolean };
+
+function readStored(): Stored | null {
+  try {
+    const raw = window.localStorage.getItem(FIT_STORAGE_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as unknown;
+    if (!v || typeof v !== "object") return null;
+    const o = v as Record<string, unknown>;
+    return {
+      p: o.p && typeof o.p === "object" ? (o.p as Partial<FitProfile>) : {},
+      budgetMan: typeof o.budgetMan === "number" && Number.isFinite(o.budgetMan) ? o.budgetMan : 0,
+      open: o.open === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(v: Stored) {
+  try { window.localStorage.setItem(FIT_STORAGE_KEY, JSON.stringify(v)); } catch { /* 프라이빗 모드 등 — 메모리에만 */ }
+}
 
 const DEFAULT: FitProfile = {
   household: 1, incomeWon: 300 * MAN, dual: false, newborns: 0, olderMinor: false, assetMan: 15_000, carMan: 0,
@@ -33,7 +62,7 @@ const DEFAULT: FitProfile = {
 
 const LIST_STEP = 12;
 
-export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }: Props) {
+export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, currentId }: Props) {
   const kind: EligKind = data.kind ?? "janggi";
   const [open, setOpen] = useState(false);
   const [p, setP] = useState<FitProfile>(() => ({
@@ -46,6 +75,45 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }
   const [budgetMan, setBudgetMan] = useState<number>(0);
   const [shown, setShown] = useState(LIST_STEP);
   const set = <K extends keyof FitProfile>(k: K, v: FitProfile[K]) => setP((prev) => ({ ...prev, [k]: v }));
+  const firstClasses = useMemo(
+    () => (kind === "cheongnyeon" ? (data.rank_tables[0]?.rows ?? []).filter((r) => r.rank === 1 && r.label).map((r) => r.label!) : []),
+    [kind, data],
+  );
+
+  // 저장된 조건 되살리기 — 읽기 전엔 쓰지 않는다(기본값으로 덮어쓰지 않게). 공고마다 다른 항목은 이 공고에 있는 값일 때만 받는다
+  const loaded = useRef(false);
+  useEffect(() => {
+    const s = readStored();
+    if (s) {
+      setP((prev) => {
+        const next: FitProfile = { ...prev };
+        for (const k of Object.keys(DEFAULT) as (keyof FitProfile)[]) {
+          const v = s.p[k];
+          if (v === undefined || v === null || typeof v !== typeof DEFAULT[k]) continue;
+          if (typeof v === "number" && !Number.isFinite(v)) continue;
+          (next as Record<keyof FitProfile, unknown>)[k] = v;
+        }
+        const group = typeof s.p.group === "string" && data.rank_tables.some((t) => t.group === s.p.group) ? s.p.group : prev.group;
+        const t = data.rank_tables.find((x) => x.group === group);
+        const areasOfT = t ? janggiAreas(t) : [];
+        next.group = group;
+        next.area = typeof s.p.area === "string" && areasOfT.includes(s.p.area) ? s.p.area : (group === prev.group ? prev.area : areasOfT[0] ?? null);
+        next.cls = typeof s.p.cls === "string" && data.class_blocks?.some((c) => c.name === s.p.cls) ? s.p.cls : prev.cls;
+        next.applicantType = typeof s.p.applicantType === "string" && data.applicant_types?.some((a) => a.name === s.p.applicantType) ? s.p.applicantType : prev.applicantType;
+        next.priorityClass = typeof s.p.priorityClass === "string" && firstClasses.includes(s.p.priorityClass) ? s.p.priorityClass : null;
+        return next;
+      });
+      setBudgetMan(s.budgetMan);
+      setOpen(s.open);
+    }
+    // 마운트 때 한 번만 — data·firstClasses는 서버가 준 값이라 안 바뀐다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    // 첫 커밋의 쓰기는 건너뛴다 — 위 읽기 effect와 같은 커밋에 돌아 기본값으로 저장소를 덮어썼다(setState는 다음 렌더에야 반영)
+    if (!loaded.current) { loaded.current = true; return; }
+    writeStored({ p, budgetMan, open });
+  }, [p, budgetMan, open]);
 
   const gus = useMemo(() => seoulGus(tiers), [tiers]);
   const guOptions = useMemo(() => [
@@ -64,10 +132,6 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }
     if (kind === "cheongnyeon") return fitCheongnyeon(data, p, income);
     return fitJanggi(data, p, income);
   }, [kind, data, p, income]);
-  const firstClasses = useMemo(
-    () => (kind === "cheongnyeon" ? (data.rank_tables[0]?.rows ?? []).filter((r) => r.rank === 1 && r.label).map((r) => r.label!) : []),
-    [kind, data],
-  );
 
   const picks: ComplexPick[] = useMemo(() => {
     const out: ComplexPick[] = [];
@@ -119,10 +183,13 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }
       const money = rent != null ? `월 ${wonShort(rent)}${deposit != null ? ` | 보증금 ${wonShort(deposit)}` : ""}` : deposit != null ? `보증금 ${wonShort(deposit)}` : "";
       out.push({ c, tag, tone, order, sub: [areaTxt, money, c.unit_count != null ? num(c.unit_count, "호") : ""].filter(Boolean).join(" | ") });
     }
-    return out.sort((a, b) => a.order - b.order || a.c.name.localeCompare(b.c.name, "ko"));
-  }, [kind, complexes, facts, p, budgetMan, data, income, table, verdict]);
+    // 단지 상세에서는 보고 있는 단지를 맨 위에
+    return out.sort((a, b) => Number(b.c.id === currentId) - Number(a.c.id === currentId) || a.order - b.order || a.c.name.localeCompare(b.c.name, "ko"));
+  }, [kind, complexes, facts, p, budgetMan, data, income, table, verdict, currentId]);
 
   const eligible = verdict?.ok !== false;
+  const current = currentId != null ? complexes.find((c) => c.id === currentId) ?? null : null;
+  const currentPick = current ? picks.find((x) => x.c.id === current.id) ?? null : null;
 
   return (
     <div className={`fit${open ? " open" : ""}`}>
@@ -226,6 +293,14 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }
                 <b>{verdict.rankLabel}</b>
                 {verdict.score && <span>{kind === "haengbok" ? "우선공급 예상 배점" : "예상 가점"} <b>{verdict.score.total}</b> / {verdict.score.max}점</span>}
               </div>
+              {/* 행복주택은 일반공급과 우선공급이 딴 트랙이고 우선공급 순위는 단지마다 갈린다 — 머리의 「일반공급 n순위」와
+                  단지 태그의 「우선공급 n순위」가 서로 다른 말임을 여기서 밝힌다(사용자 혼동 2026-09-14) */}
+              {kind === "haengbok" && isSeoul(p.gu) && (
+                <p className="fit-tracks">
+                  우선공급은 단지가 있는 자치구 기준입니다. <b>{p.gu}</b> 단지는 우선공급 1순위, 그 외 서울 단지는 2순위.
+                  우선공급에서 떨어지면 자동으로 일반공급{verdict.rank != null ? ` ${verdict.rank}순위` : ""}로 넘어갑니다.
+                </p>
+              )}
               <ul className="elig-why">
                 {verdict.reasons.map((r, i) => (
                   <li key={i} className={r.ok === true ? "y" : r.ok === false ? "n" : ""}><span>{r.label}</span><p>{r.text}</p></li>
@@ -235,21 +310,32 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }
             </div>
           )}
 
+          {current && (
+            <p className={`fit-me${currentPick ? " ok" : " no"}`}>
+              <b>{current.name}</b>
+              <span>
+                {currentPick
+                  ? <>{eligible ? "이 단지는 내 조건에 듭니다" : "조건에 맞으면 볼 수 있는 단지입니다"}{currentPick.tag ? ` | ${currentPick.tag}` : ""}</>
+                  : "이 단지는 지금 조건(면적이나 계층, 예산)에 들지 않습니다"}
+              </span>
+            </p>
+          )}
+
           <div className="fit-list">
             <h3>
               {eligible ? "맞는 단지" : "조건에 맞으면 볼 수 있는 단지"} <b>{picks.length}</b><small>곳</small>
-              {kind === "haengbok" && isSeoul(p.gu) && <small> | {p.gu} 단지가 우선공급 1순위</small>}
+              {kind === "haengbok" && isSeoul(p.gu) && <small> | 태그는 우선공급 순위{verdict?.rank != null ? ` (일반공급은 모든 단지 ${verdict.rank}순위)` : ""}</small>}
             </h3>
             {picks.length === 0 ? (
               <p className="elig-none">조건에 드는 단지가 없습니다. 면적이나 예산을 넓혀 보세요.</p>
             ) : (
               <ul className="fit-rows">
                 {picks.slice(0, shown).map(({ c, tag, tone, sub }) => (
-                  <li key={c.id}>
-                    <Link href={noticeComplexPath(noticeSlug, c)}>
+                  <li key={c.id} className={c.id === currentId ? "me" : undefined}>
+                    <Link href={noticeComplexPath(noticeSlug, c)} aria-current={c.id === currentId ? "page" : undefined}>
                       <span className="fit-row-main">
                         <b>{c.name}</b>
-                        <small>{c.sigungu}{c.is_new ? " | 신규" : ""}</small>
+                        <small>{c.sigungu}{c.is_new ? " | 신규" : ""}{c.id === currentId ? " | 이 단지" : ""}</small>
                       </span>
                       <span className="fit-row-sub">{sub}</span>
                       {tag && <em className={`tag ${tone}`}>{tag}</em>}
