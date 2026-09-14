@@ -5,6 +5,9 @@
 // - 행복주택(haengbok): 계층별 소득(100%, 신혼 맞벌이 120%, 출생자녀 +10/+20%p) · 자산 · 자동차, 일반공급 순위(거주지),
 //   우선공급 순위(단지 자치구 = 내 자치구면 1순위, 서울이면 2순위)와 배점(거주기간·청약 납입·나이·장애 등).
 // - 매입임대(maeip): 소득 130% 이하면 1순위, 초과면 2순위. 동일순위는 추첨.
+// - 청년 매입임대(cheongnyeon): 수급자·한부모·차상위면 1순위(소득·자산 심사 없음), 본인과 부모 소득 100%·국민임대 자산이면 2순위,
+//   본인 소득 100%(1인 기준)·행복주택(청년) 자산이면 3순위. 동일순위는 가점(수급자 3, 한부모 3, 부모무주택 2, 장애인 본인 2 가구 1,
+//   소득 50% 이하 3, 청약 24회 3 / 12회 2 / 6회 1) 합산 → 항목 순서 → 추첨.
 //
 // 여기서 나오는 답은 안내지 심사 결과가 아니다. 판정에 쓴 기준은 전부 reasons에 적어 돌려준다 — 왜 그렇게 봤는지가 보여야
 // 사용자가 공고문에서 제 자리를 찾는다. 배점표의 점수 규칙(3년 이상 3점 등)은 공고문 표를 읽어 들이지 않고 행복주택 제도의
@@ -40,6 +43,16 @@ export type FitProfile = {
   area: string | null;
   /** 행복주택: 고른 계층 */
   cls: string | null;
+  /** 청년 매입임대: 신청유형(대학생 · 취업준비생 · 청년 · 이공계인재) */
+  applicantType: string | null;
+  /** 청년 매입임대: 1순위 자격(수급자가구 · 한부모가족 · 차상위계층). 없으면 null */
+  priorityClass: string | null;
+  /** 청년 매입임대 3순위: 본인 월소득(원). incomeWon은 본인과 부모 합산 */
+  selfIncomeWon: number;
+  /** 청년 매입임대 가점: 부모 무주택 · 본인 장애인 · 부모 중 장애인 */
+  parentsHomeless: boolean;
+  disabledSelf: boolean;
+  disabledFamily: boolean;
 };
 
 export type Reason = { label: string; ok: boolean | null; text: string };
@@ -380,6 +393,101 @@ export function fitMaeip(d: NoticeEligibilityData, p: FitProfile, seed: IncomeSt
     reasons.push({ label: "소득", ok: false, text: `${r.rank}순위 ${r.income_pct}% 이하(월 ${won(lim)}) 초과` });
   }
   return { ok: false, rank: null, rankLabel: "미달", priorityRank: null, score: null, reasons, incomeLimit: null };
+}
+
+// ── 청년 매입임대 ───────────────────────────────────────────
+
+/** 청년 매입임대 가점(공고문 배점표 ①~⑦). 점수는 제도 고정값 — 화면은 공고문 배점표를 같이 그린다 */
+export const CHEONGNYEON_SCORE_MAX = 11;
+
+export function fitCheongnyeon(d: NoticeEligibilityData, p: FitProfile, seed: IncomeStandard[]): FitVerdict {
+  const t = d.rank_tables[0];
+  const reasons: Reason[] = [];
+  if (!t) return { ok: null, rank: null, rankLabel: "판정 불가", priorityRank: null, score: null, reasons, incomeLimit: null };
+  const bump = d.income_table?.bump ?? { "1": 20, "2": 10 };
+  const rows = t.rows;
+  const r2 = rows.find((r) => r.rank === 2);
+  const r3 = rows.find((r) => r.rank === 3);
+
+  // 공통 요건: 미혼 무주택 본인 + 신청유형
+  const type = p.applicantType ?? "";
+  if (/청년|이공계/.test(type)) {
+    const ageOk = p.age >= 19 && p.age <= 39;
+    reasons.push({ label: "나이", ok: ageOk, text: `${type} 유형은 19~39세, 입력 ${p.age}세` });
+  } else if (type) {
+    reasons.push({ label: "유형", ok: null, text: `${type}: ${(d.applicant_types ?? []).find((x) => x.name === type)?.text ?? "공고문 신청유형 요건"}` });
+  }
+  reasons.push({ label: "혼인", ok: null, text: "혼인 중이 아니고 본인이 무주택자여야 합니다" });
+  const ageBad = /청년|이공계/.test(type) && !(p.age >= 19 && p.age <= 39);
+
+  let rank: number | null = null;
+  let limit: { pct: number; won: number | null } | null = null;
+  if (p.priorityClass) {
+    rank = 1;
+    reasons.push({ label: "자격", ok: true, text: `1순위: ${p.priorityClass} (순위 자격을 입증하면 소득과 자산 심사 없음)` });
+  } else {
+    const pct2 = r2?.income_pct ?? 100;
+    const lim2 = incomeLimitWon(pct2, p.household, d.income_table, seed, bump);
+    const income2 = lim2 == null ? null : p.incomeWon <= lim2;
+    const asset2 = r2?.asset_man == null ? null : p.assetMan <= r2.asset_man;
+    const car2 = r2?.car_man == null ? null : p.carMan <= r2.car_man;
+    if (income2 !== false && asset2 !== false && car2 !== false) {
+      rank = 2;
+      limit = { pct: pct2, won: lim2 };
+      reasons.push({ label: "소득", ok: income2, text: `2순위: 본인과 부모 합산 ${pct2}% 이하${lim2 != null ? ` (${p.household}인 월 ${won(lim2)})` : ""}, 입력 월 ${won(p.incomeWon)}` });
+      if (r2?.asset_man != null) reasons.push({ label: "자산", ok: asset2, text: `본인과 부모 총자산 ${man(r2.asset_man)} 이하, 입력 ${man(p.assetMan)}` });
+      if (r2?.car_man != null) reasons.push({ label: "자동차", ok: car2, text: `자동차가액 ${man(r2.car_man)} 이하, 입력 ${man(p.carMan)}` });
+    } else {
+      reasons.push({
+        label: "2순위", ok: false,
+        text: income2 === false ? `본인과 부모 합산 소득 ${pct2}% (월 ${won(lim2!)}) 초과` : asset2 === false ? `본인과 부모 총자산 ${man(r2!.asset_man!)} 초과` : `자동차가액 ${man(r2!.car_man!)} 초과`,
+      });
+      const pct3 = r3?.income_pct ?? 100;
+      const lim3 = incomeLimitWon(pct3, 1, d.income_table, seed, bump);
+      const income3 = lim3 == null ? null : p.selfIncomeWon <= lim3;
+      const asset3 = r3?.asset_man == null ? null : p.assetMan <= r3.asset_man;
+      const car3 = r3?.car_man == null ? null : p.carMan <= r3.car_man;
+      if (r3 && income3 !== false && asset3 !== false && car3 !== false) {
+        rank = 3;
+        limit = { pct: pct3, won: lim3 };
+        reasons.push({ label: "소득", ok: income3, text: `3순위: 본인 ${pct3}% 이하 (1인 기준${lim3 != null ? ` 월 ${won(lim3)}` : ""}), 입력 본인 월 ${won(p.selfIncomeWon)}` });
+        if (r3.asset_man != null) reasons.push({ label: "자산", ok: asset3, text: `본인 총자산 ${man(r3.asset_man)} 이하, 입력 ${man(p.assetMan)}` });
+        if (r3.car_man != null) reasons.push({ label: "자동차", ok: car3, text: `자동차가액 ${man(r3.car_man)} 이하, 입력 ${man(p.carMan)}` });
+      } else if (r3) {
+        reasons.push({
+          label: "3순위", ok: false,
+          text: income3 === false ? `본인 소득 ${pct3} % (1인 월 ${won(lim3!)}) 초과` : asset3 === false ? `본인 총자산 ${man(r3.asset_man!)} 초과` : `자동차가액 ${man(r3.car_man!)} 초과`,
+        });
+      }
+    }
+  }
+
+  // 가점 — 순위 내 경쟁 때 합산. ①② 수급자·한부모는 1순위만, ⑥ 소득 50%는 2·3순위만
+  const lines: string[] = [];
+  let total = 0;
+  if (rank === 1 && /수급자/.test(p.priorityClass ?? "")) { total += 3; lines.push("① 수급자가구 3점"); }
+  if (rank === 1 && /한부모/.test(p.priorityClass ?? "")) { total += 3; lines.push("② 한부모가족 3점"); }
+  if (p.parentsHomeless) { total += 2; lines.push("③ 부모 무주택 2점"); }
+  if (p.disabledSelf) { total += 2; lines.push("④ 장애인(본인) 2점"); }
+  if (p.disabledFamily) { total += 1; lines.push("⑤ 장애인(가구) 1점"); }
+  if (rank === 2 || rank === 3) {
+    const half = incomeLimitWon(50, rank === 2 ? p.household : 1, d.income_table, seed, bump);
+    const mine = rank === 2 ? p.incomeWon : p.selfIncomeWon;
+    if (half != null && mine <= half) { total += 3; lines.push(`⑥ 소득 50% 이하 (월 ${won(half)}) 3점`); }
+  }
+  const dep = p.deposits >= 24 ? 3 : p.deposits >= 12 ? 2 : p.deposits >= 6 ? 1 : 0;
+  if (dep) { total += dep; lines.push(`⑦ 청약 납입 ${p.deposits}회 ${dep}점`); }
+
+  const ok = rank == null ? false : ageBad ? false : true;
+  return {
+    ok,
+    rank,
+    rankLabel: rank != null ? `${rank}순위` : "미달",
+    priorityRank: null,
+    score: rank != null ? { total, max: CHEONGNYEON_SCORE_MAX, lines } : null,
+    reasons,
+    incomeLimit: limit,
+  };
 }
 
 // ── 단지 고르기 ─────────────────────────────────────────────

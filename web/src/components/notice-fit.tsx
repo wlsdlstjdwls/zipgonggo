@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { num, wonShort } from "@/lib/format";
 import {
-  areaBand, classKey, complexFacts, fitHaengbok, fitJanggi, fitMaeip, isSeoul, janggiAreas, MAN, seoulGus,
+  areaBand, classKey, complexFacts, fitCheongnyeon, fitHaengbok, fitJanggi, fitMaeip, isSeoul, janggiAreas, MAN, seoulGus,
   type ComplexPick, type FitProfile, type FitVerdict,
 } from "@/lib/notice-fit";
 import { noticeComplexPath } from "@/lib/routes";
@@ -28,6 +28,7 @@ type Props = {
 const DEFAULT: FitProfile = {
   household: 1, incomeWon: 300 * MAN, dual: false, newborns: 0, olderMinor: false, assetMan: 15_000, carMan: 0,
   deposits: 24, gu: "", residenceYears: 3, age: 30, under2: false, special: false, group: null, area: null, cls: null,
+  applicantType: null, priorityClass: null, selfIncomeWon: 250 * MAN, parentsHomeless: false, disabledSelf: false, disabledFamily: false,
 };
 
 const LIST_STEP = 12;
@@ -40,6 +41,7 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }
     group: data.rank_tables[0]?.group ?? null,
     area: data.rank_tables[0] ? janggiAreas(data.rank_tables[0])[0] ?? null : null,
     cls: data.class_blocks?.[0]?.name ?? null,
+    applicantType: data.applicant_types?.[0]?.name ?? null,
   }));
   const [budgetMan, setBudgetMan] = useState<number>(0);
   const [shown, setShown] = useState(LIST_STEP);
@@ -59,8 +61,13 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }
   const verdict: FitVerdict | null = useMemo(() => {
     if (kind === "haengbok") return fitHaengbok(data, p, income);
     if (kind === "maeip") return fitMaeip(data, p, income);
+    if (kind === "cheongnyeon") return fitCheongnyeon(data, p, income);
     return fitJanggi(data, p, income);
   }, [kind, data, p, income]);
+  const firstClasses = useMemo(
+    () => (kind === "cheongnyeon" ? (data.rank_tables[0]?.rows ?? []).filter((r) => r.rank === 1 && r.label).map((r) => r.label!) : []),
+    [kind, data],
+  );
 
   const picks: ComplexPick[] = useMemo(() => {
     const out: ComplexPick[] = [];
@@ -155,23 +162,50 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }
                   </div>
                 </div>
               )}
-              <div className="elig-f">
-                <span>거주지</span>
-                <Select value={p.gu} options={guOptions} onChange={(v) => set("gu", v)} placeholder="선택 안 함" ariaLabel="거주지" />
-              </div>
+              {kind === "cheongnyeon" && (data.applicant_types?.length ?? 0) > 0 && (
+                <div className="elig-f wide">
+                  <span>신청유형</span>
+                  <div className="elig-seg wrap" role="group" aria-label="신청유형">
+                    {data.applicant_types!.map((t) => (
+                      <button key={t.name} type="button" className={p.applicantType === t.name ? "on" : ""} onClick={() => set("applicantType", t.name)}>{t.name}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {kind === "cheongnyeon" && firstClasses.length > 0 && (
+                <div className="elig-f wide">
+                  <span>1순위 자격</span>
+                  <Select value={p.priorityClass ?? ""} options={firstClasses.map((c) => ({ value: c, label: c }))}
+                    onChange={(v) => set("priorityClass", v || null)} placeholder="해당 없음" ariaLabel="1순위 자격" />
+                </div>
+              )}
+              {kind !== "cheongnyeon" && (
+                <div className="elig-f">
+                  <span>거주지</span>
+                  <Select value={p.gu} options={guOptions} onChange={(v) => set("gu", v)} placeholder="선택 안 함" ariaLabel="거주지" />
+                </div>
+              )}
               {(kind === "haengbok") && (
                 <Num label={isSeoul(p.gu) ? `${p.gu} 거주 햇수` : "현재 거주지 햇수"} value={p.residenceYears} unit="년" onChange={(v) => set("residenceYears", v)} max={80} />
               )}
-              {(kind === "haengbok") && <Num label="나이" value={p.age} unit="세" onChange={(v) => set("age", v)} max={120} />}
-              <Num label="가구원 수" value={p.household} unit="명" onChange={(v) => set("household", v)} min={1} max={7} />
-              <Num label={kind === "haengbok" && p.cls && classKey(p.cls) === "대학생" ? "본인과 부모 월소득" : "세대 월소득"} value={Math.round(p.incomeWon / MAN)} unit="만 원" onChange={(v) => set("incomeWon", v * MAN)} max={100_000} />
-              {kind !== "maeip" && <Num label="총자산" value={p.assetMan} unit="만 원" onChange={(v) => set("assetMan", v)} max={1_000_000} />}
+              {(kind === "haengbok" || kind === "cheongnyeon") && <Num label="나이" value={p.age} unit="세" onChange={(v) => set("age", v)} max={120} />}
+              <Num label={kind === "cheongnyeon" ? "본인과 부모 가구원 수" : "가구원 수"} value={p.household} unit="명" onChange={(v) => set("household", v)} min={1} max={7} />
+              <Num label={kind === "cheongnyeon" || (kind === "haengbok" && p.cls && classKey(p.cls) === "대학생") ? "본인과 부모 월소득" : "세대 월소득"} value={Math.round(p.incomeWon / MAN)} unit="만 원" onChange={(v) => set("incomeWon", v * MAN)} max={100_000} />
+              {kind === "cheongnyeon" && <Num label="본인 월소득 (3순위 판정)" value={Math.round(p.selfIncomeWon / MAN)} unit="만 원" onChange={(v) => set("selfIncomeWon", v * MAN)} max={100_000} />}
+              {kind !== "maeip" && <Num label={kind === "cheongnyeon" ? "총자산 (2순위 본인과 부모, 3순위 본인)" : "총자산"} value={p.assetMan} unit="만 원" onChange={(v) => set("assetMan", v)} max={1_000_000} />}
               {kind !== "maeip" && <Num label="자동차가액" value={p.carMan} unit="만 원" onChange={(v) => set("carMan", v)} max={100_000} />}
               {kind !== "maeip" && <Num label="청약 납입 회차" value={p.deposits} unit="회" onChange={(v) => set("deposits", v)} max={600} />}
-              {kind !== "maeip" && <Num label="2023.3.28. 이후 출생 자녀" value={p.newborns} unit="명" onChange={(v) => set("newborns", v)} max={10} />}
+              {kind !== "maeip" && kind !== "cheongnyeon" && <Num label="2023.3.28. 이후 출생 자녀" value={p.newborns} unit="명" onChange={(v) => set("newborns", v)} max={10} />}
               <Num label="보증금 예산 (0이면 무관)" value={budgetMan} unit="만 원" onChange={setBudgetMan} max={10_000_000} />
             </div>
-            {kind !== "maeip" && (
+            {kind === "cheongnyeon" && (
+              <div className="elig-checks">
+                <label className="elig-chk"><input type="checkbox" checked={p.parentsHomeless} onChange={(e) => set("parentsHomeless", e.target.checked)} /><span>부모가 무주택자다 (사망 등 부재 포함)</span></label>
+                <label className="elig-chk"><input type="checkbox" checked={p.disabledSelf} onChange={(e) => set("disabledSelf", e.target.checked)} /><span>본인이 등록 장애인이다</span></label>
+                <label className="elig-chk"><input type="checkbox" checked={p.disabledFamily} onChange={(e) => set("disabledFamily", e.target.checked)} /><span>부모 중 등록 장애인이 있다</span></label>
+              </div>
+            )}
+            {kind !== "maeip" && kind !== "cheongnyeon" && (
               <div className="elig-checks">
                 <label className="elig-chk"><input type="checkbox" checked={p.dual} onChange={(e) => set("dual", e.target.checked)} /><span>맞벌이다</span></label>
                 <label className="elig-chk"><input type="checkbox" checked={p.olderMinor} onChange={(e) => set("olderMinor", e.target.checked)} /><span>2023.3.27. 이전 출생 미성년 자녀가 있다</span></label>
@@ -190,7 +224,7 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }
               <div className="fit-verdict-h">
                 <em className={`elig-badge${verdict.ok ? " ok" : ""}`}>{verdict.ok === false ? "기준 미달" : verdict.ok ? "신청 가능" : "확인 필요"}</em>
                 <b>{verdict.rankLabel}</b>
-                {verdict.score && <span>우선공급 예상 배점 <b>{verdict.score.total}</b> / {verdict.score.max}점</span>}
+                {verdict.score && <span>{kind === "haengbok" ? "우선공급 예상 배점" : "예상 가점"} <b>{verdict.score.total}</b> / {verdict.score.max}점</span>}
               </div>
               <ul className="elig-why">
                 {verdict.reasons.map((r, i) => (

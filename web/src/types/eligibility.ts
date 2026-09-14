@@ -44,8 +44,9 @@ export type EligibilityRules = {
 // ── 공고문에서 읽은 신청자격 묶음 (notice_eligibility, 0024) ──
 // 모양은 pipeline/parsers/sh_eligibility.py Eligibility.as_json()과 같이 든다. 화면은 읽기만 한다.
 
-/** 양식. janggi 장기전세(면적×순위 표) · haengbok 행복주택(계층 절) · maeip 매입임대(순위 두 줄 표) */
-export type EligKind = "janggi" | "haengbok" | "maeip";
+/** 양식. janggi 장기전세(면적×순위 표) · haengbok 행복주택(계층 절) · maeip 매입임대(순위 두 줄 표) ·
+ * cheongnyeon 청년 매입임대(순위 셋 표 + 신청유형 + 가점 배점표) */
+export type EligKind = "janggi" | "haengbok" | "maeip" | "cheongnyeon";
 
 export type EligRankRow = {
   /** 신청면적 라벨(장기전세). 매입임대 표는 면적 열이 없어 null */
@@ -54,6 +55,15 @@ export type EligRankRow = {
   income_pct: number | null;
   dual_income_pct: number | null;
   requirement: string | null;
+  /** 청년 매입임대 「자격」 열(수급자가구 · 한부모가족 · 차상위계층 · 일반). 다른 양식은 없다 */
+  label?: string | null;
+  /** 요건 칸의 ※ 주석(인정 범위 등) */
+  note?: string | null;
+  /** 청년 매입임대 2·3순위 자산 기준(만 원). 1순위는 null */
+  asset_man?: number | null;
+  car_man?: number | null;
+  /** 소득을 누구 것으로 보나 — 「본인과 부모」(2순위) · 「본인」(3순위) */
+  income_scope?: string | null;
 };
 export type EligRankTable = { group: string; classes: string[]; rows: EligRankRow[] };
 export type EligMatrix = { columns: string[]; rows: { area: string | null; applicant: string; pcts: (number | null)[] }[] };
@@ -79,11 +89,15 @@ export type EligSelection = {
   title: string;
   rows: { group: string | null; area: string | null; steps: string[] }[];
   tie_break: string | null;
+  /** 선정 방법 글머리(청년 매입임대 「• 순위 간 경합이 있을 경우 …」). 다른 양식은 없다 */
+  notes?: string[];
 };
 export type EligScoreTable = {
   group: string | null;
   points: number[];
-  items: { label: string; cells: string[]; note: string | null }[];
+  items: { label: string; cells: string[]; note: string | null;
+    /** 적용대상(청년 매입임대 배점표 — 1순위 · 공통 · 2,3순위). 다른 양식은 없다 */
+    target?: string | null }[];
 };
 export type EligPenalties = { rows: { label: string; points: number }[]; notes: string[] };
 
@@ -109,6 +123,10 @@ export type NoticeEligibilityData = {
   score_tables: EligScoreTable[];
   penalties: EligPenalties | null;
   class_blocks?: EligClassBlock[];
+  /** 청년 매입임대 신청유형 표(대학생 · 취업준비생 · 청년 · 이공계인재). 다른 양식은 없다 */
+  applicant_types?: { name: string; text: string }[];
+  /** 표 밖 유의사항(청년 매입임대 배점표 각주 등) */
+  notes?: string[];
 };
 
 export type NoticeEligibility = {

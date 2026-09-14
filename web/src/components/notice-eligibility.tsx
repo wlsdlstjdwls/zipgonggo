@@ -1,7 +1,8 @@
 // 공고문에서 읽은 신청자격(notice_eligibility, 0024) — 제도 일반 시드 카드 대신 이 공고 자체의 기준을 그린다.
 //
-// 세 양식(lib/notice-fit.ts 머리말): 장기전세는 면적×순위×출생자녀 가산×맞벌이 매트릭스 + 선정 순서 + 가감점표,
-// 행복주택은 계층 절(요건·순위·배점·선정), 매입임대는 순위 두 줄. 표가 여러 장이라 **한 번에 다 펴지 않는다** —
+// 네 양식(lib/notice-fit.ts 머리말): 장기전세는 면적×순위×출생자녀 가산×맞벌이 매트릭스 + 선정 순서 + 가감점표,
+// 행복주택은 계층 절(요건·순위·배점·선정), 매입임대는 순위 두 줄, 청년 매입임대는 신청유형 + 순위 셋(자격 열) + 가점 배점표.
+// 표가 여러 장이라 **한 번에 다 펴지 않는다** —
 // 제목 밑에 한 줄 요약을 두고, 순위 표만 펼친 채 나머지는 <details>로 접는다(사용자 지적 2026-09-14: "나열식이라 보기 힘들다").
 // 값은 파이프라인이 공고문 쪽 XML에서 좌표로 읽은 것이다. 소득표 금액은 검산(verified)을 통과했을 때만 싣는다.
 import type { ReactNode } from "react";
@@ -100,6 +101,38 @@ function RankTable({ t }: { t: EligRankTable }) {
   );
 }
 
+/** 청년 매입임대 순위 표 — 순위 | 자격 | 요건. 1순위는 자격이 셋이라 순위 칸을 rowSpan으로 묶는다(공고문 표와 같은 모양) */
+function CheongnyeonRankTable({ t }: { t: EligRankTable }) {
+  const rankSpan = spans(t.rows, (r) => (r.rank == null ? null : String(r.rank)));
+  return (
+    <div className="ne-block">
+      <div className="tbl ne-tbl">
+        <table>
+          <thead>
+            <tr>
+              <th>순위</th>
+              <th>자격</th>
+              <th>요건</th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.rows.map((r, i) => (
+              <tr key={i}>
+                {rankSpan[i] > 0 && <td rowSpan={rankSpan[i]} className="ne-rank">{r.rank != null ? `${r.rank}순위` : "—"}</td>}
+                <td className="ne-area">{r.label ?? "—"}</td>
+                <td className="ne-req">
+                  {r.requirement ?? "—"}
+                  {r.note && <small className="ne-dim"> {r.note}</small>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function SelectionTable({ t, title }: { t: EligSelection; title?: boolean }) {
   const groupSpan = spans(t.rows, (r) => r.group);
   const hasArea = t.rows.some((r) => r.area);
@@ -135,6 +168,11 @@ function SelectionTable({ t, title }: { t: EligSelection; title?: boolean }) {
         </table>
       </div>
       {t.tie_break && <p className="elig-memo">배점이 같을 때: {t.tie_break}</p>}
+      {t.notes && t.notes.filter((n) => n !== t.tie_break).length > 0 && (
+        <ul className="ne-list">
+          {t.notes.filter((n) => n !== t.tie_break).map((n, i) => <li key={i}>{n}</li>)}
+        </ul>
+      )}
     </div>
   );
 }
@@ -155,6 +193,7 @@ function ScoreTable({ t }: { t: EligScoreTable }) {
             {t.items.map((it, i) => (
               <tr key={i}>
                 <td className="ne-item">
+                  {it.target && <em className="ne-tgt">{it.target}</em>}
                   {it.label}
                   {it.note && <small>{it.note}</small>}
                 </td>
@@ -249,6 +288,18 @@ function summary(elig: NoticeEligibility): string {
     const r1 = d.rank_tables[0]?.rows.find((r) => r.rank === 1);
     return r1?.income_pct != null ? `소득 ${r1.income_pct}% 이하 1순위, 초과 2순위 | 동일순위 추첨` : "순위별 소득 기준";
   }
+  if (kind === "cheongnyeon") {
+    const rows = d.rank_tables[0]?.rows ?? [];
+    const firsts = rows.filter((r) => r.rank === 1).map((r) => (r.label ?? "").replace(/가구$|가족$/, "").trim()).filter(Boolean);
+    const r2 = rows.find((r) => r.rank === 2);
+    const r3 = rows.find((r) => r.rank === 3);
+    return [
+      firsts.length ? `1순위 ${firsts.join(" / ")}` : "",
+      r2 ? `2순위 ${r2.income_scope ?? "본인과 부모"} 소득 ${r2.income_pct ?? 100}%${r2.asset_man != null ? ` 총자산 ${wonKo(r2.asset_man * 10_000)}` : ""} 이하` : "",
+      r3 ? `3순위 ${r3.income_scope ?? "본인"} 소득 ${r3.income_pct ?? 100}%${r3.asset_man != null ? ` 총자산 ${wonKo(r3.asset_man * 10_000)}` : ""} 이하` : "",
+      d.score_tables.length ? "동일순위는 가점" : "",
+    ].filter(Boolean).join(" | ");
+  }
   const pcts = d.rank_tables.flatMap((t) => t.rows.map((r) => r.income_pct)).filter((v): v is number => v != null);
   const duals = d.rank_tables.flatMap((t) => t.rows.map((r) => r.dual_income_pct)).filter((v): v is number => v != null);
   const asset = d.asset?.rows.find((r) => r.label.includes("총자산"))?.values_man[0];
@@ -273,7 +324,28 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
         <ClassTabs tabs={d.class_blocks!.map((c) => ({ key: c.name, label: classKey(c.name), body: <ClassBlock c={c} /> }))} />
       )}
 
-      {kind !== "haengbok" && d.rank_tables.length > 0 && (
+      {kind === "cheongnyeon" && (d.applicant_types?.length ?? 0) > 0 && (
+        <Fold title="신청유형" hint="공고일 기준 본인에 해당하는 유형 하나를 고른다" open>
+          <div className="tbl ne-tbl">
+            <table>
+              <thead><tr><th>유형</th><th>요건</th></tr></thead>
+              <tbody>
+                {d.applicant_types!.map((t, i) => (
+                  <tr key={i}><td className="ne-area">{t.name}</td><td className="ne-req">{t.text || "—"}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Fold>
+      )}
+
+      {kind === "cheongnyeon" && d.rank_tables.length > 0 && (
+        <Fold title="신청 순위와 자격" hint="1순위는 소득과 자산 심사 없음, 2순위는 본인과 부모, 3순위는 본인 기준" open>
+          {d.rank_tables.map((t, i) => <CheongnyeonRankTable key={i} t={t} />)}
+        </Fold>
+      )}
+
+      {kind !== "haengbok" && kind !== "cheongnyeon" && d.rank_tables.length > 0 && (
         <Fold title={kind === "maeip" ? "신청 순위" : "소득기준과 신청순위"} open
           hint={kind === "maeip" ? undefined : "면적과 순위마다 다르고, 맞벌이면 완화된 기준"}>
           {d.rank_tables.map((t, i) => <RankTable key={i} t={t} />)}
@@ -314,7 +386,8 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
       )}
 
       {d.asset && (
-        <Fold title={kind === "haengbok" ? "자산과 자동차 기준" : "자산 기준"} hint={kind === "haengbok" ? "계층별, 출생자녀가 있으면 완화" : undefined}>
+        <Fold title={kind === "haengbok" ? "자산과 자동차 기준" : "자산 기준"}
+          hint={kind === "haengbok" ? "계층별, 출생자녀가 있으면 완화" : kind === "cheongnyeon" ? "2순위는 본인과 부모, 3순위는 본인 자산" : undefined}>
           <div className="tbl ne-tbl">
             <table>
               <thead>
@@ -341,7 +414,7 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
       )}
 
       {income && (
-        <Fold title="가구원수별 월평균소득 기준액" open={kind === "maeip"}
+        <Fold title="가구원수별 월평균소득 기준액" open={kind === "maeip" || kind === "cheongnyeon"}
           hint={`${income.base_year ?? incomeYear}년 소득 통계 기준${noticeYear ? `, ${noticeYear}년 공고에 적용` : ""}`}>
           <p className="ne-lead">
             공고문은 통계청이 발표한 전년도 도시근로자 가구당 월평균소득을 씁니다. 연도가 공고보다 한 해 앞서는 이유입니다.
@@ -374,17 +447,20 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
               6인 이상 가구는 5인 값에 1인당 {Object.entries(income.per_person_won).map(([k, v]) => `${k}% ${wonKo(v)}`).join(", ")}을 더합니다.
             </p>
           )}
+          {kind === "cheongnyeon" && (income.notes ?? []).map((n, i) => <p key={i} className="elig-memo">{n}</p>)}
         </Fold>
       )}
 
       {d.selection.length > 0 && (
-        <Fold title={kind === "maeip" ? "동일순위 경쟁 시" : "동일순위 경쟁 시 입주자 선정 기준"} hint="같은 순위 안에서 경쟁하면 이 순서로 정한다" open={kind === "maeip"}>
+        <Fold title={kind === "maeip" ? "동일순위 경쟁 시" : kind === "cheongnyeon" ? "입주자 선정 순서" : "동일순위 경쟁 시 입주자 선정 기준"}
+          hint={kind === "cheongnyeon" ? "순위가 높은 순, 같은 순위면 가점 합산" : "같은 순위 안에서 경쟁하면 이 순서로 정한다"} open={kind === "maeip" || kind === "cheongnyeon"}>
           {d.selection.map((t, i) => <SelectionTable key={i} t={t} title={d.selection.length > 1} />)}
         </Fold>
       )}
 
       {d.score_tables.length > 0 && (
-        <Fold title="가점과 감점 배점표">
+        <Fold title={kind === "cheongnyeon" ? "가점 배점표" : "가점과 감점 배점표"} open={kind === "cheongnyeon"}
+          hint={kind === "cheongnyeon" ? "동일순위 경쟁 시 합산, 같은 점수면 항목 순서(①~⑦)로" : undefined}>
           {d.score_tables.map((t, i) => <ScoreTable key={i} t={t} />)}
           {d.penalties && (
             <div className="ne-block">
@@ -404,6 +480,7 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
           )}
         </Fold>
       )}
+      {kind !== "haengbok" && <Notes items={d.notes ?? []} />}
       <p className="note ne-foot">최종 자격은 공고문과 기관 심사가 정합니다.</p>
     </section>
   );

@@ -114,6 +114,10 @@ class Eligibility:
     kind: str = "janggi"
     # 행복주택 계층 절(sh_eligibility_haengbok._parse_class). 다른 양식은 빈 목록
     class_blocks: list[dict[str, Any]] = field(default_factory=list)
+    # 청년 매입임대 신청유형 표(대학생·취업준비생·청년·이공계인재 — sh_eligibility_cheongnyeon). 다른 양식은 빈 목록
+    applicant_types: list[dict[str, Any]] = field(default_factory=list)
+    # 표 밖 유의사항(청년 매입임대 배점표 각주 등)
+    notes: list[str] = field(default_factory=list)
 
     def as_json(self) -> dict[str, Any]:
         return {
@@ -129,6 +133,8 @@ class Eligibility:
             "selection": self.selection,
             "score_tables": self.score_tables,
             "penalties": self.penalties,
+            "applicant_types": self.applicant_types,
+            "notes": self.notes,
         }
 
 
@@ -877,13 +883,14 @@ def _relines(lines: list[Line], gap: float) -> list[Line]:
 
 def parse_eligibility(pages: list[tuple[int, str]]) -> Eligibility | None:
     """공고문 쪽 XML 목록 → 신청자격 묶음. 양식을 차례로 대 본다 — 장기전세(「소득기준 및 신청순위」 표) → 행복주택(계층 절) →
-    매입임대(「대상 | 세부 자격요건」 두 줄 표). 어느 것도 아니면 None(화면은 제도 시드로 후퇴)."""
+    청년 매입임대(「순위 | 자격 | 상세요건」 표) → 매입임대(「대상 | 세부 자격요건」 두 줄 표). 어느 것도 아니면 None(화면은 제도 시드로 후퇴)."""
     lines = _lines(pages)
     rank_tables, p1 = parse_rank_tables(lines)
     if not rank_tables:
+        from .sh_eligibility_cheongnyeon import parse_cheongnyeon
         from .sh_eligibility_haengbok import parse_haengbok
         from .sh_eligibility_maeip import parse_maeip
-        for other in (parse_haengbok, parse_maeip):
+        for other in (parse_haengbok, parse_cheongnyeon, parse_maeip):
             found = other(pages)
             if found is not None:
                 return Eligibility(**found)

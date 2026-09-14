@@ -50,6 +50,7 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
       household: p.household, incomeWon: p.incomeHouseholdWon, dual: jx.dual, newborns: jx.newborns, olderMinor: jx.olderMinor,
       assetMan: p.assetMan, carMan: p.carMan, deposits: jx.deposits, gu: p.residence, residenceYears: 0, age: p.age, under2: p.hasNewborn,
       special: false, group: jx.group, area: jx.area, cls: null,
+      applicantType: null, priorityClass: null, selfIncomeWon: 0, parentsHomeless: false, disabledSelf: false, disabledFamily: false,
     };
     return fitJanggi(jg.data, fp, rules.income);
   }, [jg, p, jx, rules.income]);
