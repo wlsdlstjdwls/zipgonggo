@@ -1,6 +1,6 @@
 "use client";
 
-// 공고별 「내 조건으로 노려볼 단지」 — 이 공고의 자격 묶음(공고문에서 읽은 것)에 내 조건을 대 보고, 맞는 단지를 추린다.
+// 공고별 「내 조건에 맞는 단지」 — 이 공고의 자격 묶음(공고문에서 읽은 것)에 내 조건을 대 보고, 맞는 단지를 추린다.
 // ayounghome의 「내 조건으로 노려볼 만한 단지 찾기」(계층·자치구·배점·거주기간 입력 → 과거 커트라인으로 정렬)에서 착안(사용자 제안 2026-09-14).
 // 과거 경쟁률·커트라인은 아직 결과 표가 1건뿐이라 못 쓴다 — 지금은 자격 판정(순위·배점)과 단지 조건(자치구·면적·금액)으로 고른다.
 // 값은 전부 브라우저 안에만 있다(자가진단과 같은 약속). 양식마다 묻는 게 다르다(lib/notice-fit.ts 머리말).
@@ -121,7 +121,7 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }
     <div className={`fit${open ? " open" : ""}`}>
       {!open ? (
         <button type="button" className="btn acc fit-open" onClick={() => setOpen(true)}>
-          내 조건 넣고 노려볼 단지 보기
+          내 조건 넣고 맞는 단지 보기
         </button>
       ) : (
         <div className="fit-body">
@@ -203,7 +203,7 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug }
 
           <div className="fit-list">
             <h3>
-              {eligible ? "노려볼 단지" : "조건에 맞으면 볼 수 있는 단지"} <b>{picks.length}</b><small>곳</small>
+              {eligible ? "맞는 단지" : "조건에 맞으면 볼 수 있는 단지"} <b>{picks.length}</b><small>곳</small>
               {kind === "haengbok" && isSeoul(p.gu) && <small> | {p.gu} 단지가 우선공급 1순위</small>}
             </h3>
             {picks.length === 0 ? (

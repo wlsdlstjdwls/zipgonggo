@@ -270,7 +270,7 @@ export default async function NoticePage({ params }: Params) {
 
           {noticeElig && (
             <section className="dsec lead" id="fit">
-              <h2>내 조건으로 노려볼 단지</h2>
+              <h2>내 조건에 맞는 단지</h2>
               <p className="note" style={{ margin: "0 0 12px" }}>
                 이 공고문의 소득과 자산, 순위 기준에 내 조건을 대 보고 맞는 단지를 추립니다. 값은 어디로도 보내지 않습니다.
               </p>
