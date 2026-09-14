@@ -363,7 +363,6 @@ export default async function NoticePage({ params }: Params) {
             { label: "접수", value: period ?? NO_DATE },
             { label: "문의처", value: n.contact },
           ]}
-          updatedNote={`갱신 ${n.updated_at} | ${L.updatedVia}`}
         />
       </div>
 

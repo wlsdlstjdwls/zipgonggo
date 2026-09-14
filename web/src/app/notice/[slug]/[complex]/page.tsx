@@ -319,7 +319,6 @@ export default async function ComplexPage({ params }: Params) {
             { label: "접수 마감", value: n.apply_end_at ? `${dateK(n.apply_end_at)}${n.apply_end_tm ? ` ${n.apply_end_tm}` : ""}` : NO_DATE },
             { label: "문의처", value: n.contact },
           ]}
-          updatedNote={`갱신 ${n.updated_at} | ${L.updatedVia}`}
         />
       </div>
 

@@ -13,12 +13,11 @@ type Props = {
   /** 버튼류 — 페이지마다 CTA 구성이 다르다(원문 링크, 포털, 저장, 지도로 이동 등) */
   cta: ReactNode;
   rows: SpecRow[];
-  updatedNote: string;
   /** 단지 상세의 "이 페이지는 지도 앵커입니다" 같은 안내 한 줄 */
   footNote?: ReactNode;
 };
 
-export function DetailAside({ tone, ddayLabel, ddayNum, ddayNote, ddayExtra, cta, rows, updatedNote, footNote }: Props) {
+export function DetailAside({ tone, ddayLabel, ddayNum, ddayNote, ddayExtra, cta, rows, footNote }: Props) {
   return (
     <aside className="aside">
       <div className="aside-in">
@@ -37,7 +36,6 @@ export function DetailAside({ tone, ddayLabel, ddayNum, ddayNote, ddayExtra, cta
               <b>{r.value ?? "—"}</b>
             </div>
           ))}
-          <span className="u">{updatedNote}</span>
         </div>
         {footNote && <p className="note" style={{ margin: "12px 0 0" }}>{footNote}</p>}
       </div>
