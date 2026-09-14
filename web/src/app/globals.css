@@ -1185,6 +1185,77 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .ne-list li { font-size: 12px; line-height: 1.65; color: var(--mut); }
 /* 병합 칸(면적)이 첫 열이라 sticky 배경이 줄무늬를 가리지 않게 */
 .ne-tbl table tbody tr:hover td.ne-area { background: var(--sub); }
+.ne-tbl td.ne-cell.wrap { white-space: normal; min-width: 180px; }
+
+/* ── 상세 페이지 정리(2026-09-14: "나열식이라 보기 힘들다") — 차례 줄, 접이식 묶음, 계층 탭, 한 줄 요약 ── */
+.d-nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px var(--pad); border-bottom: 1px solid var(--line); background: var(--sub); }
+.d-nav a { display: inline-flex; align-items: center; height: 28px; padding: 0 11px; border-radius: 9px; background: var(--bg); border: 1px solid var(--line); font-weight: 800; font-size: 11.5px; color: var(--mut); }
+.d-nav a:hover { color: var(--ink); border-color: var(--ink); }
+.dsec > h2 .dsec-src { margin-left: auto; font-weight: 600; font-size: 11px; letter-spacing: 0; color: var(--dim); }
+.ne-sum { margin: -4px 0 12px; font-weight: 700; font-size: 12.5px; line-height: 1.6; color: var(--mut); }
+.ne-foot { margin: 12px 0 0; }
+.ne-fold { margin-top: 8px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
+.ne-fold + .ne-fold { margin-top: 8px; }
+.ne-fold > summary { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 12px 14px; cursor: pointer; list-style: none; }
+.ne-fold > summary::-webkit-details-marker { display: none; }
+.ne-fold > summary::before { content: "+"; flex: none; width: 18px; height: 18px; border-radius: 6px; background: var(--sub); color: var(--mut); font-weight: 900; font-size: 13px; line-height: 18px; text-align: center; align-self: center; }
+.ne-fold[open] > summary::before { content: "−"; }
+.ne-fold > summary b { font-weight: 800; font-size: 13.5px; color: var(--ink); }
+.ne-fold > summary small { font-weight: 600; font-size: 11.5px; color: var(--dim); }
+.ne-fold-body { padding: 0 14px 14px; }
+.ne-fold-body > .ne-block:first-child { margin-top: 0; }
+.ne-fold .ne-fold { margin: 10px 0 0; }
+.ne-reqs li { padding-left: 0; }
+.ne-class { display: grid; gap: 14px; }
+.ne-sub .ne-group { margin-top: 4px; }
+.ctabs { margin-top: 4px; }
+.ctabs-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.ctabs-bar .chip-f { height: 34px; padding: 0 13px; }
+.ctabs-panel { padding: 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
+
+/* 접수 일정 — 핵심 두 날짜는 카드(.steps), 나머지는 한 줄 목록 */
+.tl { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 0; border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
+.tl li { display: flex; align-items: baseline; gap: 12px; padding: 9px 14px; background: var(--bg); border-top: 1px solid var(--line); }
+.tl li:first-child { border-top: 0; }
+.tl li > span { flex: 0 0 132px; font-weight: 800; font-size: 11px; letter-spacing: 0.04em; color: var(--dim); }
+.tl li > b { display: flex; flex-wrap: wrap; gap: 4px 6px; font-weight: 700; font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tl li > b i { font-style: normal; color: var(--mut); }
+.tl li > b em { font-style: normal; font-weight: 600; color: var(--dim); }
+
+/* 내 조건으로 노려볼 단지(notice-fit.tsx) */
+.fit-open { height: 46px; }
+.fit-body { display: grid; gap: 16px; }
+.fit-form { padding: 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--sub); display: grid; gap: 12px; }
+.fit-form .elig-grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.fit-form .elig-in, .fit-form .elig-seg button, .fit-form .sel { background: var(--bg); }
+/* 위 줄이 같은 특이도의 .elig-seg button.on을 덮으면 켜진 칸이 흰 바탕에 흰 글자가 된다(탐색기 chip-f와 같은 함정, 2026-09-14) */
+.fit-form .elig-seg button.on, .fit-form .sel.on { background: var(--ink); }
+.elig-seg.wrap { flex-wrap: wrap; }
+.elig-seg.wrap button { flex: 1 1 100px; }
+.fit-verdict { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
+.fit-verdict.ok { border-color: rgba(21, 128, 61, 0.3); background: #fbfefc; }
+.fit-verdict.no { border-color: rgba(220, 38, 38, 0.25); background: #fffafa; }
+.fit-verdict-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fit-verdict-h > b { font-weight: 900; font-size: 17px; letter-spacing: -0.03em; }
+.fit-verdict-h > span { font-weight: 700; font-size: 12.5px; color: var(--mut); }
+.fit-verdict-h > span b { color: var(--acc); }
+.fit-list h3 { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; font-weight: 900; font-size: 15px; }
+.fit-list h3 b { color: var(--acc); }
+.fit-list h3 small { font-weight: 700; font-size: 11px; color: var(--dim); }
+.fit-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fit-rows a { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main tag" "sub tag"; column-gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-btn); transition: transform 240ms var(--sp), border-color 200ms var(--ease); }
+.fit-rows a:hover { transform: translateY(-1.5px); border-color: var(--acc); }
+.fit-row-main { grid-area: main; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.fit-row-main b { font-weight: 800; font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fit-row-main small { flex: none; font-weight: 600; font-size: 11px; color: var(--dim); }
+.fit-row-sub { grid-area: sub; margin-top: 2px; font-size: 12px; color: var(--mut); }
+.fit-rows .tag { grid-area: tag; align-self: center; }
+.fit-more { margin-top: 10px; width: 100%; }
+.elig-jg { padding: 8px 10px; border-radius: 8px; background: var(--acc-soft); color: var(--mut); }
+.elig-jg b { color: var(--acc); }
+.elig-jg.n { background: var(--hot-soft); }
+.elig-jg.n b { color: var(--hot); }
+.elig-cls legend small { margin-left: 6px; font-weight: 600; color: var(--dim); }
 .elig-note { margin: 26px 0 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: 11.5px; line-height: 1.8; color: var(--dim); }
 
 @container (max-width: 900px) {

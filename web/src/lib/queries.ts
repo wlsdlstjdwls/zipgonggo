@@ -351,7 +351,7 @@ export const listSitemapNotices = unstable_cache(
 
 export const getEligibilityRules = unstable_cache(
   async (): Promise<EligibilityRules> => {
-    const [types, income, tiers] = await Promise.all([
+    const [types, income, tiers, janggi] = await Promise.all([
       query<SupplyType>(
         `SELECT code, category, name, housing_type, sort_order, age_min, age_max, age_exempt, marital,
                 marital_max_yr, newborn_exempt, required_class, homeless_scope, income_scope, income_pct,
@@ -364,8 +364,14 @@ export const getEligibilityRules = unstable_cache(
           WHERE year = (SELECT max(year) FROM income_standard) ORDER BY household, pct`,
       ),
       query<RegionTier>(`SELECT name, kind, tier FROM region_tier ORDER BY tier, name`),
+      // 가장 최근 장기전세 공고문의 자격 묶음 — /eligibility가 면적×순위 매트릭스를 풀 때 기준으로 쓴다(공고마다 같은 표 양식)
+      query<{ slug: string; title: string; data: EligibilityRules["janggi"] extends infer J ? (J extends { data: infer D } ? D : never) : never }>(
+        `SELECT n.slug, n.title, e.data FROM notice_eligibility e JOIN notice n ON n.id = e.notice_id
+          WHERE n.housing_type = '장기전세' AND e.verified AND COALESCE(e.data->>'kind', 'janggi') = 'janggi'
+          ORDER BY n.posted_at DESC, n.id DESC LIMIT 1`,
+      ),
     ]);
-    return { types, income, tiers, incomeYear: income[0]?.year ?? 0 };
+    return { types, income, tiers, incomeYear: income[0]?.year ?? 0, janggi: janggi[0] ?? null };
   },
   ["eligibility-rules"],
   { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_ELIGIBILITY] },

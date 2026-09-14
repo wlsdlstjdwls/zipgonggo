@@ -3,8 +3,11 @@
 // 자격진단 — 내 조건을 넣으면 33개 공급유형 중 어디에 넣을 수 있는지 가른다.
 // 규칙은 서버가 DB(supply_type·income_standard·region_tier)에서 읽어 넘긴다. 여기서 계산만 한다(lib/eligibility).
 // 값은 전부 브라우저 안에만 있다 — 어디로도 보내지 않는다(개인정보처리방침과 같은 약속).
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { classOptions, diagnoseAll, HOUSEHOLD_MAX, type Marital, type Profile, type Verdict } from "@/lib/eligibility";
+import { fitJanggi, janggiAreas, type FitProfile, type FitVerdict } from "@/lib/notice-fit";
+import { noticePath } from "@/lib/routes";
 import type { EligibilityRules } from "@/types/eligibility";
 import { Select } from "./select";
 
@@ -25,9 +28,31 @@ const DEFAULT: Profile = {
   residence: "",
 };
 
+// 장기전세 세부 조건 — 면적·순위·출생자녀·맞벌이·청약 회차. supply_type 한 줄(income_pct)로는 매트릭스를 못 푼다(handoff 0-1).
+// 기준은 가장 최근 장기전세 공고문(rules.janggi)의 표다. 공고마다 같은 양식이라 다음 공고에도 거의 그대로 간다.
+type JanggiExtra = { group: string | null; area: string | null; dual: boolean; newborns: number; olderMinor: boolean; deposits: number };
+
 export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
   const [p, setP] = useState<Profile>(DEFAULT);
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setP((prev) => ({ ...prev, [k]: v }));
+  const jg = rules.janggi ?? null;
+  const [jx, setJx] = useState<JanggiExtra>(() => ({
+    group: jg?.data.rank_tables[0]?.group ?? null,
+    area: jg?.data.rank_tables[0] ? janggiAreas(jg.data.rank_tables[0])[0] ?? null : null,
+    dual: false, newborns: 0, olderMinor: false, deposits: 24,
+  }));
+  const setJ = <K extends keyof JanggiExtra>(k: K, v: JanggiExtra[K]) => setJx((prev) => ({ ...prev, [k]: v }));
+  const jgTable = jg?.data.rank_tables.find((t) => t.group === jx.group) ?? jg?.data.rank_tables[0];
+  const jgAreas = useMemo(() => (jgTable ? janggiAreas(jgTable) : []), [jgTable]);
+  const jgVerdict: FitVerdict | null = useMemo(() => {
+    if (!jg) return null;
+    const fp: FitProfile = {
+      household: p.household, incomeWon: p.incomeHouseholdWon, dual: jx.dual, newborns: jx.newborns, olderMinor: jx.olderMinor,
+      assetMan: p.assetMan, carMan: p.carMan, deposits: jx.deposits, gu: p.residence, residenceYears: 0, age: p.age, under2: p.hasNewborn,
+      special: false, group: jx.group, area: jx.area, cls: null,
+    };
+    return fitJanggi(jg.data, fp, rules.income);
+  }, [jg, p, jx, rules.income]);
 
   const classes = useMemo(() => classOptions(rules.types), [rules.types]);
   const regions = useMemo(() => rules.tiers.filter((t) => t.tier === "서울").map((t) => t.name), [rules.tiers]);
@@ -93,6 +118,38 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
           </label>
         </div>
 
+        {jg && (
+          <fieldset className="elig-cls">
+            <legend>장기전세 세부 조건 <small>기준: {jg.title}</small></legend>
+            <div className="elig-grid">
+              {jg.data.rank_tables.length > 1 && (
+                <div className="elig-f wide">
+                  <span>공급 구분</span>
+                  <Select value={jx.group ?? ""} options={jg.data.rank_tables.map((t) => ({ value: t.group, label: t.group }))}
+                    onChange={(v) => { const t = jg.data.rank_tables.find((x) => x.group === v); setJx((prev) => ({ ...prev, group: v || null, area: t ? janggiAreas(t)[0] ?? null : null })); }}
+                    placeholder="공급 구분" ariaLabel="장기전세 공급 구분" />
+                </div>
+              )}
+              {jgAreas.length > 0 && (
+                <div className="elig-f wide">
+                  <span>신청 면적</span>
+                  <div className="elig-seg" role="group" aria-label="신청 면적">
+                    {jgAreas.map((a) => (
+                      <button key={a} type="button" className={jx.area === a ? "on" : ""} onClick={() => setJ("area", a)}>{a}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Num label="청약 납입 회차" value={jx.deposits} unit="회" onChange={(v) => setJ("deposits", v)} max={600} />
+              <Num label="2023.3.28. 이후 출생 자녀" value={jx.newborns} unit="명" onChange={(v) => setJ("newborns", v)} max={10} />
+            </div>
+            <div className="elig-checks" style={{ marginTop: 10 }}>
+              <label className="elig-chk"><input type="checkbox" checked={jx.dual} onChange={(e) => setJ("dual", e.target.checked)} /><span>맞벌이다</span></label>
+              <label className="elig-chk"><input type="checkbox" checked={jx.olderMinor} onChange={(e) => setJ("olderMinor", e.target.checked)} /><span>2023.3.27. 이전 출생 미성년 자녀가 있다</span></label>
+            </div>
+          </fieldset>
+        )}
+
         <fieldset className="elig-cls">
           <legend>해당하는 계층 (여러 개 고를 수 있다)</legend>
           <div className="elig-chips">
@@ -113,11 +170,11 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
         {pass.length === 0 ? (
           <p className="elig-none">조건에 맞는 유형이 없다. 아래 미달 목록에서 어떤 기준에 걸리는지 볼 수 있다.</p>
         ) : (
-          <ul className="elig-list">{pass.map((v) => <Card key={v.type.code} v={v} />)}</ul>
+          <ul className="elig-list">{pass.map((v) => <Card key={v.type.code} v={v} janggi={v.type.housing_type === "장기전세" ? jgVerdict : null} janggiRef={jg} area={jx.area} />)}</ul>
         )}
 
         <h2 className="mute">기준에 못 미치는 유형 <b>{fail.length}</b></h2>
-        <ul className="elig-list">{fail.map((v) => <Card key={v.type.code} v={v} />)}</ul>
+        <ul className="elig-list">{fail.map((v) => <Card key={v.type.code} v={v} janggi={v.type.housing_type === "장기전세" ? jgVerdict : null} janggiRef={jg} area={jx.area} />)}</ul>
 
         <p className="elig-note">
           도시근로자 월평균소득은 {rules.incomeYear}년 고시액 기준이다. 이 진단은 안내일 뿐 심사 결과가 아니다 —
@@ -128,7 +185,7 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
   );
 }
 
-function Card({ v }: { v: Verdict }) {
+function Card({ v, janggi, janggiRef, area }: { v: Verdict; janggi?: FitVerdict | null; janggiRef?: EligibilityRules["janggi"]; area?: string | null }) {
   const t = v.type;
   const failed = v.checks.filter((c) => !c.ok);
   return (
@@ -153,6 +210,14 @@ function Card({ v }: { v: Verdict }) {
       {v.ok && t.ranks.length > 0 && (
         <p className="elig-rank">
           순위 {t.ranks.map((r, i) => `${i + 1}순위 ${r}`).join(" | ")}
+        </p>
+      )}
+      {janggi && janggiRef && (
+        /* 시드 한 줄(income_pct)이 아니라 최근 공고문의 면적×순위 매트릭스로 본 자리 — 순위가 곧 당락 순서다 */
+        <p className={`elig-rank elig-jg${janggi.ok === false ? " n" : ""}`}>
+          <b>{area ?? ""} {janggi.rankLabel}</b>
+          {janggi.reasons[0] && <span> | {janggi.reasons[0].text}</span>}
+          <small> | <Link href={noticePath(janggiRef.slug)}>{janggiRef.title}</Link> 기준</small>
         </p>
       )}
       {v.ok && t.note && <p className="elig-memo">{t.note}</p>}

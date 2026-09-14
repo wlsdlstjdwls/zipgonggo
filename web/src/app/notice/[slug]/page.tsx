@@ -9,6 +9,7 @@ import { ExternalLink } from "@/components/external-link";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
 import { NoticeEligibilitySection } from "@/components/notice-eligibility";
+import { NoticeFit } from "@/components/notice-fit";
 import { SaveButton } from "@/components/save-button";
 import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
@@ -200,8 +201,18 @@ export default async function NoticePage({ params }: Params) {
             </p>
           </header>
 
+          {/* 긴 페이지의 차례 — 무엇이 어디 있는지 먼저 보인다(사용자 지적 2026-09-14: "나열식이라 보기 힘들다") */}
+          <nav className="d-nav" aria-label="이 페이지 차례">
+            {complexes.length > 0 && <a href="#complexes">단지 {num(complexes.length, "곳")}</a>}
+            <a href="#schedule">일정</a>
+            {noticeElig && <a href="#fit">내 조건</a>}
+            {(noticeElig || eligTypes.length > 0) && <a href="#eligibility">신청자격</a>}
+            {showAreaTable && areas.length > 0 && <a href="#areas">지역별 호수</a>}
+            <a href="#info">공고 정보</a>
+          </nav>
+
           {complexes.length > 0 && (
-            <section className="dsec lead">
+            <section className="dsec lead" id="complexes">
               {/* 제목 줄(「공급 단지 62곳 | 1,484호」)은 탐색기 머리의 수량과 같은 말이라 뺐다(사용자 요청 2026-09-09).
                   호수는 탐색기 안 수량 줄이 이어받는다 */}
               <h2 className="sr-only">공급 단지</h2>
@@ -229,34 +240,54 @@ export default async function NoticePage({ params }: Params) {
 
           {/* 자리는 원래대로 정정 이력 다음이다(사용자 정정 2026-09-09) — 올리지 않고 lead 톤과
               접수 시작·마감 강조로만 눈에 띄게 한다 */}
-          <section className="dsec lead">
+          <section className="dsec lead" id="schedule">
             <h2>접수 일정</h2>
             {hasSchedule ? (
-              <div className="steps">
-                {steps.map((s) => (
-                  <div key={s.label} className={`step${s.key ? " key" : ""}${s.on && s.value ? " on" : ""}`}>
-                    <span>{s.label}</span>
-                    <b>{s.value ? <Stamped v={s.value} /> : "—"}</b>
-                    {s.sub && <em><Stamped v={s.sub} pre="~ " /></em>}
-                  </div>
-                ))}
-              </div>
+              <>
+                {/* 달력에 적는 두 날짜만 카드. 나머지 단계는 한 줄씩 — 카드 여덟 장이 나란히 서면 어느 것이 급한지 안 보였다(2026-09-14) */}
+                <div className="steps">
+                  {steps.filter((s) => s.key).map((s) => (
+                    <div key={s.label} className={`step key${s.on && s.value ? " on" : ""}`}>
+                      <span>{s.label}</span>
+                      <b>{s.value ? <Stamped v={s.value} /> : "—"}</b>
+                      {s.sub && <em><Stamped v={s.sub} pre="~ " /></em>}
+                    </div>
+                  ))}
+                </div>
+                <ol className="tl">
+                  {steps.filter((s) => !s.key).map((s) => (
+                    <li key={s.label}>
+                      <span>{s.label}</span>
+                      <b>{s.value ? <Stamped v={s.value} /> : "—"}{s.sub && <em><Stamped v={s.sub} pre=" ~ " /></em>}</b>
+                    </li>
+                  ))}
+                </ol>
+              </>
             ) : (
               <p className="note" style={{ marginTop: 0 }}>공고일 {dateK(n.posted_at, true)}. 접수 기간은 {L.originalDoc}에서 확인하세요.</p>
             )}
           </section>
 
           {noticeElig && (
+            <section className="dsec lead" id="fit">
+              <h2>내 조건으로 노려볼 단지</h2>
+              <p className="note" style={{ margin: "0 0 12px" }}>
+                이 공고문의 소득과 자산, 순위 기준에 내 조건을 대 보고 맞는 단지를 추립니다. 값은 어디로도 보내지 않습니다.
+              </p>
+              <NoticeFit data={noticeElig.data} complexes={complexes} supply={supply} income={eligRules.income} tiers={eligRules.tiers} noticeSlug={n.slug} />
+            </section>
+          )}
+
+          {noticeElig && (
             <NoticeEligibilitySection elig={noticeElig} incomeYear={eligRules.incomeYear} noticeYear={noticeYear} originalDoc={L.originalDoc} />
           )}
 
           {eligTypes.length > 0 && (
-            <section className="dsec">
-              <h2>신청자격</h2>
-              <p className="note" style={{ margin: "0 0 12px" }}>
-                {n.housing_type} 제도의 유형별 일반 기준입니다. 이 공고에서 실제로 모집하는 유형과 세부 조건은{" "}
-                {L.originalDoc}에서 확인하세요.{" "}
-                <Link href={ROUTES.eligibility}>내 조건으로 신청 가능한 유형 진단하기 →</Link>
+            <section className="dsec" id="eligibility">
+              <h2>신청자격 <small className="dsec-src">{n.housing_type} 제도 일반 기준</small></h2>
+              <p className="ne-sum">
+                유형 {eligTypes.length}개. 이 공고가 실제로 모집하는 유형과 세부 조건은 {L.originalDoc} 기준.{" "}
+                <Link href={ROUTES.eligibility}>내 조건으로 진단하기 →</Link>
               </p>
               {/* 표(가로 스크롤)는 좁은 화면에서 유형 열이 밀려나 안 보인다는 지적(2026-09-09) — 자가진단
                   카드(elig-card/elig-why)와 같은 모양으로 유형 하나당 카드 하나씩 쌓는다 */}
@@ -279,13 +310,13 @@ export default async function NoticePage({ params }: Params) {
               </ul>
 
               {incomeRows.length > 0 && (
-                <>
+                <details className="ne-fold">
                   {/* 공고는 통계청 발표 전년도 소득을 쓴다 — 「2025년」만 쓰면 옛 값처럼 읽힌다(사용자 지적 2026-09-14) */}
-                  <h3 className="elig-sub">
-                    가구원수별 월평균소득 기준
+                  <summary>
+                    <b>가구원수별 월평균소득 기준</b>
                     <small>{eligRules.incomeYear}년 소득 통계 기준{noticeYear ? `, ${noticeYear}년 공고에 적용` : ""}</small>
-                  </h3>
-                  <div className="tbl">
+                  </summary>
+                  <div className="tbl ne-fold-body">
                     <table>
                       <thead>
                         <tr>
@@ -305,13 +336,13 @@ export default async function NoticePage({ params }: Params) {
                       </tbody>
                     </table>
                   </div>
-                </>
+                </details>
               )}
             </section>
           )}
 
           {showAreaTable && areas.length > 0 && (
-            <section className="dsec">
+            <section className="dsec" id="areas">
               <h2>{n.address ? "시군구별 공급호수" : "공급 지역"}</h2>
               {!n.address && <p className="note" style={{ margin: "0 0 12px" }}>주택별 주소는 공고문 첨부에만 있습니다.</p>}
               <div className="tbl">
@@ -331,14 +362,14 @@ export default async function NoticePage({ params }: Params) {
             </section>
           )}
 
-          {/* 원문·포털 링크는 오른쪽 카드가 이미 준다 — 같은 링크를 두 번 걸지 않는다(사용자 요청 2026-09-09) */}
-          <section className="dsec">
+          {/* 원문·포털 링크는 오른쪽 카드가 이미 준다 — 같은 링크를 두 번 걸지 않는다(사용자 요청 2026-09-09).
+              공급 구분·입주 시작·문의처도 태그 줄과 제원 패널이 이미 말한다 — 「한 값은 한 곳」(2026-09-14). 여기엔 그 밖의 값만 */}
+          <section className="dsec" id="info">
             <h2>공고 정보</h2>
             <SpecList>
+              <Spec label="공급 기관" value={n.agency} />
+              <Spec label="공고일" value={dateK(n.posted_at)} />
               <Spec label="공급 유형" value={<Term>{n.housing_type}</Term>} />
-              <Spec label="공급 구분" value={supplyKind ? <TermText>{supplyKind}</TermText> : null} />
-              <Spec label="입주 시작" value={moveIn} />
-              <Spec label="문의처" value={n.contact} />
               <Spec label="단지명" value={n.complex_name} />
               <Spec label="총세대수" value={n.total_household != null ? num(n.total_household, "세대") : null} />
               <Spec label="난방" value={n.heating} />

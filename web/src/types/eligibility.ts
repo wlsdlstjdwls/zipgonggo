@@ -37,13 +37,19 @@ export type EligibilityRules = {
   income: IncomeStandard[];
   tiers: RegionTier[];
   incomeYear: number;
+  /** 가장 최근 장기전세 공고문에서 읽은 자격 묶음. /eligibility가 면적×순위 매트릭스를 풀 때 쓴다. 없으면 null */
+  janggi?: { slug: string; title: string; data: NoticeEligibilityData } | null;
 };
 
 // ── 공고문에서 읽은 신청자격 묶음 (notice_eligibility, 0024) ──
 // 모양은 pipeline/parsers/sh_eligibility.py Eligibility.as_json()과 같이 든다. 화면은 읽기만 한다.
 
+/** 양식. janggi 장기전세(면적×순위 표) · haengbok 행복주택(계층 절) · maeip 매입임대(순위 두 줄 표) */
+export type EligKind = "janggi" | "haengbok" | "maeip";
+
 export type EligRankRow = {
-  area: string;
+  /** 신청면적 라벨(장기전세). 매입임대 표는 면적 열이 없어 null */
+  area: string | null;
   rank: number | null;
   income_pct: number | null;
   dual_income_pct: number | null;
@@ -54,10 +60,20 @@ export type EligMatrix = { columns: string[]; rows: { area: string | null; appli
 export type EligAsset = { columns: string[]; rows: { label: string; values_man: (number | null)[] }[] };
 export type EligIncomeTable = {
   households: number[];
-  rows: { pct: number; won: (number | null)[] }[];
+  rows: {
+    pct: number;
+    won: (number | null)[];
+    /** 행복주택 소득표의 적용 조건 칸(「공통 (청년계층은 …)」「신혼부부 계층 (맞벌이인 동시에 …)」). 장기전세·매입임대는 없다 */
+    conditions?: string[];
+  }[];
   verified?: boolean;
   /** 검산에 쓴 통계연도. 2025년 공고(제49차)는 2024년 통계다 — 없으면 화면은 income_standard 최신 연도로 후퇴 */
   base_year?: number;
+  /** 행복주택·매입임대 표는 1인 +20%p, 2인 +10%p를 더한 값이 직접 적혀 있다. 키는 가구원수 문자열 */
+  bump?: Record<string, number>;
+  /** 6인 이상 가구는 5인 값에 1인당 이 금액을 더한다(행복주택 각주). 키는 % 문자열 */
+  per_person_won?: Record<string, number>;
+  notes?: string[];
 };
 export type EligSelection = {
   title: string;
@@ -71,7 +87,17 @@ export type EligScoreTable = {
 };
 export type EligPenalties = { rows: { label: string; points: number }[]; notes: string[] };
 
+/** 행복주택 계층 절 하나(4-2 대학생 … 4-6 주거급여수급자). sh_eligibility_haengbok._parse_class */
+export type EligClassBlock = {
+  name: string;
+  general: { intro: string | null; requirements: string[]; ranks: { rank: number; text: string }[]; notes: string[] };
+  priority: { intro: string | null; ranks: { rank: number; text: string }[]; score: EligScoreTable | null; notes: string[] };
+  selection: EligSelection | null;
+  notes: string[];
+};
+
 export type NoticeEligibilityData = {
+  kind?: EligKind;
   source_pages: number[];
   rank_tables: EligRankTable[];
   bonus_conditions: string[];
@@ -82,6 +108,7 @@ export type NoticeEligibilityData = {
   selection: EligSelection[];
   score_tables: EligScoreTable[];
   penalties: EligPenalties | null;
+  class_blocks?: EligClassBlock[];
 };
 
 export type NoticeEligibility = {
