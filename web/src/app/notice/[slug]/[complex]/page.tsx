@@ -5,6 +5,11 @@
 // 2026-09-09 개편(사용자 요청): 제원과 공급현황을 한 섹션으로 합치고, 그 위에 요약 스트립을 놓아
 // "중요한 정보가 뭔지"를 먼저 보이게 했다. 값이 없는 자리는 감추지 않고 「준비 중」으로 말한다.
 // 공고문 용어는 링크로 걸어 페이지 밑 「용어 설명」으로 잇는다.
+//
+// 2026-09-14 「한 값은 한 곳」(사용자 지적: 같은 숫자가 요약 스트립·제원 카드·공급현황 카드에 세 번 나왔다):
+//   요약 스트립 = 결정에 쓰는 값(보증금·월임대료·전용면적·호수와 그 배분·입주 시작)
+//   제원 카드   = 그 어디에도 없는 값(공용/계약면적·난방·구조·승강기·계약금/잔금). 공급유형이 한 줄이면 그 줄도 여기로 흡수
+//   공급현황 표 = 공급유형이 두 줄 이상일 때만 — 줄마다 다른 값(호수·금액·면적)을 견주는 자리
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -24,10 +29,10 @@ import { UnitTable } from "@/components/unit-table";
 import { agencyLabels } from "@/lib/agency";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
 import { applyPhase, count, dateK, deadlineChip, NO_DATE, num, wonKo } from "@/lib/format";
-import { areaText, commonArea, complexPriceGroups, complexPriceRows, CONVERT_HINT, m2, moveInLabel, unitPriceRows } from "@/lib/notice-view";
+import { areaText, classLabel, commonArea, complexPriceGroups, complexPriceRows, CONVERT_HINT, m2, moveInLabel, typeLabel, unitPriceRows } from "@/lib/notice-view";
 import { getComplexImages, getComplexSupply, getComplexUnits, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
 import { ComplexGallery } from "@/components/complex-gallery";
-import { shownImages } from "@/lib/complex-images";
+import { imagesEnabled, shownImages } from "@/lib/complex-images";
 import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
 import { regionShort, sidoShort } from "@/lib/sido";
 import type { Notice, NoticeComplex } from "@/types/notice";
@@ -86,7 +91,8 @@ export default async function ComplexPage({ params }: Params) {
   const [supply, units, images] = await Promise.all([
     getComplexSupply(n.id, c.id, c.name),
     getComplexUnits(c.id),
-    getComplexImages(c.sh_bizns_cd),
+    // 파일 자리가 안 정해진 배포에서는 질의도 하지 않는다 — 행만 있으면 액박이 된다(lib/complex-images 머리글)
+    imagesEnabled ? getComplexImages(c.sh_bizns_cd) : Promise.resolve([]),
   ]);
   // 호수는 (공급유형, 공급대상)마다 한 칸이다 — 청년 소득있음/없음 두 줄이 같은 칸을 나눠 써 두 번 세면 안 된다
   const counted = new Map(supply.filter((s) => s.units_total != null).map((s) => [`${s.supply_type}|${s.tenant_class}`, s]));
@@ -121,26 +127,43 @@ export default async function ComplexPage({ params }: Params) {
   // 호실 표에서만 나오는 값(승강기·구조). 별첨이 있는 매입임대 공고만 채워진다
   const layouts = [...new Set(units.map((u) => u.room_layout).filter(Boolean))] as string[];
   const elevators = [...new Set(units.map((u) => u.elevator).filter(Boolean))] as string[];
-  const downPayment = supply.find((s) => s.down_payment != null)?.down_payment ?? null;
-  const balance = supply.find((s) => s.balance != null)?.balance ?? null;
+  // 계약금·잔금은 주택형마다 다르다. 첫 줄 값만 적으면 4개 유형 단지에서 29㎡형 계약금이 단지 값처럼 보인다 —
+  // 서로 다르면 「최소~최대」로 적는다. 정확한 줄별 값은 공고문 표에 있다
+  const moneyRange = (vals: (number | null)[]): string | null => {
+    const xs = [...new Set(vals.filter((v): v is number => v != null))];
+    if (!xs.length) return null;
+    return xs.length === 1 ? wonKo(xs[0]) : `${wonKo(Math.min(...xs))}~${wonKo(Math.max(...xs))}`;
+  };
+  const downPayment = moneyRange(supply.map((s) => s.down_payment));
+  const balance = moneyRange(supply.map((s) => s.balance));
   const unitCount = c.unit_count ?? (units.length || null) ?? (unitTotal || null);
+  // 호수 밑줄 — 공가와 예비자 배분. 공급/재공급은 태그 줄이 이미 말하므로 여기 또 쓰지 않는다
+  const unitSub = hasReserve && (vacantTotal > 0 || reserveTotal > 0)
+    ? [vacantTotal > 0 ? `공가 ${num(vacantTotal, "호")}` : null, reserveTotal > 0 ? `예비 ${num(reserveTotal, "호")}` : null].filter(Boolean).join(" | ")
+    : null;
+  // 공급유형이 한 줄이면 「공급현황」 카드를 따로 두지 않고 제원 카드가 그 줄을 흡수한다
+  const one = supply.length === 1 ? supply[0] : null;
+  const oneSplit = one != null && (one.units_priority != null || one.units_general != null);
+  // 장기전세처럼 월임대료가 없는 공고는 아래 금액 표(PriceTable)가 계약금·잔금 줄을 따로 그린다 — 그때는 여기서 뺀다
+  const payInPriceTable = priceGroups.length === 0 && priceBreak.some((r) => r.group === "pay");
   // 별첨에 동 표기가 있는 단지만 「동호수별」이다 — 다세대·빌라는 호만 실린다(사용자 지적 2026-09-09)
   const unitLabel = units.some((u) => u.building) ? "동호수별 정보" : "호실별 정보";
   const hasFacts = supply.length > 0 || units.length > 0;
 
-  // 요약 스트립·태그 줄과 겹치지 않는 값만 남긴다. 전부 비면 표 자체를 그리지 않는다
+  // 요약 스트립·태그 줄·공급현황 표와 겹치지 않는 값만 남긴다. 전부 비면 표 자체를 그리지 않는다
   // [라벨, 값, 라벨을 줄여 쓴 자리의 사전 표제어]
   const specs: [string, string, string?][] = ([
-    ["공용면적", supply.length ? m2(commonArea(supply[0])) : null],
-    ["계약면적", supply[0]?.area_total != null ? m2(supply[0].area_total) : null],
+    // 한 줄짜리 공급은 그 줄의 대상·유형을 여기서 말한다. 유형은 전용면적 칸과 거의 같은 말이라 주거약자용일 때만
+    ["공급대상", one && hasClass ? classLabel(one) : null],
+    ["공급유형", one?.accessible ? typeLabel(one) : null],
+    // 공용·계약면적은 주택형마다 다르다 — 여러 줄이면 공급현황 표의 면적 칸이 줄마다 적는다
+    ["공용면적", one ? m2(commonArea(one)) : null],
+    ["계약면적", one?.area_total != null ? m2(one.area_total) : null],
     ["구조", layouts.length ? layouts.join(" | ") : null],
     ["승강기", elevators.length ? elevators.join(" | ") : null],
     ["난방", c.heating],
-    // 공가는 우선·일반 배분이 적힌 공고에만 있다. 재공급 표에 모집호수만 있는 공고에서 「공가 0호」를 쓰면 거짓말이 된다
-    ["현재 공가", hasReserve && vacantTotal > 0 ? num(vacantTotal, "호") : null, "공가"],
-    ["예비자 모집", hasReserve && reserveTotal > 0 ? num(reserveTotal, "호") : null, "예비입주자"],
-    ["계약금", downPayment != null ? wonKo(downPayment) : null],
-    ["잔금", balance != null ? wonKo(balance) : null],
+    ["계약금", !payInPriceTable ? downPayment : null],
+    ["잔금", !payInPriceTable ? balance : null],
   ] as [string, string | null, string?][]).filter((r): r is [string, string, string?] => r[1] != null && r[1] !== "");
 
   // 화면에 실제로 쓴 말만 페이지 밑에 편다. 이건 서버 렌더용 밑그림이고, 브라우저에서는 GlossaryList가
@@ -199,22 +222,31 @@ export default async function ComplexPage({ params }: Params) {
             />
             <Kpi label="월임대료" value={c.min_rent != null ? wonKo(c.min_rent) : hasFacts && !hasRent ? "없음" : null} sub={c.min_rent != null ? "최소" : "전세형"} />
             <Kpi label="전용면적" value={area} />
-            <Kpi label="공급 호수" value={unitCount != null ? num(unitCount, "호") : null} sub={kind} />
+            <Kpi label="공급 호수" value={unitCount != null ? num(unitCount, "호") : null} sub={unitSub} />
             <Kpi label="입주 시작" value={moveIn} sub={moveIn ? "공고문 예정일" : null} />
           </div>
 
           {/* 제원과 공급현황은 한 섹션이다 — 같은 표를 세로/가로로 두 번 나눠 보여줄 이유가 없다(사용자 요청 2026-09-09) */}
           <section className="dsec">
-            <h2>공급 정보{supply.length > 0 && unitTotal > 0 ? ` | ${num(unitTotal, "호")}` : ""}</h2>
-            {/* 단지명·주소·지역은 머리글이, 공급 구분·유형은 태그 줄이, 호수·전용면적·입주 시작은 위 요약 스트립이
-                이미 말했다 — 여기 남기는 건 그 어디에도 없는 값뿐이다(사용자 지적 2026-09-09: 겹치는 정보 없애기) */}
-            {specs.length > 0 && (
+            <h2>공급 정보</h2>
+            {/* 단지명·주소·지역은 머리글이, 공급 구분·유형은 태그 줄이, 호수와 배분·금액·전용면적·입주 시작은 위 요약
+                스트립이 이미 말했다 — 여기 남기는 건 그 어디에도 없는 값뿐이다(사용자 지적 2026-09-09·09-14: 겹치는 정보 없애기) */}
+            {(specs.length > 0 || oneSplit) && (
               <SpecList>
+                {/* 한 줄짜리 공급의 우선/일반 배분. 요약 스트립은 합(공가)만 말한다 */}
+                {one && oneSplit && (
+                  <Spec
+                    label="공가 배분"
+                    term="공가"
+                    value={<><Term as="우선">우선공급</Term> {num(one.units_priority ?? 0, "호")} / <Term as="일반">일반공급</Term> {num(one.units_general ?? 0, "호")}</>}
+                  />
+                )}
                 {specs.map(([label, value, term]) => <Spec key={label} label={label} value={value} term={term} />)}
               </SpecList>
             )}
 
-            {supply.length > 0 && (
+            {/* 공급유형이 둘 이상일 때만 표 — 줄마다 다른 호수·금액·면적을 견준다. 한 줄이면 위 카드가 전부다 */}
+            {supply.length > 1 && (
               <div className="dsub">
                 <h3>공급현황 {count(supply.length, "건")}</h3>
                 <SupplyTable supply={supply} hasReserve={hasReserve} hasRent={hasRent} hasClass={hasClass} />
@@ -245,8 +277,10 @@ export default async function ComplexPage({ params }: Params) {
               <ComplexGallery images={images} biznsCd={c.sh_bizns_cd!} complexName={c.name} supplyTypes={supplyTypes} />
             ) : (
               <Pending
-                title="이 단지의 사진과 도면은 아직 준비 중입니다"
-                lead={c.sh_bizns_cd
+                title={imagesEnabled ? "이 단지의 사진과 도면은 아직 준비 중입니다" : "사진과 도면은 공개 준비 중입니다"}
+                lead={!imagesEnabled
+                  ? <>서울주택도시공사 SH주택정보의 평면도와 사진을 지면에 싣기 위한 확인 절차가 끝나면 보여 드립니다. 그때까지는 {L.originalDoc}의 전자팸플릿 안내를 따라 확인하세요.</>
+                  : c.sh_bizns_cd
                   ? <>서울주택도시공사가 이 단지의 평면도와 사진을 아직 공개하지 않았습니다. 준공 전이거나 자료 등록이 늦는 단지입니다.</>
                   : <>준공 전 신규 공급 단지라 SH주택정보에 단지 자료가 아직 없습니다. 전자팸플릿은 {L.originalDoc}의 안내를 따라 확인하세요.</>}
                 action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}

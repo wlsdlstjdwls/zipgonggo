@@ -60,6 +60,15 @@ export function sortedTypes(images: ComplexImage[]): string[] {
     .sort((a, b) => Number(areaKey(a)) - Number(areaKey(b)) || a.localeCompare(b));
 }
 
+// 이미지 파일이 놓인 자리. 로컬은 `web/public/sh-house`(gitignore — 배포에 안 올라간다)라 개발에서만 기본값을 준다.
+// 배포에서는 스토리지 주소를 `NEXT_PUBLIC_SH_HOUSE_BASE`로 받는다. 비어 있으면 **갤러리를 그리지 않는다** —
+// DB에 행만 있고 파일이 없어 사진이 전부 액박으로 나갔다(사용자 지적 2026-09-14). 스토리지에 올리고 이 값을 넣으면 켜진다.
+export const SH_HOUSE_BASE: string | null =
+  process.env.NEXT_PUBLIC_SH_HOUSE_BASE?.replace(/\/+$/, "") || (process.env.NODE_ENV === "production" ? null : "/sh-house");
+
+/** 지면에 사진을 실을 수 있는가. 서버 페이지는 이걸로 질의 자체를 건너뛴다 */
+export const imagesEnabled = SH_HOUSE_BASE != null;
+
 export function imageSrc(biznsCd: string, img: ComplexImage): string {
-  return `/sh-house/${biznsCd}/${encodeURIComponent(img.file_name)}`;
+  return `${SH_HOUSE_BASE ?? "/sh-house"}/${biznsCd}/${encodeURIComponent(img.file_name)}`;
 }

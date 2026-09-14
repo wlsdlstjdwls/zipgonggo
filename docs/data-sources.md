@@ -381,6 +381,7 @@ LH 이용약관(`lh.or.kr/menu.es?mid=a10802000000`) 제1~12조와 부칙을 훑
 | `CRON_TRIGGER_SECRET` | 직접 생성(무작위 문자열) | web `/api/cron/{잡}` 인증. 때리는 쪽(Cloudflare Worker `worker/`, Windows 예약 작업)과 같은 값 |
 | `GITHUB_DISPATCH_TOKEN` | GitHub PAT — `actions:write` 하나면 된다 | 위 라우트가 워크플로를 부를 때 쓴다. **Vercel env에만 둔다** — 외부 서비스에 넘기지 않는다 |
 | `GITHUB_REPO` | `owner/repo` | 부를 저장소. `wlsdlstjdwls/zipgonggo` |
+| `NEXT_PUBLIC_SH_HOUSE_BASE` | 스토리지(Vercel Blob 등) 공개 URL | SH 단지 사진·도면 파일 자리. **비우면 배포에서 갤러리를 그리지 않는다** — `web/public/sh-house`는 gitignore라 Vercel에 안 올라간다. 스토리지에 올린 뒤 그 공개 URL을 넣는다 |
 
 ## 미해결
 
