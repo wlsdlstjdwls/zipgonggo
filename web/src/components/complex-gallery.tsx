@@ -41,15 +41,19 @@ function Strip({
   // 줄 양끝에 더 있는지. 끌 수 있다는 걸 눈으로 알려 주지 않으면 「안 끌린다」로 읽힌다(사용자 지적 2026-09-14)
   // 넘치지 않는 줄은 끌 것이 없다. 그런 줄에까지 손바닥 커서를 주면 「끌리는데 안 먹는다」로 읽힌다
   // (사용자 지적 2026-09-14 — 실제로 끌던 줄이 4장짜리였다)
-  const [edge, setEdge] = useState({ left: false, right: false, over: false });
+  // fits는 「재 봤더니 안 넘친다」다. over의 반대가 아니라 **재기 전에는 둘 다 false**여야 한다 —
+  // 재기 전에 가운데로 모아 두면, 넘치는 줄에서 첫 칸이 왼쪽으로 밀려 나가 스크롤로도 못 돌아온다
+  const [edge, setEdge] = useState({ left: false, right: false, over: false, fits: false });
 
   const measure = useCallback(() => {
     const el = ref.current;
     if (!el) return;
+    const over = el.scrollWidth > el.clientWidth + 4;
     setEdge({
       left: el.scrollLeft > 4,
       right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
-      over: el.scrollWidth > el.clientWidth + 4,
+      over,
+      fits: !over,
     });
   }, []);
 
@@ -134,7 +138,7 @@ function Strip({
   return (
     <div className="gal-rail">
       <ul
-        className={`gal-strip${edge.over ? " over" : ""}${dragging ? " dragging" : ""}`} ref={ref} onScroll={measure}
+        className={`gal-strip${edge.over ? " over" : ""}${edge.fits ? " fits" : ""}${dragging ? " dragging" : ""}`} ref={ref} onScroll={measure}
         onPointerDown={onPointerDown} onClick={onClick}
         // 누른 채 움직이면 크롬이 제 드래그(고스트)를 시작하고 그 순간 pointermove가 끊긴다.
         // mousedown을 막으면 그게 안 일어난다 — click은 그대로 난다(막히는 건 선택·포커스뿐)

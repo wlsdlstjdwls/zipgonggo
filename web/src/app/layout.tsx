@@ -37,12 +37,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Pretendard 단일 패밀리 — fitin-app이 라틴/한글 2폰트 조합을 버리고 정착한 결론 */}
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
         {/* 구글 애드센스 로더. 사이트 검토 크롤러가 원본 HTML에서 이 태그를 찾으므로
-            next/script 클라이언트 주입이 아니라 <head>에 그대로 출력한다 */}
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3393846164946829"
-          crossOrigin="anonymous"
-        />
+            next/script 클라이언트 주입이 아니라 <head>에 그대로 출력한다.
+            개발 중에는 넣지 않는다 — localhost는 승인된 사이트가 아니라 광고 요청이 403으로 떨어지고,
+            콘솔이 그 빨간 줄로 덮여 진짜 오류가 묻힌다(사용자 지적 2026-09-14) */}
+        {process.env.NODE_ENV === "production" && (
+          <script
+            async
+            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3393846164946829"
+            crossOrigin="anonymous"
+          />
+        )}
         {/* 저장된 필터가 있으면 하이드레이션 전에 목록을 가려 둔다 — 무필터 목록이 보였다 갈리는 걸 막는다(사용자 지적 2026-09-09) */}
         <script dangerouslySetInnerHTML={{ __html: BOOT_SCOPE_JS }} />
       </head>

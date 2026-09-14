@@ -42,7 +42,8 @@ export function PhotoViewer({
   // 슬라이드 줄을 밀 거리는 무대 폭이 있어야 정해진다. 첫 그림에는 아직 상자가 없으니 재서 상태로 들고 있는다
   const [width, setWidth] = useState(0);
   // 손을 떼고 나서만 애니메이션을 건다. 끄는 중에 transition이 걸리면 손가락을 따라오지 않는다.
-  const [animate, setAnimate] = useState(true);
+  // 처음엔 꺼 둔다 — 아래 useEffect 참고.
+  const [animate, setAnimate] = useState(false);
   // 지금 사진 원본의 가로 픽셀. SH가 올린 실내 사진은 650~770px뿐이라 크게 보면 흐리다 — 그걸 미리 말해 준다
   const [natural, setNatural] = useState(0);
 
@@ -70,6 +71,16 @@ export function PhotoViewer({
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  // 열릴 때만은 transition을 끈다. 켜 둔 채 열면 줄이 0에서 -index*폭으로 미끄러져,
+  // 열한 번째 사진을 눌렀는데 앞 열 장이 주르륵 지나간 뒤에야 그 사진이 선다(사용자 지적 2026-09-14).
+  // 첫 그림은 폭을 재야 자리가 정해지므로(width) 자리잡기 자체가 한 번의 transform 변화다 — 그걸 안 태운다.
+  // rAF 두 번: 한 번은 아직 같은 프레임이라 제자리 그림이 화면에 나가기 전에 켜질 수 있다.
+  useEffect(() => {
+    let inner = 0;
+    const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => setAnimate(true)); });
+    return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); };
   }, []);
 
   const go = useCallback((next: number) => {
