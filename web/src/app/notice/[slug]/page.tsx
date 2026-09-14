@@ -18,7 +18,7 @@ import { HOUSEHOLD_MAX, ruleLines } from "@/lib/eligibility";
 import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, NO_DATE, num, won, wonKo, wonShort } from "@/lib/format";
 import { moveInLabel } from "@/lib/notice-view";
 import {
-  getAmendChain, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply,
+  getAmendChain, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition,
 } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
@@ -76,9 +76,11 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
 export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
-  const [areas, chain, complexes, supply, eligRules, noticeElig] = await Promise.all([
+  const [areas, chain, complexes, supply, eligRules, noticeElig, prior] = await Promise.all([
     getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id), getNoticeSupply(n.id), getEligibilityRules(),
     getNoticeEligibility(n.id),
+    // 「내 조건」에 붙일 직전 같은 계열 공고의 경쟁률(사용자 요청 2026-09-14). 결과 표가 없는 계열은 null
+    getPriorCompetition(n),
   ]);
   // 공고문에서 읽은 자격 묶음(notice_eligibility, 0024)이 있으면 그것을 그린다 — 장기전세는 면적×순위×자녀가산×맞벌이로
   // 갈려 시드 한 줄로는 거짓말이었다(사용자 지적 2026-09-14). 없는 공고만 아래 제도 일반 기준(supply_type)으로 후퇴한다.
@@ -274,7 +276,7 @@ export default async function NoticePage({ params }: Params) {
               <p className="note" style={{ margin: "0 0 12px" }}>
                 이 공고문의 소득과 자산, 순위 기준에 내 조건을 대 보고 맞는 단지를 추립니다. 값은 어디로도 보내지 않습니다.
               </p>
-              <NoticeFit data={noticeElig.data} complexes={complexes} supply={supply} income={eligRules.income} tiers={eligRules.tiers} noticeSlug={n.slug} />
+              <NoticeFit data={noticeElig.data} complexes={complexes} supply={supply} income={eligRules.income} tiers={eligRules.tiers} noticeSlug={n.slug} prior={prior} />
             </section>
           )}
 

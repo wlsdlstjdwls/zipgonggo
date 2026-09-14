@@ -7,7 +7,7 @@ import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_ELIGIBILITY, CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { todayKST } from "./format";
-import type { ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, Sector } from "@/types/notice";
+import type { ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorResultRow, Sector } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
@@ -377,3 +377,65 @@ export const getEligibilityRules = unstable_cache(
   ["eligibility-rules"],
   { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_ELIGIBILITY] },
 );
+
+/* ── 과거 경쟁률 (0014 notice_result) ────────────────────────
+   「내 조건에 맞는 단지」에 지난 회차 경쟁률을 붙인다(사용자 요청 2026-09-14). 같은 housing_type이라도 청년 매입임대와
+   장기미임대 매입임대는 신청자 풀이 달라 제목 계열(noticeFamily)로 한 번 더 가른다 — 계열이 다른 결과를 보이면 남의 경쟁률이다.
+   산술이 맞은 줄(reconciled)만 쓴다. 단지 이름은 표기가 조금씩 달라(「고덕온빛채」/「고덕 온빛채」) 공백·괄호·구두점을 걷어 견준다. */
+
+// 대괄호 표현 안에서 「]」는 맨 앞, 「-」는 맨 뒤여야 글자 그대로다(Postgres ARE)
+// 괄호 주석(「꿈의숲 롯데캐슬(미아4)」·「푸르내(서울리츠1호)」)은 먼저 통째로 걷는다 — 회차마다 붙었다 떨어진다
+const NAME_KEY = `regexp_replace(lower(regexp_replace(%s, '\([^)]*\)', '', 'g')), '[]_.,·・[[:space:]-]', '', 'g')`;
+
+/** 결과 계열 열쇠. 같은 housing_type 안에서 신청자 풀이 다른 프로그램을 가른다. 화면 문자열이 아니라 비교 열쇠다 */
+export function noticeFamily(title: string, housingType: string): string {
+  const t = title.replace(/\s+/g, "");
+  if (/청년매입임대|청년주택매입/.test(t)) return "청년매입임대";
+  if (/신혼신생아|미리내집/.test(t)) return "신혼신생아";
+  if (/장기미임대/.test(t)) return "장기미임대";
+  if (/다자녀/.test(t)) return "다자녀";
+  if (/자립준비청년/.test(t)) return "자립준비청년";
+  if (/서울리츠/.test(t)) return `${housingType}서울리츠`;
+  if (/잔여세대|잔여공가/.test(t)) return `${housingType}잔여`;
+  return housingType;
+}
+
+export async function getPriorCompetition(n: Pick<Notice, "id" | "agency" | "housing_type" | "title" | "posted_at">): Promise<PriorCompetition | null> {
+  // 1) 결과 표가 있는 같은 유형의 앞선 공고 — 최근 것부터 몇 건만 보고 계열이 같은 첫 공고를 고른다
+  const cands = await query<{ id: number; slug: string; title: string; posted_at: string }>(
+    `SELECT n.id, n.slug, n.title, n.posted_at::text AS posted_at
+       FROM notice n
+      WHERE n.agency = $1 AND n.housing_type::text = $2 AND n.posted_at < $3::date AND n.id <> $4
+        AND EXISTS (SELECT 1 FROM notice_result r WHERE r.notice_id = n.id AND r.reconciled)
+      ORDER BY n.posted_at DESC, n.id DESC LIMIT 12`,
+    [n.agency, n.housing_type, n.posted_at, n.id],
+  );
+  const family = noticeFamily(n.title, n.housing_type);
+  const prior = cands.find((c) => noticeFamily(c.title, n.housing_type) === family);
+  if (!prior) return null;
+  // 2) 그 공고의 줄 가운데 이 공고 단지와 이름이 맞는 것 + 전체 소계 합산. 쿼리 둘, 단지 수와 무관
+  const [rows, sums] = await Promise.all([
+    query<PriorResultRow>(
+      `SELECT r.complex_name, r.supply_type, r.tenant_class, r.bracket, r.units, r.applicants, r.ratio::float AS ratio
+         FROM notice_result r
+        WHERE r.notice_id = $1 AND r.reconciled
+          AND ${NAME_KEY.replace("%s", "r.complex_name")} IN (
+                SELECT ${NAME_KEY.replace("%s", "c.name")} FROM notice_complex c WHERE c.notice_id = $2)
+        ORDER BY r.row_no`,
+      [prior.id, n.id],
+    ),
+    query<{ complexes: number; units: number | null; applicants: number | null }>(
+      `SELECT count(DISTINCT complex_name)::int AS complexes, sum(units)::int AS units, sum(applicants)::int AS applicants
+         FROM notice_result WHERE notice_id = $1 AND reconciled AND bracket = '소계'`,
+      [prior.id],
+    ),
+  ]);
+  const s = sums[0];
+  const units = s?.units ?? 0;
+  const applicants = s?.applicants ?? 0;
+  return {
+    notice: prior,
+    rows,
+    summary: { complexes: s?.complexes ?? 0, units, applicants, ratio: units > 0 ? Math.round((applicants / units) * 10) / 10 : null },
+  };
+}

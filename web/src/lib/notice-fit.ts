@@ -12,8 +12,8 @@
 // 여기서 나오는 답은 안내지 심사 결과가 아니다. 판정에 쓴 기준은 전부 reasons에 적어 돌려준다 — 왜 그렇게 봤는지가 보여야
 // 사용자가 공고문에서 제 자리를 찾는다. 배점표의 점수 규칙(3년 이상 3점 등)은 공고문 표를 읽어 들이지 않고 행복주택 제도의
 // 고정 규칙으로 두되, 화면은 공고문 배점표를 같이 그린다.
-import type { EligAsset, EligClassBlock, EligIncomeTable, EligRankRow, EligRankTable, IncomeStandard, NoticeEligibilityData, RegionTier } from "@/types/eligibility";
-import type { NoticeComplex, NoticeSupply } from "@/types/notice";
+import type { EligAsset, EligClassBlock, EligIncomeTable, EligKind, EligRankRow, EligRankTable, IncomeStandard, NoticeEligibilityData, RegionTier } from "@/types/eligibility";
+import type { NoticeComplex, NoticeSupply, PriorResultRow } from "@/types/notice";
 
 export type FitProfile = {
   /** 가구원 수(태아 포함) */
@@ -500,6 +500,8 @@ export type ComplexPick = {
   order: number;
   /** 면적·금액 한 줄 */
   sub: string;
+  /** 지난 회차 경쟁률(내 구분·전체). 결과 줄이 없는 단지는 null */
+  prior: ComplexPrior | null;
 };
 
 /** 면적 라벨(「60㎡ 이하」「60㎡ 초과 85㎡ 이하」「50㎡ 미만」)을 구간으로 */
@@ -528,4 +530,69 @@ export function complexFacts(supply: NoticeSupply[]): Map<string, { areas: numbe
     m.set(s.complex_name, f);
   }
   return m;
+}
+
+// ── 지난 회차 경쟁률 ────────────────────────────────────────
+// notice_result(0014)의 직전 같은 계열 공고 줄을 단지에 붙인다(사용자 요청 2026-09-14). 「내 순위」 구분과 「전체」(소계) 둘을 만든다.
+// 주택형마다 줄이 갈리므로 합산 경쟁률 = 신청자 합 ÷ 공급호수 합(가중 평균)이고, 주택형별 값은 detail로 따로 돌려준다.
+// 지난 값은 이번 결과를 보장하지 않는다 — 화면이 그 말을 반드시 같이 한다.
+
+export type PriorLine = { label: string; ratio: number; units: number; applicants: number; detail: string };
+export type ComplexPrior = { mine: PriorLine | null; total: PriorLine | null };
+
+/** 결과 표와 단지 표의 이름을 견주는 열쇠. queries.ts NAME_KEY(SQL)와 같은 규칙 — 공백·괄호·구두점을 걷는다 */
+export function priorNameKey(name: string): string {
+  return name.replace(/\([^)]*\)/g, "").toLowerCase().replace(/[\s[\]_.,·・-]/g, "");
+}
+
+function aggregate(rows: PriorResultRow[], label: string): PriorLine | null {
+  const ok = rows.filter((r) => r.units != null && r.applicants != null && r.units > 0);
+  if (!ok.length) return null;
+  const units = ok.reduce((a, r) => a + r.units!, 0);
+  const applicants = ok.reduce((a, r) => a + r.applicants!, 0);
+  const detail = ok
+    .map((r) => `${r.supply_type ? `${r.supply_type}${/[A-Za-z]$|㎡$/.test(r.supply_type) ? "" : "㎡"}` : ""}${r.tenant_class ? ` ${r.tenant_class}` : ""} ${r.applicants}명/${r.units}호 ${r.ratio != null ? `${r.ratio}:1` : ""}`.trim())
+    .join(" | ");
+  return { label, ratio: Math.round((applicants / units) * 10) / 10, units, applicants, detail };
+}
+
+/**
+ * 단지 하나의 지난 회차 경쟁률. 양식마다 「내 구분」이 다르다 —
+ * 행복주택: 내 계층(classKey) 줄 가운데 우선(서울 거주)·일반 띠. 청년 매입임대·매입임대: 「일반n순위」/「n순위」. 장기전세: 구분 없음(소계만).
+ */
+export function priorForComplex(
+  rows: PriorResultRow[],
+  o: { kind: EligKind; cls: string | null; rank: number | null; priority: boolean },
+): ComplexPrior | null {
+  if (!rows.length) return null;
+  let total: PriorLine | null;
+  let mine: PriorLine | null = null;
+  if (o.kind === "haengbok" && o.cls) {
+    // 행복주택은 계층마다 신청자 풀이 다르다 — 이 단지에 내 계층 줄이 없으면 다른 계층의 「전체」도 보이지 않는다
+    // (청년에게 신혼부부 4.2:1을 보이면 남의 경쟁률이다). 「전체」는 내 계층의 우선 + 일반 합.
+    const key = classKey(o.cls);
+    const cls = rows.filter((r) => r.tenant_class && classKey(r.tenant_class) === key);
+    if (!cls.length) return null;
+    const bracket = o.priority ? "우선" : "일반";
+    mine = aggregate(cls.filter((r) => r.bracket === bracket), `${key} ${bracket}공급`);
+    total = aggregate(cls.filter((r) => r.bracket === "소계"), `${key} 전체`);
+  } else {
+    total = aggregate(rows.filter((r) => r.bracket === "소계"), "전체");
+  }
+  if (o.kind !== "haengbok" && o.rank != null) {
+    const want = `${o.rank}순위`;
+    mine = aggregate(rows.filter((r) => r.bracket.replace(/\s/g, "").endsWith(want) && r.bracket !== "소계"), want);
+  }
+  if (!mine && !total) return null;
+  return { mine, total };
+}
+
+/** 지난 공고 제목을 한 줄 꼬리표로. 「2026년 1차 행복주택 입주자 모집공고 (2026. 5. 28. 공고)」 → 「2026년 1차 행복주택」 */
+export function priorLabel(title: string): string {
+  return title
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/입주자\s*모집\s*공고?|모집\s*공고|서울주택도시개발공사|서울주택도시공사/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }

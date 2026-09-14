@@ -186,3 +186,23 @@ export type FilterOption = { value: string; count: number };
 /** 스코프 바·필터 바의 수량. 지금 걸린 다른 필터를 반영해 센다(자기 축은 빼고) — 지역을 바꾸면 유형 수량도 따라 바뀐다.
  * total은 부문 칩 「전체」의 수, closing7은 「마감 7일 내」 칩의 수다. */
 export type Facets = { sector: FilterOption[]; sido: FilterOption[]; type: FilterOption[]; closing7: number; total: number };
+
+/** 과거 결과 표 한 줄(notice_result, 0014). 단지 × 공급유형 × 계층 × 구분(우선·일반·n순위·소계). 산술이 맞은(reconciled) 줄만 온다 */
+export type PriorResultRow = {
+  complex_name: string;
+  supply_type: string;
+  tenant_class: string;
+  bracket: string;
+  units: number | null;
+  applicants: number | null;
+  ratio: number | null;
+};
+
+/** 「내 조건에 맞는 단지」가 쓰는 직전 같은 계열 공고의 경쟁률. 없으면 null(결과 글이 아직 없거나 표 양식을 못 읽은 계열) */
+export type PriorCompetition = {
+  notice: { id: number; slug: string; title: string; posted_at: string };
+  /** 이 공고 단지와 이름이 맞는 줄만. 단지 이름은 공백·괄호·구두점을 걷어 견준다 */
+  rows: PriorResultRow[];
+  /** 그 공고 전체 — 소계 줄 합산. 단지가 안 겹쳐도 「지난 회차는 평균 n:1」은 말할 수 있다 */
+  summary: { complexes: number; units: number; applicants: number; ratio: number | null };
+};

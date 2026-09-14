@@ -9,17 +9,19 @@
 // 이 단지가 드는지 한 줄로 먼저 말한 뒤 목록 맨 위에 「이 단지」로 띄운다. 단지 상세는 언제나 접힌 채 시작하고 거기서 편 상태는
 // 저장하지 않는다(공고 상세의 펼침만 기억, 사용자 요청 2026-09-14). 접기 버튼은 위에 하나.
 // 보증금 예산 필터는 뺐다 — 대출을 끼면 예산이 뜻을 잃고, 금액은 단지 줄에 다 적혀 있다(사용자 지적 2026-09-14).
+// 지난 회차 경쟁률(prior, notice_result)은 단지 줄마다 「내 구분」과 「전체」로 붙이고 낮은 순으로 앞세운다(사용자 요청 2026-09-14).
+// 직전 같은 계열 공고의 결과라 이번 결과를 보장하지 않는다 — 목록 머리와 안내문이 그 말을 한다. 결과 표가 없는 계열은 줄이 없다.
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FIT_STORAGE_KEY } from "@/lib/constants";
-import { num, wonShort } from "@/lib/format";
+import { dateK, num, wonShort } from "@/lib/format";
 import {
-  areaBand, classKey, complexFacts, fitCheongnyeon, fitHaengbok, fitJanggi, fitMaeip, isSeoul, janggiAreas, MAN, seoulGus,
+  areaBand, classKey, complexFacts, fitCheongnyeon, fitHaengbok, fitJanggi, fitMaeip, isSeoul, janggiAreas, MAN, priorForComplex, priorLabel, priorNameKey, seoulGus,
   type ComplexPick, type FitProfile, type FitVerdict,
 } from "@/lib/notice-fit";
-import { noticeComplexPath } from "@/lib/routes";
+import { noticeComplexPath, noticePath } from "@/lib/routes";
 import type { EligKind, IncomeStandard, NoticeEligibilityData, RegionTier } from "@/types/eligibility";
-import type { NoticeComplex, NoticeSupply } from "@/types/notice";
+import type { NoticeComplex, NoticeSupply, PriorCompetition, PriorResultRow } from "@/types/notice";
 import { Select } from "./select";
 
 type Props = {
@@ -31,6 +33,8 @@ type Props = {
   noticeSlug: string;
   /** 단지 상세에서 넘기는 지금 보고 있는 단지 id. 있으면 이 단지의 판정을 먼저 말하고 목록 맨 위에 둔다 */
   currentId?: number;
+  /** 직전 같은 계열 공고의 경쟁률(getPriorCompetition). 없으면 경쟁률 줄을 그리지 않는다 */
+  prior?: PriorCompetition | null;
 };
 
 type Stored = { p: Partial<FitProfile>; open: boolean };
@@ -63,7 +67,7 @@ const DEFAULT: FitProfile = {
 
 const LIST_STEP = 12;
 
-export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, currentId }: Props) {
+export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, currentId, prior }: Props) {
   const kind: EligKind = data.kind ?? "janggi";
   const [open, setOpen] = useState(false);
   const [p, setP] = useState<FitProfile>(() => ({
@@ -128,6 +132,15 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
   const table = data.rank_tables.find((t) => t.group === p.group) ?? data.rank_tables[0];
   const areas = useMemo(() => (table ? janggiAreas(table) : []), [table]);
   const facts = useMemo(() => complexFacts(supply), [supply]);
+  // 지난 회차 결과 줄을 단지 이름 열쇠로 묶는다(이름 표기 차이는 열쇠가 걷는다)
+  const priorRows = useMemo(() => {
+    const m = new Map<string, PriorResultRow[]>();
+    for (const r of prior?.rows ?? []) {
+      const k = priorNameKey(r.complex_name);
+      m.set(k, [...(m.get(k) ?? []), r]);
+    }
+    return m;
+  }, [prior]);
 
   const verdict: FitVerdict | null = useMemo(() => {
     if (kind === "haengbok") return fitHaengbok(data, p, income);
@@ -184,11 +197,15 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
       }
       const areaTxt = areasOf.length ? (Math.min(...areasOf) === Math.max(...areasOf) ? `${Math.min(...areasOf)}㎡` : `${Math.min(...areasOf)}~${Math.max(...areasOf)}㎡`) : "";
       const money = rent != null ? `월 ${wonShort(rent)}${deposit != null ? ` | 보증금 ${wonShort(deposit)}` : ""}` : deposit != null ? `보증금 ${wonShort(deposit)}` : "";
-      out.push({ c, tags, order, sub: [areaTxt, money, c.unit_count != null ? num(c.unit_count, "호") : ""].filter(Boolean).join(" | ") });
+      // 지난 회차 경쟁률 — 내 구분(행복주택은 계층 × 우선/일반, 나머지는 순위)이 있으면 그것, 없으면 전체. 낮은 경쟁률이 앞(순위 다음, 금액 앞)
+      const pr = priorForComplex(priorRows.get(priorNameKey(c.name)) ?? [], { kind, cls: p.cls, rank: verdict?.rank ?? null, priority: kind === "haengbok" && isSeoul(p.gu) });
+      const ratio = pr?.mine?.ratio ?? pr?.total?.ratio ?? null;
+      order += ratio != null ? Math.min(ratio, 999) / 1e6 : 1e-3;
+      out.push({ c, tags, order, sub: [areaTxt, money, c.unit_count != null ? num(c.unit_count, "호") : ""].filter(Boolean).join(" | "), prior: pr });
     }
     // 단지 상세에서는 보고 있는 단지를 맨 위에
     return out.sort((a, b) => Number(b.c.id === currentId) - Number(a.c.id === currentId) || a.order - b.order || a.c.name.localeCompare(b.c.name, "ko"));
-  }, [kind, complexes, facts, p, data, income, table, verdict, currentId]);
+  }, [kind, complexes, facts, p, data, income, table, verdict, currentId, priorRows]);
 
   // 행복주택 경쟁 순서(공고문 선정기준 절). 배점이 순위를 바꾸는 게 아니라 같은 순위 안 순서라는 걸 이 줄로 보인다
   const haengbokSteps = useMemo(() => {
@@ -328,6 +345,7 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
                   ? <>{eligible ? "이 단지는 내 조건에 듭니다" : "조건에 맞으면 볼 수 있는 단지입니다"}{currentPick.tags.map((t) => ` | ${t.text}`).join("")}</>
                   : "이 단지는 지금 조건(면적이나 계층)에 들지 않습니다"}
               </span>
+              {currentPick?.prior && <PriorLine prior={currentPick.prior} />}
             </p>
           )}
 
@@ -335,11 +353,20 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
             <h3>
               {eligible ? "맞는 단지" : "조건에 맞으면 볼 수 있는 단지"} <b>{picks.length}</b><small>곳</small>
             </h3>
+            {prior && (
+              <p className="fit-prior-head">
+                경쟁률은 지난 회차 <Link href={noticePath(prior.notice.slug)}>{priorLabel(prior.notice.title)}</Link>
+                <small>{dateK(prior.notice.posted_at)} 공고</small> 결과입니다
+                {prior.summary.ratio != null && <> — 단지 {num(prior.summary.complexes)}곳 평균 <b>{prior.summary.ratio}:1</b></>}.
+                {picks.some((x) => x.prior) ? " 낮은 경쟁률부터 보입니다. " : " 이번 공고 단지와 겹치는 단지가 없어 단지 줄에는 안 붙습니다. "}
+                이번 결과를 보장하지 않습니다.
+              </p>
+            )}
             {picks.length === 0 ? (
               <p className="elig-none">조건에 드는 단지가 없습니다. 면적이나 계층을 바꿔 보세요.</p>
             ) : (
               <ul className="fit-rows">
-                {picks.slice(0, shown).map(({ c, tags, sub }) => (
+                {picks.slice(0, shown).map(({ c, tags, sub, prior: pr }) => (
                   <li key={c.id} className={c.id === currentId ? "me" : undefined}>
                     <Link href={noticeComplexPath(noticeSlug, c)} aria-current={c.id === currentId ? "page" : undefined}>
                       <span className="fit-row-main">
@@ -347,6 +374,7 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
                         <small>{c.sigungu}{c.is_new ? " | 신규" : ""}{c.id === currentId ? " | 이 단지" : ""}</small>
                       </span>
                       <span className="fit-row-sub">{sub}</span>
+                      {pr && <PriorLine prior={pr} />}
                       {tags.length > 0 && (
                         <span className="fit-tags">
                           {tags.map((t) => <em key={t.text} className={`tag ${t.tone}`}>{t.text}</em>)}
@@ -363,13 +391,31 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
               </button>
             )}
             <p className="elig-note">
-              공고문의 기준을 내 조건에 대 본 안내입니다. 심사 결과가 아니며, 경쟁률과 당첨선은 이 공고의 결과가 나와야 알 수 있습니다.
-              입력한 값은 이 브라우저를 벗어나지 않습니다.
+              공고문의 기준을 내 조건에 대 본 안내입니다. 심사 결과가 아닙니다.
+              {prior
+                ? " 경쟁률은 지난 회차의 접수 결과이며 이번 공고의 경쟁률과 당첨선은 이 공고의 결과가 나와야 알 수 있습니다."
+                : " 경쟁률과 당첨선은 이 공고의 결과가 나와야 알 수 있습니다."}
+              {" "}입력한 값은 이 브라우저를 벗어나지 않습니다.
             </p>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+/** 단지 한 줄의 지난 회차 경쟁률. 내 구분 + 전체. 주택형별 값은 title로 */
+function PriorLine({ prior }: { prior: NonNullable<ComplexPick["prior"]> }) {
+  const parts = [prior.mine, prior.total && (!prior.mine || prior.total.ratio !== prior.mine.ratio || prior.total.units !== prior.mine.units) ? prior.total : null]
+    .filter((x): x is NonNullable<typeof x> => x != null);
+  if (!parts.length) return null;
+  return (
+    <span className="fit-row-prior" title={parts.map((x) => `${x.label}: ${x.detail}`).join(" / ")}>
+      <small>지난 회차</small>
+      {parts.map((x) => (
+        <span key={x.label}>{x.label} <b>{x.ratio}:1</b><i>{num(x.applicants)}명/{num(x.units)}호</i></span>
+      ))}
+    </span>
   );
 }
 

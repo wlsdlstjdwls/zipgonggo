@@ -84,7 +84,7 @@ def _parsed_seqs(cur) -> set[str]:
 
 
 def run(*, dry_run: bool, max_pages: int | None, since_year: int | None, limit: int | None,
-        relink_only: bool, reparse: bool) -> Stats:
+        relink_only: bool, reparse: bool, kinds: set[str] | None = None) -> Stats:
     cfg = settings()
     started = utc_now()
     stats = Stats()
@@ -138,6 +138,10 @@ def run(*, dry_run: bool, max_pages: int | None, since_year: int | None, limit: 
             if notice_id is None:
                 stats.skip("unlinked")
                 continue
+            # 원장엔 다 넣되 첨부는 고른 종류만 읽는다 — 당첨자 명단은 수십 쪽이라 경쟁률만 채울 땐 건너뛴다
+            if kinds and got.kind not in kinds:
+                stats.skip("kind_filtered")
+                continue
             if row.seq in parsed:
                 stats.skip("already_parsed")
                 continue
@@ -174,13 +178,15 @@ def _add_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--limit", type=int, default=None, help="첨부를 읽을 글 수 상한. 원장 적재는 전부 한다")
     ap.add_argument("--relink", action="store_true", help="목록을 받지 않고, 못 이은 결과 글만 다시 이어 본다")
     ap.add_argument("--reparse", action="store_true", help="이미 읽은 글도 첨부를 다시 받아 파싱한다")
+    ap.add_argument("--kind", action="append", choices=["competition", "winner"], default=None,
+                    help="첨부를 읽을 결과 글 종류. 여러 번 줄 수 있다. 원장(result_post)은 종류와 무관하게 다 넣는다")
 
 
 def main(argv: list[str] | None = None) -> int:
     return stage_main(
         "S3 i-sh 결과 글(경쟁률·당첨자 발표) 적재",
         lambda a: run(dry_run=a.dry_run, max_pages=a.max_pages, since_year=a.since_year,
-                      limit=a.limit, relink_only=a.relink, reparse=a.reparse),
+                      limit=a.limit, relink_only=a.relink, reparse=a.reparse, kinds=set(a.kind) if a.kind else None),
         add_args=_add_args, argv=argv,
     )
 

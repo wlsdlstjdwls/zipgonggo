@@ -49,7 +49,8 @@ LAYOUT_B_COLS = ("단지명", "공급유형", "신청자격", "대상", "공급�
 # 「주택형」과 「성별」은 붙어 찍혀 한 칸("주택형성별")으로 온다 — 형만 앞에서 떼어 쓴다.
 LAYOUT_C_COLS = ("구분", "자치구", "주소지", "주택명", "주택형성별", "대상", "공급호수", "계", "경쟁률")
 
-BRACKET_A = re.compile(r"^(우선|일반)$")
+# 2026년 1차(seq=305877)부터 우선·일반 띠 없이 「예비자」 한 줄만 있는 블록이 생겼다(예비입주자만 뽑는 단지)
+BRACKET_A = re.compile(r"^(우선|일반|예비자)$")
 BRACKET_B = re.compile(r"^(?:(?:우선|일반)\s*)?\d+\s*순위$|^소계$")   # 「3순위」와 「일반1순위」 둘 다
 TOTAL_ROW = re.compile(r"^(총계|계)$")
 SUPPLY_TYPE_RE = re.compile(r"(\d+\s*[A-Z]?)\s*$")     # "아4)39" → "39", "20A" → "20A"
@@ -114,10 +115,24 @@ def _pitch(chars: list[Char]) -> float:
     return statistics.median(gaps) if gaps else 7.5
 
 
-def _cell(chars: list[Char], lo: float, hi: float, pitch: float) -> _Cell:
-    """열 범위 안 글자를 x 순으로 잇는다. 폭 0(쉼표·마침표)은 같은 x의 숫자보다 앞선다."""
+def _cell(chars: list[Char], lo: float, hi: float, pitch: float, *, lines: bool = False) -> _Cell:
+    """열 범위 안 글자를 x 순으로 잇는다. 폭 0(쉼표·마침표)은 같은 x의 숫자보다 앞선다.
+
+    lines=True면 줄(y)을 먼저 본다 — 글자 칸(계층 「주거급여」/「수급자」 두 줄)은 x로만 이으면 두 줄이 지퍼처럼 섞인다
+    (「주수거급급자여」, 실측 seq=305877). 숫자 칸은 소수점이 딴 줄에 찍히므로 x 순이어야 한다."""
     sel = [c for c in chars if lo <= _cx(c) < hi and c.ch.strip()]
-    sel.sort(key=lambda c: (c.l, c.w != 0))
+    if lines:
+        # 줄 번호: t 순으로 훑어 6px 넘게 벌어지면 새 줄. 같은 줄 글자도 t가 1~2px씩 달라 반올림으로는 못 가른다
+        line_of: dict[int, int] = {}
+        prev_t, ln = None, 0
+        for c in sorted(sel, key=lambda c: c.t):
+            if prev_t is not None and c.t - prev_t > 6:
+                ln += 1
+            line_of[id(c)] = ln
+            prev_t = c.t
+        sel.sort(key=lambda c: (line_of[id(c)], c.l, c.w != 0))
+    else:
+        sel.sort(key=lambda c: (c.l, c.w != 0))
     text = "".join(c.ch for c in sel).strip()
     wide = [c for c in sel if c.w > 0]
     hole = any(b.l - a.l > pitch * HOLE_RATIO for a, b in zip(wide, wide[1:]))
@@ -125,8 +140,10 @@ def _cell(chars: list[Char], lo: float, hi: float, pitch: float) -> _Cell:
 
 
 def _int(cell: _Cell) -> int | None:
+    """정수 칸. 여덟 자리 넘는 값은 이웃 줄이 이어 붙은 것이라 None — 실측 2026-09-14, 띠 경계가 어긋나면
+    「322153991526368223886250」 같은 값이 나와 DB integer를 넘겨 적재 전체가 되돌아갔다."""
     t = cell.text.replace(",", "").replace(" ", "")
-    return int(t) if t.isdigit() else None
+    return int(t) if t.isdigit() and len(t) <= 7 else None
 
 
 def _ratio(cell: _Cell) -> float | None:
@@ -337,19 +354,19 @@ def _ranges(blocks: list[list[_Band]]) -> list[tuple[float, float]]:
     return [(bs[0].lo, bs[-1].hi) for bs in blocks]
 
 
-def _block_cell(bands: list[_Band], span: tuple[float, float], pitch: float) -> _Cell:
+def _block_cell(bands: list[_Band], span: tuple[float, float], pitch: float, *, lines: bool = False) -> _Cell:
     """블록 하나에 한 번만 있는 값(단지경쟁률·면적·계층·공급호수).
 
     두 경우가 섞여 온다. 값이 띠마다 되풀이 인쇄되면(「청년」「청년」) 하나만 쓰고,
     한 값이 띠에 걸쳐 쪼개져 있으면(숫자는 우선 띠, 소수점은 일반 띠) 이어 붙인다.
     """
-    cells = [_cell(b.chars, *span, pitch) for b in bands]
+    cells = [_cell(b.chars, *span, pitch, lines=lines) for b in bands]
     filled = [c for c in cells if c.text]
     if not filled:
         return _Cell("", False)
     if len({c.text for c in filled}) == 1:
         return filled[0]
-    return _cell([c for b in bands for c in b.chars], *span, pitch)
+    return _cell([c for b in bands for c in b.chars], *span, pitch, lines=lines)
 
 
 def parse_competition_page(xml: str, page: int) -> list[CompetitionRow]:
@@ -369,6 +386,11 @@ def parse_competition_page(xml: str, page: int) -> list[CompetitionRow]:
 
 def _parse_layout_a(rows: list[tuple[float, list[Segment], list[Char]]], page: int) -> list[CompetitionRow]:
     header = {**_labels_of(rows, LAYOUT_A_MAIN), **_labels_of(rows, LAYOUT_A_SUB)}
+    # 2026년 조판은 「공급구분」이 한 조각(2025년은 「공급」/「구분」 두 줄). 없으면 계층 열을 잃어 tenant_class가 빈다
+    if "구분" not in header:
+        alias = _labels_of(rows, ("공급구분",))
+        if alias:
+            header["구분"] = alias["공급구분"]
     if not {"자치구", "단지명", "유형", "일반", "인터넷", "계"} <= set(header):
         return []
     hb = _header_bottom(header)
@@ -378,10 +400,10 @@ def _parse_layout_a(rows: list[tuple[float, list[Segment], list[Char]]], page: i
         return []
     pitch = _pitch([c for _t, _s, chars in rows for c in chars])
 
-    # 우선 띠가 블록을 연다. 「일반」만 홀로 오는 블록도 있어 앞에 우선이 없으면 제 블록으로 둔다.
+    # 우선 띠가 블록을 연다. 「일반」만 홀로 오는 블록도 있어 앞에 우선이 없으면 제 블록으로 둔다. 「예비자」는 언제나 한 줄짜리 블록.
     blocks: list[list[_Band]] = []
     for b in bands:
-        if b.label == "우선" or not blocks or blocks[-1][-1].label == "일반":
+        if b.label in ("우선", "예비자") or not blocks or blocks[-1][-1].label in ("일반", "예비자"):
             blocks.append([b])
         else:
             blocks[-1].append(b)
@@ -394,7 +416,7 @@ def _parse_layout_a(rows: list[tuple[float, list[Segment], list[Char]]], page: i
     out: list[CompetitionRow] = []
     for i, bs in enumerate(blocks):
         supply_type = _supply_type(_block_cell(bs, _span(bounds, "유형"), pitch))
-        tenant = _block_cell(bs, _span(bounds, "구분"), pitch).text
+        tenant = _block_cell(bs, _span(bounds, "구분"), pitch, lines=True).text
         block_ratio_cell = _block_cell(bs, _span(bounds, "단지"), pitch)
         units_sum = applicants_sum = 0
         all_ok = True
@@ -404,7 +426,9 @@ def _parse_layout_a(rows: list[tuple[float, list[Segment], list[Char]]], page: i
             visit = _cell(b.chars, *_span(bounds, "방문"), pitch)
             total_cell = _cell(b.chars, *_span(bounds, "계"), pitch)
             total = _int(total_cell)
-            ratio_cell = _cell(b.chars, *_span(bounds, "우선"), pitch) if b.label == "우선" else _Cell("", False)
+            # 우선 띠는 우선경쟁률 칸, 예비자 한 줄 블록은 단지경쟁률 칸에 값이 있다. 일반 띠엔 경쟁률이 인쇄되지 않는다
+            ratio_cell = (_cell(b.chars, *_span(bounds, "우선"), pitch) if b.label == "우선"
+                          else _cell(b.chars, *_span(bounds, "단지"), pitch) if b.label == "예비자" else _Cell("", False))
             ratio = _ratio(ratio_cell)
             # 계 = 인터넷 + 방문. 둘 다 성하고 합이 맞으면 계를 믿는다.
             parts = (_int(internet) or 0) + (_int(visit) or 0)
@@ -416,7 +440,10 @@ def _parse_layout_a(rows: list[tuple[float, list[Segment], list[Char]]], page: i
             elif not sum_ok and total_cell.hole and not ratio_cell.hole and ratio and units:
                 total, repaired = round(ratio * units), True                      # 계 칸에만 구멍 → 경쟁률로 되메움
                 sum_ok = True
-            ok = sum_ok and (ratio_ok or b.label == "일반")   # 일반 띠엔 경쟁률이 인쇄되지 않는다
+            # 일반 띠엔 경쟁률이 인쇄되지 않아 계 = 인터넷 + 방문만 본다. 우선·예비자 띠는 인쇄된 경쟁률이 계 ÷ 합계와 맞으면
+            # 인터넷 칸이 글자를 흘렸어도(한 글자짜리는 구멍으로 못 잡는다 — 305877 「8」+「52」=「140」) 두 인쇄값이 서로 맞는 것이라 믿는다
+            # 단, 계·경쟁률 칸 자체에 구멍이 있으면 안 믿는다 — 둘 다 한 자리씩 흘리면 산술이 우연히 맞는다(288199 어울채 5,444→544, 777.7→77.7)
+            ok = sum_ok if b.label == "일반" else (sum_ok or (ratio_ok and not total_cell.hole and not ratio_cell.hole))
             all_ok &= ok
             out.append(CompetitionRow(name.get(i, ""), gu.get(i, ""), "", "", supply_type, tenant, b.label,
                                       units, total, ratio, ok, repaired, page))

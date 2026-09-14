@@ -1223,12 +1223,22 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .fit-list h3 b { color: var(--acc); }
 .fit-list h3 small { font-weight: 700; font-size: 11px; color: var(--dim); }
 .fit-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.fit-rows a { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main tag" "sub tag"; column-gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-btn); transition: transform 240ms var(--sp), border-color 200ms var(--ease); }
+.fit-rows a { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main tag" "sub tag" "prior tag"; column-gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-btn); transition: transform 240ms var(--sp), border-color 200ms var(--ease); }
 .fit-rows a:hover { transform: translateY(-1.5px); border-color: var(--acc); }
 .fit-row-main { grid-area: main; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .fit-row-main b { font-weight: 800; font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fit-row-main small { flex: none; font-weight: 600; font-size: 11px; color: var(--dim); }
 .fit-row-sub { grid-area: sub; margin-top: 2px; font-size: 12px; color: var(--mut); }
+/* 지난 회차 경쟁률 — 내 구분과 전체. 단지 줄 세 번째 줄, 단지 상세 한 줄 판정 밑 */
+.fit-row-prior { grid-area: prior; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 3px 10px; align-items: baseline; font-size: 12px; color: var(--mut); }
+.fit-row-prior small { font-weight: 700; font-size: 10.5px; color: var(--dim); letter-spacing: 0.02em; }
+.fit-row-prior b { font-weight: 800; color: var(--ink); }
+.fit-row-prior i { font-style: normal; margin-left: 4px; font-size: 11px; color: var(--dim); }
+.fit-me .fit-row-prior { flex-basis: 100%; margin-top: 2px; font-weight: 600; }
+.fit-prior-head { margin: -4px 0 10px; font-size: 12.5px; line-height: 1.6; color: var(--mut); }
+.fit-prior-head a { font-weight: 700; color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.fit-prior-head small { margin-left: 4px; font-size: 11px; color: var(--dim); }
+.fit-prior-head b { color: var(--ink); }
 .fit-tags { grid-area: tag; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .fit-tags .tag { height: 24px; padding: 0 9px; }
 .fit-open[aria-expanded="true"] { margin-bottom: 14px; }

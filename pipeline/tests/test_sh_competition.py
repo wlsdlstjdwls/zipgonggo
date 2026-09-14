@@ -79,7 +79,9 @@ def test_a_unrepairable_stays_flagged(rows_a):
     assert not r.reconciled
     assert not _find(rows_a, "어울채", "23", "소계").reconciled
     # 상한선: 이 쪽은 원문이 유난히 상했다. 더 늘면 파서가 퇴행한 것
-    assert sum(1 for r in rows_a if not r.reconciled) == 9
+    # 7 = 어울채 2 + DMC에코자이 일반·소계 2 + 왕십리자이 3. 고덕온빛채 36S 우선(인터넷 「17」→177 유실, 계 229 = 12 × 19.1)은
+    # 계·경쟁률 두 인쇄값이 서로 맞고 그 두 칸에 구멍이 없어 이제 믿는다(2026-09-14, 305877에서 같은 꼴이 많았다)
+    assert sum(1 for r in rows_a if not r.reconciled) == 7
 
 
 # ── 청년안심주택 양식 ──────────────────────────────────────────────────────
@@ -154,3 +156,38 @@ def test_c_integer_ratio_is_accepted(rows_c):
              and r.supply_type == "26B" and r.bracket == "일반2순위")
     assert (r.units, r.applicants, r.ratio) == (2, 105, 53.0)
     assert r.reconciled and not r.repaired
+
+
+# ── 행복주택 2026년 조판 (seq=305877) ───────────────────────────────────────
+# 2025년과 표 뼈대는 같은데 셋이 다르다: 「공급구분」 헤더가 한 조각, 우선·일반 없이 「예비자」 한 줄뿐인 블록,
+# 계층 「주거급여수급자」가 두 줄로 접힘. 띠를 못 열면 이웃 줄 숫자가 이어 붙어 integer를 넘긴다(적재가 통째로 되돌아갔다).
+
+PAGES_A26 = [(1, (FIX / "ish_305877" / "p1.xml").read_text(encoding="utf-8"))]
+
+
+@pytest.fixture(scope="module")
+def rows_a26():
+    return parse_competition(PAGES_A26)
+
+
+def test_a26_tenant_class_from_single_header(rows_a26):
+    assert {r.tenant_class for r in rows_a26} >= {"청년", "대학생", "고령자", "신혼부부"}
+    assert "" not in {r.tenant_class for r in rows_a26}
+
+
+def test_a26_reserve_only_block(rows_a26):
+    """「예비자」만 있는 블록은 한 줄 + 소계. 단지경쟁률 칸의 값이 곧 그 줄의 경쟁률이다."""
+    r = _find(rows_a26, "래미안개포루체하임", "49", "예비자")
+    assert (r.units, r.applicants, r.ratio, r.reconciled) == (6, 126, 21.0, True)
+    assert _find(rows_a26, "래미안개포루체하임", "49", "소계").ratio == 21.0
+    assert not any(r.complex_name == "래미안개포루체하임" and r.bracket in ("우선", "일반") for r in rows_a26)
+
+
+def test_a26_no_glued_numbers(rows_a26):
+    assert all((r.units or 0) < 100_000 and (r.applicants or 0) < 1_000_000 for r in rows_a26)
+
+
+def test_a26_ratio_corroborates_total(rows_a26):
+    """인터넷 칸이 한 글자를 흘려(「8」+52 ≠ 140) 합이 안 맞아도, 계 140 ÷ 합계 18 = 7.8이 인쇄 경쟁률과 맞으면 믿는다."""
+    r = _find(rows_a26, "강일리버파크1단지", "29", "우선")
+    assert (r.units, r.applicants, r.ratio, r.reconciled) == (18, 140, 7.8, True)
