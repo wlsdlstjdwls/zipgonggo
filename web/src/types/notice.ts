@@ -141,12 +141,28 @@ export type NoticeComplex = {
   heating: string | null;
   /** 이 단지 공급현황에 적힌 공급대상(청년·신혼부부·고령자…). 없으면 빈 배열 — 탐색기 필터가 쓴다 */
   tenant_classes: string[];
+  /** SH주택정보 단지코드(0023). 사진·도면을 이걸로 찾는다. 신규 미준공 단지는 등록 전이라 NULL */
+  sh_bizns_cd: string | null;
   /** 아래는 매입임대 별첨 주택목록(호실 단위)에서만 채워진다. 장기전세 위치 표는 NULL */
   unit_count: number | null;
   min_deposit: number | null;
   min_rent: number | null;
   area_min: number | null;
   area_max: number | null;
+};
+
+/** SH주택정보 단지 이미지 한 장 (sh_house_image, 0023). 공고가 아니라 단지에 붙는다 */
+export type ComplexImage = {
+  /** 평면도 · 전경 · 배치도 · 실내 */
+  kind: string;
+  /** 주택형(59A·84B…). 단지 전체 이미지는 빈 문자열 */
+  sply_ty: string;
+  /** 화면 표기(거실·주방·안방…). 평면도는 대개 비어 있다 */
+  label: string | null;
+  /** SH 원본 URL. 출처 표기에 쓴다 */
+  source_url: string;
+  /** 저장 파일명. 지면은 /sh-house/{bizns_cd}/{file_name}로 읽는다 */
+  file_name: string;
 };
 
 // closed: 마감 공고 포함 여부. 기본(undefined)은 감춘다 — 백필로 2004년치까지 들어와 목록이 마감으로 덮인다(사용자 요청 2026-09-09)

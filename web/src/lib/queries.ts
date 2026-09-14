@@ -7,7 +7,7 @@ import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_ELIGIBILITY, CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { todayKST } from "./format";
-import type { Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, Sector } from "@/types/notice";
+import type { ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, Sector } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
@@ -237,7 +237,7 @@ export async function getNoticeAreas(noticeId: number): Promise<NoticeArea[]> {
 export async function getNoticeComplexes(noticeId: number): Promise<NoticeComplex[]> {
   return query<NoticeComplex>(
     `SELECT c.id, c.name, c.sido, c.sigungu, c.road_address, c.is_new, c.complex_code, c.source_page,
-            c.heating, c.unit_count, c.min_deposit, c.min_rent, c.area_min, c.area_max,
+            c.heating, c.unit_count, c.min_deposit, c.min_rent, c.area_min, c.area_max, c.sh_bizns_cd,
             COALESCE(t.classes, ARRAY[]::text[]) AS tenant_classes
      FROM notice_complex c
      LEFT JOIN LATERAL (
@@ -270,6 +270,18 @@ export async function getComplexSupply(noticeId: number, complexId: number, comp
      WHERE notice_id = $1 AND (complex_id = $2 OR complex_name = $3)
      ORDER BY ${SUPPLY_ORDER}`,
     [noticeId, complexId, complexName],
+  );
+}
+
+/** 단지 1곳의 사진·도면(0023). SH주택정보에서 모은 것이라 코드가 안 붙은 단지는 빈 배열.
+ *  순서: 평면도 → 전경 → 배치도 → 실내. 평면도를 먼저 보여준다 — 청약자가 제일 먼저 찾는 그림이다. */
+export async function getComplexImages(biznsCd: string | null): Promise<ComplexImage[]> {
+  if (!biznsCd) return [];
+  return query<ComplexImage>(
+    `SELECT kind, sply_ty, label, source_url, file_name
+       FROM sh_house_image WHERE bizns_cd = $1
+      ORDER BY array_position(ARRAY['평면도','전경','배치도','실내'], kind), sply_ty, sort_no, id`,
+    [biznsCd],
   );
 }
 

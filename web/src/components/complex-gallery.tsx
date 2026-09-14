@@ -34,9 +34,9 @@ function Strip({
   // 끄는 동안은 scroll-snap을 끈다. 켜 둔 채 scrollLeft를 조금씩 밀면 브라우저가 매번 스냅점으로
   // 되돌려 한 칸 폭을 한 번에 넘지 않는 한 제자리다 — 실측 8·16·24px 모두 0으로 복귀(사용자 지적 2026-09-14)
   const [dragging, setDragging] = useState(false);
-  const start = useRef<{ x: number; left: number } | null>(null);
-  // 끌고 나서 손을 떼면 click이 따라온다. 그걸 사진 열기로 오해하지 않으려는 표시.
-  // 다음 pointerdown이 아니라 click이 지나간 직후에 내린다 — 키보드 Enter처럼 pointerdown 없는 click도 있다
+  // 누르기 시작한 칸. click의 target으로는 못 찾는다 — 아래 onClick 주석 참고
+  const pressed = useRef<number | null>(null);
+  // 끌고 나서 손을 떼면 click이 따라온다. 그걸 사진 열기로 오해하지 않으려는 표시
   const dragged = useRef(false);
   // 줄 양끝에 더 있는지. 끌 수 있다는 걸 눈으로 알려 주지 않으면 「안 끌린다」로 읽힌다(사용자 지적 2026-09-14)
   const [edge, setEdge] = useState({ left: false, right: false });
@@ -53,32 +53,60 @@ function Strip({
     return () => window.removeEventListener("resize", measure);
   }, [measure, images, active]);
 
+  // 끌기는 window에서 받되 **pointerdown 안에서 곧장 붙인다.** useEffect로 달면 안 된다 —
+  // effect는 비동기라 등록되기 전에 pointermove가 지나가고, 그러면 줄이 한 방향으로 간 뒤 안 돌아온다
+  // (실측: 왼쪽 490px은 먹고 오른쪽 500px은 통째로 유실 = 「맨 끝에서 고정」).
+  //
+  // 줄에 setPointerCapture는 걸지 않는다. 크롬이 그 뒤의 마우스 이벤트를 잡은 요소로 돌려서
+  // click이 칸의 <button>에 닿지 않는다. 캡처 없이 window로 받으면 커서가 줄 밖으로 나가도 끌린다.
+  const drag = useRef<(() => void) | null>(null);
+  useEffect(() => () => drag.current?.(), []);
+
+  const beginDrag = (x0: number, left0: number) => {
+    drag.current?.();
+    const el = ref.current;
+    if (!el) return;
+    const onMove = (e: PointerEvent) => {
+      const dx = e.clientX - x0;
+      const before = el.scrollLeft;
+      el.scrollLeft = left0 - dx;
+      // 문턱을 포인터 이동만으로 잡으면 더 갈 데가 없는 끝에서 헛손질까지 「끈 것」이 된다.
+      // 실제로 줄이 움직였을 때만 클릭을 삼킨다
+      if (Math.abs(dx) > DRAG_SLOP_PX && el.scrollLeft !== before) dragged.current = true;
+    };
+    const end = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      drag.current = null;
+      setDragging(false);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    drag.current = end;
+    setDragging(true);
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLUListElement>) => {
+    const li = (e.target as HTMLElement | null)?.closest?.("li");
+    pressed.current = li ? [...(ref.current?.children ?? [])].indexOf(li) : null;
+    dragged.current = false;
     // 터치는 브라우저 기본 스크롤이 낫다(관성이 있다). 마우스는 그게 안 돼서 직접 민다
     if (e.pointerType === "touch") return;
     const el = ref.current;
     if (!el || el.scrollWidth <= el.clientWidth) return;
-    start.current = { x: e.clientX, left: el.scrollLeft };
-    dragged.current = false;
-    setDragging(true);
-    try { el.setPointerCapture(e.pointerId); } catch { /* 못 잡아도 이벤트는 온다 */ }
+    beginDrag(e.clientX, el.scrollLeft);
   };
 
-  const onPointerMove = (e: React.PointerEvent<HTMLUListElement>) => {
-    const el = ref.current;
-    const s = start.current;
-    if (!el || !s) return;
-    const dx = e.clientX - s.x;
-    if (Math.abs(dx) > DRAG_SLOP_PX) dragged.current = true;
-    el.scrollLeft = s.left - dx;
-  };
-
-  const onPointerUp = (e: React.PointerEvent<HTMLUListElement>) => {
-    if (start.current) {
-      try { ref.current?.releasePointerCapture(e.pointerId); } catch { /* 이미 놓였다 */ }
-    }
-    start.current = null;
-    setDragging(false);
+  // 열기는 칸의 <button>이 아니라 **줄**에서 받는다. 캡처를 걷어냈어도 click의 target은 브라우저와
+  // 입력 방식에 따라 흔들린다(끌다 놓으면 공통 조상으로 간다). 누른 칸을 pointerdown에서 적어 두면
+  // target이 어디로 가든 무엇을 열지 안다. 키보드 Enter는 pointerdown이 없으니 target으로 찾는다
+  const onClick = (e: React.MouseEvent<HTMLUListElement>) => {
+    if (dragged.current) { dragged.current = false; return; }
+    const li = (e.target as HTMLElement | null)?.closest?.("li");
+    const i = li ? [...(ref.current?.children ?? [])].indexOf(li) : pressed.current;
+    if (i !== null && i >= 0) onOpen(i);
   };
 
   const nudge = (dir: 1 | -1) => {
@@ -90,20 +118,13 @@ function Strip({
     <div className="gal-rail">
       <ul
         className={`gal-strip${dragging ? " dragging" : ""}`} ref={ref} onScroll={measure}
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
+        onPointerDown={onPointerDown} onClick={onClick}
       >
         {images.map((img, i) => {
           const text = caption(img, mixed);
           return (
             <li key={img.file_name}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (dragged.current) { dragged.current = false; return; }
-                  onOpen(i);
-                }}
-              >
+              <button type="button">
                 {/* 원본 크기를 저장하지 않아 next/image를 못 쓴다. 지연 로딩만 걸어 둔다 */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img

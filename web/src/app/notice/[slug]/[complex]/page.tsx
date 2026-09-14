@@ -25,7 +25,9 @@ import { agencyLabels } from "@/lib/agency";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
 import { applyPhase, count, dateK, deadlineChip, NO_DATE, num, wonKo } from "@/lib/format";
 import { areaText, commonArea, complexPriceGroups, complexPriceRows, CONVERT_HINT, m2, moveInLabel, unitPriceRows } from "@/lib/notice-view";
-import { getComplexSupply, getComplexUnits, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
+import { getComplexImages, getComplexSupply, getComplexUnits, getNoticeBySlug, getNoticeComplexes } from "@/lib/queries";
+import { ComplexGallery } from "@/components/complex-gallery";
+import { shownImages } from "@/lib/complex-images";
 import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
 import { regionShort, sidoShort } from "@/lib/sido";
 import type { Notice, NoticeComplex } from "@/types/notice";
@@ -81,7 +83,11 @@ export default async function ComplexPage({ params }: Params) {
   const f = await load(params);
   if (!f) notFound();
   const { n, c } = f;
-  const [supply, units] = await Promise.all([getComplexSupply(n.id, c.id, c.name), getComplexUnits(c.id)]);
+  const [supply, units, images] = await Promise.all([
+    getComplexSupply(n.id, c.id, c.name),
+    getComplexUnits(c.id),
+    getComplexImages(c.sh_bizns_cd),
+  ]);
   // 호수는 (공급유형, 공급대상)마다 한 칸이다 — 청년 소득있음/없음 두 줄이 같은 칸을 나눠 써 두 번 세면 안 된다
   const counted = new Map(supply.filter((s) => s.units_total != null).map((s) => [`${s.supply_type}|${s.tenant_class}`, s]));
   const unitTotal = [...counted.values()].reduce((a, s) => a + (s.units_total ?? 0), 0);
@@ -91,6 +97,8 @@ export default async function ComplexPage({ params }: Params) {
   const hasRent = supply.some((s) => s.rent != null);          // 장기전세는 월임대료가 없다
   const showRent = hasRent || c.min_rent != null;               // 「보증금과 임대료」 제목·표의 임대료 열을 그릴지
   const hasClass = new Set(supply.map((s) => s.tenant_class)).size > 1 || supply.some((s) => s.income_option);
+  // 이 공고가 이 단지에서 공급하는 주택형. 사진·도면을 이걸로 걸러 낸다 — SH주택정보는 단지에 있는 형을 다 준다
+  const supplyTypes = [...new Set(supply.map((s) => s.supply_type).filter(Boolean))];
   const moveIn = moveInLabel(supply.find((s) => s.move_in_from)?.move_in_from ?? null);
   // 공급현황이 있으면 그 표가, 호실 목록만 있으면(매입임대 별첨) 호실 금액의 범위가 근거다
   const priceBreak = supply.length > 0 ? complexPriceRows(supply, c) : (unitPriceRows(units).length ? unitPriceRows(units) : complexPriceRows(supply, c));
@@ -226,6 +234,24 @@ export default async function ComplexPage({ params }: Params) {
             {/* 주차·관리비는 SH 공고문 첨부에 없는 값이다 — 없다고 하지 않고 어디서 확인하는지 말한다 */}
             <p className="note">주차장과 관리비, 주차 요금은 공고문 첨부에 실리지 않아 아직 싣지 못합니다. 계약 전에 관리사무소나 {L.originalDoc}에서 확인하세요.</p>
             {units.length > 0 && <p className="note" style={{ marginTop: 4 }}>호실별 층, 구조, 승강기, 금액은 아래 「{unitLabel}」에 있습니다.</p>}
+          </section>
+
+          {/* 사진·도면은 공급현황 바로 뒤 — 어떤 주택형이 나왔는지 본 다음 그 형의 평면도를 본다.
+              단지 코드가 안 붙은 단지(신규 미준공)와 SH가 자료를 안 올린 단지는 섹션을 감추지 않고 왜 비었는지 말한다 */}
+          <section className="dsec">
+            {/* 장수는 실제로 펼쳐 놓은 것만 센다 — 딴 주택형까지 세면 「47장」이라 해 놓고 12장을 보여준다 */}
+            <h2>사진과 도면{images.length > 0 ? ` | ${count(shownImages(images, supplyTypes).length, "장")}` : ""}</h2>
+            {images.length > 0 ? (
+              <ComplexGallery images={images} biznsCd={c.sh_bizns_cd!} complexName={c.name} supplyTypes={supplyTypes} />
+            ) : (
+              <Pending
+                title="이 단지의 사진과 도면은 아직 준비 중입니다"
+                lead={c.sh_bizns_cd
+                  ? <>서울주택도시공사가 이 단지의 평면도와 사진을 아직 공개하지 않았습니다. 준공 전이거나 자료 등록이 늦는 단지입니다.</>
+                  : <>준공 전 신규 공급 단지라 SH주택정보에 단지 자료가 아직 없습니다. 전자팸플릿은 {L.originalDoc}의 안내를 따라 확인하세요.</>}
+                action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
+              />
+            )}
           </section>
 
           {/* 보증금과 임대료는 공급현황 아래 — 어떤 유형이 있는지 먼저 보고 그 금액을 읽는 순서다(사용자 요청 2026-09-09) */}
