@@ -53,3 +53,4 @@ python db\migrate.py --status   # 적용 현황
 | `0018_notice_apply_time.sql` | `notice`에 접수 시작·마감 시각 — 흐름도에 시각까지 적혀 있다 | Neon 2026-09-09 |
 | `0019_notice_complex_geom.sql` | `notice_complex`에 geom·geo_precision·geo_matched_by·geo_matched_at, `complex`에 매칭 출처 2칸 — S6 오프라인 주소-좌표 조인 결과 자리 | Neon 2026-09-09 |
 | `0020_eligibility_rules.sql` | `supply_type` · `income_standard` · `region_tier` — 공고와 무관한 제도 규칙(32개 공급유형 자격·배점, 도시근로자 소득기준, 지역등급). `/eligibility` 자격진단의 원천 | Neon 2026-09-09 |
+| `0023_sh_house_image.sql` | `sh_house_image` + `notice_complex.sh_bizns_cd` — SH주택정보 단지 이미지(평면도·전경·배치도·실내). 공고가 아니라 단지에 붙는다 | Neon 2026-09-14 |
