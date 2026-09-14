@@ -189,15 +189,19 @@ export function PhotoViewer({
     const g = gesture.current;
     setAnimate(true);
 
-    if (g?.mode === "swipe") {
+    // 두 번 누르기는 **확대 중에도** 받아야 한다. swipe에서만 보면 확대한 뒤에는 제스처가 pan이라
+    // 두 번 눌러도 아무 일이 없어 되돌릴 길이 사라진다(사용자 지적 2026-09-14)
+    if (g && (g.mode === "swipe" || g.mode === "pan")) {
       const dx = e.clientX - g.x0;
       const dt = Math.max(1, performance.now() - g.t0);
       const width = stageRef.current?.clientWidth ?? window.innerWidth;
       const velocity = (dx / dt) * 1000;
-      // 짧고 안 움직인 누름은 탭이다. 그림 위에서 두 번 이으면 확대, 여백을 누르면 닫는다.
+      // 짧고 안 움직인 누름은 탭이다. 그림 위에서 두 번 이으면 확대(확대 중이면 원래대로), 여백을 누르면 닫는다.
       // 여백 탭을 곧장 닫기로 쓰는 건 그림 위 탭과 갈리기 때문이다 — 타이머로 두 번 탭을 기다릴 필요가 없다.
       if (Math.abs(dx) < TAP_SLOP_PX && Math.abs(e.clientY - g.y0) < TAP_SLOP_PX) {
-        if (!g.onImage) {
+        // 확대 중에는 여백 탭으로 닫지 않는다. 크게 본 그림은 가장자리가 어디까지인지 눈에 안 잡혀
+        // 짚었다가 통째로 닫히면 억울하다. 확대를 먼저 풀면 그 다음 탭이 닫는다
+        if (!g.onImage && !zoomed) {
           onClose();
           return;
         }
@@ -209,12 +213,11 @@ export function PhotoViewer({
         } else {
           lastTap.current = now;
         }
-      } else if (dx < -width * SWIPE_RATIO || velocity < -SWIPE_VELOCITY_PX_S) {
-        go(index + 1);
-      } else if (dx > width * SWIPE_RATIO || velocity > SWIPE_VELOCITY_PX_S) {
-        go(index - 1);
+      } else if (g.mode === "swipe") {
+        if (dx < -width * SWIPE_RATIO || velocity < -SWIPE_VELOCITY_PX_S) go(index + 1);
+        else if (dx > width * SWIPE_RATIO || velocity > SWIPE_VELOCITY_PX_S) go(index - 1);
       }
-      setDrag(0);
+      if (g.mode === "swipe") setDrag(0);
     }
 
     if (pointers.current.size === 0) gesture.current = null;
