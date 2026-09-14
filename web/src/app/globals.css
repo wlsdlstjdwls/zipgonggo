@@ -630,8 +630,10 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 @media (hover: none) { .gal-arrow { display: none; } }
 
 /* 가로로 끌어 넘기는 줄. 터치는 브라우저 기본 스크롤, 마우스는 포인터로 scrollLeft를 민다 */
-.gal-strip { display: flex; gap: 10px; margin: 0; padding: 0 0 6px; list-style: none; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; cursor: grab; user-select: none; }
-.gal-strip:active { cursor: grabbing; }
+.gal-strip { display: flex; gap: 10px; margin: 0; padding: 0 0 6px; list-style: none; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; user-select: none; }
+/* 손바닥 커서는 **넘치는 줄에만**. 다 보이는 줄에 주면 끌리는 줄 알고 끌다 「안 된다」가 된다 */
+.gal-strip.over { cursor: grab; }
+.gal-strip.over:active { cursor: grabbing; }
 /* 스냅은 터치에만 준다. 마우스 끌기는 scrollLeft를 직접 미는데, 스냅을 켜 두면 브라우저가 밀 때마다
    스냅점으로 되돌려 한 칸 폭을 한 번에 넘지 않는 한 제자리고(실측 8·16·24px 모두 0 복귀),
    놓는 순간에도 도로 당겨진다. 터치는 브라우저가 알아서 끄니 스냅이 이롭다(사용자 지적 2026-09-14) */

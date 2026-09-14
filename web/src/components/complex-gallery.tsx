@@ -44,7 +44,9 @@ function Strip({
   // 끌고 나서 손을 떼면 click이 따라온다. 그걸 사진 열기로 오해하지 않으려는 표시
   const dragged = useRef(false);
   // 줄 양끝에 더 있는지. 끌 수 있다는 걸 눈으로 알려 주지 않으면 「안 끌린다」로 읽힌다(사용자 지적 2026-09-14)
-  const [edge, setEdge] = useState({ left: false, right: false });
+  // 넘치지 않는 줄은 끌 것이 없다. 그런 줄에까지 손바닥 커서를 주면 「끌리는데 안 먹는다」로 읽힌다
+  // (사용자 지적 2026-09-14 — 실제로 끌던 줄이 4장짜리였다)
+  const [edge, setEdge] = useState({ left: false, right: false, over: false });
   const [diag, setDiag] = useState("");
 
   const log = (tag: string, o?: unknown) => {
@@ -57,7 +59,11 @@ function Strip({
   const measure = useCallback(() => {
     const el = ref.current;
     if (!el) return;
-    setEdge({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+    setEdge({
+      left: el.scrollLeft > 4,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+      over: el.scrollWidth > el.clientWidth + 4,
+    });
   }, []);
 
   useEffect(() => {
@@ -146,7 +152,7 @@ function Strip({
   return (
     <div className="gal-rail">
       <ul
-        className={`gal-strip${dragging ? " dragging" : ""}`} ref={ref} onScroll={measure}
+        className={`gal-strip${edge.over ? " over" : ""}${dragging ? " dragging" : ""}`} ref={ref} onScroll={measure}
         onPointerDown={onPointerDown} onClick={onClick}
         // 누른 채 움직이면 크롬이 제 드래그(고스트)를 시작하고 그 순간 pointermove가 끊긴다.
         // mousedown을 막으면 그게 안 일어난다 — click은 그대로 난다(막히는 건 선택·포커스뿐)
