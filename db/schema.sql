@@ -633,3 +633,19 @@ CREATE INDEX idx_notice_result_address ON notice_result (address) WHERE address 
 ALTER TABLE notice ADD COLUMN schedule_steps jsonb;
 COMMENT ON COLUMN notice.schedule_steps IS
   'SH 첨부 일정 흐름도에서 읽은 접수·발표 외 단계. [{label,start,end}] 순서 배열. end가 null이면 하루';
+
+-- 0024 — 공고문에서 읽은 신청자격 묶음 (SH 장기전세 6~8쪽·30~32쪽)
+-- 순위 한 줄 = 행 하나인 eligibility로는 신청면적 × 순위 × 출생자녀 가산 × 맞벌이 매트릭스, 동일순위 선정 순서,
+-- 가감점 배점표를 담을 수 없어 공고 1건에 묶음 하나를 jsonb로 둔다. 모양은 pipeline sh_eligibility.Eligibility.as_json()과
+-- web/types/eligibility.ts NoticeEligibilityData가 같이 든다. verified는 소득표 검산(100% 기준액 × %) 통과 여부.
+CREATE TABLE notice_eligibility (
+  notice_id     bigint      PRIMARY KEY REFERENCES notice(id) ON DELETE CASCADE,
+  source        text        NOT NULL,                 -- sh_attach
+  source_pages  integer[]   NOT NULL DEFAULT '{}',    -- 공고문 쪽 번호(화면의 「공고문 n쪽」 출처 표기)
+  data          jsonb       NOT NULL,
+  verified      boolean     NOT NULL DEFAULT false,
+  parsed_at     timestamptz NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE  notice_eligibility IS '공고문의 신청자격 묶음(소득기준·신청순위·가산·자산·선정순서·배점표). 공고당 1행, jsonb';
+COMMENT ON COLUMN notice_eligibility.verified IS '소득표 검산 통과 여부. false면 화면은 소득표 금액을 내보내지 않는다';

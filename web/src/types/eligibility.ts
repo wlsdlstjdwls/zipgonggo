@@ -38,3 +38,54 @@ export type EligibilityRules = {
   tiers: RegionTier[];
   incomeYear: number;
 };
+
+// ── 공고문에서 읽은 신청자격 묶음 (notice_eligibility, 0024) ──
+// 모양은 pipeline/parsers/sh_eligibility.py Eligibility.as_json()과 같이 든다. 화면은 읽기만 한다.
+
+export type EligRankRow = {
+  area: string;
+  rank: number | null;
+  income_pct: number | null;
+  dual_income_pct: number | null;
+  requirement: string | null;
+};
+export type EligRankTable = { group: string; classes: string[]; rows: EligRankRow[] };
+export type EligMatrix = { columns: string[]; rows: { area: string | null; applicant: string; pcts: (number | null)[] }[] };
+export type EligAsset = { columns: string[]; rows: { label: string; values_man: (number | null)[] }[] };
+export type EligIncomeTable = {
+  households: number[];
+  rows: { pct: number; won: (number | null)[] }[];
+  verified?: boolean;
+};
+export type EligSelection = {
+  title: string;
+  rows: { group: string | null; area: string | null; steps: string[] }[];
+  tie_break: string | null;
+};
+export type EligScoreTable = {
+  group: string | null;
+  points: number[];
+  items: { label: string; cells: string[]; note: string | null }[];
+};
+export type EligPenalties = { rows: { label: string; points: number }[]; notes: string[] };
+
+export type NoticeEligibilityData = {
+  source_pages: number[];
+  rank_tables: EligRankTable[];
+  bonus_conditions: string[];
+  bonus_notes: string[];
+  income_matrix: EligMatrix | null;
+  asset: EligAsset | null;
+  income_table: EligIncomeTable | null;
+  selection: EligSelection[];
+  score_tables: EligScoreTable[];
+  penalties: EligPenalties | null;
+};
+
+export type NoticeEligibility = {
+  source_pages: number[];
+  data: NoticeEligibilityData;
+  /** 소득표 검산(100% 기준액 × %) 통과 여부. false면 소득표 금액을 내보내지 않는다 */
+  verified: boolean;
+  parsed_at: string;
+};

@@ -8,6 +8,7 @@ import { DetailHeadBar } from "@/components/detail-headbar";
 import { ExternalLink } from "@/components/external-link";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
+import { NoticeEligibilitySection } from "@/components/notice-eligibility";
 import { SaveButton } from "@/components/save-button";
 import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
@@ -16,7 +17,7 @@ import { HOUSEHOLD_MAX, ruleLines } from "@/lib/eligibility";
 import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, NO_DATE, num, won, wonKo, wonShort } from "@/lib/format";
 import { moveInLabel } from "@/lib/notice-view";
 import {
-  getAmendChain, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeSupply,
+  getAmendChain, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply,
 } from "@/lib/queries";
 import { noticePath, ROUTES } from "@/lib/routes";
 import { regionLabel } from "@/lib/sido";
@@ -74,13 +75,16 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
 export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
-  const [areas, chain, complexes, supply, eligRules] = await Promise.all([
+  const [areas, chain, complexes, supply, eligRules, noticeElig] = await Promise.all([
     getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id), getNoticeSupply(n.id), getEligibilityRules(),
+    getNoticeEligibility(n.id),
   ]);
-  // supply_type.housing_type이 notice.housing_type과 잇는 고리(0020 마이그레이션) — 공고 개별 문구는
-  // 아직 파싱 전이라(eligibility 테이블 0건) 제도 일반 기준으로 대신 보여준다. 유형마다 조건 종류가 달라
+  // 공고문에서 읽은 자격 묶음(notice_eligibility, 0024)이 있으면 그것을 그린다 — 장기전세는 면적×순위×자녀가산×맞벌이로
+  // 갈려 시드 한 줄로는 거짓말이었다(사용자 지적 2026-09-14). 없는 공고만 아래 제도 일반 기준(supply_type)으로 후퇴한다.
+  // supply_type.housing_type이 notice.housing_type과 잇는 고리(0020). 유형마다 조건 종류가 달라
   // null인 항목은 그 유형에서 안 보는 기준이라 화면에서도 뺀다.
-  const eligTypes = eligRules.types.filter((t) => t.housing_type === n.housing_type);
+  const eligTypes = noticeElig ? [] : eligRules.types.filter((t) => t.housing_type === n.housing_type);
+  const noticeYear = n.posted_at ? new Date(n.posted_at).getFullYear() : null;
   // 신청자격에 실제로 쓰인 %만 열로 추린다 — 8종 전부 보여주면 모바일에서 표가 너무 넓어진다
   const incomePcts = [...new Set(eligTypes.map((t) => t.income_pct).filter((p): p is number => p !== null))].sort((a, b) => a - b);
   const incomeRows = incomePcts.length
@@ -242,6 +246,10 @@ export default async function NoticePage({ params }: Params) {
             )}
           </section>
 
+          {noticeElig && (
+            <NoticeEligibilitySection elig={noticeElig} incomeYear={eligRules.incomeYear} noticeYear={noticeYear} originalDoc={L.originalDoc} />
+          )}
+
           {eligTypes.length > 0 && (
             <section className="dsec">
               <h2>신청자격</h2>
@@ -272,7 +280,11 @@ export default async function NoticePage({ params }: Params) {
 
               {incomeRows.length > 0 && (
                 <>
-                  <h3 className="elig-sub">가구원수별 월평균소득 기준 ({eligRules.incomeYear}년)</h3>
+                  {/* 공고는 통계청 발표 전년도 소득을 쓴다 — 「2025년」만 쓰면 옛 값처럼 읽힌다(사용자 지적 2026-09-14) */}
+                  <h3 className="elig-sub">
+                    가구원수별 월평균소득 기준
+                    <small>{eligRules.incomeYear}년 소득 통계 기준{noticeYear ? `, ${noticeYear}년 공고에 적용` : ""}</small>
+                  </h3>
                   <div className="tbl">
                     <table>
                       <thead>

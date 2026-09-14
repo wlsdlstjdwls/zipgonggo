@@ -2,7 +2,7 @@
 // 발행 상태(publish) 필터는 S8이 생기기 전까지 걸지 않는다 — 지금은 전부 'parsed'.
 // 목록·옵션은 unstable_cache로 REVALIDATE_SEC 캐시한다. 파이프라인이 DB를 갱신해도 그 안엔 반영된다(page.tsx revalidate와 동일).
 import { unstable_cache } from "next/cache";
-import type { EligibilityRules, IncomeStandard, RegionTier, SupplyType } from "@/types/eligibility";
+import type { EligibilityRules, IncomeStandard, RegionTier, SupplyType, NoticeEligibility } from "@/types/eligibility";
 import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_ELIGIBILITY, CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
@@ -298,6 +298,15 @@ export async function getComplexUnits(noticeComplexId: number): Promise<NoticeUn
 }
 
 /** 공고 전체 공급현황 줄. 0건이면 화면에 표를 그리지 않는다. */
+/** 공고문에서 읽은 신청자격 묶음(0024). 없으면 null — 화면은 제도 일반 시드로 후퇴한다 */
+export async function getNoticeEligibility(noticeId: number): Promise<NoticeEligibility | null> {
+  const rows = await query<NoticeEligibility>(
+    `SELECT source_pages, data, verified, parsed_at::text AS parsed_at FROM notice_eligibility WHERE notice_id = $1`,
+    [noticeId],
+  );
+  return rows[0] ?? null;
+}
+
 export async function getNoticeSupply(noticeId: number): Promise<NoticeSupply[]> {
   return query<NoticeSupply>(
     `SELECT ${SUPPLY_COLS} FROM notice_supply WHERE notice_id = $1 ORDER BY complex_name, ${SUPPLY_ORDER}`,

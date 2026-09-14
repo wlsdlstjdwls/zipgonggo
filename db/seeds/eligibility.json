@@ -1121,13 +1121,13 @@
       "required_class": [],
       "homeless_scope": "세대원",
       "income_scope": "세대",
-      "income_pct": 200,
+      "income_pct": 150,
       "asset_scope": "세대",
-      "asset_limit_man": 64000,
+      "asset_limit_man": 66200,
       "car_limit_man": 4542,
       "region_limit": "전국",
       "birth_bonus": true,
-      "note": "청약24회 이상 필수(1순위)",
+      "note": "면적과 순위별 소득기준이 다르다(60㎡ 이하 1,2순위 70%, 3,4순위 105%, 60㎡ 초과 150%. 맞벌이는 140~200%). 2023.3.28. 이후 출생자녀가 있으면 10~20%p 가산. 청약 24회 이상 필수(1순위). 총자산 6억 6,200만 원은 제51차(2026.8.) 공고 기준",
       "ranking_method": "배점합산→추첨",
       "ranks": [
         "배점합산"
@@ -1486,6 +1486,12 @@
     {
       "year": 2025,
       "household": 1,
+      "pct": 150,
+      "monthly_won": 5720045
+    },
+    {
+      "year": 2025,
+      "household": 1,
       "pct": 200,
       "monthly_won": 7626726
     },
@@ -1530,6 +1536,12 @@
       "household": 2,
       "pct": 130,
       "monthly_won": 7626151
+    },
+    {
+      "year": 2025,
+      "household": 2,
+      "pct": 150,
+      "monthly_won": 8799405
     },
     {
       "year": 2025,
@@ -1582,6 +1594,12 @@
     {
       "year": 2025,
       "household": 3,
+      "pct": 150,
+      "monthly_won": 12252644
+    },
+    {
+      "year": 2025,
+      "household": 3,
       "pct": 200,
       "monthly_won": 16336858
     },
@@ -1626,6 +1644,12 @@
       "household": 4,
       "pct": 130,
       "monthly_won": 11442863
+    },
+    {
+      "year": 2025,
+      "household": 4,
+      "pct": 150,
+      "monthly_won": 13203303
     },
     {
       "year": 2025,
@@ -1678,6 +1702,12 @@
     {
       "year": 2025,
       "household": 5,
+      "pct": 150,
+      "monthly_won": 13990478
+    },
+    {
+      "year": 2025,
+      "household": 5,
       "pct": 200,
       "monthly_won": 18653970
     },
@@ -1726,6 +1756,12 @@
     {
       "year": 2025,
       "household": 6,
+      "pct": 150,
+      "monthly_won": 14859395
+    },
+    {
+      "year": 2025,
+      "household": 6,
       "pct": 200,
       "monthly_won": 19812526
     },
@@ -1770,6 +1806,12 @@
       "household": 7,
       "pct": 130,
       "monthly_won": 13846663
+    },
+    {
+      "year": 2025,
+      "household": 7,
+      "pct": 150,
+      "monthly_won": 15976919
     },
     {
       "year": 2025,

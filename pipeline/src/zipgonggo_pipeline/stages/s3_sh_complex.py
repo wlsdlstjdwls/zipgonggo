@@ -25,7 +25,11 @@ from pathlib import Path
 from ..config import PIPELINE_ROOT, settings
 from ..db import connect
 from ..parsers.sh_attach import merge_teukhwa, parse_attachment, teukhwa_facts
-from ..repo import replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts
+from ..parsers.sh_eligibility import parse_eligibility, verify_income_table
+from ..repo import (
+    income_base100, replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts,
+    upsert_notice_eligibility,
+)
 from ..sources.ish import IshClient, find_attachments, is_missing_page
 from ..sources.ish_board import BOARDS, IshBoardClient, find_seq_by_title
 from .common import Stats, finish_ingest, stage_main, utc_now
@@ -353,6 +357,13 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                         pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq))
                         extras = []
                     facts = parse_attachment(pages, ref_year=n["posted_at"].year if n["posted_at"] else None)
+                    # 신청자격 묶음(장기전세 양식만 — 「소득기준 및 신청순위」 표가 없으면 None). 단지 표와 별개라
+                    # 파서가 깨져도 단지 적재는 살린다
+                    elig = None
+                    try:
+                        elig = parse_eligibility(pages)
+                    except Exception as exc:  # noqa: BLE001
+                        log.warning("%s eligibility parse failed: %s", n["slug"], exc)
                     # 특화형은 첨부 하나가 주택 한 채다 — 나머지 첨부까지 읽어 한 공고로 합친다.
                     # 다른 양식은 첨부 하나가 공고문 전체라 첫 첨부만 읽는다(요청 수를 늘리지 않는다)
                     if facts.kind == "teukhwa":
@@ -377,8 +388,9 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                 stats.groups += 1
                 sch, sup = facts.schedule, facts.supply
                 log.info(
-                    "%s: %d쪽 · %s · 단지 %d건 · 호실 %d건 · 공급 %d건 · 일정 %s · 전세금 %s (%s)",
+                    "%s: %d쪽 · %s · 단지 %d건 · 호실 %d건 · 공급 %d건 · 자격 %s · 일정 %s · 전세금 %s (%s)",
                     n["slug"], len(pages), kind, len(rows), len(units), len(supply_rows),
+                    f"{len(elig.rank_tables)}표/{len(elig.selection)}선정/{len(elig.score_tables)}배점" if elig else "없음",
                     f"{sch.apply_start}~{sch.apply_end}" if sch else "없음",
                     f"{sup.min_deposit}~{sup.max_deposit}({sup.unit_total}호)" if sup else "없음",
                     att_name,
@@ -389,7 +401,9 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                     stats.skip("supply")
                 if supply_rows:
                     stats.skip("supply_lines")
-                if not rows and not sch and not sup and not supply_rows:
+                if elig is not None:
+                    stats.skip("eligibility")
+                if not rows and not sch and not sup and not supply_rows and elig is None:
                     stats.skip("no_table")
                     continue
                 stats.skip(f"kind:{kind}")
@@ -419,6 +433,17 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                         schedule_steps=steps_json(sch),
                         **facts.totals,
                     )
+                    if elig is not None:
+                        # 소득표는 100% 기준액으로 검산한 뒤에만 금액을 싣는다(Synap 글자 유실)
+                        verified = False
+                        if elig.income_table is not None:
+                            checked = verify_income_table(elig.income_table, income_base100(cur))
+                            elig.income_table = checked
+                            verified = checked["verified"]
+                            if not verified:
+                                log.warning("%s 소득표 검산 실패: %s", n["slug"], checked["mismatches"][:3])
+                        upsert_notice_eligibility(cur, n["id"], source=SOURCE, source_pages=elig.source_pages,
+                                                  data=elig.as_json(), verified=verified)
                     cur.execute("RELEASE SAVEPOINT nc")
                     stats.updated += 1
                     conn.commit()

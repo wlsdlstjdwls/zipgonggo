@@ -453,3 +453,31 @@ def replace_region_tiers(cur, rows: list[dict[str, Any]]) -> int:
     for r in rows:
         cur.execute("INSERT INTO region_tier (name, kind, tier) VALUES (%(name)s, %(kind)s, %(tier)s)", r)
     return len(rows)
+
+
+# ─────────────────────────────────────────────────────────────
+# S3 — 공고문 신청자격 묶음 (notice_eligibility, 0024)
+# ─────────────────────────────────────────────────────────────
+
+
+def income_base100(cur) -> dict[int, int]:
+    """가구원수 → 최신 연도 100% 기준액(원). 공고문 소득표 검산에 쓴다."""
+    cur.execute(
+        "SELECT household, monthly_won FROM income_standard "
+        "WHERE pct = 100 AND year = (SELECT max(year) FROM income_standard)"
+    )
+    return {r["household"]: r["monthly_won"] for r in cur.fetchall()}
+
+
+def upsert_notice_eligibility(cur, notice_id: int, *, source: str, source_pages: list[int], data: dict[str, Any], verified: bool) -> None:
+    cur.execute(
+        """
+        INSERT INTO notice_eligibility (notice_id, source, source_pages, data, verified, parsed_at)
+        VALUES (%(notice_id)s, %(source)s, %(source_pages)s, %(data)s::jsonb, %(verified)s, now())
+        ON CONFLICT (notice_id) DO UPDATE SET
+          source = EXCLUDED.source, source_pages = EXCLUDED.source_pages, data = EXCLUDED.data,
+          verified = EXCLUDED.verified, parsed_at = now()
+        """,
+        {"notice_id": notice_id, "source": source, "source_pages": source_pages,
+         "data": json.dumps(data, ensure_ascii=False), "verified": verified},
+    )
