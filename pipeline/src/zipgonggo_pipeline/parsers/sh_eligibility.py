@@ -110,9 +110,15 @@ class Eligibility:
     selection: list[dict[str, Any]]
     score_tables: list[dict[str, Any]]
     penalties: dict[str, Any] | None
+    # 양식. janggi(장기전세, 면적×순위 표) · haengbok(행복주택, 계층 절) · maeip(매입임대, 순위 두 줄 표). 화면이 이걸로 그림을 고른다
+    kind: str = "janggi"
+    # 행복주택 계층 절(sh_eligibility_haengbok._parse_class). 다른 양식은 빈 목록
+    class_blocks: list[dict[str, Any]] = field(default_factory=list)
 
     def as_json(self) -> dict[str, Any]:
         return {
+            "kind": self.kind,
+            "class_blocks": self.class_blocks,
             "source_pages": self.source_pages,
             "rank_tables": self.rank_tables,
             "bonus_conditions": self.bonus_conditions,
@@ -199,7 +205,7 @@ def _clean(text: str) -> str:
     t = re.sub(r"(20\d{2})(\d)(\d{2})(?=\s*(?:이후|이전))", r"\1.\2.\3.", t)   # 2023328 이후 → 2023.3.28. 이후
     t = re.sub(r"(?<![\d.])(\d)(\d)순위", r"\1,\2순위", t)                    # 12순위 미해당자 → 1,2순위
     t = re.sub(r"(\d)\s*[・·]\s*(\d)", r"\1,\2", t)                             # 1・2순위 → 1,2순위
-    t = t.replace("・", " ").replace("·", " ")
+    t = t.replace("・", " ").replace("·", " ").replace("‧", " ")   # ‧(U+2027)는 2025년 행복주택 배점표 항목에 나온다
     t = re.sub(r"(?<=[가-힣])(\d+%)", r" \1", t)                               # 월평균소득70% → 월평균소득 70%
     t = re.sub(r"(\d+%)\s*(이하|초과)(?=\d)", r"\1 \2 ", t)                     # 70%초과105%이하
     t = re.sub(r"(\d+%)(이하|초과)", r"\1 \2", t)                                # 70%이하 → 70% 이하
@@ -516,34 +522,43 @@ def verify_income_table(table: dict[str, Any], base100: dict[int, int]) -> dict[
     """읽힌 칸을 100% 기준액 × %(반올림)와 대조한다.
 
     공고문 소득표는 통계청 100% 기준액에 비율을 곱해 만든다(70% 1인 2,669,354 = 3,813,363 × 0.7).
+    행복주택·매입임대 표는 1인 +20%p·2인 +10%p를 더한 값이 직접 적혀 있다(table["bump"] = {"1": 20, "2": 10}) —
+    100% 1인 4,576,036 = 3,813,363 × 1.2.
     - 같으면 clean. 읽힌 숫자열이 기댓값의 부분열이면(글자가 떨어진 것) hole. 그 밖은 mismatch.
-    - mismatch가 없고 clean이 6칸 이상이면 verified — 구멍과 빈칸을 기댓값으로 채운다.
+    - mismatch가 없고 clean이 4칸 이상이면 verified — 구멍과 빈칸을 기댓값으로 채운다(매입임대 표는 한 줄 6칸뿐이다).
+      단 table["keep_blank"]면 원문에 아예 없는 칸(행복주택 1인 110% 이상)은 비워 둔다.
     - 하나라도 어긋나면 손대지 않는다. 틀린 금액을 싣느니 빈칸이 낫다.
     """
+    bump = {int(k): int(v) for k, v in (table.get("bump") or {}).items()}
+
+    def expect(h: int, pct: int) -> int:
+        return int(base100[h] * (pct + bump.get(h, 0)) / 100 + 0.5)
+
     mismatches: list[dict[str, Any]] = []
     clean = holes = 0
     for r in table["rows"]:
         for h, v in zip(table["households"], r["won"]):
             if v is None or h not in base100:
                 continue
-            expect = int(base100[h] * r["pct"] / 100 + 0.5)
-            if expect == v:
+            e = expect(h, r["pct"])
+            if e == v:
                 clean += 1
-            elif _subsequence(str(v), str(expect)):
+            elif _subsequence(str(v), str(e)):
                 holes += 1
             else:
-                mismatches.append({"pct": r["pct"], "household": h, "read": v, "expected": expect})
-    verified = clean >= 6 and not mismatches
+                mismatches.append({"pct": r["pct"], "household": h, "read": v, "expected": e})
+    verified = clean >= 4 and not mismatches
     rows = []
     for r in table["rows"]:
         won = list(r["won"])
         if verified:
-            won = [int(base100[h] * r["pct"] / 100 + 0.5) if h in base100 else v for h, v in zip(table["households"], won)]
+            won = [expect(h, r["pct"]) if (h in base100 and (v is not None or not table.get("keep_blank"))) else v
+                   for h, v in zip(table["households"], won)]
         else:
             # 검산 못 한 표는 구멍 난 칸을 비운다 — 「839428」 같은 틀린 숫자를 그대로 내보내지 않는다
-            won = [v if (v is not None and h in base100 and int(base100[h] * r["pct"] / 100 + 0.5) == v) else None
+            won = [v if (v is not None and h in base100 and expect(h, r["pct"]) == v) else None
                    for h, v in zip(table["households"], won)]
-        rows.append({"pct": r["pct"], "won": won})
+        rows.append({**r, "won": won})
     return {**table, "rows": rows, "verified": verified, "clean": clean, "holes": holes, "mismatches": mismatches}
 
 
@@ -861,10 +876,17 @@ def _relines(lines: list[Line], gap: float) -> list[Line]:
 
 
 def parse_eligibility(pages: list[tuple[int, str]]) -> Eligibility | None:
-    """공고문 쪽 XML 목록 → 신청자격 묶음. 「소득기준 및 신청순위」 표가 없으면 None(다른 양식)."""
+    """공고문 쪽 XML 목록 → 신청자격 묶음. 양식을 차례로 대 본다 — 장기전세(「소득기준 및 신청순위」 표) → 행복주택(계층 절) →
+    매입임대(「대상 | 세부 자격요건」 두 줄 표). 어느 것도 아니면 None(화면은 제도 시드로 후퇴)."""
     lines = _lines(pages)
     rank_tables, p1 = parse_rank_tables(lines)
     if not rank_tables:
+        from .sh_eligibility_haengbok import parse_haengbok
+        from .sh_eligibility_maeip import parse_maeip
+        for other in (parse_haengbok, parse_maeip):
+            found = other(pages)
+            if found is not None:
+                return Eligibility(**found)
         return None
     conds, notes, matrix = parse_bonus(lines)
     asset = parse_asset(lines)

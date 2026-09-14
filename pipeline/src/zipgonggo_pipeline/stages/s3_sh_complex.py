@@ -357,7 +357,7 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                         pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq))
                         extras = []
                     facts = parse_attachment(pages, ref_year=n["posted_at"].year if n["posted_at"] else None)
-                    # 신청자격 묶음(장기전세 양식만 — 「소득기준 및 신청순위」 표가 없으면 None). 단지 표와 별개라
+                    # 신청자격 묶음(장기전세·행복주택·매입임대 양식. 셋 다 아니면 None). 단지 표와 별개라
                     # 파서가 깨져도 단지 적재는 살린다
                     elig = None
                     try:
@@ -390,7 +390,8 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                 log.info(
                     "%s: %d쪽 · %s · 단지 %d건 · 호실 %d건 · 공급 %d건 · 자격 %s · 일정 %s · 전세금 %s (%s)",
                     n["slug"], len(pages), kind, len(rows), len(units), len(supply_rows),
-                    f"{len(elig.rank_tables)}표/{len(elig.selection)}선정/{len(elig.score_tables)}배점" if elig else "없음",
+                    (f"{elig.kind} {len(elig.class_blocks)}계층" if elig.class_blocks
+                     else f"{elig.kind} {len(elig.rank_tables)}표/{len(elig.selection)}선정/{len(elig.score_tables)}배점") if elig else "없음",
                     f"{sch.apply_start}~{sch.apply_end}" if sch else "없음",
                     f"{sup.min_deposit}~{sup.max_deposit}({sup.unit_total}호)" if sup else "없음",
                     att_name,
