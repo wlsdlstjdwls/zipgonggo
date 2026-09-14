@@ -171,6 +171,8 @@ function Strip({
 
   return (
     <div className="gal-rail">
+      {/* 고무줄로 밀린 줄이 레일 밖(옆 칸)까지 그려지지 않게 자르는 상자. 화살표는 이 밖에 둔다 — 레일 가장자리에 걸쳐야 해서 */}
+      <div className="gal-clip">
       <ul
         className={`gal-strip${edge.over ? " over" : ""}${edge.fits ? " fits" : ""}${dragging ? " dragging" : ""}`} ref={ref} onScroll={measure}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove}
@@ -199,6 +201,7 @@ function Strip({
           );
         })}
       </ul>
+      </div>
       {DEV && trace && <p className="gal-trace">{trace}</p>}
       {(edge.left || edge.right) && (
         <>
