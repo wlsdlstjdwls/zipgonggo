@@ -22,6 +22,13 @@ const OTHERS_TAB = "다른 주택형";
 // 이만큼 움직여야 「끈 것」으로 친다. 3px은 클릭 중 손 떨림에 걸려 사진 열기를 통째로 삼켰다(사용자 지적 2026-09-14)
 const DRAG_SLOP_PX = 6;
 
+// 끝에서 더 끌면 줄이 고무줄처럼 조금 따라왔다가 되돌아온다. scrollLeft는 0 밑으로 못 가서, 이게 없으면
+// 맨 앞에서 오른쪽으로 끄는 순간 화면이 죽은 듯 서 있다 — 줄을 처음 잡으면 대개 그 상황이라 「항상 안 끌린다」로
+// 읽힌다(사용자 지적 2026-09-14). 식은 fitin-app 주간 스트립과 같다: 끈 거리에 비례하되 상한을 둔다
+const RUBBER_RATIO = 0.3;
+const RUBBER_MAX_PX = 72;
+const RUBBER_BACK = "transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1)";
+
 // 개발 화면에서만 계측 줄을 그린다
 const DEV = process.env.NODE_ENV !== "production";
 
@@ -112,9 +119,18 @@ function Strip({
       d.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
       if (d.axis === "y") { d.active = false; return; }
       try { el.setPointerCapture(e.pointerId); } catch { /* 이미 뗀 포인터 — 캡처 없이도 계속 간다 */ }
+      // 되돌아오는 중이던 고무줄이 있으면 그 자리에서 다시 잡는다
+      el.style.transition = "";
       setDragging(true);
     }
-    el.scrollLeft = d.left0 - dx;
+    const max = el.scrollWidth - el.clientWidth;
+    const want = d.left0 - dx;
+    const next = Math.min(max, Math.max(0, want));
+    el.scrollLeft = next;
+    // 갈 수 없는 만큼(over)은 스크롤 대신 줄 자체를 밀어 「잡혀 있다」는 느낌을 남긴다
+    const over = want - next;
+    const pull = over === 0 ? 0 : -Math.sign(over) * Math.min(Math.abs(over) * RUBBER_RATIO, RUBBER_MAX_PX);
+    el.style.transform = pull ? `translateX(${pull}px)` : "";
     // 끌고 나서 손을 떼면 click이 따라온다. 그걸 사진 열기로 오해하지 않게 표시해 둔다
     dragged.current = true;
   };
@@ -129,6 +145,12 @@ function Strip({
     if (!d.active) return;
     d.active = false;
     try { if (el?.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId); } catch { /* 이미 풀렸다 */ }
+    // 고무줄을 놓는다 — 되돌아가는 것만 애니메이션. transition을 남겨 두면 다음 끌기가 미끄러지므로 끝나면 걷는다
+    if (el && el.style.transform) {
+      el.style.transition = RUBBER_BACK;
+      el.style.transform = "";
+      window.setTimeout(() => { if (el.style.transform === "") el.style.transition = ""; }, 300);
+    }
     setDragging(false);
   };
 
