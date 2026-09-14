@@ -157,6 +157,13 @@ development 전부 들어갔다(2026-09-10). 셋 중 하나라도 없으면 라�
 > `vercel deploy`를 CLI로 직접 돌리지 마라. Root Directory가 `web`이라 저장소 루트에서 올려야 하는데,
 > 그러면 `pipeline/data/`까지 1.8GB를 올리다 100MB 제한에 걸린다. **배포는 git push(Git 연동)로 한다.**
 
+**푸시 자동 배포는 꺼 두었다(2026-09-14, 사용자 결정).** `web/vercel.json`의 `git.deploymentEnabled.main: false`.
+커밋·푸시마다 빌드가 도는 게 낭비라서다. 배포하고 싶을 때만 **Deploy Hook**을 때린다 —
+Vercel 대시보드 → Settings → Git → Deploy Hooks에서 `main` 브랜치용으로 하나 만들어 두고
+`curl -X POST <hook URL>`. 이 URL은 아는 사람이 곧 배포할 수 있는 토큰이니 저장소에 두지 않는다.
+대시보드 Deployments → Redeploy로도 된다. Deploy Hook은 `github.enabled=false`일 때만 막히고
+`git.deploymentEnabled`엔 영향받지 않는다(공식 문서 2026-09-14 확인).
+
 ### 방아쇠 둘 — 겹쳐 둔다
 
 **① Cloudflare Worker (주 방아쇠, PC 무관).** `worker/`. 10분마다 `collect`와 `patrol`을 차례로 때린다.

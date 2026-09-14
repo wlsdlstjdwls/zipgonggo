@@ -278,6 +278,10 @@ CRON_TRIGGER_SECRET && npx wrangler deploy` 한 번이면 붙는다(시크릿은
 (`vercel redeploy <URL>`이면 업로드 없이 된다). 이걸 안 해서 501이 계속 나왔다.
 ② `vercel deploy`를 CLI로 직접 돌리면 안 된다 — Root Directory가 `web`이라 저장소 루트에서 올려야 하는데
 `pipeline/data/` 1.8GB가 딸려 가 100MB 제한에 걸린다. **배포는 git push(Git 연동)로 한다.**
+③ **푸시 자동 배포는 꺼져 있다(2026-09-14)** — `web/vercel.json` `git.deploymentEnabled.main: false`.
+푸시해도 빌드 안 돈다. 배포는 Vercel 대시보드 Settings → Git → Deploy Hooks(`main`)의 URL에
+`curl -X POST`, 또는 Deployments → Redeploy. 「커밋·푸시했으니 배포됐겠지」는 이제 틀린 가정이다 —
+배포가 필요한 변경이면 훅을 때리고 curl로 프로덕션을 실측한다. 자세한 건 automation.md 「배포」.
 
 Vercel Cron으로 안 간 이유: **Hobby는 최소 하루 1회**고 `17 * * * *`는 **배포 자체가 실패**한다
 (공식 문서 2026-09-10 확인). 정밀도도 ±59분이라 GitHub과 다를 게 없다.
