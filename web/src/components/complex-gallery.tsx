@@ -24,9 +24,9 @@ const DRAG_SLOP_PX = 6;
 
 // 끝에서 더 끌면 줄이 고무줄처럼 조금 따라왔다가 되돌아온다. scrollLeft는 0 밑으로 못 가서, 이게 없으면
 // 맨 앞에서 오른쪽으로 끄는 순간 화면이 죽은 듯 서 있다 — 줄을 처음 잡으면 대개 그 상황이라 「항상 안 끌린다」로
-// 읽힌다(사용자 지적 2026-09-14). 식은 fitin-app 주간 스트립과 같다: 끈 거리에 비례하되 상한을 둔다
-const RUBBER_RATIO = 0.3;
-const RUBBER_MAX_PX = 72;
+// 읽힌다(사용자 지적 2026-09-14). 끈 거리에 비례해 **상한 없이** 따라온다 — fitin 주간 스트립은 44px에서
+// 멈추지만 여기선 그게 「조금 가다 막힌다」로 느껴졌다(사용자 지적 2026-09-14). 놓으면 제자리로 돌아온다
+const RUBBER_RATIO = 0.5;
 const RUBBER_BACK = "transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1)";
 
 // 개발 화면에서만 계측 줄을 그린다
@@ -129,7 +129,7 @@ function Strip({
     el.scrollLeft = next;
     // 갈 수 없는 만큼(over)은 스크롤 대신 줄 자체를 밀어 「잡혀 있다」는 느낌을 남긴다
     const over = want - next;
-    const pull = over === 0 ? 0 : -Math.sign(over) * Math.min(Math.abs(over) * RUBBER_RATIO, RUBBER_MAX_PX);
+    const pull = -over * RUBBER_RATIO;
     el.style.transform = pull ? `translateX(${pull}px)` : "";
     // 끌고 나서 손을 떼면 click이 따라온다. 그걸 사진 열기로 오해하지 않게 표시해 둔다
     dragged.current = true;
