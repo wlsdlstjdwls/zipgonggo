@@ -238,6 +238,7 @@ export async function getNoticeComplexes(noticeId: number): Promise<NoticeComple
   return query<NoticeComplex>(
     `SELECT c.id, c.name, c.sido, c.sigungu, c.road_address, c.is_new, c.complex_code, c.source_page,
             c.heating, c.unit_count, c.min_deposit, c.min_rent, c.area_min, c.area_max, c.sh_bizns_cd,
+            ST_Y(c.geom::geometry) AS lat, ST_X(c.geom::geometry) AS lng,
             COALESCE(t.classes, ARRAY[]::text[]) AS tenant_classes
      FROM notice_complex c
      LEFT JOIN LATERAL (

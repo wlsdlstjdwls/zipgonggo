@@ -125,7 +125,7 @@ export type NoticeUnit = {
 
 export type NoticeArea = { sido: string; sigungu: string | null; supply_count: number | null };
 
-/** 공고가 공급하는 단지 (notice_complex, SH 첨부 공고문 표). 좌표 없음 — S6 이후 */
+/** 공고가 공급하는 단지 (notice_complex, SH 첨부 공고문 표). 좌표는 S6 오프라인 조인 결과(geom) */
 export type NoticeComplex = {
   id: number;
   name: string;
@@ -143,6 +143,10 @@ export type NoticeComplex = {
   tenant_classes: string[];
   /** SH주택정보 단지코드(0023). 사진·도면을 이걸로 찾는다. 신규 미준공 단지는 등록 전이라 NULL */
   sh_bizns_cd: string | null;
+  /** 좌표(WGS84). 행안부 요약DB 오프라인 조인이 못 맞춘 단지는 둘 다 NULL — 화면은 「지도 미표시」.
+   * 지오코딩 API로 채우지 않는다(CLAUDE.md 하지 말 것 1) */
+  lat: number | null;
+  lng: number | null;
   /** 아래는 매입임대 별첨 주택목록(호실 단위)에서만 채워진다. 장기전세 위치 표는 NULL */
   unit_count: number | null;
   min_deposit: number | null;

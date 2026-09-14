@@ -1,7 +1,7 @@
 "use client";
 
 // 주소 1건 지도 — 단지 상세·공고 상세의 「위치」 섹션.
-// DB에 좌표가 없어(행안부 요약DB 미승인) 브라우저에서 geocoder 서브모듈로 실시간 변환한다.
+// 좌표(coord)를 받으면 그대로 찍는다(단지 상세 — notice_complex.geom). 없으면 브라우저 geocoder로 실시간 변환한다(공고 상세 — notice.address는 좌표가 없다).
 // 변환 결과는 어디에도 저장하지 않는다 — CLAUDE.md "하지 말 것 1". SDK 로드는 lib/naver-maps-loader 공용.
 // 마커는 말풍선(이름 + 보조 글자)으로 띄우고, 누르면 로드뷰가 열린다. 지도 위 버튼도 같은 토글(사용자 요청 2026-09-08).
 
@@ -15,10 +15,12 @@ import { usePanorama } from "@/lib/use-panorama";
 
 type Props = { address: string; title: string; sub?: string;
   /** 기본은 NAVER_MAP_DEFAULT_ZOOM. 단지 상세는 한 단계 낮게 써서 원래 배율을 지킨다(사용자 요청 2026-09-09) */
-  zoom?: number };
+  zoom?: number;
+  /** DB 좌표. 있으면 지오코딩을 건너뛴다 */
+  coord?: LatLng | null };
 type State = "loading" | "ready" | "no-key" | "failed";
 
-export function NaverMap({ address, title, sub = "", zoom = NAVER_MAP_DEFAULT_ZOOM }: Props) {
+export function NaverMap({ address, title, sub = "", zoom = NAVER_MAP_DEFAULT_ZOOM, coord: given }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const panoEl = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<State>(hasMapKey() ? "loading" : "no-key");
@@ -34,7 +36,7 @@ export function NaverMap({ address, title, sub = "", zoom = NAVER_MAP_DEFAULT_ZO
     let map: any = null;
     loadNaverMaps()
       .then(async (maps) => {
-        const p = await geocode(maps, address);
+        const p = given ?? await geocode(maps, address);
         if (cancelled) return;
         if (!p || !el.current) { setState("failed"); return; }
         const pos = new maps.LatLng(p.lat, p.lng);
@@ -50,7 +52,8 @@ export function NaverMap({ address, title, sub = "", zoom = NAVER_MAP_DEFAULT_ZO
       })
       .catch(() => { if (!cancelled) setState("failed"); });
     return () => { cancelled = true; if (map?.destroy) map.destroy(); };
-  }, [address, title, sub, zoom]);
+    // given은 렌더마다 새 객체일 수 있어 숫자만 의존성에 건다 — 안 그러면 렌더마다 지도를 부수고 다시 만든다
+  }, [address, title, sub, zoom, given?.lat, given?.lng]);
 
   const panoState = usePanorama(panoEl, coord, roadview, state === "ready");
 

@@ -93,7 +93,7 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
   }, []);
 
   // 2) 마커 동기화 + 핀 집합이 바뀌었을 때만 한 번 fit
-  // useEffect(그리기 다음 틱)이면 cx-load 오버레이가 걷히는 첫 페인트에 아직 fitBounds 전
+  // useEffect(그리기 다음 틱)이면 첫 페인트에 아직 fitBounds 전
   // (마운트 때 줌 — 좁은 서울 기준)이 한 프레임 비쳤다가 fit 결과로 튀는 게 보였다(사용자 지적 2026-09-09).
   // useLayoutEffect로 같은 커밋의 페인트 전에 끝내 그 프레임 자체를 없앤다.
   useLayoutEffect(() => {

@@ -1,7 +1,8 @@
 "use client";
 
 // 공급 단지 탐색기 — 왼쪽 목록(검색·조건·건수) + 오른쪽 브랜드 핀 지도(ComplexMap). 벤치마크 docs/references/공고지도2.png.
-// 지도는 먼저 뜨고, 좌표는 브라우저 지오코딩이 끝나면 한 번에 얹는다(탭 메모리만, 저장 금지 — CLAUDE.md 하지 말 것 1).
+// 좌표는 서버가 notice_complex.geom(행안부 요약DB 오프라인 조인)에서 내려준다 — 브라우저 지오코딩은 40차에서 뺐다(공고당 ~140회 호출·진행 오버레이가 사라짐).
+// 좌표 없는 단지는 「지도 미표시」. 지오코딩 API로 메우지 않는다(CLAUDE.md 하지 말 것 1).
 // 행 호버 ↔ 핀 강조, 행·핀 클릭 → 선택(핀이 이름 라벨로 바뀜, 목록 스크롤, 화면 밖이면 지도 pan). 선택 단지는 로드뷰를 열 수 있다.
 // 클라이언트 컴포넌트지만 목록은 서버에서 HTML로 렌더되므로 크롤러도 단지명·주소를 본다.
 //
@@ -12,7 +13,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { noticeComplexPath } from "@/lib/routes";
-import { geocodeAll, hasMapKey, loadNaverMaps, type LatLng } from "@/lib/naver-maps-loader";
+import { hasMapKey, type LatLng } from "@/lib/naver-maps-loader";
 import { num, wonExact, wonKo, wonShort } from "@/lib/format";
 import type { NoticeComplex } from "@/types/notice";
 import { ComplexMap, type MapItem } from "./complex-map";
@@ -20,7 +21,7 @@ import { Select } from "./select";
 import { Trunc } from "./trunc";
 
 type Props = { items: NoticeComplex[]; hasUnits: boolean; noticeSlug: string; /** 공고 전체 공급 호수. 섹션 제목을 뺀 자리를 이 줄이 대신 센다(사용자 요청 2026-09-09) */ unitTotal?: number };
-type Phase = "loading" | "ready" | "failed" | "no-key";
+type Phase = "ready" | "no-key";
 
 // 핀이 아직 없을 때 첫 화면 — 서울 전역
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.978 };
@@ -121,9 +122,13 @@ const numOrNull = (s: string) => {
 
 export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Props) {
   const listEl = useRef<HTMLUListElement>(null);
-  const [phase, setPhase] = useState<Phase>(hasMapKey() ? "loading" : "no-key");
-  const [progress, setProgress] = useState(0);
-  const [coords, setCoords] = useState<Map<string, LatLng | null>>(new Map());
+  const phase: Phase = hasMapKey() ? "ready" : "no-key";
+  // 주소 → 좌표. ComplexMap이 주소로 찾는다. 좌표 없는 단지는 null(핀 없음)
+  const coords = useMemo(() => {
+    const m = new Map<string, LatLng | null>();
+    for (const c of items) m.set(fullAddress(c), c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null);
+    return m;
+  }, [items]);
   const [focus, setFocus] = useState<number | null>(null);
   const [roadview, setRoadview] = useState(false);
   const [gu, setGu] = useState("");
@@ -193,19 +198,6 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
   const conds = [cls, band, areaLo.trim(), areaHi.trim(), dep, rent, onlyNew ? "new" : ""].filter(Boolean).length;
   const filtered = Boolean(gu || q.trim()) || conds > 0;
   const hasMoreTools = classes.length > 1 || bands.length > 1 || deposits.length > 0 || rents.length > 0 || showNewChip;
-
-  // 1) 지오코딩 — 마운트 즉시
-  useEffect(() => {
-    if (!hasMapKey()) return;
-    let cancelled = false;
-    setPhase("loading");
-    setProgress(0);
-    loadNaverMaps()
-      .then((maps) => geocodeAll(maps, items.map(fullAddress), (n) => { if (!cancelled) setProgress(n); }))
-      .then((r) => { if (!cancelled) { setCoords(r); setPhase("ready"); } })
-      .catch(() => { if (!cancelled) setPhase("failed"); });
-    return () => { cancelled = true; };
-  }, [items]);
 
   const mapItems = useMemo(() => visible.map(toItem), [visible]);
 
@@ -333,7 +325,7 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
         <ul className="cx-list" ref={listEl} aria-label="공급 단지 목록" onKeyDown={onListKey}>
           {visible.map((c) => {
             const on = c.id === selected;
-            const noPin = phase === "ready" && !coords.get(fullAddress(c));
+            const noPin = phase === "ready" && (c.lat == null || c.lng == null);
             return (
               <li key={c.id} data-id={c.id} className={`${on ? "on" : ""}${focus === c.id ? " is-focus" : ""}`.trim() || undefined}>
                 <button type="button" onClick={() => onPick(c.id)} aria-pressed={on} onMouseEnter={() => setFocus(c.id)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(c.id)} onBlur={() => setFocus(null)}>
@@ -378,18 +370,6 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
               <span className="lg" aria-hidden="true" />재공급
             </p>
           )}
-          {phase !== "failed" && (
-            /* 지도 위 진행 오버레이 — 상태 문구만으로는 몇 곳이 남았는지 안 보인다(사용자 요청 2026-09-09).
-               다 되면 조건부로 떼지 않고 옅어지게만 한다 — 지도가 뒤에서 빡 하고 드러나던 걸 막는다(사용자 지적 2026-09-09) */
-            <div className={`cx-load${phase !== "loading" ? " hide" : ""}`} role="status" aria-live="polite" aria-hidden={phase !== "loading"}>
-              <p className="cx-load-n"><b>{progress}</b><span>/ {items.length}</span></p>
-              <p className="cx-load-t">주소를 좌표로 바꾸는 중</p>
-              <div className="cx-load-bar" role="progressbar" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={progress}>
-                <i style={{ transform: `scaleX(${items.length ? progress / items.length : 0})` }} />
-              </div>
-            </div>
-          )}
-          {phase === "failed" && <p className="map-note">주소를 찾지 못해 핀을 표시하지 못했습니다.</p>}
           {picked && (
             <div className="cx-card">
               <div className="cx-card-t">

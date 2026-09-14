@@ -7,6 +7,24 @@
 
 ---
 
+## 지금 상태 (2026-09-14, 40차 세션)
+
+**공고 상세 단지 지도가 DB 좌표(`notice_complex.geom`)로 핀을 찍는다. 브라우저 지오코딩과 「주소를 좌표로 바꾸는 중」 오버레이는 뺐다.**
+15차부터 밀린 「다음에 할 일 1」. 실측: notice_complex 1,454건 중 좌표 1,443건, 없는 건 11건(handoff에 적혀 있던 906/166은 옛 수치였다).
+
+- `getNoticeComplexes`가 `ST_Y(c.geom::geometry) AS lat, ST_X(c.geom::geometry) AS lng`를 내린다. `NoticeComplex`에 `lat`/`lng`(둘 다 `number | null`).
+  이 쿼리는 `unstable_cache`가 아니라 캐시 키 문제는 없다.
+- `complex-explorer.tsx` — `geocodeAll`·`loadNaverMaps` 경로와 `progress`·`loading`·`failed` 상태를 **완전 제거**(좌표 없는 행에만 남기지 않았다 —
+  11건뿐이고, 남기면 오버레이·SDK 로딩 대기가 그대로 남는다). `coords`는 `items`에서 `useMemo`로 만든 주소 → 좌표 맵(ComplexMap이 주소로 찾는 구조는 그대로).
+  「지도 미표시」는 `c.lat == null`로 판정. `globals.css`의 `.cx-load*` 블록도 지웠다.
+- `naver-map.tsx`에 `coord?: LatLng | null` prop — 있으면 지오코딩을 건너뛴다. 단지 상세(`[complex]/page.tsx`)가 넘긴다.
+  공고 상세 「위치」는 `notice.address`라 좌표가 없어 아직 지오코딩한다(1회). 의존성은 `given?.lat`·`given?.lng` 숫자로 — 객체를 걸면 렌더마다 지도를 다시 만든다.
+- 검증: tsc 통과. dev(3100)에서 제51차 장기전세(138곳) 핀이 마운트 즉시 전부 찍힘, 오버레이 없음. 단지 상세 「위치」 지도도 뜸.
+  Chrome 네트워크 도구가 이 탭의 요청을 하나도 안 잡아 지오코딩 호출 0회는 코드 제거로만 보장(실측치 아님).
+- 프로젝트에 eslint 설정이 없어 `next lint`가 대화형 설치 프롬프트를 띄운다 — lint 검증은 못 한다.
+
+---
+
 ## 지금 상태 (2026-09-14, 39차 세션)
 
 **신청자격 파서가 행복주택·매입임대 양식을 읽고, 공고 상세에 「내 조건에 맞는 단지」가 붙었고, 상세 화면을 접이식으로 정리했다.**
@@ -922,15 +940,12 @@ Vercel Cron은 못 쓴다 — Hobby는 최소 간격이 하루 1회고 `0 * * * 
   애드센스가 붙어 있어 Hobby 「비상업」 조건에도 걸린다 — Pro 전환은 사용자 판단.
 - 남은 미연결 SH 단지 433행은 신규 미준공(SH주택정보 미등록)이거나 이름·주소가 크게 다른 것. `match`가 실패 목록을 찍어 준다
 
-### 1. 지도를 DB 좌표로 갈아 끼우기 — 15차부터 밀린 것
+### 1. ~~지도를 DB 좌표로 갈아 끼우기~~ — 40차에서 해결
 
-`notice_complex.geom`이 906건 차 있는데 `web/src/components/complex-explorer.tsx`는 아직 마운트 때마다
-브라우저에서 네이버 geocoder를 돌린다(공고당 ~140회). 서버가 좌표를 내려주면 「주소를 좌표로 바꾸는 중」
-오버레이가 통째로 사라지고 첫 화면이 즉시 완성된다.
+`getNoticeComplexes`가 lat/lng를 내리고 `complex-explorer.tsx`는 지오코딩을 안 한다(위 40차 기록). 남은 것:
 
-- `getNoticeComplexes`에 `ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng` 추가
-- `NoticeComplex` 타입에 `lat`/`lng` 추가, `ComplexExplorer`의 `geocodeAll` 경로는 좌표 없는 행에만 남긴다(또는 완전 제거)
-- 좌표 없는 166건은 지금처럼 「지도 미표시」
+- 공고 상세 「위치」 지도(`NaverMap`, `notice.address`)는 아직 브라우저 지오코딩 1회 — notice에 geom이 없다. S6에서 notice 주소도 조인하면 같은 `coord` prop으로 끝난다
+- 좌표 없는 notice_complex 11건은 「지도 미표시」. `s6` 매칭 실패 목록을 보고 주소를 손볼지 판단
 
 ### 2. ~~장기전세 공사 건설형 재공급 — 지구 묶음 펴기~~ — 25차에서 해결
 

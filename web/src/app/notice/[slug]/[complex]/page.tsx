@@ -328,7 +328,7 @@ export default async function ComplexPage({ params }: Params) {
 
           <section className="dsec">
             <h2>위치</h2>
-            <div className="d-map"><NaverMap address={full} title={c.name} sub={mapSub} zoom={NAVER_MAP_COMPLEX_ZOOM} /></div>
+            <div className="d-map"><NaverMap address={full} title={c.name} sub={mapSub} zoom={NAVER_MAP_COMPLEX_ZOOM} coord={c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : undefined} /></div>
           </section>
 
           <GlossaryList terms={terms} />
