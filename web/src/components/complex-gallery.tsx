@@ -66,24 +66,34 @@ function Strip({
     drag.current?.();
     const el = ref.current;
     if (!el) return;
-    const onMove = (e: PointerEvent) => {
-      const dx = e.clientX - x0;
+    const move = (x: number) => {
+      const dx = x - x0;
       const before = el.scrollLeft;
       el.scrollLeft = left0 - dx;
       // 문턱을 포인터 이동만으로 잡으면 더 갈 데가 없는 끝에서 헛손질까지 「끈 것」이 된다.
       // 실제로 줄이 움직였을 때만 클릭을 삼킨다
       if (Math.abs(dx) > DRAG_SLOP_PX && el.scrollLeft !== before) dragged.current = true;
     };
+    const onPointer = (e: PointerEvent) => move(e.clientX);
+    // pointermove가 끊겨도(브라우저가 제 나름의 드래그를 시작하는 등) mousemove로 이어 간다.
+    // 둘 다 와도 같은 자리를 두 번 셈할 뿐이라 해가 없다
+    const onMouse = (e: MouseEvent) => move(e.clientX);
     const end = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", end);
-      window.removeEventListener("pointercancel", end);
+      // capture로 걸었으면 뗄 때도 capture여야 한다
+      window.removeEventListener("pointermove", onPointer, true);
+      window.removeEventListener("mousemove", onMouse, true);
+      window.removeEventListener("pointerup", end, true);
+      window.removeEventListener("mouseup", end, true);
+      window.removeEventListener("pointercancel", end, true);
       drag.current = null;
       setDragging(false);
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", end);
-    window.addEventListener("pointercancel", end);
+    // capture 단계로 듣는다 — 중간 어디선가 stopPropagation을 걸어도 끌기가 죽지 않게
+    window.addEventListener("pointermove", onPointer, true);
+    window.addEventListener("mousemove", onMouse, true);
+    window.addEventListener("pointerup", end, true);
+    window.addEventListener("mouseup", end, true);
+    window.addEventListener("pointercancel", end, true);
     drag.current = end;
     setDragging(true);
   };
@@ -119,6 +129,10 @@ function Strip({
       <ul
         className={`gal-strip${dragging ? " dragging" : ""}`} ref={ref} onScroll={measure}
         onPointerDown={onPointerDown} onClick={onClick}
+        // 누른 채 움직이면 크롬이 제 드래그(고스트)를 시작하고 그 순간 pointermove가 끊긴다.
+        // mousedown을 막으면 그게 안 일어난다 — click은 그대로 난다(막히는 건 선택·포커스뿐)
+        onMouseDown={(e) => { if (e.button === 0) e.preventDefault(); }}
+        onDragStart={(e) => e.preventDefault()}
       >
         {images.map((img, i) => {
           const text = caption(img, mixed);
