@@ -22,6 +22,11 @@ const OTHERS_TAB = "다른 주택형";
 // 이만큼 움직여야 「끈 것」으로 친다. 3px은 클릭 중 손 떨림에 걸려 사진 열기를 통째로 삼켰다(사용자 지적 2026-09-14)
 const DRAG_SLOP_PX = 6;
 
+// 끌기가 왜 안 먹는지 손으로 잡을 수 없어서 심은 임시 계측. 개발에서만 산다.
+// 콘솔이 아니라 줄 밑에 찍는다 — 사용자가 F12를 열지 않고도 한 줄만 읽어 주면 된다.
+// 원인이 잡히면 지운다(2026-09-14).
+const DEBUG = process.env.NODE_ENV !== "production";
+
 function Strip({
   images, biznsCd, complexName, mixed, active, onOpen,
 }: {
@@ -40,6 +45,14 @@ function Strip({
   const dragged = useRef(false);
   // 줄 양끝에 더 있는지. 끌 수 있다는 걸 눈으로 알려 주지 않으면 「안 끌린다」로 읽힌다(사용자 지적 2026-09-14)
   const [edge, setEdge] = useState({ left: false, right: false });
+  const [diag, setDiag] = useState("");
+
+  const log = (tag: string, o?: unknown) => {
+    if (!DEBUG) return;
+    const line = o === undefined ? tag : `${tag} ${JSON.stringify(o)}`;
+    console.log("[gal]", line);
+    setDiag(line);
+  };
 
   const measure = useCallback(() => {
     const el = ref.current;
@@ -74,11 +87,14 @@ function Strip({
       // 실제로 줄이 움직였을 때만 클릭을 삼킨다
       if (Math.abs(dx) > DRAG_SLOP_PX && el.scrollLeft !== before) dragged.current = true;
     };
-    const onPointer = (e: PointerEvent) => move(e.clientX);
+    let moves = 0;
+    const onPointer = (e: PointerEvent) => { moves++; move(e.clientX); };
     // pointermove가 끊겨도(브라우저가 제 나름의 드래그를 시작하는 등) mousemove로 이어 간다.
     // 둘 다 와도 같은 자리를 두 번 셈할 뿐이라 해가 없다
-    const onMouse = (e: MouseEvent) => move(e.clientX);
+    let mouseMoves = 0;
+    const onMouse = (e: MouseEvent) => { mouseMoves++; move(e.clientX); };
     const end = () => {
+      log("end", { moves, mouseMoves, from: left0, to: el.scrollLeft, dragged: dragged.current });
       // capture로 걸었으면 뗄 때도 capture여야 한다
       window.removeEventListener("pointermove", onPointer, true);
       window.removeEventListener("mousemove", onMouse, true);
@@ -99,13 +115,15 @@ function Strip({
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLUListElement>) => {
+    log("down", { type: e.pointerType, button: e.button,
+      sw: ref.current?.scrollWidth, cw: ref.current?.clientWidth, target: (e.target as HTMLElement)?.tagName });
     const li = (e.target as HTMLElement | null)?.closest?.("li");
     pressed.current = li ? [...(ref.current?.children ?? [])].indexOf(li) : null;
     dragged.current = false;
     // 터치는 브라우저 기본 스크롤이 낫다(관성이 있다). 마우스는 그게 안 돼서 직접 민다
-    if (e.pointerType === "touch") return;
+    if (e.pointerType === "touch") { log("skip: touch"); return; }
     const el = ref.current;
-    if (!el || el.scrollWidth <= el.clientWidth) return;
+    if (!el || el.scrollWidth <= el.clientWidth) { log("skip: 넘치지 않음"); return; }
     beginDrag(e.clientX, el.scrollLeft);
   };
 
@@ -113,6 +131,7 @@ function Strip({
   // 입력 방식에 따라 흔들린다(끌다 놓으면 공통 조상으로 간다). 누른 칸을 pointerdown에서 적어 두면
   // target이 어디로 가든 무엇을 열지 안다. 키보드 Enter는 pointerdown이 없으니 target으로 찾는다
   const onClick = (e: React.MouseEvent<HTMLUListElement>) => {
+    log("click", { dragged: dragged.current, pressed: pressed.current });
     if (dragged.current) { dragged.current = false; return; }
     const li = (e.target as HTMLElement | null)?.closest?.("li");
     const i = li ? [...(ref.current?.children ?? [])].indexOf(li) : pressed.current;
@@ -152,6 +171,7 @@ function Strip({
           );
         })}
       </ul>
+      {DEBUG && diag && <p className="gal-diag">{diag}</p>}
       {(edge.left || edge.right) && (
         <>
           <button type="button" className="gal-arrow prev" onClick={() => nudge(-1)} disabled={!edge.left} aria-label="왼쪽으로">‹</button>

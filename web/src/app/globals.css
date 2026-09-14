@@ -637,6 +637,8 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
    놓는 순간에도 도로 당겨진다. 터치는 브라우저가 알아서 끄니 스냅이 이롭다(사용자 지적 2026-09-14) */
 @media (hover: none) { .gal-strip { scroll-snap-type: x proximity; } }
 .gal-strip.dragging { scroll-snap-type: none; }
+/* 임시 계측 줄(개발 전용). 끌기 원인이 잡히면 지운다 */
+.gal-diag { margin: 4px 0 0; padding: 4px 8px; border-radius: 6px; background: #fff4d6; font-family: ui-monospace, monospace; font-size: 11px; line-height: 1.5; color: #7a5b00; word-break: break-all; }
 .gal-strip > li { flex: 0 0 184px; scroll-snap-align: start; }
 .gal-strip button { display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: #fff; cursor: zoom-in; text-align: left; font: inherit; }
 .gal-strip button:hover { border-color: var(--line-strong); }
