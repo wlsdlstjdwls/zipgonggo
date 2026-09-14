@@ -607,6 +607,64 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 .dsub { margin-top: 20px; }
 .dsub > h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-weight: 800; font-size: 14.5px; line-height: 1.3; letter-spacing: -0.03em; color: var(--ink); }
 .dsub > h3::before { content: ""; flex: none; width: 3px; height: 13px; border-radius: 2px; background: var(--line-strong); }
+
+/* 사진과 도면(0023) — 평면도는 세로로 긴 도면과 가로로 넓은 배치도가 섞여 온다.
+   원본 비율을 모르므로 칸 높이를 고정하고 contain으로 넣는다. 잘라내면 도면이 읽히지 않는다. */
+.gal-n { font-weight: 700; font-size: 11.5px; color: var(--dim); }
+/* 한 영역, 한 줄. 종류는 탭으로 가른다 — 세로로 쌓으면 네 덩이가 지면을 다 먹는다(사용자 지적 2026-09-14) */
+.gal-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.gal-tab { padding: 7px 12px; border: 1px solid var(--line2); border-radius: 999px; background: #fff; cursor: pointer; font: inherit; font-weight: 800; font-size: 12.5px; line-height: 1.2; letter-spacing: -0.02em; color: var(--dim); }
+.gal-tab:hover { border-color: var(--line-strong); color: var(--ink); }
+.gal-tab.on { border-color: var(--ink); background: var(--ink); color: #fff; }
+.gal-tab.on .gal-n { color: rgba(255, 255, 255, 0.72); }
+/* 이 공고에 없는 주택형 — 나머지 탭과 한 줄에 있되 같은 무게로 읽히면 안 된다 */
+.gal-tab.alt { margin-left: auto; border-style: dashed; }
+
+/* 줄과 양끝 화살표. 끌 수 있다는 걸 눈으로 알려 주지 않으면 「안 끌린다」로 읽힌다(사용자 지적 2026-09-14) */
+.gal-rail { position: relative; }
+.gal-arrow { position: absolute; top: 74px; width: 30px; height: 30px; transform: translateY(-50%); border: 1px solid var(--line2); border-radius: 999px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 1px 5px rgba(16, 20, 28, 0.14); color: var(--ink); font-size: 17px; line-height: 1; cursor: pointer; }
+.gal-arrow:disabled { opacity: 0; pointer-events: none; }
+.gal-arrow.prev { left: -6px; }
+.gal-arrow.next { right: -6px; }
+/* 손가락으로 미는 화면에서는 화살표가 자리만 차지한다 */
+@media (hover: none) { .gal-arrow { display: none; } }
+
+/* 가로로 끌어 넘기는 줄. 터치는 브라우저 기본 스크롤, 마우스는 포인터로 scrollLeft를 민다 */
+.gal-strip { display: flex; gap: 10px; margin: 0; padding: 0 0 6px; list-style: none; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; cursor: grab; user-select: none; }
+.gal-strip:active { cursor: grabbing; }
+/* 스냅은 터치에만 준다. 마우스 끌기는 scrollLeft를 직접 미는데, 스냅을 켜 두면 브라우저가 밀 때마다
+   스냅점으로 되돌려 한 칸 폭을 한 번에 넘지 않는 한 제자리고(실측 8·16·24px 모두 0 복귀),
+   놓는 순간에도 도로 당겨진다. 터치는 브라우저가 알아서 끄니 스냅이 이롭다(사용자 지적 2026-09-14) */
+@media (hover: none) { .gal-strip { scroll-snap-type: x proximity; } }
+.gal-strip.dragging { scroll-snap-type: none; }
+.gal-strip > li { flex: 0 0 184px; scroll-snap-align: start; }
+.gal-strip button { display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: #fff; cursor: zoom-in; text-align: left; font: inherit; }
+.gal-strip button:hover { border-color: var(--line-strong); }
+.gal-strip img { display: block; width: 100%; height: 148px; object-fit: contain; background: #fbfbfc; }
+.gal-strip span { display: block; padding: 7px 9px; border-top: 1px solid var(--line); font-weight: 700; font-size: 11.5px; line-height: 1.3; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 전체화면 뷰어 — 좌우로 넘기고 확대한다. 제스처를 직접 받으므로 브라우저 기본 스크롤·확대를 끈다 */
+.pv { position: fixed; inset: 0; z-index: 90; background: rgba(12, 14, 18, 0.94); }
+.pv-stage { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
+.pv-track { display: flex; height: 100%; will-change: transform; }
+.pv-track.anim { transition: transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1); }
+.pv-slide { flex: 0 0 100%; display: flex; align-items: center; justify-content: center; margin: 0; padding: 56px 16px 64px; }
+/* 원본이 작아도 화면을 채운다. max-*만 주면 SH 실내 사진(650~770px)이 큰 화면 한가운데 우표만 하게 뜬다.
+   비는 자리는 object-fit이 지키고, 그림이 실제로 그려진 상자는 photo-viewer가 따로 셈해 쓴다(contentRect) */
+.pv-slide img { width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; transform-origin: center; }
+.pv-top { position: absolute; inset: 12px 12px auto; display: flex; align-items: center; gap: 10px; pointer-events: none; }
+.pv-count, .pv-cap, .pv-chip { padding: 6px 11px; border-radius: 999px; background: rgba(0, 0, 0, 0.55); color: #fff; font-weight: 700; font-size: 11.5px; line-height: 1.3; }
+.pv-cap { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-btn { margin-left: auto; width: 34px; height: 34px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 15px; cursor: pointer; pointer-events: auto; }
+.pv-nav { position: absolute; top: 50%; width: 42px; height: 42px; transform: translateY(-50%); border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 24px; line-height: 1; cursor: pointer; }
+.pv-nav:disabled { opacity: 0.25; cursor: default; }
+.pv-nav.prev { left: 12px; }
+.pv-nav.next { right: 12px; }
+.pv-foot { position: absolute; inset: auto 12px 14px; display: flex; justify-content: center; }
+.pv-foot .pv-chip { border: 0; cursor: default; }
+.pv-foot button.pv-chip { cursor: pointer; }
+/* 손가락으로 넘기는 화면에서는 화살표가 자리만 차지한다 */
+@media (hover: none) { .pv-nav { display: none; } }
 .aside { border-left: 1px solid var(--line); }
 .aside-in { position: sticky; top: 60px; padding: 22px var(--pad); display: flex; flex-direction: column; gap: 14px; }
 .dcard { padding: 18px; border-radius: var(--r-panel); }
