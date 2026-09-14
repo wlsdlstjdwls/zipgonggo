@@ -634,7 +634,10 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 @media (hover: none) { .gal-arrow { display: none; } }
 
 /* 가로로 끌어 넘기는 줄. 터치는 브라우저 기본 스크롤, 마우스는 포인터로 scrollLeft를 민다 */
-.gal-strip { display: flex; gap: 10px; margin: 0; padding: 0 0 6px; list-style: none; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; user-select: none; }
+.gal-strip { display: flex; gap: 10px; margin: 0; padding: 0; list-style: none; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; user-select: none; }
+/* 스크롤바는 숨긴다(사용자 요청 2026-09-14). 끌기와 화살표, 반쯤 잘린 다음 칸이 「더 있다」를 이미 말한다 */
+.gal-strip { scrollbar-width: none; }
+.gal-strip::-webkit-scrollbar { display: none; }
 /* 손바닥 커서는 **넘치는 줄에만**. 다 보이는 줄에 주면 끌리는 줄 알고 끌다 「안 된다」가 된다 */
 .gal-strip.over { cursor: grab; }
 .gal-strip.over:active { cursor: grabbing; }
@@ -648,8 +651,6 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
    끌 것이 없는 줄이라는 걸 생김새로 말해 준다(사용자 지적 2026-09-14).
    넘치는 줄에는 절대 주면 안 된다 — 가운데 정렬은 첫 칸을 스크롤로 닿지 못하는 왼쪽 밖으로 밀어낸다 */
 .gal-strip.fits { justify-content: center; }
-/* 개발 전용 계측 줄. 원인을 잡으면 지운다 */
-.gal-trace { margin: 4px 0 0; font-family: ui-monospace, monospace; font-size: 11px; color: #7a45d8; }
 /* 칸 폭은 **줄 폭의 52%**다. 픽셀로 잡으면 화면이 넓어질수록 줄이 안 넘치고, 안 넘치는 줄은
    브라우저가 스크롤할 거리가 0이라 끌기가 원천적으로 죽는다 — 「어느 단지든 좌우로 끌려야 한다」는
    요구는 이 기하로만 지킬 수 있다(사용자 지적 2026-09-14).

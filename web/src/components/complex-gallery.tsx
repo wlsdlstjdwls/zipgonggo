@@ -29,9 +29,6 @@ const DRAG_SLOP_PX = 6;
 const RUBBER_RATIO = 0.5;
 const RUBBER_BACK = "transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1)";
 
-// 개발 화면에서만 계측 줄을 그린다
-const DEV = process.env.NODE_ENV !== "production";
-
 function Strip({
   images, biznsCd, complexName, mixed, active, onOpen,
 }: {
@@ -54,10 +51,6 @@ function Strip({
   // fits는 「재 봤더니 안 넘친다」다. over의 반대가 아니라 **재기 전에는 둘 다 false**여야 한다 —
   // 재기 전에 가운데로 모아 두면, 넘치는 줄에서 첫 칸이 왼쪽으로 밀려 나가 스크롤로도 못 돌아온다
   const [edge, setEdge] = useState({ left: false, right: false, over: false, fits: false });
-  // 개발 화면 전용 계측. 끌기가 **어디서** 죽는지 사용자 브라우저에서 직접 읽으려고 둔다.
-  // 프로덕션 빌드에는 한 줄도 안 들어간다(DEV로 가른다). 원인을 잡으면 지운다
-  const [trace, setTrace] = useState("");
-  const tally = useRef({ pm: 0, mm: 0, cancel: 0, dragstart: 0, from: 0 });
 
   const measure = useCallback(() => {
     const el = ref.current;
@@ -91,12 +84,6 @@ function Strip({
     const li = (e.target as HTMLElement | null)?.closest?.("li");
     pressed.current = li ? [...(el?.children ?? [])].indexOf(li) : null;
     dragged.current = false;
-    if (DEV) {
-      tally.current = { pm: 0, mm: 0, cancel: 0, dragstart: 0, from: el?.scrollLeft ?? 0 };
-      setTrace(`down ${e.pointerType}/btn${e.button}/primary${e.isPrimary ? 1 : 0} | 줄 ${el?.scrollWidth ?? 0}/${el?.clientWidth ?? 0}`
-        + (e.pointerType === "touch" ? " | 터치는 브라우저에 맡김" : "")
-        + (el && el.scrollWidth <= el.clientWidth ? " | 안 넘쳐서 끌 것 없음" : ""));
-    }
     // 마우스는 좌클릭만, 손가락이 여럿이면 첫 손가락만
     if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
     // 터치는 브라우저 기본 스크롤이 낫다(관성이 붙는다). 마우스는 그게 안 돼서 직접 민다
@@ -110,7 +97,6 @@ function Strip({
     const d = drag.current;
     const el = ref.current;
     if (!d.active || !el || e.pointerId !== d.id) return;
-    if (DEV) tally.current.pm += 1;
     const dx = e.clientX - d.x0;
     const dy = e.clientY - d.y0;
     // 축이 정해지기 전에는 아무것도 하지 않는다 — 세로로 그으면 지면 스크롤을 뺏지 않고 물러난다
@@ -138,10 +124,6 @@ function Strip({
   const onPointerEnd = (e: React.PointerEvent<HTMLUListElement>) => {
     const d = drag.current;
     const el = ref.current;
-    if (DEV && d.active) {
-      const t = tally.current;
-      setTrace(`끝 ${e.type} | 축 ${d.axis ?? "미정"} | pointermove ${t.pm} | dragstart ${t.dragstart} | scrollLeft ${t.from}→${el?.scrollLeft ?? 0}`);
-    }
     if (!d.active) return;
     d.active = false;
     try { if (el?.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId); } catch { /* 이미 풀렸다 */ }
@@ -181,7 +163,7 @@ function Strip({
         // 누른 채 움직이면 크롬이 제 드래그(고스트)를 시작하고 그 순간 pointermove가 끊긴다.
         // mousedown을 막으면 그게 안 일어난다 — click은 그대로 난다(막히는 건 선택·포커스뿐)
         onMouseDown={(e) => { if (e.button === 0) e.preventDefault(); }}
-        onDragStart={(e) => { tally.current.dragstart += 1; e.preventDefault(); }}
+        onDragStart={(e) => e.preventDefault()}
       >
         {images.map((img, i) => {
           const text = caption(img, mixed);
@@ -202,7 +184,6 @@ function Strip({
         })}
       </ul>
       </div>
-      {DEV && trace && <p className="gal-trace">{trace}</p>}
       {(edge.left || edge.right) && (
         <>
           <button type="button" className="gal-arrow prev" onClick={() => nudge(-1)} disabled={!edge.left} aria-label="왼쪽으로">‹</button>
