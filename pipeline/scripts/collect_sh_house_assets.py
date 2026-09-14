@@ -10,9 +10,9 @@
     python scripts/collect_sh_house_assets.py assets 309467         # 단지별 보유 이미지 조사 → …/manifest.json
     python scripts/collect_sh_house_assets.py fetch 309467 --only "천왕이펜하우스 3단지"  # 내려받기 → …/img/
     python scripts/collect_sh_house_assets.py load 309467           # DB 적재 + web/public/sh-house 복사
+    python scripts/collect_sh_house_assets.py link-all              # 다른 공고의 같은 단지에도 biznsCd 연결
 
-`match`는 공고문 「주택 위치 안내」 표(sh_complex 파서)를 쓴다. 그 쪽 XML이 `data/ish/{seq}/`에 캐시돼
-있어야 한다 — 없으면 S3 수집을 먼저 돌린다.
+`match`는 DB의 `notice_complex` 행(공고 수집이 넣은 것)을 대조한다 — 공고문을 다시 읽지 않는다.
 
 **공개 발행 전에 SH 이용 허락을 받는다.** `/houseinfo/robots.txt`가 자기 경로를 막고 있다(sources 머리글 참조).
 산출물은 커밋하지 않는다(CLAUDE.md 커밋 규칙 — `pipeline/data/`).
@@ -31,7 +31,6 @@ from pathlib import Path
 PIPELINE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PIPELINE_ROOT / "src"))
 
-from zipgonggo_pipeline.parsers.sh_complex import parse_location_table  # noqa: E402
 from zipgonggo_pipeline.sources.sh_houseinfo import SEOUL_SIG, HouseInfoClient, Image  # noqa: E402
 
 OUT_ROOT = PIPELINE_ROOT / "data" / "sh-house"
@@ -44,7 +43,10 @@ DEFAULT_KINDS = ("평면도", "전경", "배치도", "실내")
 PROBE_IMG_TYPES = ("01", "03", "07")
 
 PAREN_RE = re.compile(r"\([^)]*\)")
-STRIP_RE = re.compile(r"[\s\-\[\]·]")
+# 밑줄도 지운다 — SH는 `공덕SK리더스뷰_2단지`, 공고문은 `공덕SK리더스뷰2단지`
+STRIP_RE = re.compile(r"[\s\-_\[\]·]")
+# 같은 뜻을 다르게 적는 것들. 왼쪽을 오른쪽으로 접는다(대조 키에서만)
+NAME_ALIASES = (("VIEW", "뷰"), ("이편한세상", "e편한세상"), ("아파트", ""))
 SIDO_RE = re.compile(r"^서울특별시\s*")
 UNSAFE_RE = re.compile(r'[\\/:*?"<>|]')
 # 실내 사진 이름 앞머리의 주택형: `84A 안방`·`59A1 작은방2번`·`49B 거실욕실`. 뒤에 공백이 있어야 한다 —
@@ -54,11 +56,16 @@ SPLY_LABEL_RE = re.compile(r"^(\d{2,3}[A-Za-z]?\d?)\s")
 
 def _name_key(name: str) -> str:
     """단지명 대조 키. SH주택정보는 이름 뒤에 지구 주석을 단다(`상림마을6-1단지(은평1-8,임대)`)."""
-    return STRIP_RE.sub("", PAREN_RE.sub("", name or ""))
+    key = STRIP_RE.sub("", PAREN_RE.sub("", name or "")).upper()
+    for src, dst in NAME_ALIASES:
+        key = key.replace(src.upper(), dst.upper())
+    return key
 
 
 def _addr_key(addr: str) -> str:
-    return re.sub(r"\s", "", SIDO_RE.sub("", addr or ""))
+    """주소 대조 키. 공고문은 뒤에 `(공덕동 공덕 SK 리더스뷰)` 같은 주석을 달고, SH는 `1단지(101동…)`를 단다 —
+    괄호를 통째로 지운다. 번지 뒤 `-`는 남긴다(115-8과 1158은 다른 집)."""
+    return re.sub(r"\s", "", PAREN_RE.sub("", SIDO_RE.sub("", addr or "")))
 
 
 def cmd_houses(client: HouseInfoClient) -> Path:
@@ -91,25 +98,55 @@ def _notice_pages(seq: str) -> list[tuple[int, str]]:
     return [(n, p.read_text(encoding="utf-8")) for n, p in sorted(pages)]
 
 
-def cmd_match(seq: str) -> Path:
-    """공고 단지 ↔ SH주택정보 biznsCd. 이름 → 주소 순으로 대조한다."""
+def _house_index() -> tuple[dict[str, str], dict[str, str]]:
     houses = json.loads((OUT_ROOT / "houses.json").read_text(encoding="utf-8"))
     by_name: dict[str, str] = {}
     by_addr: dict[str, str] = {}
     for cd, h in houses.items():
         by_name.setdefault(_name_key(h["name"]), cd)
         by_addr.setdefault(_addr_key(h["address"]), cd)
+    return by_name, by_addr
 
+
+def _lookup(by_name: dict[str, str], by_addr: dict[str, str], name: str, addr: str) -> tuple[str | None, str]:
+    """이름 → 주소 순. (biznsCd, 대조 방법)"""
+    cd = by_name.get(_name_key(name))
+    if cd:
+        return cd, "이름"
+    cd = by_addr.get(_addr_key(addr))
+    return cd, ("주소" if cd else "실패")
+
+
+def _db_complexes(seq: str) -> list[dict]:
+    """DB의 공고 단지 행. load가 이 이름으로 UPDATE하므로 대조도 같은 이름을 써야 한다.
+
+    예전엔 `parse_location_table`로 공고문을 다시 읽었는데, 행복주택 공고(309337)는 「주택 위치 안내」 표가
+    없어 0건이 나왔다 — 단지 62곳이 DB엔 다른 파서로 이미 들어 있는데도. DB가 정본이다.
+    """
+    from zipgonggo_pipeline.db import connect
+
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """SELECT nc.name, nc.road_address, nc.sigungu, nc.is_new
+                 FROM notice_complex nc JOIN notice n ON n.id = nc.notice_id
+                WHERE n.source_key = %s ORDER BY nc.id""",
+            (f"ish:{seq}",),
+        )
+        rows = cur.fetchall()
+    if not rows:
+        raise SystemExit(f"DB에 공고 단지가 없다: ish:{seq} — 공고 수집을 먼저 돌린다")
+    return rows
+
+
+def cmd_match(seq: str) -> Path:
+    """공고 단지 ↔ SH주택정보 biznsCd. 이름 → 주소 순으로 대조한다."""
+    by_name, by_addr = _house_index()
     rows = []
-    for c in parse_location_table(_notice_pages(seq)):
-        cd = by_name.get(_name_key(c.name))
-        how = "이름"
-        if not cd:
-            cd = by_addr.get(_addr_key(c.road_address))
-            how = "주소"
+    for c in _db_complexes(seq):
+        cd, how = _lookup(by_name, by_addr, c["name"], c["road_address"] or "")
         rows.append({
-            "단지명": c.name, "주소": c.road_address, "자치구": c.sigungu,
-            "신규": c.is_new, "biznsCd": cd, "대조": how if cd else "실패",
+            "단지명": c["name"], "주소": c["road_address"], "자치구": c["sigungu"],
+            "신규": bool(c["is_new"]), "biznsCd": cd, "대조": how,
         })
 
     out = OUT_ROOT / seq / "match.json"
@@ -118,7 +155,36 @@ def cmd_match(seq: str) -> Path:
     hit = [r for r in rows if r["biznsCd"]]
     miss_new = sum(1 for r in rows if not r["biznsCd"] and r["신규"])
     print(f"{len(hit)}/{len(rows)}단지 대조 (실패 {len(rows) - len(hit)}건 중 신규공급 {miss_new}건) → {out}", file=sys.stderr)
+    for r in rows:
+        if not r["biznsCd"]:
+            print(f"  실패: {r['단지명']} | {r['주소']}", file=sys.stderr)
     return out
+
+
+def cmd_link_all() -> int:
+    """SH 공고 전체의 단지 행에 biznsCd를 붙인다(DB만, 요청 없음).
+
+    이미지는 단지에 붙는데 연결(`notice_complex.sh_bizns_cd`)은 load가 그 공고 행에만 걸었다. 그래서
+    같은 공덕SK리더스뷰가 제50차·2025년 3차 공고에선 사진이 없었다. 한 번 받은 단지는 어느 공고에서든 보이게.
+    """
+    from zipgonggo_pipeline.db import connect
+
+    by_name, by_addr = _house_index()
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """SELECT nc.id, nc.name, nc.road_address FROM notice_complex nc JOIN notice n ON n.id = nc.notice_id
+                WHERE n.source_key LIKE 'ish:%%' AND nc.sh_bizns_cd IS NULL"""
+        )
+        rows = cur.fetchall()
+        linked = 0
+        for r in rows:
+            cd, _ = _lookup(by_name, by_addr, r["name"], r["road_address"] or "")
+            if cd:
+                cur.execute("UPDATE notice_complex SET sh_bizns_cd = %s WHERE id = %s", (cd, r["id"]))
+                linked += 1
+        conn.commit()
+    print(f"미연결 {len(rows)}행 중 {linked}행 연결", file=sys.stderr)
+    return linked
 
 
 def cmd_assets(seq: str, client: HouseInfoClient) -> Path:
@@ -275,6 +341,7 @@ def main() -> None:
     p_fetch.add_argument("--kinds", default=",".join(DEFAULT_KINDS), help=f"쉼표 구분. 기본 {','.join(DEFAULT_KINDS)}")
     p_fetch.add_argument("--only", default="", help="단지명 부분 문자열. 한 단지만 받을 때")
     sub.add_parser("load", help="받아 둔 이미지를 DB에 넣고 웹 자리로 복사한다").add_argument("seq")
+    sub.add_parser("link-all", help="SH 공고 전체 단지 행에 biznsCd를 붙인다(DB만)")
 
     args = ap.parse_args()
     if args.cmd == "match":
@@ -282,6 +349,9 @@ def main() -> None:
         return
     if args.cmd == "load":
         cmd_load(args.seq)
+        return
+    if args.cmd == "link-all":
+        cmd_link_all()
         return
 
     client = HouseInfoClient(delay_sec=args.delay)
