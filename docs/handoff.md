@@ -7,6 +7,47 @@
 
 ---
 
+## 지금 상태 (2026-09-15, 49차 세션)
+
+**검색 오픈(구글·네이버) 전 SEO 점검과 조치.** 프로덕션(zipgonggo.com) HTML을 직접 받아 대조했다.
+
+### 이미 돼 있던 것
+
+`robots.ts` · `sitemap.ts`(975 URL, lastmod = DB `updated_at`) · `metadataBase` 운영 도메인 고정 ·
+전 페이지 canonical · OG/twitter 카드 · 파비콘/manifest · `lang="ko"` · 404 · 얇은 페이지 noindex 분기 · ads.txt.
+
+### 고친 것 넷 (`9297bba`)
+
+1. **소유확인 `<meta>`가 없었다.** 이게 없으면 서치콘솔·서치어드바이저에 **사이트맵 제출 화면 자체가 안 열린다.**
+   `GOOGLE_SITE_VERIFICATION` / `NAVER_SITE_VERIFICATION` env → `layout.tsx` `metadata.verification`.
+   값이 비면 키를 통째로 뺀다 — `content=""`인 `<meta>`가 나가면 확인이 「태그는 있는데 값이 다르다」로 실패한다.
+2. **`/area/{시도}`가 고아 페이지였다.** 사이트맵에만 있고 내부 링크 **0개**(홈 HTML 실측).
+   푸터에 지역 링크 묶음(`.foot-area`)을 넣었다 — **사이트맵과 같은 원천**(`listFilterOptions` + `AREA_MIN_COUNT`)이어야 한다.
+   공고 상세의 지역 태그도 `/area`로 가는 링크로 바꿨다(`.tag.link`).
+   목록이 무한스크롤이라 홈 HTML에는 첫 24건뿐이었는데, 이 두 길로 크롤 깊이가 준다.
+3. **JSON-LD가 한 줄도 없었다.** `lib/jsonld.ts` + `components/json-ld.tsx`.
+   `url-structure.md` 규격대로 — 공고는 `RealEstateListing` + `Event`(접수) + `ItemList`(공급 단지),
+   홈·지역은 `CollectionPage`, 단지는 `ApartmentComplex`. 사이트 정체(`Organization`·`WebSite`)는 **홈에 한 번만**
+   선언하고 나머지 페이지는 `@id`로 가리킨다. 한 페이지에 `<script>` 하나, `@graph`로 묶는다 — 나누면 `@id` 참조가 끊긴다.
+4. **빵부스러기(`BreadcrumbList`)** 를 홈 빼고 세 페이지에.
+
+### 함정 — meta와 JSON-LD가 어긋나면 스팸이다
+
+description을 두 군데서 따로 만들면 언젠가 갈린다. `noticeDescription` · `areaDescription` ·
+`complexDescription`으로 뽑아 **`generateMetadata`와 JSON-LD가 같은 함수를 부른다.** 문구를 고칠 땐 그 함수만 고친다.
+
+곁들여: `Event`는 `startDate`가 필수라 **접수 시작일이 없는 공고는 Event를 아예 안 만든다** — 공고일로 메우면
+지면에 없는 사실을 말하는 게 된다. 단지 좌표도 있는 것만 `geo`에 싣는다(지오코딩 API 값은 애초에 없다).
+
+### 사용자가 해야 하는 것 — 코드로는 못 끝난다
+
+1. [구글 서치콘솔](https://search.google.com/search-console) 속성 추가 → HTML 태그 → `content=` 안 문자열
+2. [네이버 서치어드바이저](https://searchadvisor.naver.com) 사이트 등록 → HTML 태그 → 같은 자리
+3. 둘을 Vercel env(production)에 `GOOGLE_SITE_VERIFICATION` · `NAVER_SITE_VERIFICATION`으로 넣고 **재배포**
+4. 재배포 뒤 양쪽에서 「확인」 누르고, 통과하면 `https://zipgonggo.com/sitemap.xml` 제출
+
+---
+
 ## 지금 상태 (2026-09-15, 48차 세션)
 
 **민간임대 단지에 사진과 평면도가 붙었다.** 「민간임대 공고를 보면 이미지가 없다」는 사용자 지적에서 시작했다.
@@ -148,16 +189,23 @@ exceeding retry limit` — Next dev의 렌더 워커가 반복해 죽은 것이�
 
 ### 다음에 할 일
 
-0. ~~**배포**~~ — **2026-09-15 끝냈다.** 46·47차 분 전부 프로덕션에 있다(`dpl_9kdq32XG…`, `zipgonggo.com` alias).
+0. **소유확인 코드 두 개를 Vercel env에 넣고 재배포** — 위 「사용자가 해야 하는 것」. 이거 전엔 사이트맵 제출이 안 된다.
+1. **남은 SEO 거리** (49차 점검에서 미룬 것, 값어치 순)
+   - 공고별 동적 OG 이미지(`opengraph-image.tsx`) — 지금은 전 페이지 공통 1장이라 공유 카드가 다 똑같다
+   - 단지 465장 `noindex` 재검토 — 좌표는 아직이지만 사진 710장·평면도·관리비가 붙어 더는 얇지 않다
+   - RSS 피드 — 네이버 서치어드바이저가 제출을 받는다. 신규 공고 수집이 빨라진다
+   - `/type/{유형}` · `/area/{시군구}` — `url-structure.md`에 설계만 있고 미구현. pSEO 축이 통째로 남아 있다
+   - 홈 canonical이 `https://zipgonggo.com`(슬래시 없음), 사이트맵은 `/` — 같은 URL로 정규화되지만 표기는 맞추는 게 낫다
+2. ~~**배포**~~ — **2026-09-15 끝냈다.** 46·47차 분 전부 프로덕션에 있다(`dpl_9kdq32XG…`, `zipgonggo.com` alias).
    배포 경로가 바뀌었다 — 저장소 루트에 `.vercelignore`를 두어 `pipeline/data`(3.3GB)를 뺀다.
    이제 **`npx vercel deploy --prod --yes`를 저장소 루트에서 치면 된다**(Deploy Hook URL 없이도).
    실측 — `curl -s https://zipgonggo.com/notice/youth-2026-6658-mingan | grep -c "내 조건에 맞는 주택형"` → 1
-1. **계층 「전체」 41줄** — 공고문 표에 계층이 안 적힌 줄. 본문(`raw.labels`)이나 공고 제목에서 끌어올 여지를 본다.
+3. **계층 「전체」 41줄** — 공고문 표에 계층이 안 적힌 줄. 본문(`raw.labels`)이나 공고 제목에서 끌어올 여지를 본다.
    이게 풀리면 위 「구분 미확인」도 같이 줄어든다.
-2. **적재 속도** — 건당 Neon 왕복 12회. 매시 20건엔 문제 없어 미뤄 둔다.
-3. 「[민간임대] 」 제목 접두어가 목록 태그와 겹친다(44차 5번, 사용자 판단 대기).
-4. **못 맞춘 좌표 14건** — 45차 그대로. 요약DB를 다음 달 스냅샷으로 갈면 붙을 가능성이 크다.
-5. `/eligibility` 자가진단은 아직 `ppmh_*`/`ys_priv_*` 시드 줄 그대로다. 공고 상세만 공고문 근거로 고쳤다 —
+4. **적재 속도** — 건당 Neon 왕복 12회. 매시 20건엔 문제 없어 미뤄 둔다.
+5. 「[민간임대] 」 제목 접두어가 목록 태그와 겹친다(44차 5번, 사용자 판단 대기).
+6. **못 맞춘 좌표 14건** — 45차 그대로. 요약DB를 다음 달 스냅샷으로 갈면 붙을 가능성이 크다.
+7. `/eligibility` 자가진단은 아직 `ppmh_*`/`ys_priv_*` 시드 줄 그대로다. 공고 상세만 공고문 근거로 고쳤다 —
    자가진단도 맞추려면 시드(`내집마련.xlsx` → `db/seeds/eligibility.json`)의 `ys_priv_general` 나이·혼인 칸을 고쳐야 한다.
 
 ---
