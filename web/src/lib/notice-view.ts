@@ -17,9 +17,11 @@ export function typeLabel(s: NoticeSupply): string {
   return `${s.supply_type.replace(/[A-Za-z]$/, "")}㎡${s.accessible ? " 주거약자용" : ""}`;
 }
 
-/** 공급대상 표기 — 청년은 소득 조건까지 */
+/** 공급대상 표기 — 청년은 소득 조건까지. 민간임대는 income_option에 특별공급/일반공급이 든다.
+ *  「전체」는 공고문 표에 계층이 안 적혀 파서가 비워 둔 자리다 — 모든 계층이 대상이라는 뜻이 아니므로 적지 않는다 */
 export function classLabel(s: NoticeSupply): string {
-  return s.income_option ? `${s.tenant_class} ${s.income_option}` : s.tenant_class;
+  const cls = s.tenant_class === "전체" ? "" : s.tenant_class;
+  return [cls, s.income_option].filter(Boolean).join(" ");
 }
 
 /** 입주시작 원문("’27.4", "2027.4", "27.4.")을 사람 말로. 「(예정)」 열이라 확정 표기가 아니면 예정으로 읽는다.

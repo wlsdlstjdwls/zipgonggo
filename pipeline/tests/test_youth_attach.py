@@ -6,7 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from zipgonggo_pipeline.parsers.youth_attach import (
-    YouthAttachFacts, fill_missing_class, lines_from_tables, load_tables, supply_rows, unit_rows,
+    YouthAttachFacts, lines_from_tables, load_tables, supply_rows, unit_rows,
 )
 
 FIX = Path(__file__).parent / "fixtures" / "youth_attach"
@@ -189,7 +189,29 @@ def test_decimal_comma_typo():
     assert max(rents) == 390_000
 
 
-def test_missing_class_inherits_from_other_table():
-    """2026 장한평역 장안동 하트리움 — 예비자 표에 계층 열도 제목도 없다. 같은 공고의 다른 표가 한 계층만 말하면 물려받는다."""
-    ls = fill_missing_class(lines("2026_heartrium_janghanpyeong_add"))
-    assert {x.tenant_class for x in ls} == {"청년/신혼부부"}
+def test_missing_class_stays_unknown():
+    """2026 장한평역 장안동 하트리움 — 예비자 표에 계층 열도 제목도 없다. 다른 표의 계층을 끌어다 적지 않는다(36㎡는 신혼부부형일 수 있다).
+    제목 줄에 계층이 적힌 표만 그 값을 쓴다."""
+    ls = lines("2026_heartrium_janghanpyeong_add")
+    assert {x.tenant_class for x in ls} == {"전체"}   # 이 공고는 어느 표에도 계층이 없다
+
+
+def test_class_inside_parentheses():
+    """2026 노량진역 더써밋타워 — 유형 칸이 「일반(청년)」 「특별(청년,신혼부부)」. 괄호 안 계층은 살린다."""
+    ls = lines("2026_summit_reserve_add")
+    assert [(x.supply_kind, x.tenant_class) for x in ls] == [
+        ("일반공급", "청년"), ("일반공급", "청년"), ("일반공급", "청년"),
+        ("일반공급", "청년/신혼부부"), ("일반공급", "청년"), ("특별공급", "청년"),
+    ]
+
+
+def test_wrong_unit_falls_back_to_the_only_plausible_scale():
+    """2026 신풍역 비스타동원 — 「(단위 : 만원)」 밑에 천원 단위 금액(332,000). 만원이면 33억이라 있을 수 없다."""
+    ls = lines("2026_vista_add")
+    assert ls[0].options[0].deposit == 332_000_000
+
+
+def test_subtotal_row_with_merged_class_cell():
+    """2026 역삼역 더원역삼 — 「합 계」 줄에 금액이 있고 옆 칸이 세로 병합으로 계층을 물려받아 온다. 집계 줄은 세지 않는다."""
+    ls = lines("2026_theone_add")
+    assert len(ls) == 1 and ls[0].room == "1006" and ls[0].options[0].deposit == 123_000_000

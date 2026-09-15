@@ -36,7 +36,7 @@ export function DepositOptionsTable({ supply, hasClass }: Props) {
             return (
               <tr key={s.id}>
                 <td className="tc-key">
-                  {hasClass && <span className="tc-tag"><TermText>{classLabel(s)}</TermText></span>}
+                  {hasClass && classLabel(s) && <span className="tc-tag"><TermText>{classLabel(s)}</TermText></span>}
                   <TermText>{typeLabel(s)}</TermText>
                 </td>
                 {labels.map((l) => {

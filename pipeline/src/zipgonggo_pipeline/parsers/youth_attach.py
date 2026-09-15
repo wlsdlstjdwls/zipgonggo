@@ -43,7 +43,7 @@ _FLOOR = re.compile(r"(\d{1,2})\s*층")
 _AREA = re.compile(r"(\d{1,3}(?:\.\d{1,2})?)")
 _AREA_BOUND = re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d{1,3})?)(?![\d.])")   # 「18.038㎡」 소수 셋째 자리까지
 # 배율을 곱한 결과가 이 밖이면 단위 표기가 표와 안 맞는 것(「(단위 : 만원)」 밑에 원 단위 금액 — 세이지움 개봉 2026)
-_DEPOSIT_RANGE = (1_000_000, 5_000_000_000)
+_DEPOSIT_RANGE = (1_000_000, 1_500_000_000)   # 실측 최대 4억대. 15억을 넘으면 단위를 잘못 읽은 것
 _RENT_RANGE = (10_000, 20_000_000)
 _PAREN = re.compile(r"[(（]([^)）]*)[)）]")
 _NUM_CELL = re.compile(r"^[\d,.\s]+$")
@@ -296,9 +296,15 @@ def _scaled(v: Decimal | None, col_scale: int | None, table_scale: int | None, k
         scale = 10000 if (v < 100_000 if kind == "deposit" else v < 10_000) else 1
     lo, hi = _DEPOSIT_RANGE if kind == "deposit" else _RENT_RANGE
     out = int(v * scale)
-    if not lo <= out <= hi and lo <= v <= hi:
-        return int(v)      # 표기된 단위와 안 맞는 칸 — 원 단위로 적힌 값이다
-    return out
+    if lo <= out <= hi:
+        return out
+    # 표기된 단위와 칸의 값이 안 맞는다(「(단위 : 만원)」 밑의 원 단위 금액, 천원 단위 금액).
+    # 서울 민간임대에서 있을 수 있는 금액대에 드는 배율이 하나뿐이면 그걸로 읽는다. 여럿이거나 없으면 비운다
+    fits = [int(v * s) for s in (1, 1000, 10_000) if lo <= v * s <= hi]
+    if len(fits) == 1:
+        return fits[0]
+    log.warning("단위를 못 가린 금액을 비운다: %s(배율 %s, %s)", v, scale, kind)
+    return None
 
 
 def _parse_area(cell: str | None) -> tuple[Decimal | None, str | None, str | None]:
@@ -329,7 +335,10 @@ def _parse_area(cell: str | None) -> tuple[Decimal | None, str | None, str | Non
 
 def _tenant(text: str) -> str:
     t = _flat(text)
-    t = re.sub(r"\([^)]*\)", "", t)               # (대학생포함)·(재공급)
+    # 괄호 안 부연은 지우되, 「일반(청년,신혼부부)」처럼 계층이 괄호에 든 양식은 괄호만 벗긴다
+    t = re.sub(r"[(（]([^)）]*)[)）]",
+               lambda m: f"/{m.group(1)}/" if re.search(r"청년|신혼|가구|고령|대학생", m.group(1)) else "", t)
+    t = t.replace("대학생포함", "")
     t = t.replace("계층", "").replace("공급대상", "")
     t = _KIND_ANY.sub("", t)
     t = _TENANT_JOIN.sub("/", t).strip("/ ")
@@ -380,7 +389,8 @@ def _lines_from_table(t: RawTable, table_scale: int | None = None) -> list[Suppl
     ctx_kind = _last_kind(t.context)
     # 계층 열이 아예 없는 표는 표 위 글에서 계층을 읽는다. 「(n세대)」가 붙은 쪽이 확실하지만,
     # 예비자 표처럼 세대수가 없는 양식도 있어 그때는 낱말만으로 받는다
-    class_cells = any(_norm(r[c.idx]) for c in cols if c.role in ("class", "unlabeled") for r in body if c.idx < len(r))
+    class_cells = any(_norm(r[c.idx]) and not _SUBTOTAL.match(_flat(r[c.idx])) and not _KIND_ANY.fullmatch(_flat(r[c.idx]))
+                      for c in cols if c.role in ("class", "unlabeled") for r in body if c.idx < len(r))
     ctx_tenant = _tenant_from_context(t.context, loose=not class_cells)
 
     deposit_cols = [c for c in cols if c.role == "deposit"]
@@ -453,7 +463,8 @@ def _lines_from_table(t: RawTable, table_scale: int | None = None) -> list[Suppl
                 m = _ROOM.search(v) or re.search(r"\d{3,4}", v)
                 room = m.group(1) if m else room
         class_text = " ".join(class_text_parts)
-        if _SUBTOTAL.match(_flat(class_text)) or (not class_text and area is None and room is None):
+        # 조각 하나라도 「소계」·「합계」면 그 줄은 집계다 — 옆 칸이 세로 병합으로 계층을 물려받아 와도 줄로 세지 않는다
+        if any(_SUBTOTAL.match(_flat(x)) for x in class_text_parts) or (not class_text and area is None and room is None):
             carry.clear()
             continue
         if area is None and room is None:
@@ -528,9 +539,14 @@ def _last_kind(context: str) -> str | None:
     return f"{hits[-1].group(1)}공급" if hits else None
 
 
+# 표 위 띠에서 제목으로 볼 줄 수. 그 위는 앞 표의 본문 글자가 섞여 들어와 남의 계층을 물려받는다
+CONTEXT_TITLE_LINES = 3
+
+
 def _tenant_from_context(context: str, *, loose: bool = False) -> str | None:
     """표 제목 「- 청년(40세대), 임대 보증금 및 월임대료」 「신혼부부(16세대)」에서 공급대상을 읽는다. 마지막 줄이 표에 가장 가깝다."""
-    flat = _flat(context)
+    title = chr(10).join(context.splitlines()[-CONTEXT_TITLE_LINES:]) if loose else context
+    flat = _flat(title)
     hits = [(m.start(), m.group(0)) for m in re.finditer(r"청년/?신혼부부|신혼부부|청년|1인가구", flat)]
     if not hits:
         return None
@@ -587,21 +603,8 @@ class YouthAttachFacts:
 
 def parse_pdf(path: str | Path) -> YouthAttachFacts:
     tables = tables_from_pdf(path)
-    lines = fill_missing_class(lines_from_tables(tables))
+    lines = lines_from_tables(tables)
     return YouthAttachFacts(lines=lines, pages=sorted({ln.page for ln in lines}))
-
-
-def fill_missing_class(lines: list[SupplyLine]) -> list[SupplyLine]:
-    """계층 열도 표 제목도 없는 표(예비자 표가 그렇다)는 「전체」로 남는다 —
-    같은 공고의 다른 표가 한 계층만 말하면 그걸 물려준다. 둘 이상이면 「전체」 그대로 둔다."""
-    known = {ln.tenant_class for ln in lines if ln.tenant_class != "전체"}
-    if len(known) != 1:
-        return lines
-    only = known.pop()
-    for ln in lines:
-        if ln.tenant_class == "전체":
-            ln.tenant_class = only
-    return lines
 
 
 def supply_rows(facts: YouthAttachFacts, *, complex_name: str, is_new: bool) -> list[dict[str, Any]]:

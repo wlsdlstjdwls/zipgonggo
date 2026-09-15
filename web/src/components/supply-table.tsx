@@ -56,7 +56,7 @@ export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
           {supply.map((s) => (
             <tr key={s.id}>
               <td className="tc-key">
-                {hasClass && <span className="tc-tag"><TermText>{classLabel(s)}</TermText></span>}
+                {hasClass && classLabel(s) && <span className="tc-tag"><TermText>{classLabel(s)}</TermText></span>}
                 <TermText>{typeLabel(s)}</TermText>
               </td>
               <td className="num strong">{s.units_total != null ? num(s.units_total, "호") : "—"}</td>
