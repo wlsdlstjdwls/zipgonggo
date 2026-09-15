@@ -56,6 +56,15 @@
 - `NEXT_PUBLIC_YOUTH_HOUSE_BASE=https://7rk03a9qvljtxnq3.public.blob.vercel-storage.com/youth` — production·preview env.
 - 내리려면 그 값을 지우고 **재배포**한다. `NEXT_PUBLIC_*`은 빌드 때 박혀서 값만 지워선 안 내려간다.
 
+### 함정 다섯 — 수집 한 번에 연결이 통째로 날아간다
+
+배포 직후 프로덕션에서 사진이 안 떴다. 코드도 env도 맞았는데 `youth_home_code`가 **NULL**이었다.
+`repo.replace_notice_complexes`가 단지 행을 지우고 다시 넣으면서 좌표와 `sh_bizns_cd`만 되돌리고
+새 컬럼은 안 챙겼기 때문이다(2026-09-14에 SH 325단지 사진이 사라진 것과 **똑같은 사고**).
+
+`youth_home_code`를 그 되돌리기 목록에 넣었다. **연결 컬럼을 새로 만들면 거기에 같이 넣어야 한다** —
+안 넣으면 다음 수집 한 번에 조용히 날아가고, 화면은 「자료가 없다」고 멀쩡히 거짓말한다.
+
 ### 곁가지 — dev 서버가 물렸던 건
 
 공고상세만 500이 나고 코드는 git clean이었다. 500 본문에 `Jest worker encountered 2 child process exceptions,

@@ -65,22 +65,25 @@ def replace_notice_complexes(cur, notice_id: int, rows: list[dict[str, Any]]) ->
     좌표(S6이 요약DB로 맞춘 값)는 지우고 다시 넣어도 살아남아야 한다 — 파서를 고쳐 S3을 다시 돌릴 때마다
     좌표가 통째로 날아가면 S6을 매번 다시 돌려야 한다(실측 2026-09-09: 재실행 한 번에 262건 소실).
     유일키가 (공고, 단지명, 도로명주소)라 그 키로 그대로 되돌린다. 주소가 바뀐 행은 못 찾아 비는 게 맞다.
-    SH주택정보 단지 연결(`sh_bizns_cd`, collect_sh_house_assets load/link-all)도 같은 이유로 살린다 —
+    단지 이미지 연결(`sh_bizns_cd`·`youth_home_code`, collect_{sh,youth}_house_assets load/match)도 같은 이유로 살린다 —
     자격 파서를 고쳐 S3을 다시 돌린 날 세 공고 325단지의 사진이 통째로 사라졌다(실측 2026-09-14).
+    **새 연결 컬럼을 만들면 여기에 같이 넣어야 한다** — 안 넣으면 수집 한 번에 조용히 날아간다
+    (실측 2026-09-15: `youth_home_code`를 빼먹어 민간임대 445행이 배포 직전에 통째로 NULL이 됐다).
     """
     cur.execute(
         """
         CREATE TEMP TABLE IF NOT EXISTS _nc_geom
           (name text, road_address text, geom geography(Point,4326), geo_precision geo_precision,
-           geo_matched_by text, geo_matched_at timestamptz, sh_bizns_cd text) ON COMMIT DROP
+           geo_matched_by text, geo_matched_at timestamptz, sh_bizns_cd text, youth_home_code text) ON COMMIT DROP
         """
     )
     cur.execute("TRUNCATE _nc_geom")
     cur.execute(
         """
         INSERT INTO _nc_geom
-        SELECT name, road_address, geom, geo_precision, geo_matched_by, geo_matched_at, sh_bizns_cd
-          FROM notice_complex WHERE notice_id = %s AND (geom IS NOT NULL OR sh_bizns_cd IS NOT NULL)
+        SELECT name, road_address, geom, geo_precision, geo_matched_by, geo_matched_at, sh_bizns_cd, youth_home_code
+          FROM notice_complex
+         WHERE notice_id = %s AND (geom IS NOT NULL OR sh_bizns_cd IS NOT NULL OR youth_home_code IS NOT NULL)
         """,
         (notice_id,),
     )
@@ -107,7 +110,8 @@ def replace_notice_complexes(cur, notice_id: int, rows: list[dict[str, Any]]) ->
         """
         UPDATE notice_complex c SET geom = COALESCE(g.geom, c.geom), geo_precision = COALESCE(g.geo_precision, c.geo_precision),
                geo_matched_by = COALESCE(g.geo_matched_by, c.geo_matched_by), geo_matched_at = COALESCE(g.geo_matched_at, c.geo_matched_at),
-               sh_bizns_cd = COALESCE(g.sh_bizns_cd, c.sh_bizns_cd)
+               sh_bizns_cd = COALESCE(g.sh_bizns_cd, c.sh_bizns_cd),
+               youth_home_code = COALESCE(g.youth_home_code, c.youth_home_code)
           FROM _nc_geom g
          WHERE c.notice_id = %s AND c.name = g.name AND c.road_address = g.road_address
         """,
