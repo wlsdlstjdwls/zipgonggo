@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import { FilterRail } from "@/components/filter-rail";
+import { JsonLd } from "@/components/json-ld";
 import { NoticeExplorer } from "@/components/notice-explorer";
 import { PAGE_SIZE } from "@/lib/constants";
+import { siteGraph, WEBSITE_ID, ORG_ID } from "@/lib/jsonld";
 import { listNoticesPage } from "@/lib/queries";
 import { ROUTES } from "@/lib/routes";
+import { absoluteUrl } from "@/lib/site-url";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
@@ -29,6 +32,24 @@ export default async function HomePage() {
   // 지도는 공고 상세의 공급 단지 탐색기에 있다(사용자 결정 2026-09-08)
   return (
     <div className="stage list-stage">
+      {/* 사이트 자체의 정체(Organization·WebSite)는 홈에만 한 번 선언한다 — 다른 페이지는 @id로 이걸 가리킨다.
+          홈 자신은 CollectionPage(전국 목록) */}
+      <JsonLd
+        graph={[
+          ...siteGraph(),
+          {
+            "@type": "CollectionPage",
+            "@id": `${absoluteUrl(ROUTES.home)}#page`,
+            url: absoluteUrl(ROUTES.home),
+            name: HOME_TITLE,
+            description: HOME_DESCRIPTION,
+            inLanguage: "ko-KR",
+            isPartOf: { "@id": WEBSITE_ID },
+            publisher: { "@id": ORG_ID },
+            mainEntity: { "@type": "ItemList", name: HOME_TITLE, numberOfItems: page.total },
+          },
+        ]}
+      />
       <FilterRail />
       <div className="list-col">
         <NoticeExplorer initial={page} title="입주자모집공고" />

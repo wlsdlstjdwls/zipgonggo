@@ -29,14 +29,16 @@ import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
 import { DepositOptionsTable, optionLabels } from "@/components/deposit-options-table";
 import { UnitTable } from "@/components/unit-table";
+import { JsonLd } from "@/components/json-ld";
 import { agencyLabels } from "@/lib/agency";
+import { complexGraph } from "@/lib/jsonld";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
 import { applyPhase, count, dateK, deadlineChip, NO_DATE, num, wonKo } from "@/lib/format";
 import { areaText, classLabel, commonArea, complexPriceGroups, complexPriceRows, CONVERT_HINT, m2, moveInLabel, typeLabel, unitPriceRows } from "@/lib/notice-view";
 import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition, getYouthHouse } from "@/lib/queries";
 import { ComplexGallery } from "@/components/complex-gallery";
 import { imagesEnabled, shownImages } from "@/lib/complex-images";
-import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
+import { complexSegment, noticeComplexPath, noticePath, ROUTES } from "@/lib/routes";
 import { regionShort, sidoShort } from "@/lib/sido";
 import type { ImageSource, Notice, NoticeComplex } from "@/types/notice";
 
@@ -58,17 +60,22 @@ async function load(params: Params["params"]): Promise<Found | null> {
   return c ? { n, c, siblings } : null;
 }
 
+/** meta description과 JSON-LD가 같은 문장을 쓴다 */
+function complexDescription(n: Notice, c: NoticeComplex): string {
+  const money = c.min_rent != null
+    ? `보증금 ${wonKo(c.min_deposit)} / 월 ${wonKo(c.min_rent)}`
+    : c.min_deposit != null ? `보증금 ${wonKo(c.min_deposit)}` : "보증금과 임대료는 원문 표 확인";
+  return `${regionShort(c)} ${c.road_address}, ${n.housing_type}. ${money}. ${c.unit_count != null ? `이번 공고 ${num(c.unit_count, "호")} 공급. ` : ""}${n.agency} ${n.title}.`;
+}
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const f = await load(params);
   if (!f) return { title: "단지를 찾을 수 없습니다", robots: { index: false, follow: false } };
   const { n, c } = f;
   const area = areaText(c);
-  const money = c.min_rent != null
-    ? `보증금 ${wonKo(c.min_deposit)} / 월 ${wonKo(c.min_rent)}`
-    : c.min_deposit != null ? `보증금 ${wonKo(c.min_deposit)}` : "보증금과 임대료는 원문 표 확인";
   return {
     title: `${c.name} ${area ? `전용 ${area} ` : ""}보증금/임대료 | ${n.title}`.replace(/\s+/g, " "),
-    description: `${regionShort(c)} ${c.road_address}, ${n.housing_type}. ${money}. ${c.unit_count != null ? `이번 공고 ${num(c.unit_count, "호")} 공급. ` : ""}${n.agency} ${n.title}.`,
+    description: complexDescription(n, c),
     alternates: { canonical: noticeComplexPath(n.slug, c) },
     // 좌표가 건물 단위로 확보되기 전까지 색인하지 않는다(docs/url-structure.md 얇은 페이지 방지)
     robots: { index: false, follow: true },
@@ -227,6 +234,14 @@ export default async function ComplexPage({ params }: Params) {
 
   return (
     <article className="stage">
+      {/* 색인은 막혀 있지만(좌표 미확보) 구조는 같은 규격으로 낸다 — 좌표가 차서 색인을 열 때 바로 쓰인다 */}
+      <JsonLd
+        graph={complexGraph(n, c, noticeComplexPath(n.slug, c), [
+          { name: "공고 목록", path: ROUTES.home },
+          { name: n.title, path: noticePath(n.slug) },
+          { name: c.name, path: noticeComplexPath(n.slug, c) },
+        ], complexDescription(n, c))}
+      />
       <DetailHeadBar
         title={c.name}
         sub={n.title}

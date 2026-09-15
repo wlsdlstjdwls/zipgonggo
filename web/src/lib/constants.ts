@@ -75,3 +75,9 @@ export const NAVER_MAP_COMPLEX_ZOOM = 16;
 export const SITEMAP_PRIORITY_OPEN = 0.9;
 export const SITEMAP_PRIORITY_CLOSED = 0.3;
 export const SITEMAP_MAX_URLS = 40_000;
+
+// 검색엔진 사이트 소유확인 코드. 구글 서치콘솔·네이버 서치어드바이저가 발급하는 문자열을
+// <meta>로 심어야 사이트맵 제출 화면이 열린다. HTML에 그대로 노출되는 값이라 비밀은 아니지만,
+// 발급처가 달라 env로 둔다. 비어 있으면 <meta> 자체를 안 그린다(빈 content는 확인이 실패한다).
+export const GOOGLE_SITE_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION ?? "";
+export const NAVER_SITE_VERIFICATION = process.env.NAVER_SITE_VERIFICATION ?? "";

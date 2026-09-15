@@ -5,10 +5,14 @@ import { CalcDock } from "@/components/calc-dock";
 import { HomeLink } from "@/components/home-link";
 import { SaveProvider } from "@/components/save-context";
 import { ListStateProvider } from "@/components/list-state";
-import { BOOT_SCOPE_JS, CONTACT_EMAIL, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/constants";
-import { ROUTES } from "@/lib/routes";
+import {
+  AREA_MIN_COUNT, BOOT_SCOPE_JS, CONTACT_EMAIL, GOOGLE_SITE_VERIFICATION, NAVER_SITE_VERIFICATION,
+  SITE_DESCRIPTION, SITE_NAME, SITE_TITLE,
+} from "@/lib/constants";
+import { areaPath, ROUTES } from "@/lib/routes";
 import Link from "next/link";
-import { listFacets } from "@/lib/queries";
+import { listFacets, listFilterOptions } from "@/lib/queries";
+import { sidoShort } from "@/lib/sido";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
@@ -24,12 +28,21 @@ export const metadata: Metadata = {
   // 여기서는 파일이 못 채우는 값만 — 공유 카드의 사이트명·타입·로케일.
   openGraph: { type: "website", siteName: SITE_NAME, locale: "ko_KR", title: SITE_TITLE, description: SITE_DESCRIPTION, url: "/" },
   twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION },
+  // 구글 서치콘솔·네이버 서치어드바이저 소유확인. 값이 없으면 키 자체를 빼야 한다 —
+  // content가 빈 <meta>가 나가면 확인이 "태그는 있는데 값이 다르다"로 실패한다.
+  verification: {
+    ...(GOOGLE_SITE_VERIFICATION ? { google: GOOGLE_SITE_VERIFICATION } : {}),
+    ...(NAVER_SITE_VERIFICATION ? { other: { "naver-site-verification": NAVER_SITE_VERIFICATION } } : {}),
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // 무필터 수량 — 스코프 바가 매 페이지에 상시 노출되므로 여기서 한 번만 조회한다(unstable_cache 캐시, 6차 설계).
   // 필터가 걸리면 ListStateProvider가 /api/facets로 다시 받아 갈아끼운다.
-  const facets = await listFacets({});
+  // 푸터 지역 링크 — 사이트맵과 **같은 원천·같은 기준**(listFilterOptions + AREA_MIN_COUNT)이어야 한다.
+  // 사이트맵에만 있고 링크가 없으면 /area/{시도}는 고아 페이지가 된다(2026-09-15 점검: 홈 HTML에 /area 링크 0개).
+  const [facets, options] = await Promise.all([listFacets({}), listFilterOptions(undefined)]);
+  const areas = options.sido.filter((o) => o.count >= AREA_MIN_COUNT);
   return (
     // 부트 스크립트가 하이드레이션 전에 data-booting을 걸어 서버 HTML과 어긋난다 — 의도된 차이라 경고를 끈다
     <html lang="ko" suppressHydrationWarning>
@@ -76,6 +89,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </Suspense>
           <footer className="site-footer">
             <div className="bar">
+              {/* 지역별 착지 페이지로 가는 유일한 내부 링크. 크롤러가 공고 상세까지 닿는 길이 여기서 갈라진다 —
+                  목록은 무한스크롤이라 홈 HTML에는 첫 24건만 있다(2026-09-15 점검). 지우지 말 것 */}
+              {areas.length > 0 && (
+                <nav className="foot-area" aria-label="지역별 모집공고">
+                  <b>지역별 모집공고</b>
+                  <ul>
+                    {areas.map((o) => (
+                      <li key={o.value}>
+                        <Link href={areaPath(o.value)}>
+                          {sidoShort(o.value)} <em>{o.count}</em>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              )}
               <p>출처: 국토교통부 마이홈포털 공공주택 모집공고 조회 서비스(공공데이터포털), 서울주거포털 SH 공고 목록. 공고 원문은 각 기관 링크에서 확인하세요.</p>
               {/* 개인정보처리방침은 다른 링크보다 굵게 — 개인정보보호법 시행령이 "글자 크기나 색상으로 구분해
                   쉽게 확인할 수 있게" 하라고 정한다 */}

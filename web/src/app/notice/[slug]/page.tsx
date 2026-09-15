@@ -14,17 +14,21 @@ import { NoticeFitMingan } from "@/components/notice-fit-mingan";
 import { SaveButton } from "@/components/save-button";
 import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
+import { JsonLd } from "@/components/json-ld";
 import { agencyLabels } from "@/lib/agency";
+import { AREA_MIN_COUNT } from "@/lib/constants";
 import { HOUSEHOLD_MAX, ruleLines } from "@/lib/eligibility";
+import { noticeGraph } from "@/lib/jsonld";
 import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, NO_DATE, num, won, wonKo, wonShort } from "@/lib/format";
 import { MINGAN_INCOME_PCTS, minganRuleCards } from "@/lib/mingan-fit";
 import { moveInLabel } from "@/lib/notice-view";
 import {
   getAmendChain, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition,
+  listFilterOptions,
 } from "@/lib/queries";
-import { noticePath, ROUTES } from "@/lib/routes";
-import { regionLabel } from "@/lib/sido";
-import type { NoticeListItem } from "@/types/notice";
+import { areaPath, noticePath, ROUTES } from "@/lib/routes";
+import { regionLabel, sidoShort } from "@/lib/sido";
+import type { Notice, NoticeListItem } from "@/types/notice";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
@@ -38,16 +42,22 @@ async function load(params: Params["params"]) {
   return getNoticeBySlug(decodeURIComponent(slug));
 }
 
+/** meta description과 JSON-LD가 **같은 문장**을 쓴다 — 둘이 어긋나면 구조화 데이터가 스팸으로 읽힌다 */
+function noticeDescription(n: Notice): string {
+  const d = daysUntil(n.apply_end_at);
+  const dday = d === null ? "" : d < 0 ? "(마감)" : `(D-${d})`;
+  const supply = n.supply_count != null ? num(n.supply_count, "호") : "";
+  return `${n.agency} ${n.title}. 접수 ${dateK(n.apply_start_at)}~${dateK(n.apply_end_at)}${dday}. ${regionLabel(n)} ${supply}. 최소 보증금 ${won(n.min_deposit)}, 최소 월임대료 ${won(n.min_rent)}.`;
+}
+
 // docs/url-structure.md 공고 페이지 템플릿. 호실이 아직 없어 "{n}호실" 자리는 공급호수로 채운다.
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const n = await load(params);
   if (!n) return { title: "공고를 찾을 수 없습니다" };
-  const d = daysUntil(n.apply_end_at);
-  const dday = d === null ? "" : d < 0 ? "(마감)" : `(D-${d})`;
   const supply = n.supply_count != null ? num(n.supply_count, "호") : "";
   return {
     title: `${n.title} — ${n.housing_type} ${supply} 보증금/임대료/접수일정`.replace(/\s+/g, " "),
-    description: `${n.agency} ${n.title}. 접수 ${dateK(n.apply_start_at)}~${dateK(n.apply_end_at)}${dday}. ${regionLabel(n)} ${supply}. 최소 보증금 ${won(n.min_deposit)}, 최소 월임대료 ${won(n.min_rent)}.`,
+    description: noticeDescription(n),
     // 같은 공고가 기관 seq 여러 개로 들어온 경우 정본을 가리킨다. URL은 살려 두고 색인만 하나로 모은다
     alternates: { canonical: noticePath(n.canonical_slug ?? n.slug) },
   };
@@ -78,12 +88,22 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
 export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
-  const [areas, chain, complexes, supply, eligRules, noticeElig, prior] = await Promise.all([
+  const [areas, chain, complexes, supply, eligRules, noticeElig, prior, options] = await Promise.all([
     getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id), getNoticeSupply(n.id), getEligibilityRules(),
     getNoticeEligibility(n.id),
     // 「내 조건」에 붙일 직전 같은 계열 공고의 경쟁률(사용자 요청 2026-09-14). 결과 표가 없는 계열은 null
     getPriorCompetition(n),
+    // 이 시도가 /area로 발행되는지 — 미달 시도는 /로 301이라 빵부스러기·태그가 리다이렉트를 가리키면 안 된다.
+    // 레이아웃도 같은 함수를 부르지만 React cache가 한 요청 안에서 한 번만 돌린다
+    listFilterOptions(undefined),
   ]);
+  // 빵부스러기(JSON-LD BreadcrumbList) — 화면의 「← 목록」·지역 태그와 같은 길이어야 한다
+  const areaLink = (options.sido.find((o) => o.value === n.sido)?.count ?? 0) >= AREA_MIN_COUNT ? areaPath(n.sido) : null;
+  const crumbs = [
+    { name: "공고 목록", path: ROUTES.home },
+    ...(areaLink ? [{ name: sidoShort(n.sido), path: areaLink }] : []),
+    { name: n.title, path: noticePath(n.canonical_slug ?? n.slug) },
+  ];
   // 공고문에서 읽은 자격 묶음(notice_eligibility, 0024)이 있으면 그것을 그린다 — 장기전세는 면적×순위×자녀가산×맞벌이로
   // 갈려 시드 한 줄로는 거짓말이었다(사용자 지적 2026-09-14). 없는 공고만 아래 제도 일반 기준(supply_type)으로 후퇴한다.
   // supply_type.housing_type이 notice.housing_type과 잇는 고리(0020). 유형마다 조건 종류가 달라
@@ -177,6 +197,9 @@ export default async function NoticePage({ params }: Params) {
 
   return (
     <article className="stage">
+      {/* 구조화 데이터 — docs/url-structure.md: 공고 페이지는 ItemList + Event.
+          canonical과 같은 경로로 @id를 만든다(정본이 따로 있으면 정본) */}
+      <JsonLd graph={noticeGraph(n, complexes, noticePath(n.canonical_slug ?? n.slug), crumbs, noticeDescription(n))} />
       {/* 머리글이 헤더에 가리면 제목·상태를 헤더 자리에 띄운다(사용자 요청 2026-09-09) */}
       <DetailHeadBar
         title={n.title}
@@ -194,6 +217,9 @@ export default async function NoticePage({ params }: Params) {
               {/* D-day는 오른쪽 카드가 크게 센다 — 여기서 또 세지 않는다 */}
               <span className="tag type"><Term>{n.housing_type}</Term></span>
               <span className="tag">{n.agency}</span>
+              {/* 지역 태그는 /area/{시도}로 가는 링크다 — 상세에서 같은 지역 다른 공고로 건너가는 유일한 길이고,
+                  크롤러가 상세에서 목록으로 되돌아 나가는 길이기도 하다(2026-09-15 SEO 점검) */}
+              {areaLink && <Link href={areaLink} className="tag link">{sidoShort(n.sido)}</Link>}
               {n.sector === "민간임대" && <span className="tag">{n.sector}</span>}
               {n.house_type && <span className="tag">{n.house_type}</span>}
               {/* 공급/재공급은 태그 줄에서 바로 읽혀야 한다(사용자 요청 2026-09-09) */}
