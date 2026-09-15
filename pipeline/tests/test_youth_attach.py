@@ -6,7 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from zipgonggo_pipeline.parsers.youth_attach import (
-    YouthAttachFacts, lines_from_tables, load_tables, supply_rows, unit_rows,
+    YouthAttachFacts, _if_understood, lines_from_tables, load_tables, supply_rows, unit_rows,
 )
 
 FIX = Path(__file__).parent / "fixtures" / "youth_attach"
@@ -232,7 +232,7 @@ def test_conversion_columns_and_count_total_column():
     ls = lines("2019_urbaniel_public")
     assert [(x.tenant_class, x.supply_type, x.count, x.options[0].deposit, x.options[0].rent) for x in ls] == [
         ("대학생", "16", 13, 16_560_000, 70_000), ("청년", "17", 17, 19_120_000, 80_000),
-        ("신혼부부", "35", 9, 40_360_000, 160_000), ("신혼부부", "35", 10, 40_920_000, 160_000),
+        ("신혼부부", "35A", 9, 40_360_000, 160_000), ("신혼부부", "35B", 10, 40_920_000, 160_000),
     ]
 
 
@@ -241,4 +241,45 @@ def test_won_sign_prefixed_amounts():
     ls = lines("2025_bx201_add")
     assert [(x.tenant_class, x.count, x.options[0].deposit, x.options[0].rent) for x in ls] == [
         ("청년", 1, 60_000_000, 382_000), ("청년/신혼부부", 2, 100_000_000, 665_000),
+    ]
+
+
+def test_nogrid_layout_read_by_coordinates():
+    """2021 구산역 구산주택 최초 — 세로 괘선이 없어 pdfplumber가 「보증금 보증금 보증금⏎세⏎30%」로 뭉갠 표.
+    글자 좌표로 열을 다시 세운다(youth_attach_words). 한 줄에 특별·일반이 나란히라 표 둘로 쪼갠다."""
+    ls = lines("2021_gusan_first_nogrid")
+    assert [(x.supply_kind, x.tenant_class, x.type_code, x.count) for x in ls] == [
+        ("특별공급", "청년", "17A", 31), ("특별공급", "신혼부부", "33A", 7), ("특별공급", "신혼부부", "33B", 6),
+        ("일반공급", "청년", "17A", 84), ("일반공급", "청년", "17B", 28),
+        ("일반공급", "신혼부부", "33A", 9), ("일반공급", "신혼부부", "33B", 52),
+    ]
+    assert [(o.label, o.deposit, o.rent) for o in ls[0].options] == [
+        ("30%", 36_000_000, 350_000), ("35%", 42_000_000, 320_000), ("40%", 48_000_000, 290_000),
+    ]
+    assert ls[3].options[0].deposit == 40_000_000 and ls[3].options[0].rent == 420_000   # 일반공급은 금액이 다르다
+
+
+def test_nogrid_shifted_columns_are_rejected():
+    """2022 불광역 호반베르디움 — 머리에 「(한국부동산원 주변 시세의 85% 이하)」가 끼어 비율이 한 칸 밀린다.
+    같은 비율이 두 번 나오거나 월임대료가 비율을 거슬러 오르면 그 표는 통째로 버린다 — 반쯤 읽은 금액을 싣지 않는다."""
+    ls = lines("2022_hoban_first_nogrid")
+    assert ls and not _if_understood(ls)
+
+
+def test_area_written_as_type_number():
+    """2021 서울대입구역 BX201 최초 — 유형 칸이 「15형」뿐(면적 열이 따로 없다). 비율이 많아 표를 20/25/30과 35/40/45로 끊었다."""
+    ls = lines("2021_bx201_first")
+    assert [(x.supply_kind, x.tenant_class, str(x.area), x.count) for x in ls[:2]] == [
+        ("특별공급", "청년", "15", None), ("특별공급", "청년", "15", 34),
+    ]
+    assert [o.label for o in ls[1].options] == ["35%", "40%", "45%"]   # 뒤 표는 제목이 없다 — 같은 쪽 앞 표의 공급구분을 물려받는다
+
+
+def test_type_code_in_class_column():
+    """2022 잠실새내역 잠실엘타워 최초 — 「공급유형」 한 칸에 계층(청년)과 타입(16A)이 같이 묶여 있다."""
+    ls = lines("2022_jamsil_first")
+    assert [(x.supply_kind, x.tenant_class, x.type_code, x.count) for x in ls] == [
+        ("특별공급", "청년", "16A", 37), ("특별공급", "청년", "16B", 5),
+        ("일반공급", "청년", "16A", 119), ("일반공급", "청년", "16B", 18), ("일반공급", "청년", "16C", 1),
+        ("일반공급", "신혼부부", "33A", 10), ("일반공급", "신혼부부", "33B", 20),
     ]

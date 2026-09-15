@@ -57,6 +57,7 @@ _TENANT_JOIN = re.compile(r"\s*(?:or|또는|및|/|·|,|&|과|와)\s*")
 # 유형 칸의 「특별」「일반」 — 「청년⏎특별」처럼 「공급」 없이 줄만 바꿔 적기도 한다
 _KIND_ANY = re.compile(r"(특별|일반)\s*(?:공급)?")
 _MONEY_DOT = re.compile(r"^\d{1,3}(?:\.\d{3})+$")
+_TYPE_ONLY = re.compile(r"\d{1,3}[A-Za-z]")   # 「17A」만 적힌 유형 칸(괘선 없는 옛 조판)
 _CURRENCY = re.compile(r"[₩￦\\Ww]|원$")
 
 
@@ -99,13 +100,20 @@ def _open_pdf(path: str | Path):
         return pdfplumber.open(io.BytesIO(fixed))
 
 
-def tables_from_pdf(path: str | Path) -> list[RawTable]:
+def tables_from_pdf(path: str | Path, *, words: bool = False) -> list[RawTable]:
+    """괘선으로 칸을 읽는다. `words=True`면 괘선을 무시하고 글자 좌표로 열을 세운다(옛 조판 되살리기)."""
+    from .youth_attach_words import tables_from_words   # 순환 참조를 피해 여기서만
+
     out: list[RawTable] = []
+    halves_left: list[tuple[int, str, Any]] = []
     with _open_pdf(path) as pdf:
         for i, page in enumerate(pdf.pages, 1):
             w, h = page.width, page.height
             halves = [("a", page.crop((0, 0, w / 2, h))), ("b", page.crop((w / 2, 0, w, h)))] if w > h else [("", page)]
             for tag, half in halves:
+                halves_left.append((i, tag, half))
+                if words:
+                    continue
                 for t in half.find_tables():
                     rows = t.extract()
                     if not rows or not _looks_like_rent_table(rows):
@@ -114,6 +122,9 @@ def tables_from_pdf(path: str | Path) -> list[RawTable]:
                     ctx_top = max(half.bbox[1], top - CONTEXT_HEIGHT)
                     ctx = half.crop((half.bbox[0], ctx_top, half.bbox[2], top)).extract_text() or "" if top > ctx_top else ""
                     out.append(RawTable(page=i, half=tag, context=ctx, rows=rows))
+        if words:
+            for i, tag, half in halves_left:
+                out.extend(tables_from_words(half, i, tag, RawTable))
     return out
 
 
@@ -364,6 +375,9 @@ def _parse_area(cell: str | None) -> tuple[Decimal | None, str | None, str | Non
         room = room or rm.group(1)
         t = _ROOM.sub(" ", t)
     t = re.sub(r"(단층|\d+층)형", " ", t)
+    # 「17A」 「33B」만 적힌 유형 칸(괘선 없는 옛 조판) — 숫자는 면적, 글자까지가 타입이다
+    if code is None and _TYPE_ONLY.fullmatch(t.replace(" ", "")):
+        code = t.replace(" ", "")
     m = _AREA_BOUND.search(t)
     area = Decimal(m.group(1)) if m else None
     return area, code, room
@@ -393,6 +407,7 @@ def _tenant(text: str) -> str:
 def lines_from_tables(tables: list[RawTable]) -> list[SupplyLine]:
     lines: list[SupplyLine] = []
     page_scale: dict[tuple[int, str], int] = {}   # 한 쪽 안에서 단위는 안 바뀐다 — 둘째 표부터는 위 표 텍스트가 띠를 덮어 못 읽는다
+    page_kind: dict[tuple[int, str], str] = {}    # 비율이 많아 표를 둘로 끊은 양식(20/25/30 · 35/40/45) — 뒤 표엔 제목이 없다
     for t in tables:
         key = (t.page, t.half)
         try:
@@ -401,7 +416,14 @@ def lines_from_tables(tables: list[RawTable]) -> list[SupplyLine]:
                 scale = page_scale.get(key)
             else:
                 page_scale[key] = scale
-            lines.extend(_lines_from_table(t, scale))
+            got = _lines_from_table(t, scale)
+            kinds = {ln.supply_kind for ln in got if ln.supply_kind}
+            if len(kinds) == 1:
+                page_kind[key] = kinds.pop()
+            elif not kinds and key in page_kind:
+                for ln in got:
+                    ln.supply_kind = page_kind[key]
+            lines.extend(got)
         except Exception as exc:  # noqa: BLE001
             log.warning("표를 못 읽었다 p%d%s: %s", t.page, t.half, exc)
     return lines
@@ -458,7 +480,8 @@ def _lines_from_table(t: RawTable, table_scale: int | None = None) -> list[Suppl
                 if _SUBTOTAL.match(_flat(v)):
                     class_text_parts.append(v)
                     continue
-                if re.fullmatch(r"\d{1,3}(?:\.\d{1,2})?", v):
+                if re.fullmatch(r"\d{1,3}(?:\.\d{1,2})?\s*형?", v):
+                    v = v.rstrip("형").strip()
                     # 「공급유형(TYPE)」 열에 면적만 적은 2020년 양식. 면적 열을 이미 읽었으면 덮지 않는다 —
                     # 옆의 공급호수 조각(「13」)이 면적으로 들어앉는다
                     if area is None:
@@ -472,6 +495,10 @@ def _lines_from_table(t: RawTable, table_scale: int | None = None) -> list[Suppl
                 if m and floor is None and not any(k in v for k in ("청년", "신혼", "가구")):
                     floor = int(m.group(1))
                     v = _FLOOR.sub("", v)
+                if _TYPE_ONLY.fullmatch(v) and area is None:
+                    # 「공급유형」 한 칸에 계층과 타입이 같이 묶인 머리(괘선 없는 옛 조판) — 「16A」는 계층이 아니라 타입이다
+                    area, code, _ = _parse_area(v)
+                    continue
                 if c.role == "unlabeled" and "㎡" in v and _parse_area(v)[0] is not None:
                     area, code, rm = _parse_area(v)
                     room = room or rm
@@ -684,9 +711,50 @@ class YouthAttachFacts:
         return max(xs) if xs else None
 
 
+# 좌표로 읽은 줄이 이 비율만큼 비율 라벨(30%·40%)을 달고 있어야 표를 알아본 것으로 본다
+UNDERSTOOD_MIN = 0.8
+
+
+def _if_understood(lines: list[SupplyLine]) -> list[SupplyLine]:
+    """괘선 없는 조판을 좌표로 읽은 결과가 믿을 만한지 본다.
+
+    머리를 제대로 세웠으면 금액마다 비율(「보증금 30%」)이 붙는다. 비율이 안 붙었다는 건 열을 잘못 갈랐다는 뜻이고,
+    그때는 임대료도 같이 어긋나 있다 — 화면에 「보증금만 있고 월세는 모름」으로 싣느니 표가 없다고 본다.
+    """
+    if not lines:
+        return lines
+    ok = sum(1 for ln in lines if _sane(ln))
+    if ok >= UNDERSTOOD_MIN * len(lines):
+        return lines
+    log.info("좌표로 읽은 표를 버린다 — 앞뒤가 맞는 줄 %d/%d", ok, len(lines))
+    return []
+
+
+def _sane(ln: SupplyLine) -> bool:
+    """비율마다 금액이 제 자리에 들어갔는지 — 보증금은 비율 따라 오르고 월임대료는 내린다.
+
+    열을 한 칸 밀려 읽으면 비율이 겹치거나(같은 「85%」가 둘) 월임대료가 열 배로 튄다. 그 표는 통째로 못 믿는다.
+    """
+    opts = [o for o in ln.options if o.ratio]
+    if len(opts) != len(ln.options) or not opts:
+        return False
+    if len({o.ratio for o in opts}) != len(opts):
+        return False
+    opts = sorted(opts, key=lambda o: o.ratio)
+    deposits = [o.deposit for o in opts if o.deposit is not None]
+    rents = [o.rent for o in opts if o.rent is not None]
+    if len(rents) != len(opts):
+        return False
+    return deposits == sorted(deposits) and rents == sorted(rents, reverse=True)
+
+
 def parse_pdf(path: str | Path) -> YouthAttachFacts:
     tables = tables_from_pdf(path)
     lines = lines_from_tables(tables)
+    if not lines:
+        # 괘선으로는 한 줄도 못 읽었다 — 세로 괘선을 안 그린 옛 조판(2019~2022)일 수 있다. 글자 좌표로 다시 읽는다.
+        # 괘선으로 읽히는 공고는 이 길로 오지 않는다 — 멀쩡한 결과를 새 경로가 덮어쓰지 않게
+        lines = _if_understood(lines_from_tables(tables_from_pdf(path, words=True)))
     return YouthAttachFacts(lines=lines, pages=sorted({ln.page for ln in lines}))
 
 
