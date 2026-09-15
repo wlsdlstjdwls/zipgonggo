@@ -150,6 +150,9 @@ export type NoticeComplex = {
   tenant_classes: string[];
   /** SH주택정보 단지코드(0023). 사진·도면을 이걸로 찾는다. 신규 미준공 단지는 등록 전이라 NULL */
   sh_bizns_cd: string | null;
+  /** 청년안심주택 포털 단지코드(0026). 민간임대 단지의 사진·평면도를 이걸로 찾는다.
+   * 포털에서 내려간 옛 단지는 NULL — 공고는 살아 있어도 단지 자료는 사라진다 */
+  youth_home_code: string | null;
   /** 좌표(WGS84). 행안부 요약DB 오프라인 조인이 못 맞춘 단지는 둘 다 NULL — 화면은 「지도 미표시」.
    * 지오코딩 API로 채우지 않는다(CLAUDE.md 하지 말 것 1) */
   lat: number | null;
@@ -162,17 +165,24 @@ export type NoticeComplex = {
   area_max: number | null;
 };
 
-/** SH주택정보 단지 이미지 한 장 (sh_house_image, 0023). 공고가 아니라 단지에 붙는다 */
+/** 단지 이미지의 출처. 공공임대는 SH주택정보(0023), 민간임대는 청년안심주택 포털(0026) */
+export type ImageSource = "sh" | "youth";
+
+/** 단지 이미지 한 장. 공고가 아니라 단지에 붙는다 — 한 단지가 여러 공고에 되풀이 나온다 */
 export type ComplexImage = {
-  /** 평면도 · 전경 · 배치도 · 실내 */
+  /** 출처. 파일이 놓인 자리가 이 값으로 갈린다 */
+  source: ImageSource;
+  /** 단지 키. sh는 bizns_cd, youth는 home_code. 파일 경로의 가운데 칸이다 */
+  code: string;
+  /** 평면도 · 전경 · 배치도 · 실내(SH) | 평면도 · 전경 · 투시도 · 편의시설(청년안심) */
   kind: string;
-  /** 주택형(59A·84B…). 단지 전체 이미지는 빈 문자열 */
+  /** 주택형(59A·84B…). 단지 전체 이미지와 청년안심 평면도는 빈 문자열 */
   sply_ty: string;
   /** 화면 표기(거실·주방·안방…). 평면도는 대개 비어 있다 */
   label: string | null;
-  /** SH 원본 URL. 출처 표기에 쓴다 */
+  /** 원본 URL. 출처 표기에 쓴다 */
   source_url: string;
-  /** 저장 파일명. 지면은 /sh-house/{bizns_cd}/{file_name}로 읽는다 */
+  /** 저장 파일명. 지면은 {출처 기준 경로}/{code}/{file_name}로 읽는다 */
   file_name: string;
 };
 

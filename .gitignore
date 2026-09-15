@@ -53,5 +53,9 @@ pipeline/data/sh-house/
 # PoC 동안 SH 이미지를 여기로 복사해 지면에서 읽는다. 발행 때 스토리지로 옮긴다
 web/public/sh-house/
 
+# 청년안심주택 포털 단지 이미지 — 민간임대 축. 위와 같은 이유로 커밋하지 않는다
+pipeline/data/youth-house/
+web/public/youth-house/
+
 # setuptools 편집 설치 부산물
 *.egg-info/

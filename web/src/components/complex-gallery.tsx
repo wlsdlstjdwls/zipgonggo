@@ -1,6 +1,8 @@
 "use client";
 
-// 단지 사진과 도면 (0023). 출처는 SH주택정보 — 공고문 PDF에는 도면이 한 장도 없다(docs/data-sources.md §2c).
+// 단지 사진과 도면 (0023·0026). 공공임대는 SH주택정보, 민간임대는 청년안심주택 포털이 준다 —
+// 공고문 PDF에는 어느 쪽도 도면이 없다(SH 제51차 64쪽 0장, 민간 첨부 452건 전수 확인. docs/data-sources.md §2c).
+// 이 컴포넌트는 출처를 모른다. 파일 자리는 `lib/complex-images`의 imageSrc가 이미지 행을 보고 정한다.
 //
 // 한 영역, 한 줄. 종류를 세로로 쌓으니 평면도·전경·배치도·실내 네 덩이가 지면을 다 먹었다(사용자 지적 2026-09-14).
 // 종류는 탭으로 가르고 한 번에 한 줄만 보인다. 「이 공고에 없는 주택형」도 맨 끝 탭으로 들어와 영역이 하나다.
@@ -30,9 +32,9 @@ const RUBBER_RATIO = 0.5;
 const RUBBER_BACK = "transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1)";
 
 function Strip({
-  images, biznsCd, complexName, mixed, active, onOpen,
+  images, complexName, mixed, active, onOpen,
 }: {
-  images: ComplexImage[]; biznsCd: string; complexName: string; mixed: boolean;
+  images: ComplexImage[]; complexName: string; mixed: boolean;
   /** 숨은 탭은 폭이 0이라 끝을 잴 수 없다. 보이게 된 뒤에 다시 재려고 받는다 */
   active: boolean;
   onOpen: (i: number) => void;
@@ -173,8 +175,9 @@ function Strip({
                 {/* 원본 크기를 저장하지 않아 next/image를 못 쓴다. 지연 로딩만 걸어 둔다 */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={imageSrc(biznsCd, img)}
-                  alt={`${complexName} ${text || img.kind} ${img.kind}`}
+                  src={imageSrc(img)}
+                  // 캡션이 곧 종류인 그림(주택형 없는 평면도)은 종류를 두 번 적지 않는다 — 「… 평면도 평면도」가 됐다
+                  alt={[complexName, text, text === img.kind ? "" : img.kind].filter(Boolean).join(" ")}
                   loading="lazy" decoding="async" draggable={false}
                 />
                 {text && <span>{text}</span>}
@@ -195,9 +198,9 @@ function Strip({
 }
 
 export function ComplexGallery({
-  images, biznsCd, complexName, supplyTypes,
+  images, complexName, supplyTypes,
 }: {
-  images: ComplexImage[]; biznsCd: string; complexName: string;
+  images: ComplexImage[]; complexName: string;
   /** 이 공고가 이 단지에서 공급하는 주택형(`84`·`84S`). 비어 있으면 가를 근거가 없으니 전부 보인다 */
   supplyTypes: string[];
 }) {
@@ -217,7 +220,7 @@ export function ComplexGallery({
   // 뷰어는 지금 탭 안에서만 넘긴다 — 탭을 갈라 놓고 넘기기로 넘나들면 가른 뜻이 없어진다.
   // 뷰어에는 탭 이름이 없으니 종류를 라벨에 넣어 준다(「다른 주택형」 탭은 캡션이 이미 종류를 지고 있다)
   const slides = list.map((img) => ({
-    src: imageSrc(biznsCd, img),
+    src: imageSrc(img),
     label: mixed ? caption(img, true) : [img.kind, caption(img)].filter(Boolean).join(" "),
   }));
 
@@ -242,7 +245,7 @@ export function ComplexGallery({
       {tabs.map(([name, imgs]) => (
         <div key={name} hidden={name !== kind}>
           <Strip
-            images={imgs} biznsCd={biznsCd} complexName={complexName}
+            images={imgs} complexName={complexName}
             mixed={name === OTHERS_TAB} active={name === kind} onOpen={setOpen}
           />
         </div>
@@ -252,6 +255,13 @@ export function ComplexGallery({
         <p className="note">
           같은 단지의 다른 주택형입니다({sortedTypes(others).join(", ")}). 공고는 단지마다 일부 형만 공급하는데
           SH주택정보는 단지에 있는 형을 모두 주기 때문에 남는 것들입니다. 이 공고로 신청할 수 있는 형이 아닙니다.
+        </p>
+      ) : images[0]?.source === "youth" ? (
+        // 민간임대 평면도는 사업자가 포털에 올린 것이고, 단지에 따라 사업자 홈페이지 화면을 그대로 올린 것도 있다.
+        // 「도면」이라고 단정하지 않고 어디서 온 그림인지 밝힌다
+        <p className="note">
+          서울시 청년안심주택 「주택찾기」에 공개된 자료입니다. 평면도와 사진은 사업자가 제공한 것으로 이해를 돕기 위한
+          것이며, 동·호수와 계약 조건에 따라 실제와 다를 수 있습니다.
         </p>
       ) : (
         <p className="note">

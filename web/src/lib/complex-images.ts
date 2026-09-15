@@ -2,7 +2,7 @@
 //
 // **SH주택정보는 단지에 있는 주택형을 다 준다. 공고는 그중 일부만 공급한다.** 그대로 실으면 지면이 거짓말을 한다 —
 // 천왕이펜하우스 3단지는 제51차에서 84형 하나만 공급하는데 평면도 9장·실내 36장이 전부 나왔다(사용자 지적 2026-09-14).
-import type { ComplexImage } from "@/types/notice";
+import type { ComplexImage, ImageSource } from "@/types/notice";
 
 // 공고의 공급유형(`84`·`84S`)과 SH 표기(`84`·`84S`·`84A`)를 잇는 건 앞머리 숫자다.
 // 글자 꼬리(S·A·B1)는 같은 면적의 변형이라 한 묶음으로 본다 — 84형을 뽑은 사람에게 84A 실내는 볼 값이 있다.
@@ -60,15 +60,30 @@ export function sortedTypes(images: ComplexImage[]): string[] {
     .sort((a, b) => Number(areaKey(a)) - Number(areaKey(b)) || a.localeCompare(b));
 }
 
-// 이미지 파일이 놓인 자리. 로컬은 `web/public/sh-house`(gitignore — 배포에 안 올라간다)라 개발에서만 기본값을 준다.
-// 배포에서는 스토리지 주소를 `NEXT_PUBLIC_SH_HOUSE_BASE`로 받는다. 비어 있으면 **갤러리를 그리지 않는다** —
-// DB에 행만 있고 파일이 없어 사진이 전부 액박으로 나갔다(사용자 지적 2026-09-14). 스토리지에 올리고 이 값을 넣으면 켜진다.
+// 이미지 파일이 놓인 자리. 로컬은 `web/public/{sh-house,youth-house}`(gitignore — 배포에 안 올라간다)라
+// 개발에서만 기본값을 준다. 배포에서는 스토리지 주소를 환경변수로 받는다. 비어 있으면 **갤러리를 그리지 않는다** —
+// DB에 행만 있고 파일이 없어 사진이 전부 액박으로 나갔다(사용자 지적 2026-09-14). 스토리지에 올리고 값을 넣으면 켜진다.
+//
+// 출처가 둘인 이유는 자료를 주는 기관이 둘이기 때문이다 — 공공임대는 SH주택정보, 민간임대는 청년안심주택 포털.
+// 한쪽만 켤 수 있게 따로 둔다(저작권 확인이 기관별로 따로 끝난다).
+const devBase = (path: string) => (process.env.NODE_ENV === "production" ? null : path);
+
 export const SH_HOUSE_BASE: string | null =
-  process.env.NEXT_PUBLIC_SH_HOUSE_BASE?.replace(/\/+$/, "") || (process.env.NODE_ENV === "production" ? null : "/sh-house");
+  process.env.NEXT_PUBLIC_SH_HOUSE_BASE?.replace(/\/+$/, "") || devBase("/sh-house");
+export const YOUTH_HOUSE_BASE: string | null =
+  process.env.NEXT_PUBLIC_YOUTH_HOUSE_BASE?.replace(/\/+$/, "") || devBase("/youth-house");
 
-/** 지면에 사진을 실을 수 있는가. 서버 페이지는 이걸로 질의 자체를 건너뛴다 */
-export const imagesEnabled = SH_HOUSE_BASE != null;
+const BASES: Record<ImageSource, string | null> = { sh: SH_HOUSE_BASE, youth: YOUTH_HOUSE_BASE };
 
-export function imageSrc(biznsCd: string, img: ComplexImage): string {
-  return `${SH_HOUSE_BASE ?? "/sh-house"}/${biznsCd}/${encodeURIComponent(img.file_name)}`;
+/** 이 출처의 사진을 지면에 실을 수 있는가. 서버 페이지는 이걸로 질의 자체를 건너뛴다 */
+export function imagesEnabled(source: ImageSource): boolean {
+  return BASES[source] != null;
+}
+
+/** 두 출처 다 꺼져 있으면 갤러리 자리에 「준비 중」을 그린다 */
+export const anyImagesEnabled = SH_HOUSE_BASE != null || YOUTH_HOUSE_BASE != null;
+
+export function imageSrc(img: ComplexImage): string {
+  const base = BASES[img.source] ?? `/${img.source === "sh" ? "sh-house" : "youth-house"}`;
+  return `${base}/${img.code}/${encodeURIComponent(img.file_name)}`;
 }

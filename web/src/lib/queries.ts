@@ -237,7 +237,8 @@ export async function getNoticeAreas(noticeId: number): Promise<NoticeArea[]> {
 export async function getNoticeComplexes(noticeId: number): Promise<NoticeComplex[]> {
   return query<NoticeComplex>(
     `SELECT c.id, c.name, c.sido, c.sigungu, c.road_address, c.is_new, c.complex_code, c.source_page,
-            c.heating, c.unit_count, c.min_deposit, c.min_rent, c.area_min, c.area_max, c.sh_bizns_cd,
+            c.heating, c.unit_count, c.min_deposit, c.min_rent, c.area_min, c.area_max,
+            c.sh_bizns_cd, c.youth_home_code,
             ST_Y(c.geom::geometry) AS lat, ST_X(c.geom::geometry) AS lng,
             COALESCE(t.classes, ARRAY[]::text[]) AS tenant_classes
      FROM notice_complex c
@@ -274,16 +275,27 @@ export async function getComplexSupply(noticeId: number, complexId: number, comp
   );
 }
 
-/** 단지 1곳의 사진·도면(0023). SH주택정보에서 모은 것이라 코드가 안 붙은 단지는 빈 배열.
- *  순서: 평면도 → 전경 → 배치도 → 실내. 평면도를 먼저 보여준다 — 청약자가 제일 먼저 찾는 그림이다. */
-export async function getComplexImages(biznsCd: string | null): Promise<ComplexImage[]> {
-  if (!biznsCd) return [];
-  return query<ComplexImage>(
-    `SELECT kind, sply_ty, label, source_url, file_name
-       FROM sh_house_image WHERE bizns_cd = $1
-      ORDER BY array_position(ARRAY['평면도','전경','배치도','실내'], kind), sply_ty, sort_no, id`,
-    [biznsCd],
-  );
+/** 단지 1곳의 사진·도면. 공공임대는 SH주택정보(0023), 민간임대는 청년안심주택 포털(0026)에서 온다.
+ *  한 단지가 두 출처에 다 있지는 않다 — 코드가 붙은 쪽만 읽고, 둘 다 없으면 빈 배열.
+ *  순서: 평면도를 맨 앞에 둔다 — 청약자가 제일 먼저 찾는 그림이다. */
+export async function getComplexImages(biznsCd: string | null, homeCode: string | null = null): Promise<ComplexImage[]> {
+  if (biznsCd) {
+    return query<ComplexImage>(
+      `SELECT 'sh' AS source, bizns_cd AS code, kind, sply_ty, label, source_url, file_name
+         FROM sh_house_image WHERE bizns_cd = $1
+        ORDER BY array_position(ARRAY['평면도','전경','배치도','실내'], kind), sply_ty, sort_no, id`,
+      [biznsCd],
+    );
+  }
+  if (homeCode) {
+    return query<ComplexImage>(
+      `SELECT 'youth' AS source, home_code AS code, kind, sply_ty, label, source_url, file_name
+         FROM youth_house_image WHERE home_code = $1
+        ORDER BY array_position(ARRAY['평면도','전경','투시도','편의시설'], kind), sply_ty, sort_no, id`,
+      [homeCode],
+    );
+  }
+  return [];
 }
 
 /** 단지 1곳의 호실 목록(0021). 매입임대 별첨이 있는 공고에만 있다 — 나머지는 빈 배열.

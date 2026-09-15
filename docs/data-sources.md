@@ -136,6 +136,59 @@
 
 > **AI로 없는 도면은 만든다.** 주거 결정 자료라 실해가 나고, 대량 생성 이미지는 검색 엔진의 scaled content abuse에 직격이다. AI를 쓸 자리는 (1) 받은 도면 스캔 정리, (2) 도면에서 방 개수·구조를 뽑아 구조화 필드로, (3) 공고문 면적 실수치 기반 **모식도**(「실제 도면 아님」 라벨 필수) 셋뿐이다. 화면에 AI로 만들고 화면에서는 AI가 만든 도면이라고 표기한다.
 
+## 2d. 청년안심주택 단지 이미지 — 포털 「주택찾기」 (PoC, 2026-09-15)
+
+위 2c는 SH 단지만 덮는다. **민간임대(공공지원민간임대) 단지는 SH주택정보에 없다.** 그리고 민간 공고문에는
+도면이 없다 — 첨부 PDF **452건을 전수로** 떠서 확인했다.
+
+| 첨부 452건 전수 (2026-09-15) | 건수 |
+|---|---|
+| 그림이 한 장이라도 든 PDF | 121 |
+| 그림이 없는 PDF | 316 (열지 못한 것 15) |
+| 평면도 크기(200×150pt 초과) 그림이 든 PDF | **50**, 대개 한 장 |
+
+그 50건의 「큰 그림」을 까 보면 **위치 약도·시행사 로고·표를 통째로 앉힌 그림·A4 스캔쪽**이다
+(boardId 5646 33쪽 = 입주지원센터 약도, 5659 2·8쪽 = 표 이미지, 5671 = 23쪽 전부 595×842pt 스캔에 텍스트 레이어 0).
+**주택형 평면도를 실은 공고는 사실상 없다.** 공고문 래스터 추출은 파 봐야 나올 게 없다.
+
+대신 같은 사이트의 「주택찾기」가 단지 단위 사진을 준다 — SH주택정보의 민간판이다.
+수집: `pipeline/scripts/collect_youth_house_assets.py` (`houses` → `match` → `fetch` → `load`).
+경로 실측은 `pipeline/src/zipgonggo_pipeline/sources/youth_house.py` 머리글, 회귀는 `tests/test_youth_house.py`.
+
+- 목록 `POST /youth/pgm/home/yohome/yoHomeListJson.json` — 단지 96곳이 요청 1회에 다 온다(`rowCount`를 키운다).
+  검색 키를 하나라도 빼면 `{"exception":"Please contact the manager!"}`가 온다. 빈 값으로라도 다 보낸다.
+- 상세 `GET /youth/pgm/home/yohome/view.do?menuNo=400002&homeCode={코드}`.
+  `<article id="detail1">` 상세소개(전경·투시도·편의시설 사진) · `#detail4` 평면도.
+- 이미지 `/{cohome|coHouse}/cmmn/file/fileDown.do?atchFileId=…&fileSn=N`.
+  **프리픽스가 두 가지**(`cohome` / `coHouse`)라 하나로 통일하면 절반이 404다. HTML에 적힌 그대로 쓴다.
+
+> **함정 1: 목록 렌더링 스크립트 안에 가짜 `<img>` 템플릿이 있다** (`src='…fileId+ "&fileSn='`).
+> 정규식으로 `<img>`를 긁으면 이게 딸려 와 전 단지에 액박이 뜬다. `+`·`"`가 든 경로를 버린다.
+>
+> **함정 2: Content-Type을 믿을 수 없다.** 같은 PNG를 어떤 건 `image/png`로, 어떤 건 `application/octet-stream`으로
+> 준다(편의시설 사진 다수). 머리 바이트(`\x89PNG` 등)로 가른다 — 타입으로 거르면 편의시설 사진이 통째로 날아간다.
+>
+> **함정 3: 편의시설 캡션은 사진과 1:1로 안 붙는다.** `<li class="textbox">`(제목+설명)와 `<li><img>`가
+> 석조 격자로 섞여 순서가 어긋난다(textbox, img, img, textbox, textbox, img…). 짝지으려 들지 말고 캡션을 비운다.
+
+- 공고 단지 이름 130개 중 **90개 단지(단지 행 465 중 445)를 대조 성공**. 못 붙인 20개는 모집이 끝나 포털에서
+  내려간 옛 단지다(이랜드신촌·용답동 힐데스하임 등). 대조는 이름 → 이름 부분 → 주소 순이고,
+  포털이 이름 앞에 역세권을 붙이므로(`홍대입구역 맹그로브창천` ↔ `맹그로브창천`) 역 접두사와 「청년안심주택」 꼬리를 털고 댄다.
+- **관리비가 목록 행에 있다**(`youthMaintenanceFee`·`coupleMaintenanceFee`). 공고문 첨부에 없어 지면에서
+  「확인하세요」로 비워 둔 값이다 — 아직 안 싣는다. 시행사·시공사·입주예정일·지하철 출구 거리도 같이 온다.
+
+지면까지 붙었다(2026-09-15). `0026_youth_house_image.sql` → `load`가 DB 적재와 `web/public/youth-house/` 복사를
+같이 한다 → SH와 **같은 갤러리**를 쓴다(`components/complex-gallery.tsx`). 컴포넌트는 출처를 모르고,
+`lib/complex-images.ts`의 `imageSrc`가 이미지 행의 `source`를 보고 파일 자리를 정한다.
+기준 경로는 출처마다 따로다(`NEXT_PUBLIC_SH_HOUSE_BASE` / `NEXT_PUBLIC_YOUTH_HOUSE_BASE`) — 저작권 확인이
+기관별로 따로 끝나기 때문이다. 비어 있으면 그 출처는 배포에서 갤러리를 아예 안 그린다.
+
+> **배포에도 켠다 — PoC로 (사용자 결정 2026-09-15).** 포털 자체는 robots.txt가 없고 서울시 공공저작물 정책을 따르지만,
+> **평면도 그림이 시행사 홈페이지 캡처인 단지가 있다**(맹그로브창천 `평면도_26.png` = mangrove.city의 Room Type 구역 캡처).
+> 그건 서울시 저작물이 아니다. 이 점을 알린 뒤 사용자가 PoC 단계로 켜기로 했다. 권리자가 문제 삼으면
+> `NEXT_PUBLIC_YOUTH_HOUSE_BASE`를 비우고 재배포하는 것으로 **한 번에 내려간다**(그 값이 없으면 갤러리를 아예 안 그린다).
+> `NEXT_PUBLIC_*`은 빌드 때 박히므로 값만 지우고 재배포까지 해야 한다. 지면에는 출처와 원문 링크를 단다.
+
 ## 3. 스크래핑 대상
 
 호실 단위 표는 **API에 없고 공고문 첨부파일(HWP/PDF/XLSX) 안에만 있다.** 이 파싱이 프로젝트의 유일한 해자.
@@ -382,7 +435,7 @@ LH 이용약관(`lh.or.kr/menu.es?mid=a10802000000`) 제1~12조와 부칙을 훑
 | `GITHUB_DISPATCH_TOKEN` | GitHub PAT — `actions:write` 하나면 된다 | 위 라우트가 워크플로를 부를 때 쓴다. **Vercel env에만 둔다** — 외부 서비스에 넘기지 않는다 |
 | `GITHUB_REPO` | `owner/repo` | 부를 저장소. `wlsdlstjdwls/zipgonggo` |
 | `NEXT_PUBLIC_SH_HOUSE_BASE` | 스토리지(Vercel Blob 등) 공개 URL | SH 단지 사진·도면 파일 자리. **비우면 배포에서 갤러리를 그리지 않는다** — `web/public/sh-house`는 gitignore라 Vercel에 안 올라간다. 스토리지에 올린 뒤 그 공개 URL을 넣는다 |
-| `BLOB_READ_WRITE_TOKEN` | Vercel 대시보드 Storage → Blob 스토어 | `web/scripts/upload-sh-house.mjs`가 사진을 올릴 때만. 웹 런타임은 안 쓴다 |
+| `BLOB_READ_WRITE_TOKEN` | Vercel 대시보드 Storage → Blob 스토어 | `web/scripts/upload-house-images.mjs`가 사진을 올릴 때만. 웹 런타임은 안 쓴다 |
 
 ## 미해결
 

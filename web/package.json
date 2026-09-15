@@ -9,7 +9,8 @@
     "start": "next start -p 3100",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "upload:sh-house": "node --env-file=.env.local scripts/upload-sh-house.mjs"
+    "upload:sh-house": "node --env-file=.env.local scripts/upload-house-images.mjs sh",
+    "upload:youth-house": "node --env-file=.env.local scripts/upload-house-images.mjs youth"
   },
   "dependencies": {
     "next": "^15.5.0",

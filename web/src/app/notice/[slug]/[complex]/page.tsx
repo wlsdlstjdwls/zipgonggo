@@ -38,7 +38,7 @@ import { ComplexGallery } from "@/components/complex-gallery";
 import { imagesEnabled, shownImages } from "@/lib/complex-images";
 import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
 import { regionShort, sidoShort } from "@/lib/sido";
-import type { Notice, NoticeComplex } from "@/types/notice";
+import type { ImageSource, Notice, NoticeComplex } from "@/types/notice";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
@@ -93,11 +93,13 @@ export default async function ComplexPage({ params }: Params) {
   const { n, c, siblings } = f;
   // 민간임대(청년안심주택)는 공고문 자격 묶음이 없고 제도 고정 규칙으로 판정한다(lib/mingan-fit.ts) — 시드 규칙만 있으면 된다
   const isMingan = n.housing_type === "공공지원민간임대";
+  // 이 단지의 사진을 누가 주는가. 한 단지가 두 출처에 다 붙지는 않는다(SH 공고 단지 / 청년안심주택 포털 단지)
+  const imgSource: ImageSource | null = c.sh_bizns_cd ? "sh" : c.youth_home_code ? "youth" : null;
   const [supply, units, images, noticeElig, minganRules] = await Promise.all([
     getComplexSupply(n.id, c.id, c.name),
     getComplexUnits(c.id),
     // 파일 자리가 안 정해진 배포에서는 질의도 하지 않는다 — 행만 있으면 액박이 된다(lib/complex-images 머리글)
-    imagesEnabled ? getComplexImages(c.sh_bizns_cd) : Promise.resolve([]),
+    imgSource && imagesEnabled(imgSource) ? getComplexImages(c.sh_bizns_cd, c.youth_home_code) : Promise.resolve([]),
     getNoticeEligibility(n.id),
     isMingan ? getEligibilityRules() : Promise.resolve(null),
   ]);
@@ -283,19 +285,25 @@ export default async function ComplexPage({ params }: Params) {
           </section>
 
           {/* 사진·도면은 공급현황 바로 뒤 — 어떤 주택형이 나왔는지 본 다음 그 형의 평면도를 본다.
-              단지 코드가 안 붙은 단지(신규 미준공)와 SH가 자료를 안 올린 단지는 섹션을 감추지 않고 왜 비었는지 말한다 */}
+              단지 코드가 안 붙은 단지와 기관이 자료를 안 올린 단지는 섹션을 감추지 않고 왜 비었는지 말한다.
+              자료를 주는 기관이 공공/민간에 따라 갈리므로(SH주택정보 / 청년안심주택 포털) 문구도 갈린다 —
+              민간임대에 「준공 전이라 SH주택정보에 없다」고 적으면 사실과 다르다(사용자 지적 2026-09-15) */}
           <section className="dsec">
             {/* 장수는 실제로 펼쳐 놓은 것만 센다 — 딴 주택형까지 세면 「47장」이라 해 놓고 12장을 보여준다 */}
             <h2>사진과 도면{images.length > 0 ? ` | ${count(shownImages(images, supplyTypes).length, "장")}` : ""}</h2>
             {images.length > 0 ? (
-              <ComplexGallery images={images} biznsCd={c.sh_bizns_cd!} complexName={c.name} supplyTypes={supplyTypes} />
+              <ComplexGallery images={images} complexName={c.name} supplyTypes={supplyTypes} />
             ) : (
               <Pending
-                title={imagesEnabled ? "이 단지의 사진과 도면은 아직 준비 중입니다" : "사진과 도면은 공개 준비 중입니다"}
-                lead={!imagesEnabled
-                  ? <>서울주택도시공사 SH주택정보의 평면도와 사진을 지면에 싣기 위한 확인 절차가 끝나면 보여 드립니다. 그때까지는 {L.originalDoc}의 전자팸플릿 안내를 따라 확인하세요.</>
-                  : c.sh_bizns_cd
+                title={imgSource && imagesEnabled(imgSource) ? "이 단지의 사진과 도면은 아직 준비 중입니다" : "사진과 도면은 공개 준비 중입니다"}
+                lead={imgSource && !imagesEnabled(imgSource)
+                  ? <>{imgSource === "youth" ? "서울시 청년안심주택 포털" : "서울주택도시공사 SH주택정보"}의 평면도와 사진을 지면에 싣기 위한 확인 절차가 끝나면 보여 드립니다. 그때까지는 {L.originalDoc}의 안내를 따라 확인하세요.</>
+                  : imgSource === "youth"
+                  ? <>서울시 청년안심주택 포털이 이 단지의 평면도와 사진을 아직 올리지 않았습니다.</>
+                  : imgSource === "sh"
                   ? <>서울주택도시공사가 이 단지의 평면도와 사진을 아직 공개하지 않았습니다. 준공 전이거나 자료 등록이 늦는 단지입니다.</>
+                  : isMingan
+                  ? <>이 단지는 청년안심주택 포털 「주택찾기」에 올라 있지 않습니다. 모집이 끝나 내려갔거나 아직 등록 전입니다. 평면도는 {L.originalDoc}과 사업자 홈페이지에서 확인하세요.</>
                   : <>준공 전 신규 공급 단지라 SH주택정보에 단지 자료가 아직 없습니다. 전자팸플릿은 {L.originalDoc}의 안내를 따라 확인하세요.</>}
                 action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
               />
