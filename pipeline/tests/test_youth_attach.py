@@ -6,7 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from zipgonggo_pipeline.parsers.youth_attach import (
-    YouthAttachFacts, lines_from_tables, load_tables, supply_rows, unit_rows,
+    YouthAttachFacts, fill_missing_class, lines_from_tables, load_tables, supply_rows, unit_rows,
 )
 
 FIX = Path(__file__).parent / "fixtures" / "youth_attach"
@@ -163,3 +163,32 @@ def test_room_number_written_in_count_column():
     assert [(x.room, x.count, x.tenant_class, x.supply_kind) for x in ls] == [
         ("1810", 1, "청년/신혼부부", "특별공급"), ("1503", 1, "청년", "일반공급"), ("2206", 1, "청년/신혼부부", "일반공급"),
     ]
+
+
+def test_broken_comma_group_is_dropped():
+    """2026 구산역 구산주택 — 「69,000,00」(0 하나 빠진 쉼표). 그 칸만 버리고 같은 줄의 35·40%는 살린다."""
+    ls = lines("2026_gusan_add")
+    row = next(x for x in ls if x.type_code == "33B" and x.supply_kind == "일반공급")
+    assert [(o.label, o.deposit) for o in row.options] == [("35%", 80_000_000), ("40%", 91_000_000)]
+
+
+def test_single_digit_ratio_header_is_dropped():
+    """2026 광흥창역 이랜드PEER신촌 — 열 머리가 「보증금 3%」로 찍힌 오타(금액도 같이 틀렸다). 그 옵션만 버린다.
+    같은 쪽 둘째·셋째 표는 표 위 띠가 앞 표 글자로 덮여 단위를 못 읽는다 — 첫 표의 「(단위 : 천 원)」을 물려받는다."""
+    ls = lines("2026_peer_sinchon_add")
+    assert [o.label for o in ls[2].options] == ["40%", "35%"]
+    assert ls[0].options[0].deposit == 53_374_000    # 천원 단위가 살아 있다(만원으로 읽으면 5억이 된다)
+    assert ls[1].options[0].deposit == 190_955_000 and ls[1].options[0].rent == 73_000
+
+
+def test_decimal_comma_typo():
+    """2026 회기역 하트리움 — 만원 단위 표에 「37,4」(37.4를 쉼표로). 374만이 아니라 37.4만이다."""
+    ls = lines("2026_heartrium_hoegi_add")
+    rents = {o.rent for x in ls for o in x.options if o.rent is not None}
+    assert max(rents) == 390_000
+
+
+def test_missing_class_inherits_from_other_table():
+    """2026 장한평역 장안동 하트리움 — 예비자 표에 계층 열도 제목도 없다. 같은 공고의 다른 표가 한 계층만 말하면 물려받는다."""
+    ls = fill_missing_class(lines("2026_heartrium_janghanpyeong_add"))
+    assert {x.tenant_class for x in ls} == {"청년/신혼부부"}

@@ -263,13 +263,24 @@ def _table_scale(context: str) -> int | None:
 
 
 def _money(cell: str | None) -> Decimal | None:
-    """만원 단위 표는 「75.4」처럼 소수를 쓴다 — 배율을 곱하기 전엔 자르지 않는다."""
+    """만원 단위 표는 「75.4」처럼 소수를 쓴다 — 배율을 곱하기 전엔 자르지 않는다.
+
+    원문 오타 둘을 되돌린다: 「9.880」은 쉼표를 마침표로, 「37,4」는 마침표를 쉼표로 잘못 친 칸.
+    쉼표 뒤가 세 자리가 아닌데 되돌릴 수도 없는 칸(「69,000,00」)은 버린다 — 틀린 금액을 싣느니 비우는 게 낫다.
+    """
     t = _norm(cell).replace(" ", "")
     if not t or t in ("-", "－", "미정", "—"):
         return None
     if _MONEY_DOT.match(t):          # 「9.880」 — 쉼표를 마침표로 잘못 친 칸
         t = t.replace(".", "")
-    t = t.replace(",", "")
+    if "," in t:
+        head, *rest = t.split(",")
+        if len(rest) == 1 and len(rest[0]) in (1, 2) and "." not in t:
+            t = f"{head}.{rest[0]}"          # 「37,4」 → 37.4
+        elif any(len(x) != 3 for x in rest):
+            return None                      # 자릿수가 어긋난 쉼표 — 값을 못 믿는다
+        else:
+            t = t.replace(",", "")
     try:
         return Decimal(t)
     except Exception:  # noqa: BLE001
@@ -336,15 +347,22 @@ def _tenant(text: str) -> str:
 
 def lines_from_tables(tables: list[RawTable]) -> list[SupplyLine]:
     lines: list[SupplyLine] = []
+    page_scale: dict[tuple[int, str], int] = {}   # 한 쪽 안에서 단위는 안 바뀐다 — 둘째 표부터는 위 표 텍스트가 띠를 덮어 못 읽는다
     for t in tables:
+        key = (t.page, t.half)
         try:
-            lines.extend(_lines_from_table(t))
+            scale = _table_scale(t.context)
+            if scale is None:
+                scale = page_scale.get(key)
+            else:
+                page_scale[key] = scale
+            lines.extend(_lines_from_table(t, scale))
         except Exception as exc:  # noqa: BLE001
             log.warning("표를 못 읽었다 p%d%s: %s", t.page, t.half, exc)
     return lines
 
 
-def _lines_from_table(t: RawTable) -> list[SupplyLine]:
+def _lines_from_table(t: RawTable, table_scale: int | None = None) -> list[SupplyLine]:
     rows = t.rows
     ncols = max(len(r) for r in rows)
     header: list[list[str | None]] = []
@@ -359,9 +377,11 @@ def _lines_from_table(t: RawTable) -> list[SupplyLine]:
     roles = {c.role for c in cols}
     if "deposit" not in roles and "rent" not in roles:
         return []
-    table_scale = _table_scale(t.context)
     ctx_kind = _last_kind(t.context)
-    ctx_tenant = _tenant_from_context(t.context)
+    # 계층 열이 아예 없는 표는 표 위 글에서 계층을 읽는다. 「(n세대)」가 붙은 쪽이 확실하지만,
+    # 예비자 표처럼 세대수가 없는 양식도 있어 그때는 낱말만으로 받는다
+    class_cells = any(_norm(r[c.idx]) for c in cols if c.role in ("class", "unlabeled") for r in body if c.idx < len(r))
+    ctx_tenant = _tenant_from_context(t.context, loose=not class_cells)
 
     deposit_cols = [c for c in cols if c.role == "deposit"]
     rent_cols = [c for c in cols if c.role == "rent"]
@@ -453,6 +473,7 @@ def _lines_from_table(t: RawTable) -> list[SupplyLine]:
             ratio = dc.ratio if dc.ratio is not None else row_ratio
             label = dc.label or (f"{ratio}%" if ratio is not None else "기본")
             options.append(Option(label=label, ratio=ratio, deposit=dep, rent=rent))
+        options = _drop_inconsistent(options)
         if not options:
             continue
         kind_m = _KIND_ANY.search(_flat(class_text))
@@ -472,6 +493,30 @@ def _lines_from_table(t: RawTable) -> list[SupplyLine]:
     return out
 
 
+def _drop_inconsistent(options: list[Option]) -> list[Option]:
+    """한 줄 안에서 보증금은 비율에 비례한다 — 크게 어긋나는 옵션은 원문 오타다.
+
+    실측: 「69,000,00」(0 하나 빠진 쉼표), 머리에 「보증금 3%」로 잘못 찍힌 열. 그 칸만 빼고 나머지는 살린다.
+    견줄 짝이 없으면(비율 옵션이 하나뿐) 그대로 둔다 — 틀렸는지 알 길이 없다.
+    """
+    # 실측 최저 비율은 20%다. 한 자릿수 비율은 열 머리 오타(「30%」 → 「3%」)로, 금액도 같이 틀려 있다
+    options = [o for o in options if o.ratio is None or o.ratio >= 10]
+    # 보증금이 이 표의 본체다 — 보증금 칸을 못 읽은 옵션은 임대료만 남겨 봐야 화면에 「— / 월 69만」으로 뜬다
+    options = [o for o in options if o.deposit is not None]
+    priced = [o for o in options if o.ratio and o.deposit]
+    if len(priced) < 3:
+        return options
+    per = sorted(o.deposit / o.ratio for o in priced)
+    mid = per[len(per) // 2]
+    bad = {id(o) for o in priced if not (mid / 2) <= o.deposit / o.ratio <= mid * 2}
+    if not bad:
+        return options
+    for o in priced:
+        if id(o) in bad:
+            log.warning("비율에 안 맞는 금액을 버린다: %s %s원", o.label, o.deposit)
+    return [o for o in options if id(o) not in bad]
+
+
 def _floor_of_room(room: str | None) -> int | None:
     if not room or len(room) < 3:
         return None
@@ -483,7 +528,7 @@ def _last_kind(context: str) -> str | None:
     return f"{hits[-1].group(1)}공급" if hits else None
 
 
-def _tenant_from_context(context: str) -> str | None:
+def _tenant_from_context(context: str, *, loose: bool = False) -> str | None:
     """표 제목 「- 청년(40세대), 임대 보증금 및 월임대료」 「신혼부부(16세대)」에서 공급대상을 읽는다. 마지막 줄이 표에 가장 가깝다."""
     flat = _flat(context)
     hits = [(m.start(), m.group(0)) for m in re.finditer(r"청년/?신혼부부|신혼부부|청년|1인가구", flat)]
@@ -495,9 +540,11 @@ def _tenant_from_context(context: str) -> str | None:
     for pos, word in hits:
         if re.match(r"\(\d+세대\)", flat[pos + len(word):]) and word not in counted:
             counted.append(word)
+    if not counted and loose:
+        counted = list(dict.fromkeys(w for _, w in hits))
     if not counted:
         return None
-    return "청년/신혼부부" if len(counted) > 1 else counted[0]
+    return _tenant("/".join(counted)) if len(counted) > 1 else _tenant(counted[0])
 
 
 # ---------------------------------------------------------------- 공고 단위 집계
@@ -540,8 +587,21 @@ class YouthAttachFacts:
 
 def parse_pdf(path: str | Path) -> YouthAttachFacts:
     tables = tables_from_pdf(path)
-    lines = lines_from_tables(tables)
+    lines = fill_missing_class(lines_from_tables(tables))
     return YouthAttachFacts(lines=lines, pages=sorted({ln.page for ln in lines}))
+
+
+def fill_missing_class(lines: list[SupplyLine]) -> list[SupplyLine]:
+    """계층 열도 표 제목도 없는 표(예비자 표가 그렇다)는 「전체」로 남는다 —
+    같은 공고의 다른 표가 한 계층만 말하면 그걸 물려준다. 둘 이상이면 「전체」 그대로 둔다."""
+    known = {ln.tenant_class for ln in lines if ln.tenant_class != "전체"}
+    if len(known) != 1:
+        return lines
+    only = known.pop()
+    for ln in lines:
+        if ln.tenant_class == "전체":
+            ln.tenant_class = only
+    return lines
 
 
 def supply_rows(facts: YouthAttachFacts, *, complex_name: str, is_new: bool) -> list[dict[str, Any]]:
