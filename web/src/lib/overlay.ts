@@ -131,8 +131,9 @@ export function useEscapeStack(enabled: boolean, onEscape: () => void): void {
  * 오버레이가 떠 있는 동안 뒤 지면이 따라 움직이지 않게 잠근다.
  * overflow:hidden만으로는 iOS에서 배경이 튀어 position:fixed로 자리를 고정하고 돌려놓는다.
  * keep은 그 안에서는 스크롤을 허용할 선택자다(시트 본문 · 뷰어 무대).
+ * .selmenu도 넣는다 — 셀렉트 목록은 body로 포털돼 시트 밖에 있어, 빼면 목록 위 터치드래그가 막힌다.
  */
-export function useScrollLock(locked: boolean, keep = ".sheet, .pv"): void {
+export function useScrollLock(locked: boolean, keep = ".sheet, .pv, .selmenu"): void {
   useEffect(() => {
     if (!locked) return;
 
