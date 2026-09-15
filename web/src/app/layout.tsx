@@ -47,6 +47,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // 부트 스크립트가 하이드레이션 전에 data-booting을 걸어 서버 HTML과 어긋난다 — 의도된 차이라 경고를 끈다
     <html lang="ko" suppressHydrationWarning>
       <head>
+        {/* RSS 자동발견. metadata.alternates에 두면 안 된다 — 자식 페이지가 canonical을 넣으며
+            alternates를 통째로 덮어써서 조용히 사라진다(2026-09-15 실측). <head>에 직접 박는다 */}
+        <link rel="alternate" type="application/rss+xml" title={`${SITE_NAME} — 입주자모집공고`} href={ROUTES.rss} />
         {/* Pretendard 단일 패밀리 — fitin-app이 라틴/한글 2폰트 조합을 버리고 정착한 결론 */}
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
         {/* 구글 애드센스 로더. 사이트 검토 크롤러가 원본 HTML에서 이 태그를 찾으므로

@@ -12,6 +12,7 @@ export const ROUTES = {
   eligibility: "/eligibility",
   terms: "/terms",
   privacy: "/privacy",
+  rss: "/rss.xml",
 } as const;
 
 /** /notice/{slug}. slug에 한글·콜론이 들어가므로 항상 인코딩한다. */

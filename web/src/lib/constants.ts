@@ -76,6 +76,10 @@ export const SITEMAP_PRIORITY_OPEN = 0.9;
 export const SITEMAP_PRIORITY_CLOSED = 0.3;
 export const SITEMAP_MAX_URLS = 40_000;
 
+// RSS 피드(/rss.xml)에 싣는 글 수. 진행 중 공고 최신순만 — 마감분은 사이트맵이 맡는다.
+// 네이버 서치어드바이저는 RSS를 「최근 것」으로 읽어 신규 수집을 앞당긴다. 길게 실으면 그 신호가 흐려진다
+export const RSS_MAX_ITEMS = 50;
+
 // 검색엔진 사이트 소유확인 코드. 구글 서치콘솔·네이버 서치어드바이저가 발급하는 문자열을
 // <meta>로 심어야 사이트맵 제출 화면이 열린다.
 //

@@ -6,6 +6,7 @@ import { absoluteUrl } from "@/lib/site-url";
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [{ userAgent: "*", allow: "/", disallow: [`${ROUTES.api}/`] }],
-    sitemap: absoluteUrl("/sitemap.xml"),
+    // 사이트맵과 RSS 둘 다 알린다 — 네이버는 RSS를 「방금 올라온 것」으로 읽어 신규 수집이 빠르다
+    sitemap: [absoluteUrl("/sitemap.xml"), absoluteUrl(ROUTES.rss)],
   };
 }
