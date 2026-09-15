@@ -235,7 +235,9 @@ export default async function NoticePage({ params }: Params) {
             </section>
           )}
 
-          {n.address && (
+          {/* 단지 탐색기가 이미 같은 곳에 핀을 찍고 있으면 그리지 않는다 — 민간임대(단지 1곳)는 공고 주소와 단지 주소가
+              같아 지도가 두 번 나왔다(사용자 지적 2026-09-15). 단지가 여럿인 공고는 notice.address가 비어 있어 원래 안 그린다 */}
+          {n.address && complexes.length === 0 && (
             <section className="dsec lead">
               <h2>위치</h2>
               <div className="d-map"><NaverMap address={n.address} title={n.complex_name ?? n.title} sub={n.housing_type} /></div>
