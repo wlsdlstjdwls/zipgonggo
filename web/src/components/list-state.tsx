@@ -99,6 +99,14 @@ export function ListStateProvider({ children, initialFacets }: { children: React
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 경로가 /area/{시도}로 바뀌면 상태의 시도도 따라간다 — 푸터 링크는 클라이언트 이동이라
+  // 레이아웃이 살아 있고 위 부트 효과(마운트 1회)가 다시 돌지 않는다. 그대로 두면 서버가 그 시도로
+  // 렌더해 준 첫 페이지를 explorer가 무필터 목록으로 갈아끼운다(사용자 지적 2026-09-15)
+  useEffect(() => {
+    if (!ready || !pathSido) return;
+    setF((cur) => (cur.sido === pathSido ? cur : { ...cur, sido: pathSido }));
+  }, [ready, pathSido]);
+
   // 상태가 정해진 뒤부터만 저장한다(초기화 전에 쓰면 저장값을 스스로 지운다). 목록 화면에서만 — 상세는 스코프를 바꾸지 않는다
   useEffect(() => {
     if (!ready || !isList) return;
