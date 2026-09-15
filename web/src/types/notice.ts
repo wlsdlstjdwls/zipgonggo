@@ -165,6 +165,31 @@ export type NoticeComplex = {
   area_max: number | null;
 };
 
+/** 청년안심주택 포털 단지 사실(youth_house, 0027). 공고문 첨부에 없는 값만 모은 것 —
+ *  특히 **관리비**. 이미지와 같은 키(homeCode)라 공고를 다시 수집해도 안 날아간다 */
+export type YouthHouse = {
+  home_code: string;
+  /** 포털 표기. 역세권 접두사가 붙어 있다(`홍대입구역 맹그로브창천`) */
+  name: string;
+  /** 월 (예상)관리비 하한·상한(원). 실제 청구액이 아니다 — 화면에 그렇게 적는다 */
+  maint_low: number | null;
+  maint_high: number | null;
+  households: number | null;
+  /** 운영사 · 시행사 · 시공사 */
+  manager: string | null;
+  developer: string | null;
+  builder: string | null;
+  /** 입주(예정)일 */
+  movein: string | null;
+  phone: string | null;
+  homepage: string | null;
+  /** `홍대입구역 2호선, 경의중앙선, 공항철도` */
+  subway: string | null;
+  /** `총 288 세대 (공공임대 92 세대, 공공지원민간임대 196 세대)` */
+  scale: string | null;
+  source_url: string;
+};
+
 /** 단지 이미지의 출처. 공공임대는 SH주택정보(0023), 민간임대는 청년안심주택 포털(0026) */
 export type ImageSource = "sh" | "youth";
 

@@ -188,6 +188,101 @@ def parse_images(html: str) -> list[HouseImage]:
     return out
 
 
+# 「입주현황」 표. 열 이름이 단지마다 조금씩 다르고(공실세대수가 주석으로 빠진 단지가 있다) 순서도 장담 못 해
+# 머리글에서 관리비 열 자리를 찾아 쓴다
+TABLE_RE = re.compile(r"<table[^>]*class=\"[^\"]*boardTable[^\"]*\"[^>]*>(.*?)</table>", re.S | re.I)
+TH_RE = re.compile(r"<th[^>]*>(.*?)</th>", re.S | re.I)
+TR_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S | re.I)
+TD_RE = re.compile(r"<td[^>]*>(.*?)</td>", re.S | re.I)
+NUM_RE = re.compile(r"\d[\d,]*")
+# 주석 친 열이 머리글에 남아 있다 — `<!-- <th>공실세대수</th> -->`·`<!-- <th>공실여부</th> -->`.
+# 안 지우면 머리글이 10칸인데 <td>는 7칸이라 관리비 열 자리가 어긋나 값을 통째로 놓친다(실측 2026-09-15)
+COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+
+
+def parse_maint(html: str) -> tuple[int | None, int | None]:
+    """「입주현황」 표의 (예상)관리비 열에서 단지의 관리비 하한·상한(원).
+
+    목록 JSON의 `youthMaintenanceFee`는 **단지 절반에만 있다**(90곳 중 47곳 실측 2026-09-15 —
+    맹그로브창천·퀸즈W 둘 다 비어 있었다). 표는 주택형마다 값을 주므로 여기서 읽는 쪽이 훨씬 잘 찬다.
+    """
+    vals: list[int] = []
+    for tbl in TABLE_RE.finditer(COMMENT_RE.sub("", html)):
+        body = tbl.group(1)
+        heads = [_text(h) for h in TH_RE.findall(body)]
+        idx = next((i for i, h in enumerate(heads) if "관리비" in h), None)
+        if idx is None:
+            continue
+        for tr in TR_RE.finditer(body):
+            tds = TD_RE.findall(tr.group(1))
+            if len(tds) <= idx:
+                continue
+            m = NUM_RE.search(_text(tds[idx]))
+            if not m:
+                continue
+            v = int(m.group(0).replace(",", ""))
+            # 「0」·한두 자리는 관리비가 아니다(빈 칸에 `-`나 `0`을 적은 단지가 있다)
+            if v >= 10_000:
+                vals.append(v)
+    return (min(vals), max(vals)) if vals else (None, None)
+
+
+@dataclass(frozen=True)
+class HouseFacts:
+    """상세 「상세소개」의 라벨 값들. 공고문 첨부에 없는 것만 골라 담는다.
+
+    특히 **관리비**가 여기서 온다(목록 행) — 지면은 여태 「공고문에 없으니 관리사무소에 물어보라」고 적고 있었다.
+    """
+
+    subway: str | None = None       # `홍대입구역 2호선, 경의중앙선, 공항철도`
+    scale: str | None = None        # `총 288 세대 (공공임대 92 세대, 공공지원민간임대 196 세대)`
+    developer: str | None = None    # 시행사
+    builder: str | None = None      # 시공사
+    movein: str | None = None       # 입주(예정)일 YYYY-MM-DD
+    phone: str | None = None        # 대표전화
+    homepage: str | None = None
+    maint_low: int | None = None    # 「입주현황」 표의 (예상)관리비 하한(원)
+    maint_high: int | None = None
+
+
+# `<p><strong>주소 : </strong>서울 …</p>`. 값 안에 <span>·<a>가 섞여 들어오고 들여쓰기 탭이 수십 개다
+FACT_P_RE = re.compile(r"<p>\s*<strong>\s*([^<:]{2,20}?)\s*:\s*</strong>(.*?)</p>", re.S | re.I)
+TAG_RE = re.compile(r"<[^>]+>")
+WS_RE = re.compile(r"\s+")
+FACT_LABELS = {
+    "지하철역": "subway", "규모": "scale", "시행사": "developer", "시공사": "builder",
+    "입주(예정)일": "movein", "대표전화": "phone", "홈페이지": "homepage",
+}
+
+
+HOMEPAGE_RE = re.compile(r"<strong>\s*홈페이지\s*:\s*<a[^>]*href=\"([^\"]+)\"", re.I)
+
+
+def _text(html: str) -> str:
+    return WS_RE.sub(" ", unescape(TAG_RE.sub(" ", html))).strip()
+
+
+def parse_facts(html: str) -> HouseFacts:
+    """상세 HTML의 라벨 값. 없는 라벨은 None으로 둔다 — 단지마다 빠지는 칸이 다르다."""
+    found: dict[str, str] = {}
+    for m in FACT_P_RE.finditer(html):
+        key = FACT_LABELS.get(m.group(1).strip())
+        if not key or key in found:
+            continue
+        val = _text(m.group(2))
+        # 지하철역은 역 이름과 노선이 `<span>2호선,</span>` 여럿으로 쪼개져 온다 — 꼬리 쉼표만 턴다
+        val = val.rstrip(",").strip()
+        if val:
+            found[key] = val
+    # 홈페이지만 조판이 다르다 — 링크가 <strong> **안**에 들어 있어 위 규칙에 안 걸린다
+    if "homepage" not in found:
+        m = HOMEPAGE_RE.search(html)
+        if m:
+            found["homepage"] = unescape(m.group(1)).strip()
+    low, high = parse_maint(html)
+    return HouseFacts(maint_low=low, maint_high=high, **found)
+
+
 class YouthHouseClient:
     """포털 「주택찾기」 목록·상세. GET/POST 간격은 ThrottledHttp가 지킨다."""
 

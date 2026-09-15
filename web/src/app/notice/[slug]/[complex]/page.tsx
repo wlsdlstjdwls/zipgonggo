@@ -33,7 +33,7 @@ import { agencyLabels } from "@/lib/agency";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
 import { applyPhase, count, dateK, deadlineChip, NO_DATE, num, wonKo } from "@/lib/format";
 import { areaText, classLabel, commonArea, complexPriceGroups, complexPriceRows, CONVERT_HINT, m2, moveInLabel, typeLabel, unitPriceRows } from "@/lib/notice-view";
-import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition } from "@/lib/queries";
+import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition, getYouthHouse } from "@/lib/queries";
 import { ComplexGallery } from "@/components/complex-gallery";
 import { imagesEnabled, shownImages } from "@/lib/complex-images";
 import { complexSegment, noticeComplexPath, noticePath } from "@/lib/routes";
@@ -95,13 +95,15 @@ export default async function ComplexPage({ params }: Params) {
   const isMingan = n.housing_type === "공공지원민간임대";
   // 이 단지의 사진을 누가 주는가. 한 단지가 두 출처에 다 붙지는 않는다(SH 공고 단지 / 청년안심주택 포털 단지)
   const imgSource: ImageSource | null = c.sh_bizns_cd ? "sh" : c.youth_home_code ? "youth" : null;
-  const [supply, units, images, noticeElig, minganRules] = await Promise.all([
+  const [supply, units, images, noticeElig, minganRules, house] = await Promise.all([
     getComplexSupply(n.id, c.id, c.name),
     getComplexUnits(c.id),
     // 파일 자리가 안 정해진 배포에서는 질의도 하지 않는다 — 행만 있으면 액박이 된다(lib/complex-images 머리글)
     imgSource && imagesEnabled(imgSource) ? getComplexImages(c.sh_bizns_cd, c.youth_home_code) : Promise.resolve([]),
     getNoticeEligibility(n.id),
     isMingan ? getEligibilityRules() : Promise.resolve(null),
+    // 포털 단지 사실(0027) — 관리비가 여기 있다. 이미지와 달리 파일이 없어 배포 스위치와 무관하게 늘 읽는다
+    getYouthHouse(c.youth_home_code),
   ]);
   // 「내 조건에 맞는 단지」를 단지 상세에도(사용자 요청 2026-09-14) — 공고 상세와 같은 자격 묶음·공급현황으로 판정하고
   // 이 단지가 드는지 먼저 말한다. 자격 묶음이 있는 공고만 질의한다
@@ -182,6 +184,24 @@ export default async function ComplexPage({ params }: Params) {
     ["잔금", !payInPriceTable ? balance : null],
   ] as [string, string | null, string?][]).filter((r): r is [string, string, string?] => r[1] != null && r[1] !== "");
 
+  // 청년안심주택 포털이 주는 값(0027). 공고문 첨부에는 하나도 없는 것들이라 위 specs와 겹치지 않는다.
+  // 관리비는 단지 전체 범위다 — 주택형마다 달라 한 값으로 못 적는다(맹그로브창천 11만~14만)
+  const maint = house && house.maint_low != null
+    ? house.maint_high != null && house.maint_high !== house.maint_low
+      ? `${wonKo(house.maint_low)} ~ ${wonKo(house.maint_high)}`
+      : wonKo(house.maint_low)
+    : null;
+  const houseSpecs: [string, string, string?][] = ([
+    ["월 관리비", maint],
+    ["입주 예정일", house?.movein ? dateK(house.movein) : null],
+    ["지하철", house?.subway ?? null],
+    ["단지 규모", house?.scale ?? null],
+    ["운영사", house?.manager ?? null],
+    ["시행사", house?.developer ?? null],
+    ["시공사", house?.builder ?? null],
+    ["문의", house?.phone ?? null],
+  ] as [string, string | null, string?][]).filter((r): r is [string, string, string?] => r[1] != null && r[1] !== "");
+
   // 화면에 실제로 쓴 말만 페이지 밑에 편다. 이건 서버 렌더용 밑그림이고, 브라우저에서는 GlossaryList가
   // 실제로 걸린 링크로 목록을 다시 맞춘다 — 손으로 맞춘 목록은 어긋나기 마련이다(사용자 지적 2026-09-09)
   const terms = [
@@ -189,6 +209,7 @@ export default async function ComplexPage({ params }: Params) {
     n.housing_type,
     // 「공급 정보」 표는 위에서 만든 specs가 곧 라벨이다 — 두 곳을 따로 관리하지 않는다
     ...specs.map(([label, , term]) => term ?? label),
+    ...houseSpecs.map(([label, , term]) => term ?? label),
     // 공가·예비자 칸은 공급현황 표가 그린다 — 「현재 공가」 제원 줄이 0호라 빠져도 표에는 남는다
     ...(hasReserve ? ["공가"] : []),
     ...(supply.length === 1 ? (supply[0].units_reserve != null ? ["예비입주자"] : []) : hasReserve ? ["예비입주자"] : []),
@@ -279,8 +300,25 @@ export default async function ComplexPage({ params }: Params) {
               </div>
             )}
 
-            {/* 주차·관리비는 SH 공고문 첨부에 없는 값이다 — 없다고 하지 않고 어디서 확인하는지 말한다 */}
-            <p className="note">주차장과 관리비, 주차 요금은 공고문 첨부에 실리지 않아 아직 싣지 못합니다. 계약 전에 관리사무소나 {L.originalDoc}에서 확인하세요.</p>
+            {/* 공고문 첨부에 없는 값은 청년안심주택 포털이 준다(0027) — 관리비가 그것이다.
+                포털 자료가 있는 단지에는 그 값을 싣고, 없는 단지에만 「어디서 확인하라」고 말한다.
+                「싣지 못합니다」를 값이 있는 단지에까지 적으면 지면이 거짓말한다(사용자 지적 2026-09-15) */}
+            {houseSpecs.length > 0 && (
+              <div className="dsub">
+                <h3>단지 정보</h3>
+                <SpecList>
+                  {houseSpecs.map(([label, value, term]) => <Spec key={label} label={label} value={value} term={term} />)}
+                </SpecList>
+                <p className="note">
+                  {maint && <>관리비는 단지가 밝힌 <b>예상</b> 금액이라 실제 청구액과 다를 수 있고, 주택형과 사용량에 따라 달라집니다. </>}
+                  서울시 청년안심주택 「주택찾기」의 단지 자료입니다.
+                  {house?.homepage && <> 단지 홈페이지는 <ExternalLink href={house.homepage}>여기</ExternalLink>에 있습니다.</>}
+                </p>
+              </div>
+            )}
+            {!maint && (
+              <p className="note">주차장과 관리비, 주차 요금은 공고문 첨부에 실리지 않아 아직 싣지 못합니다. 계약 전에 관리사무소나 {L.originalDoc}에서 확인하세요.</p>
+            )}
             {units.length > 0 && <p className="note" style={{ marginTop: 4 }}>호실별 층, 구조, 승강기, 금액은 아래 「{unitLabel}」에 있습니다.</p>}
           </section>
 

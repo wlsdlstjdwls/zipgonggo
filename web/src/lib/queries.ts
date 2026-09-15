@@ -7,7 +7,7 @@ import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_ELIGIBILITY, CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { todayKST } from "./format";
-import type { ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorResultRow, Sector } from "@/types/notice";
+import type { ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorResultRow, Sector, YouthHouse } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
@@ -273,6 +273,19 @@ export async function getComplexSupply(noticeId: number, complexId: number, comp
      ORDER BY ${SUPPLY_ORDER}`,
     [noticeId, complexId, complexName],
   );
+}
+
+/** 단지 1곳의 포털 사실(0027). 공고문 첨부에 없는 값 — **관리비**·운영사·시행사·입주예정일·연락처.
+ *  민간임대 단지에만 있다. 코드가 없거나 포털에서 내려간 단지는 null. */
+export async function getYouthHouse(homeCode: string | null): Promise<YouthHouse | null> {
+  if (!homeCode) return null;
+  const rows = await query<YouthHouse>(
+    `SELECT home_code, name, maint_low, maint_high, households, manager, developer, builder,
+            movein::text AS movein, phone, homepage, subway, scale, source_url
+       FROM youth_house WHERE home_code = $1`,
+    [homeCode],
+  );
+  return rows[0] ?? null;
 }
 
 /** 단지 1곳의 사진·도면. 공공임대는 SH주택정보(0023), 민간임대는 청년안심주택 포털(0026)에서 온다.

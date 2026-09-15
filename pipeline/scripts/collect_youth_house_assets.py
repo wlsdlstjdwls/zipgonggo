@@ -1,13 +1,14 @@
-"""민간임대(청년안심주택) 공고 단지 → 포털 「주택찾기」 이미지 붙이기.
+"""민간임대(청년안심주택) 공고 단지 → 포털 「주택찾기」 이미지와 단지 사실 붙이기.
 
-왜 이 길인가: 민간임대 공고문 PDF에는 도면이 없다(첨부 452건 전수 확인 — 0026 주석 참조).
-포털 「주택찾기」가 단지 단위로 전경·투시도·평면도·편의시설 사진을 준다. 경로 실측은 `sources/youth_house.py` 머리글.
+왜 이 길인가: 민간임대 공고문 PDF에는 도면이 없고(첨부 452건 전수 확인 — 0026 주석 참조) **관리비도 없다**.
+포털 「주택찾기」가 단지 단위로 전경·투시도·평면도·편의시설 사진과 관리비·운영사·시행사·입주예정일을 준다.
+경로 실측은 `sources/youth_house.py` 머리글.
 
     cd pipeline
     python scripts/collect_youth_house_assets.py houses          # 단지 목록 → data/youth-house/houses.json
     python scripts/collect_youth_house_assets.py match           # 공고 단지 ↔ homeCode → match.json (--write면 DB에도)
     python scripts/collect_youth_house_assets.py fetch           # 상세 파싱 + 이미지 내려받기 → data/youth-house/img/
-    python scripts/collect_youth_house_assets.py load            # DB 적재 + web/public/youth-house 복사
+    python scripts/collect_youth_house_assets.py load            # 이미지(0026)+단지 사실(0027) 적재 + web/public 복사
 
 `match`는 DB의 `notice_complex` 행(공고 수집이 넣은 것)을 대조한다 — 공고문을 다시 읽지 않는다.
 SH판(`collect_sh_house_assets.py`)과 같은 흐름이되, 단지 목록이 96곳뿐이라 공고(seq)별로 나누지 않고 한 번에 돈다.
@@ -34,6 +35,7 @@ from zipgonggo_pipeline.sources.youth_house import (  # noqa: E402
     YouthHouse,
     YouthHouseClient,
     house_from_row,
+    parse_facts,
     parse_images,
 )
 
@@ -209,7 +211,9 @@ def cmd_fetch(client: YouthHouseClient, only: str, refresh: bool) -> int:
     got = 0
     for code, name in codes.items():
         dest_dir = IMG_ROOT / code
-        images = parse_images(client.detail_html(code))
+        html = client.detail_html(code)
+        facts = parse_facts(html)
+        images = parse_images(html)
         rows = []
         # 같은 파일을 두 자리에서 내주는 단지가 있다 — 맹그로브창천은 fileSn 1(상세소개)과 2(투시도)가
         # 바이트까지 같은 한 파일이다. 그대로 실으면 갤러리에 같은 그림이 「전경」과 「투시도」로 두 번 뜬다
@@ -236,7 +240,7 @@ def cmd_fetch(client: YouthHouseClient, only: str, refresh: bool) -> int:
             (dest_dir / "_files.json").write_text(
                 json.dumps({r["url"].split(".go.kr")[-1]: {"file": r["file"], "bytes": r["bytes"]} for r in rows},
                            ensure_ascii=False, indent=1), encoding="utf-8")
-        manifest.append({"homeCode": code, "단지명": name, "이미지": rows})
+        manifest.append({"homeCode": code, "단지명": name, "사실": asdict(facts), "이미지": rows})
         kinds = ", ".join(f"{k} {sum(1 for r in rows if r['kind'] == k)}" for k in KIND_ORDER
                           if any(r["kind"] == k for r in rows))
         print(f"  {code} {name}: {len(rows)}장 ({kinds or '없음'})", file=sys.stderr)
@@ -247,11 +251,25 @@ def cmd_fetch(client: YouthHouseClient, only: str, refresh: bool) -> int:
     return total
 
 
+DATE_RE = re.compile(r"(\d{4})[-.](\d{1,2})[-.](\d{1,2})")
+
+
+def _date(v: str | None) -> str | None:
+    """`2026-11-16`·`2026.11.16` → ISO. 「2026년 상반기」처럼 날짜가 아닌 안내문은 버린다."""
+    m = DATE_RE.search(v or "")
+    return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}" if m else None
+
+
 def cmd_load() -> int:
-    """받아 둔 이미지를 DB(0026)에 넣고 웹이 읽을 자리로 복사한다."""
+    """받아 둔 이미지를 DB(0026)에, 단지 사실을 DB(0027)에 넣고 웹이 읽을 자리로 파일을 복사한다.
+
+    사실은 목록(관리비·운영사·세대수·주소)과 상세(시행사·시공사·입주예정일·연락처)를 합쳐 만든다 —
+    `houses.json`과 `manifest.json`이 둘 다 있어야 하니 `houses` → `match` → `fetch` → `load` 순서를 지킨다.
+    """
     from zipgonggo_pipeline.db import connect
 
     manifest = json.loads((OUT_ROOT / "manifest.json").read_text(encoding="utf-8"))
+    by_house = {h.home_code: h for h in _load_houses()}
     copied = 0
     rows: list[tuple] = []
     for m in manifest:
@@ -288,8 +306,36 @@ def cmd_load() -> int:
         for code, urls in by_code.items():
             cur.execute("DELETE FROM youth_house_image WHERE home_code = %s AND source_url <> ALL(%s)", (code, urls))
             pruned += cur.rowcount
+        # 단지 사실(0027) — 관리비가 여기 있다. 이미지가 0장인 단지도 사실은 실을 값이 있다
+        facts_n = 0
+        for m in manifest:
+            h = by_house.get(m["homeCode"])
+            if not h:
+                continue
+            f = m.get("사실") or {}
+            cur.execute(
+                """INSERT INTO youth_house
+                     (home_code, name, address, sigungu, maint_low, maint_high, households, manager,
+                      developer, builder, movein, phone, homepage, subway, scale, source_url, collected_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                   ON CONFLICT (home_code) DO UPDATE SET
+                     name = EXCLUDED.name, address = EXCLUDED.address, sigungu = EXCLUDED.sigungu,
+                     maint_low = EXCLUDED.maint_low, maint_high = EXCLUDED.maint_high,
+                     households = EXCLUDED.households, manager = EXCLUDED.manager,
+                     developer = EXCLUDED.developer, builder = EXCLUDED.builder, movein = EXCLUDED.movein,
+                     phone = EXCLUDED.phone, homepage = EXCLUDED.homepage, subway = EXCLUDED.subway,
+                     scale = EXCLUDED.scale, source_url = EXCLUDED.source_url, collected_at = now()""",
+                (h.home_code, h.name, h.address or None, h.gu or None,
+                 # 관리비는 상세 표가 먼저다 — 목록 JSON은 단지 절반만 준다(90곳 중 47곳)
+                 f.get("maint_low") or h.maint_low, f.get("maint_high") or h.maint_high,
+                 int(h.households) if h.households.isdigit() else None,
+                 h.manager or None, f.get("developer"), f.get("builder"), _date(f.get("movein")),
+                 f.get("phone"), f.get("homepage"), f.get("subway"), f.get("scale"), h.source_url),
+            )
+            facts_n += 1
         conn.commit()
-    print(f"이미지 {len(rows)}행 적재(묵은 행 {pruned} 삭제), 파일 {copied}장 복사 → {PUBLIC_ROOT}", file=sys.stderr)
+    print(f"이미지 {len(rows)}행 적재(묵은 행 {pruned} 삭제), 단지 사실 {facts_n}행, 파일 {copied}장 복사 → {PUBLIC_ROOT}",
+          file=sys.stderr)
     return len(rows)
 
 
