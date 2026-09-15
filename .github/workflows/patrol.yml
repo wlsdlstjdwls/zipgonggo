@@ -41,6 +41,9 @@ env:
   JUSO_SEARCH_API_KEY: ${{ secrets.JUSO_SEARCH_API_KEY }}
   WEB_REVALIDATE_URL: ${{ secrets.WEB_REVALIDATE_URL }}
   REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+  # IndexNow 발행 키. **비밀이 아니라 Secret으로 두지 않는다** — 규격이 web/public/{키}.txt 로
+  # 공개하라고 요구한다. 값을 바꾸려면 그 파일도 같이 바꿔 재배포해야 한다
+  INDEXNOW_KEY: "26b1ed3396f0d701d5f21d04bd0d2801"
   # 남의 서버다. 동시 요청을 걸지 않고 간격을 지킨다(CLAUDE.md 하지 말 것 7)
   SCRAPE_DELAY_SEC: "1.5"
   PYTHONPATH: src

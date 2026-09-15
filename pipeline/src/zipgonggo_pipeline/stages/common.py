@@ -16,6 +16,7 @@ from typing import Any
 import httpx
 
 from ..config import settings
+from ..indexnow import publish as publish_indexnow
 from ..repo import insert_ingest_log, upsert_notice
 
 log = logging.getLogger("stage.common")
@@ -132,4 +133,12 @@ def stage_main(
     print(json.dumps(stats.__dict__, ensure_ascii=False, indent=1))
     if not args.dry_run and stats.ok:
         notify_web_revalidate()
+        # 캐시를 비운 **뒤에** 알린다 — 먼저 알리면 크롤러가 옛 지면을 가져간다.
+        # 실패해도 파이프라인을 막지 않는다(다음 회차가 같은 행을 다시 집는다 — 해시가 아직 옛것이라)
+        try:
+            result = publish_indexnow()
+            if result.get("submitted"):
+                log.info("IndexNow %s", result)
+        except Exception as exc:  # noqa: BLE001 — 발행 실패로 수집을 실패 처리하지 않는다
+            log.warning("IndexNow 발행 실패(무시): %s", exc)
     return 0 if stats.ok else 1

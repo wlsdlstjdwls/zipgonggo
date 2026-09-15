@@ -446,6 +446,7 @@ LH 이용약관(`lh.or.kr/menu.es?mid=a10802000000`) 제1~12조와 부칙을 훑
 | `NEXT_PUBLIC_SH_HOUSE_BASE` | 스토리지(Vercel Blob 등) 공개 URL | SH 단지 사진·도면 파일 자리. **비우면 배포에서 갤러리를 그리지 않는다** — `web/public/sh-house`는 gitignore라 Vercel에 안 올라간다. 스토리지에 올린 뒤 그 공개 URL을 넣는다 |
 | `BLOB_READ_WRITE_TOKEN` | Vercel 대시보드 Storage → Blob 스토어 | `web/scripts/upload-house-images.mjs`가 사진을 올릴 때만. 웹 런타임은 안 쓴다 |
 | `GOOGLE_SITE_VERIFICATION` | [구글 서치콘솔](https://search.google.com/search-console) → 속성 추가 → HTML 태그의 `content` 값 | 사이트 소유확인 `<meta>`. 이게 통과해야 사이트맵 제출·색인 요청 화면이 열린다. **비밀값이 아니라 현재 값은 `web/src/lib/constants.ts`에 박아 뒀다** — env는 덮어쓰기용 |
+| `INDEXNOW_KEY` | 직접 생성(16바이트 hex). 발급처 없음 — 아무 문자열이나 정하고 `web/public/{키}.txt`로 공개하면 그게 소유 증명이다 | 빙·네이버·얀덱스·Seznam에 변경 URL을 즉시 밀어 넣는다(구글은 참여 안 함). **비밀값 아님** — 공개가 규격이다. 워크플로 env에도 평문으로 있다 |
 | `NAVER_SITE_VERIFICATION` | [네이버 서치어드바이저](https://searchadvisor.naver.com) → 웹마스터도구 → 사이트 등록 → HTML 태그의 `content` 값 | 같은 용도. 네이버는 이 확인 없이는 수집 요청 자체가 안 된다. 값 자리도 위와 같다 |
 
 ## 미해결
