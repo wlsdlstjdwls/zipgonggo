@@ -624,8 +624,13 @@ def supply_rows(facts: YouthAttachFacts, *, complex_name: str, is_new: bool) -> 
         if row["move_in_from"] is None:
             row["move_in_from"] = ln.move_in
         for o in ln.options:
-            if o.as_json() not in row["_options"]:
+            # 같은 비율 라벨이 호실마다 다른 금액으로 들어온다 — 줄 하나에는 라벨마다 하나만, 보증금이 가장 낮은 것으로.
+            # 호실별 금액은 unit 표가 말한다
+            prev = next((x for x in row["_options"] if x["label"] == o.label), None)
+            if prev is None:
                 row["_options"].append(o.as_json())
+            elif o.deposit is not None and (prev["deposit"] is None or o.deposit < prev["deposit"]):
+                row["_options"][row["_options"].index(prev)] = o.as_json()
     rows = []
     for row in merged.values():
         opts = row.pop("_options")

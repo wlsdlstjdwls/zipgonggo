@@ -26,7 +26,7 @@ import { PriceTable } from "@/components/price-table";
 import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
-import { DepositOptionsTable } from "@/components/deposit-options-table";
+import { DepositOptionsTable, optionLabels } from "@/components/deposit-options-table";
 import { UnitTable } from "@/components/unit-table";
 import { agencyLabels } from "@/lib/agency";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
@@ -109,8 +109,9 @@ export default async function ComplexPage({ params }: Params) {
   const hasRent = supply.some((s) => s.rent != null);          // 장기전세는 월임대료가 없다
   const showRent = hasRent || c.min_rent != null;               // 「보증금과 임대료」 제목·표의 임대료 열을 그릴지
   const hasClass = new Set(supply.map((s) => s.tenant_class)).size > 1 || supply.some((s) => s.income_option);
-  // 민간임대 공고문의 보증금 비율 옵션(0025). 둘 이상일 때만 비율별 표를 따로 그린다
-  const hasOptions = supply.some((s) => (s.deposit_options?.length ?? 0) > 1);
+  // 민간임대 공고문의 보증금 비율 옵션(0025). 서로 다른 비율이 둘 이상일 때만 비율별 표를 따로 그린다 —
+  // 비율이 하나뿐인 공고(호실별 「보증금 40%」 하나)는 위 금액 표가 이미 그 값을 말한다
+  const hasOptions = optionLabels(supply).length > 1;
   // 이 공고가 이 단지에서 공급하는 주택형. 사진·도면을 이걸로 걸러 낸다 — SH주택정보는 단지에 있는 형을 다 준다
   const supplyTypes = [...new Set(supply.map((s) => s.supply_type).filter(Boolean))];
   const moveIn = moveInLabel(supply.find((s) => s.move_in_from)?.move_in_from ?? null);

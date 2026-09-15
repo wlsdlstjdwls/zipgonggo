@@ -70,7 +70,8 @@ def test_room_rows_become_units():
     assert len(rows) == 5
     b1 = next(r for r in rows if r["supply_type"] == "B1")
     assert b1["units_total"] == 3 and b1["deposit"] == 28_800_000  # 세 호실 중 보증금이 가장 낮은 30% 옵션
-    assert len(json.loads(b1["deposit_options"])) == 3
+    # 호실 셋이 40%·30%·40%다 — 줄 하나에는 비율마다 하나씩, 보증금이 가장 낮은 값으로 남는다
+    assert [(o["label"], o["deposit"]) for o in json.loads(b1["deposit_options"])] == [("40%", 38_400_000), ("30%", 28_800_000)]
 
 
 def test_two_class_columns_and_all_reserve():
