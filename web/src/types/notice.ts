@@ -71,7 +71,12 @@ export type Notice = NoticeListItem & {
   updated_at: string;
 };
 
-/** 공급현황 표 한 줄 (notice_supply). 단지 × 공급유형 × 공급대상 × 소득옵션 */
+/** 보증금 비율 옵션 하나 (notice_supply.deposit_options, 0025). 민간임대 공고문의 「보증금 30% | 50% | 70%」 열.
+ *  ratio가 없는 고정액 옵션(「9000만원」)은 label로만 구분한다. 금액은 원 */
+export type DepositOption = { label: string; ratio: number | null; deposit: number | null; rent: number | null };
+
+/** 공급현황 표 한 줄 (notice_supply). 단지 × 공급유형 × 공급대상 × 소득옵션.
+ *  민간임대(youth_attach)는 income_option에 특별공급/일반공급, supply_type에 타입 코드(「26A-1」)가 든다 */
 export type NoticeSupply = {
   id: number;
   complex_name: string;
@@ -94,6 +99,8 @@ export type NoticeSupply = {
   area_total: number | null;
   move_in_from: string | null;
   source_page: number | null;
+  /** 보증금 비율별 옵션. deposit·rent는 이 중 보증금이 가장 낮은 것. SH 공고는 null */
+  deposit_options: DepositOption[] | null;
 };
 
 /** 공고 안의 호실 한 칸 (unit). SH 매입임대 「[별첨1] 주택목록」에서만 나온다(0021).

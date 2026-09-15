@@ -5,6 +5,15 @@ import type { Notice, NoticeComplex, NoticeSupply, NoticeUnit } from "@/types/no
 
 /** 공급유형 표기 — "39㎡", 주거약자용이면 "39㎡ 주거약자용" */
 export function typeLabel(s: NoticeSupply): string {
+  // SH는 「39」「29S」처럼 면적 반올림이 유형이다. 민간임대(youth_attach)는 「26A-1」 「D1」 같은 사업자 타입 코드라
+  // 면적을 따로 앞세운다 — 코드만으로는 몇 평인지 모른다
+  // 「36A」처럼 SH 꼴이어도 숫자가 전용면적(26.21)과 다르면 사업자 코드다 — 「36㎡」로 내면 면적 칸과 어긋난다
+  const num = parseFloat(s.supply_type);
+  const codeLike = !/^\d+(\.\d+)?[A-Za-z]?$/.test(s.supply_type)
+    || (s.area_exclusive != null && Number.isFinite(num) && Math.round(num) !== Math.round(s.area_exclusive));
+  if (codeLike) {
+    return `${s.area_exclusive != null ? `${s.area_exclusive}㎡ ` : ""}${s.supply_type}형`;
+  }
   return `${s.supply_type.replace(/[A-Za-z]$/, "")}㎡${s.accessible ? " 주거약자용" : ""}`;
 }
 

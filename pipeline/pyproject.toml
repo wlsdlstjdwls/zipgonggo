@@ -4,9 +4,13 @@ version = "0.1.0"
 description = "집공고 — 공공임대 공고 수집·파싱·좌표매칭 파이프라인"
 requires-python = ">=3.11"
 dependencies = [
-  "httpx>=0.28", "psycopg[binary]>=3.2", "python-dotenv>=1.0", "selectolax>=0.3",
+  "httpx>=0.28",
+  "psycopg[binary]>=3.2",
+  "python-dotenv>=1.0",
+  "selectolax>=0.3",
   "openpyxl>=3.1",  # 자격진단 엑셀 · SH 공개 주택목록
   "pyproj>=3.7",    # 요약DB 출입구 좌표 EPSG:5179 → WGS84
+  "pdfplumber>=0.11",  # 청년안심주택 첨부 PDF 표(youth_attach). requirements.txt는 0.11.4
 ]
 
 [project.scripts]

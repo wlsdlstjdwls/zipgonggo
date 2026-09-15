@@ -127,16 +127,16 @@ def replace_notice_supply(cur, notice_id: int, rows: list[dict[str, Any]]) -> in
               (notice_id, complex_id, complex_name, supply_type, accessible, tenant_class, income_option, is_new,
                units_total, units_priority, units_general, units_reserve,
                deposit, down_payment, balance, rent,
-               area_exclusive, area_common, area_etc, area_total, move_in_from, source_page)
+               area_exclusive, area_common, area_etc, area_total, move_in_from, source_page, deposit_options)
             VALUES (%(notice_id)s,
                     (SELECT id FROM notice_complex WHERE notice_id = %(notice_id)s AND name = %(complex_name)s LIMIT 1),
                     %(complex_name)s, %(supply_type)s, %(accessible)s, %(tenant_class)s, %(income_option)s, %(is_new)s,
                     %(units_total)s, %(units_priority)s, %(units_general)s, %(units_reserve)s,
                     %(deposit)s, %(down_payment)s, %(balance)s, %(rent)s,
-                    %(area_exclusive)s, %(area_common)s, %(area_etc)s, %(area_total)s, %(move_in_from)s, %(source_page)s)
+                    %(area_exclusive)s, %(area_common)s, %(area_etc)s, %(area_total)s, %(move_in_from)s, %(source_page)s, %(deposit_options)s::jsonb)
             ON CONFLICT (notice_id, complex_name, supply_type, tenant_class, income_option) DO NOTHING
             """,
-            {"notice_id": notice_id, **r},
+            {"notice_id": notice_id, "deposit_options": None, **r},
         )
     return len(rows)
 
@@ -167,6 +167,23 @@ def replace_units(cur, notice_id: int, rows: list[dict[str, Any]]) -> int:
             {"notice_id": notice_id, **r},
         )
     return len(rows)
+
+
+def update_notice_complex_facts(cur, notice_id: int, *, min_deposit: int | None, min_rent: int | None,
+                                area_min: Any, area_max: Any) -> None:
+    """첨부 표에서 읽은 단지 요약값. 목록·지도가 이 네 칸을 쓴다. 새로 읽은 값이 이긴다(첨부 사실 규약과 같다).
+    민간임대(youth)는 공고당 단지가 하나라 공고 열쇠로 고친다 — 단지가 여럿인 SH는 replace_notice_complexes가 행마다 넣는다."""
+    cur.execute(
+        """
+        UPDATE notice_complex SET
+          min_deposit = COALESCE(%(min_deposit)s, min_deposit),
+          min_rent    = COALESCE(%(min_rent)s, min_rent),
+          area_min    = COALESCE(%(area_min)s, area_min),
+          area_max    = COALESCE(%(area_max)s, area_max)
+        WHERE notice_id = %(notice_id)s
+        """,
+        {"notice_id": notice_id, "min_deposit": min_deposit, "min_rent": min_rent, "area_min": area_min, "area_max": area_max},
+    )
 
 
 def queue_unmapped(cur, key: str, housing_type: str, title: str) -> None:

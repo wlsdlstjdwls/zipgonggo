@@ -10,6 +10,12 @@ import type { NoticeSupply } from "@/types/notice";
 
 type Props = { supply: NoticeSupply[]; hasReserve: boolean; hasRent: boolean; hasClass: boolean };
 
+/** deposit·rent가 어느 비율 옵션인지 — 보증금이 가장 낮은 것(pipeline supply_rows와 같은 규칙) */
+function baseOption(s: NoticeSupply) {
+  const priced = (s.deposit_options ?? []).filter((o) => o.deposit != null);
+  return priced.length ? priced.reduce((a, b) => (b.deposit! < a.deposit! ? b : a)) : null;
+}
+
 /** 면적 한 칸 — 전용을 크게, 공용/계약을 그 밑에 작게. 세 열을 하나로 접는다 */
 function AreaCell({ s }: { s: NoticeSupply }) {
   const common = commonArea(s);
@@ -61,7 +67,11 @@ export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
                 </td>
               )}
               {hasReserve && <td className="num">{s.units_reserve != null ? num(s.units_reserve, "호") : "—"}</td>}
-              <td className="num strong" title={s.deposit != null ? wonExact(s.deposit) : undefined}>{wonKo(s.deposit)}</td>
+              <td className={s.deposit_options && s.deposit_options.length > 1 ? "num stack" : "num strong"} title={s.deposit != null ? wonExact(s.deposit) : undefined}>
+                {s.deposit_options && s.deposit_options.length > 1
+                  ? <><b>{wonKo(s.deposit)}</b><small>보증금 {baseOption(s)?.label} 기준</small></>
+                  : wonKo(s.deposit)}
+              </td>
               {hasRent && <td className="num" title={s.rent != null ? wonExact(s.rent) : undefined}>{wonKo(s.rent)}</td>}
               <td className="num stack"><AreaCell s={s} /></td>
             </tr>

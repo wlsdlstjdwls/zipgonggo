@@ -227,7 +227,9 @@
   ■청약신청 페이지 / ■문의전화」 라벨 앵커로 읽는다. 결측(민간 467건 실측): 단지명 2, 주소 1, 마감일 34(7%), 이번 호수 54(12%, 대개 「예비자 모집」), 당첨자 발표 425(91%, 본문에 없음).
 - 「[공공임대]」 19건은 SH 청년안심주택(공공임대) 안내문 — 원본은 i-sh 게시판, `s1_ish_board`가 적재. 여기선 건너뛴다.
 - 상세 `/youth/bbs/BMSR00015/view.do?boardId=N&menuNo=400008` · 첨부 `/coHouse/cmmn/file/fileDown.do?atchFileId=…&fileSn=1`.
-  첨부 공고문(호실별 임대료 표)은 아직 안 읽는다 — 보증금·임대료가 비어 있는 이유.
+  첨부 공고문은 전부 텍스트 PDF(HWP 출력, 2019~2021은 가로 2단 조판). `stages/s3_youth` + `parsers/youth_attach`가 pdfplumber 괘선 표로
+  「임대보증금 및 월임대료」 표를 읽는다(2026-09-15) — 공급대상 × 특별/일반 × 주택형 × 보증금 비율(30/50/70% 등) → notice_supply(+deposit_options),
+  호실 단위 추가모집 표(「1701호」)는 unit. 받은 PDF는 `pipeline/data/youth/{boardId}.pdf`에 둔다(커밋 안 함).
 
 ### HUG 든든전세주택 — **확인됨 (API 없음)**
 

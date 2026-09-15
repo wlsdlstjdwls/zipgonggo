@@ -53,6 +53,7 @@ jobs:
     outputs:
       slugs: ${{ steps.s1.outputs.slugs }}
       count: ${{ steps.s1.outputs.count }}
+      youth_count: ${{ steps.youth.outputs.count }}
     steps:
       - uses: actions/checkout@v4
 
@@ -74,13 +75,15 @@ jobs:
           echo "count=$(jq '.new_slugs | length' stats.json)" >> "$GITHUB_OUTPUT"
 
       # 민간임대 축. 목록 JSON에 본문이 실려 와 1쪽(10건, 요청 1회)이면 하루치 새 글을 다 본다.
-      # 첨부 파서가 없어 상세(ingest) 잡에는 넘기지 않는다 — stats.json의 slugs와 섞지 않는다
+      # 첨부(PDF)는 상세(ingest) 잡의 s3_youth가 읽는다 — SH slugs와 섞지 않고 신규 건수만 넘긴다
       - name: S1 서울시 청년안심주택 게시판
+        id: youth
         if: always()
         run: |
           set -o pipefail
           python -m zipgonggo_pipeline.stages.s1_youth --max-pages 1 > youth.json
           cat youth.json
+          echo "count=$(jq '.new_slugs | length' youth.json)" >> "$GITHUB_OUTPUT"
 
       - name: 요약
         if: always()
@@ -107,7 +110,7 @@ jobs:
     name: 상세 — 첨부 파싱과 좌표
     needs: watch
     # 빈 문자열(jq가 헛돈 회차)을 「신규 있음」으로 읽지 않게 숫자로 견준다
-    if: ${{ fromJSON(needs.watch.outputs.count || '0') > 0 || inputs.force }}
+    if: ${{ fromJSON(needs.watch.outputs.count || '0') > 0 || fromJSON(needs.watch.outputs.youth_count || '0') > 0 || inputs.force }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     defaults:
@@ -157,6 +160,14 @@ jobs:
             echo "::endgroup::"
           done
           echo "fail=$fail" >> "$GITHUB_OUTPUT"
+
+      # 민간임대 첨부 PDF — 아직 공급현황이 없는 공고만(기본 선택) 최신 20건. 표 없는 첨부는 no_table로 남고 다음 회차에 또 본다
+      - name: S3 청년안심주택 첨부 공고문
+        run: |
+          set -o pipefail
+          python -m zipgonggo_pipeline.stages.s3_youth --limit 20 > s3-youth.json
+          cat s3-youth.json
+          jq -r '"- 청년안심주택 첨부 — 공고 \(.updated)건 / 줄 \(.inserted)건" + (if (.skipped | length) > 0 then " (건너뜀 \(.skipped))" else "" end)' s3-youth.json >> "$GITHUB_STEP_SUMMARY"
 
       # 같은 공고가 기관 seq 여러 개로 들어온다 — 정본을 하나 정해 목록·사이트맵에서 겹치지 않게 한다.
       # URL은 지우지 않는다(CLAUDE.md 하지 말 것 6)

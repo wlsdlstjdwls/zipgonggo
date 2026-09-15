@@ -256,7 +256,7 @@ const SUPPLY_COLS = `
   id, complex_name, supply_type, accessible, tenant_class, income_option, is_new,
   units_total, units_priority, units_general, units_reserve,
   deposit, down_payment, balance, rent,
-  area_exclusive, area_common, area_etc, area_total, move_in_from, source_page`;
+  area_exclusive, area_common, area_etc, area_total, move_in_from, source_page, deposit_options`;
 
 // 공급현황 정렬: 신규 먼저, 그다음 공급유형(면적) 오름차순, 계층은 표에 나온 순서를 흉내낸다
 const SUPPLY_ORDER = `

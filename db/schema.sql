@@ -461,6 +461,7 @@ CREATE TABLE notice_supply (
   down_payment bigint,                        -- 계약금 20%(원)
   balance      bigint,                        -- 잔금 80%(원)
   rent         bigint,                        -- 월임대료(원)
+  deposit_options jsonb,                      -- 보증금 비율별 (보증금, 월임대료) 옵션(0025). 민간임대 공고문 표. deposit·rent는 보증금 최저 옵션
 
   area_exclusive numeric(7,2),                -- 주거전용
   area_common    numeric(7,2),                -- 주거공용

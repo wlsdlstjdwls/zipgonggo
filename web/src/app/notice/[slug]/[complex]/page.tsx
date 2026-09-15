@@ -26,6 +26,7 @@ import { PriceTable } from "@/components/price-table";
 import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
+import { DepositOptionsTable } from "@/components/deposit-options-table";
 import { UnitTable } from "@/components/unit-table";
 import { agencyLabels } from "@/lib/agency";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
@@ -108,13 +109,16 @@ export default async function ComplexPage({ params }: Params) {
   const hasRent = supply.some((s) => s.rent != null);          // 장기전세는 월임대료가 없다
   const showRent = hasRent || c.min_rent != null;               // 「보증금과 임대료」 제목·표의 임대료 열을 그릴지
   const hasClass = new Set(supply.map((s) => s.tenant_class)).size > 1 || supply.some((s) => s.income_option);
+  // 민간임대 공고문의 보증금 비율 옵션(0025). 둘 이상일 때만 비율별 표를 따로 그린다
+  const hasOptions = supply.some((s) => (s.deposit_options?.length ?? 0) > 1);
   // 이 공고가 이 단지에서 공급하는 주택형. 사진·도면을 이걸로 걸러 낸다 — SH주택정보는 단지에 있는 형을 다 준다
   const supplyTypes = [...new Set(supply.map((s) => s.supply_type).filter(Boolean))];
   const moveIn = moveInLabel(supply.find((s) => s.move_in_from)?.move_in_from ?? null);
   // 공급현황이 있으면 그 표가, 호실 목록만 있으면(매입임대 별첨) 호실 금액의 범위가 근거다
   const priceBreak = supply.length > 0 ? complexPriceRows(supply, c) : (unitPriceRows(units).length ? unitPriceRows(units) : complexPriceRows(supply, c));
   // 월임대료가 있는 줄은 공급대상별로 최대/기본/최소 세 줄을 만든다(사용자 요청 2026-09-09)
-  const priceGroups = complexPriceGroups(supply);
+  // 민간임대는 공고가 비율별 금액을 직접 준다 — SH 규칙(연 이율)로 계산한 전세/월세전환 표를 내면 공고와 다른 숫자가 된다
+  const priceGroups = hasOptions ? [] : complexPriceGroups(supply);
   // 오른쪽 카드는 언제나 "마감"을 센다 — 접수 시작 D-day를 섞으면 「접수 시작까지 / 오늘 / 09.11 마감」처럼 어긋난다
   const dl = deadlineChip(n);
   const ph = applyPhase(n);
@@ -308,7 +312,14 @@ export default async function ComplexPage({ params }: Params) {
             ) : priceBreak.length > 0 ? (
               <>
                 <PriceTable rows={priceBreak} depositHead={showRent ? "보증금" : "전세금"} showRent={showRent} />
-                {hasRent && (
+                {hasOptions ? (
+                  <>
+                    <p className="note">위 표는 보증금 비율이 가장 낮은 기준값입니다. 비율을 올리면 월임대료가 내려갑니다. 비율별 금액은 아래 표에서 확인하세요.</p>
+                    <h3>보증금 비율별 임대조건</h3>
+                    <DepositOptionsTable supply={supply} hasClass={hasClass} />
+                    <p className="note">계약 때 공고에 적힌 비율 단위로 전환할 수 있고, 계약 뒤에는 바꿀 수 없는 공고가 많습니다. 조건은 {L.originalDoc}에서 확인하세요.</p>
+                  </>
+                ) : hasRent && (
                   <p className="note">
                     공고문 기준값입니다. 계약 때 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있습니다. 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
                   </p>
