@@ -193,22 +193,67 @@ small { font-size: 12px; }
   border-radius: 999px; background: var(--acc); color: #fff; font-style: normal; font-weight: 800; font-size: 10.5px; }
 .fsheet-sum { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: 12px; color: var(--dim); }
 
+/* 바텀시트 · 팝업(components/sheet.tsx) ─────────────────────
+   fitin-app의 common_bottom_sheet / common_confirm_dialog를 옮긴 조판.
+   좁은 화면: 아래에서 올라오는 시트, 손잡이 줄을 끌어 내려 닫는다. 넓은 화면(768px+): 가운데 뜨는 창.
+   좁은 화면의 시트 위치와 스크림 투명도는 CSS가 아니라 sheet.tsx가 한 프레임씩 같이 찍는다 —
+   끌기 중에는 transition이 걸리면 안 되고, 스크림은 끈 거리만큼 같이 옅어져야 한다. */
 .sheet-wrap { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; justify-content: flex-end; }
-.sheet-scrim { position: absolute; inset: 0; border: 0; padding: 0; background: rgba(15, 18, 22, 0.42); cursor: pointer; animation: fade-in 200ms var(--ease) both; }
-.sheet { position: relative; display: flex; flex-direction: column; max-height: 82vh; border-radius: var(--r-frame) var(--r-frame) 0 0;
-  background: var(--bg); box-shadow: var(--shadow-frame); animation: sheet-up 320ms var(--sp) both; }
-@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
-.sheet-h { position: relative; flex: none; display: flex; align-items: center; justify-content: center; height: 52px; border-bottom: 1px solid var(--line); }
-.sheet-h b { font-weight: 900; font-size: 15px; letter-spacing: -0.03em; color: var(--ink); }
-.sheet-grip { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 36px; height: 4px; border-radius: 999px; background: var(--line2); }
-.sheet-x { position: absolute; right: 8px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
-  border: 0; border-radius: 10px; background: none; color: var(--dim); font-size: 12px; cursor: pointer; }
-.sheet-x:hover { background: var(--sub); color: var(--ink); }
-.sheet-b { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 18px; padding: 18px var(--pad) 20px; }
+.sheet-scrim { position: absolute; inset: 0; border: 0; padding: 0; background: rgba(15, 18, 22, 0.6);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); cursor: pointer;
+  /* 없으면 브라우저가 터치를 네이티브 스크롤로 가로채 끌어 내리기가 씹힌다 */
+  touch-action: none; will-change: opacity; }
+
+.sheet { position: relative; display: flex; flex-direction: column; width: 100%; max-height: 82vh;
+  border-radius: 24px 24px 0 0; border-top: 1px solid var(--line2); background: var(--bg);
+  box-shadow: 0 -8px 40px rgba(15, 18, 22, 0.12), 0 -2px 12px rgba(15, 18, 22, 0.06);
+  padding-bottom: env(safe-area-inset-bottom); will-change: transform; }
+
+/* 손잡이 줄 — 막대 옆 빈 자리까지 이 줄 전체가 끌기 영역이다 */
+.sheet-grab { flex: none; padding: 14px 0 12px; touch-action: none; }
+.sheet-grip { display: block; width: 36px; height: 4px; margin: 0 auto; border-radius: 999px; background: var(--line2);
+  user-select: none; -webkit-user-select: none; }
+
+.sheet-h { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 0 20px 12px; border-bottom: 1px solid var(--line);
+  user-select: none; -webkit-user-select: none; touch-action: none; }
+.sheet-h b { min-width: 0; font-weight: 900; font-size: 17px; letter-spacing: -0.03em; color: var(--ink); }
+/* flex-shrink:0 필수 — 제목이 두 줄로 꺾이면 이 버튼까지 눌려 타원으로 찌그러진다 */
+.sheet-x { flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%; background: rgba(128, 128, 128, 0.1); color: var(--mut); font-size: 14px; cursor: pointer;
+  transition: background 150ms var(--ease), color 150ms var(--ease), transform 150ms var(--ease);
+  -webkit-tap-highlight-color: transparent; }
+.sheet-x:hover { background: rgba(128, 128, 128, 0.18); color: var(--ink); }
+.sheet-x:active { transform: scale(0.92); }
+
+.sheet-b { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 18px; padding: 18px var(--pad) 20px; }
 .sheet-b .selw, .sheet-b .sel { width: 100%; }
-.sheet-f { flex: none; display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; padding: 12px var(--pad) calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+.sheet-f { flex: none; display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px;
+  padding: 12px var(--pad) calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .sheet-f .btn { width: 100%; }
-@media (prefers-reduced-motion: reduce) { .sheet, .sheet-scrim { animation: none; } }
+
+/* 넓은 화면 — 같은 내용이 가운데 뜨는 창이 된다. 손잡이는 없앤다(끌 일이 없다) */
+.sheet-wrap.is-modal { align-items: center; justify-content: center; }
+.sheet-wrap.is-modal .sheet { width: min(560px, calc(100vw - 32px)); max-height: min(80vh, 660px);
+  border: 1px solid var(--line2); border-radius: var(--r-frame); box-shadow: var(--shadow-frame);
+  padding-bottom: 0; animation: sheet-pop-in 180ms var(--ease) both; }
+.sheet-wrap.is-modal[data-size="sm"] .sheet { width: min(400px, calc(100vw - 32px)); }
+.sheet-wrap.is-modal .sheet-grab { display: none; }
+.sheet-wrap.is-modal .sheet-h { padding-top: 16px; }
+.sheet-wrap.is-modal .sheet-f { padding-bottom: 12px; }
+.sheet-wrap.is-modal .sheet-scrim { animation: fade-in 180ms var(--ease) both; }
+.sheet-wrap.is-modal.is-exit .sheet-scrim { animation: fade-out 180ms var(--ease) both; }
+.sheet-wrap.is-modal.is-exit .sheet { animation: sheet-pop-out 180ms var(--ease) both; }
+
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes sheet-pop-in { from { opacity: 0; transform: scale(0.92) translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes sheet-pop-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.92) translateY(8px); } }
+
+/* 모션 감소 — 시간만 없앤다. 좁은 화면 쪽은 sheet.tsx가 트윈 길이를 0으로 줄인다 */
+@media (prefers-reduced-motion: reduce) {
+  .sheet-wrap.is-modal .sheet, .sheet-wrap.is-modal .sheet-scrim { animation-duration: 0.01ms !important; }
+}
 
 /* ── 버튼 · 칩 · 세그먼트 ────────────────────────────────── */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 18px; border-radius: var(--r-btn); border: 1px solid var(--line2); background: var(--bg); color: var(--mut); font-weight: 800; font-size: 13px; white-space: nowrap; cursor: pointer;
@@ -251,8 +296,10 @@ small { font-size: 12px; }
 .selw { position: relative; display: inline-flex; flex: none; min-width: 0; }
 .selmenu { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: max(100%, 190px); overflow-x: hidden; max-width: 320px; max-height: 320px; overflow-y: auto; overscroll-behavior: contain;
   list-style: none; margin: 0; padding: 5px; background: var(--bg); border: 1px solid var(--line2); border-radius: var(--r-panel); box-shadow: var(--shadow-float);
-  animation: mo-pop 180ms var(--sp) both; }
-.selmenu.end { left: auto; right: 0; }
+  transform-origin: top center;
+  /* fitin 팝업과 같은 진입 — 살짝 작게, 8px 아래에서 뜨며 옅음에서 진해진다(예전 mo-pop은 튀어올랐다) */
+  animation: sheet-pop-in 180ms var(--ease) both; }
+.selmenu.end { left: auto; right: 0; transform-origin: top right; }
 .selmenu li { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: var(--radius-sm); cursor: pointer;
   font-weight: 700; font-size: 13px; color: var(--mut); white-space: nowrap; }
 .selmenu li > span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; }
@@ -997,20 +1044,11 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 }
 
 /* ── 계산기 (상호전환·대출이자) ──────────────────────────
-   여는 버튼은 헤더(.nav-btn)로 올라갔다 — 여기는 그 버튼 밑에 떨어지는 패널만(사용자 요청 2026-09-09). */
-.calc { position: fixed; right: 20px; top: 68px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; }
-.calc-panel { display: flex; flex-direction: column; width: min(360px, calc(100vw - 32px)); height: min(74vh, 520px);
-  border: 1px solid var(--line2); border-radius: var(--r-frame); background: var(--bg); box-shadow: var(--shadow-frame);
-  overflow: hidden; animation: mo-pop 240ms var(--sp); }
-.calc-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 12px 12px 10px; background: var(--bg); border-bottom: 1px solid var(--line); }
-.calc-seg { flex: 1; }
+   여는 버튼은 헤더(.nav-btn)에 있고, 그릇은 공용 시트(components/sheet.tsx)다 —
+   좁은 화면에서는 아래에서 올라오고 넓은 화면에서는 가운데 뜬다. 여기는 그 안에 들어가는 내용만 잰다. */
+.calc-body { display: flex; flex-direction: column; gap: 14px; }
+.calc-seg { width: 100%; }
 .calc-seg button { flex: 1; }
-.calc-x { flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 9px;
-  background: none; color: var(--dim); font-family: inherit; font-size: 12px; cursor: pointer; }
-.calc-x:hover { background: var(--sub); color: var(--ink); }
-.calc-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 14px; }
-.calc-note { margin-top: auto; }
 .calc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .calc-f { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .calc-f > span:first-child { font-weight: 800; font-size: 11px; color: var(--dim); }
@@ -1032,8 +1070,6 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .calc-note { margin: 0; font-weight: 600; font-size: 11px; line-height: 1.7; color: var(--dim); }
 /* 독은 body로 포털된다 — .shell의 @container가 안 닿아 일반 @media로 좁힌다 */
 @media (max-width: 720px) {
-  .calc { right: 12px; top: 66px; left: 12px; align-items: stretch; }
-  .calc-panel { width: 100%; max-height: 70vh; }
   .calc-o > em { display: none; }
 }
 

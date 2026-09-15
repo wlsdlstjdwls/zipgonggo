@@ -11,6 +11,7 @@
 // portal이 필요한 까닭: transform이 걸린 조상 아래의 fixed는 뷰포트가 아니라 그 조상을 기준으로 잡힌다.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useEscapeStack, useScrollLock } from "@/lib/overlay";
 
 // 넘기기 판정 — 슬라이드 폭 대비 이동 비율 또는 놓는 순간 속도 중 하나만 넘으면 넘어간다.
 const SWIPE_RATIO = 0.22;
@@ -87,21 +88,19 @@ export function PhotoViewer({
     onIndex(clamp(next, 0, slides.length - 1));
   }, [onIndex, slides.length]);
 
-  // 뒤 지면 스크롤 잠금 + 키보드 조작.
+  // 키보드 조작. ESC만은 공용 스택에 맡긴다 — 뷰어 위에 뭔가 더 열려 있으면 그쪽이 먼저 닫혀야 한다
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
       if (e.key === "ArrowLeft") go(index - 1);
       if (e.key === "ArrowRight") go(index + 1);
     };
     document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [go, index, onClose]);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [go, index]);
+
+  useEscapeStack(true, onClose);
+  // 뒤 지면 잠금 — 시트와 같은 장치(iOS에서 배경이 튀지 않게 자리까지 고정하고 돌려놓는다)
+  useScrollLock(true);
 
   /** 그림이 실제로 그려진 자리. `object-fit: contain`이라 요소 상자 안에서 위아래(또는 좌우)가 남는다.
    *

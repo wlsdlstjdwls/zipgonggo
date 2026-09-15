@@ -9,11 +9,11 @@
 //
 // 값은 상세 페이지가 씨앗으로 넘겨준다(단지 최소 보증금·월임대료). 없으면 빈칸으로 열린다.
 
-import { useEffect, useId, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useId, useState } from "react";
 import { CONVERT_RATE_DOWN, CONVERT_RATE_UP, convert, fullConversionDeposit, loan, type LoanPlan } from "@/lib/calc";
 import { wonKo } from "@/lib/format";
 import { useCalc } from "./calc-context";
+import { Sheet } from "./sheet";
 
 type Props = {
   /** 씨앗 보증금(원) — 단지·공고의 최소 보증금 */
@@ -167,43 +167,24 @@ function LoanTab({ deposit }: Props) {
 export function CalcDock() {
   const { open, setOpen, seed, buttonRef } = useCalc();
   const [tab, setTab] = useState<Tab>("convert");
-  const [mounted, setMounted] = useState(false);
 
-  // .shell(container-type)과 .stage(animation transform)가 fixed의 컨테이닝 블록이 된다 —
-  // 화면에 고정하려면 body로 빼야 한다
-  useEffect(() => { setMounted(true); }, []);
-
-  const close = () => { setOpen(false); buttonRef.current?.focus(); };
-
-  // Esc로 닫고, 닫을 때 여는 버튼으로 초점을 돌려준다
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpen(false); buttonRef.current?.focus(); } };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, setOpen, buttonRef]);
-
-  if (!mounted || !open) return null;
+  // 여는 버튼으로 초점을 돌려준다. 닫기 자체(퇴장 애니메이션 · ESC · 배경 잠금)는 Sheet가 맡는다 —
+  // 좁은 화면에선 아래에서 올라오는 시트, 넓은 화면에선 가운데 뜨는 창이다(fitin과 같은 분기).
+  const close = useCallback(() => { setOpen(false); buttonRef.current?.focus(); }, [setOpen, buttonRef]);
 
   // 씨앗이 바뀌면(다른 공고로 이동) 입력칸을 새 값으로 다시 연다 — key로 탭 컴포넌트를 갈아끼운다
   const seedKey = `${seed.deposit ?? ""}|${seed.rent ?? ""}`;
 
-  return createPortal(
-    <div className="calc">
-      <div className="calc-panel" role="dialog" aria-label="계산기">
-        <div className="calc-head">
-          <nav className="seg calc-seg" data-on={tab} aria-label="계산기 종류">
-            <span className="seg-ind" aria-hidden="true" />
-            <button type="button" className={tab === "convert" ? "on" : ""} aria-pressed={tab === "convert"} onClick={() => setTab("convert")}>상호전환</button>
-            <button type="button" className={tab === "loan" ? "on" : ""} aria-pressed={tab === "loan"} onClick={() => setTab("loan")}>대출이자</button>
-          </nav>
-          <button type="button" className="calc-x" onClick={close} aria-label="계산기 닫기">✕</button>
-        </div>
-        {tab === "convert"
-          ? <ConvertTab key={seedKey} deposit={seed.deposit} rent={seed.rent} sourceLabel={seed.sourceLabel} />
-          : <LoanTab key={seedKey} deposit={seed.deposit} />}
-      </div>
-    </div>,
-    document.body,
+  return (
+    <Sheet open={open} onClose={close} title="계산기" size="sm">
+      <nav className="seg calc-seg" data-on={tab} aria-label="계산기 종류">
+        <span className="seg-ind" aria-hidden="true" />
+        <button type="button" className={tab === "convert" ? "on" : ""} aria-pressed={tab === "convert"} onClick={() => setTab("convert")}>상호전환</button>
+        <button type="button" className={tab === "loan" ? "on" : ""} aria-pressed={tab === "loan"} onClick={() => setTab("loan")}>대출이자</button>
+      </nav>
+      {tab === "convert"
+        ? <ConvertTab key={seedKey} deposit={seed.deposit} rent={seed.rent} sourceLabel={seed.sourceLabel} />
+        : <LoanTab key={seedKey} deposit={seed.deposit} />}
+    </Sheet>
   );
 }

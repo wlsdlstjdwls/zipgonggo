@@ -3,14 +3,14 @@
 // 목록 화면 필터 — 넓은 화면은 왼쪽 고정 레일, 좁은 화면은 바텀시트(사용자 요청 2026-09-09).
 // 헤더 아래 전폭 바(ScopeBar)와 칩이 늘어난 필터 행을 대신한다. 상세 화면의 오른쪽 스티키 패널과 같은 골격이다.
 // 값은 URL이 아니라 ListStateProvider가 들고 있고, 수량(facets)은 지금 걸린 다른 필터를 반영한 값이다.
-// 레일과 시트는 같은 본문(RailBody)을 두 번 그린다 — 어느 쪽이 보일지는 CSS가 정하므로
-// 화면 폭을 자바스크립트로 재지 않는다(서버 렌더와 어긋나지 않는다).
-import { createPortal } from "react-dom";
-import { useCallback, useEffect, useState } from "react";
+// 레일과 시트는 같은 본문(RailBody)을 두 번 그린다 — 어느 쪽이 보일지는 CSS가 정한다(서버 렌더와 어긋나지 않는다).
+// 시트 자체는 공용 Sheet(components/sheet.tsx) — 끌어 내려 닫기·스크림·배경 잠금·ESC를 거기서 맡는다.
+import { useCallback, useState } from "react";
 import { AREA_MIN_COUNT } from "@/lib/constants";
 import { hasFilter } from "@/lib/notice-filters";
 import { NOTICE_VIEWS, SECTORS, type NoticeView, type Sector } from "@/types/notice";
 import { IconCard, IconCompact, IconList } from "./icons";
+import { Sheet } from "./sheet";
 import { useListState } from "./list-state";
 import { Select } from "./select";
 
@@ -116,20 +116,9 @@ function RailBody() {
 export function FilterRail() {
   const { f, facets, reset } = useListState();
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
+  // 시트가 스스로 퇴장 애니메이션을 끝낸 뒤 이 콜백을 부른다. 배경 스크롤 잠금과 ESC도 시트가 맡는다
   const close = useCallback(() => setOpen(false), []);
-
-  // 시트가 열린 동안은 뒤 목록이 따라 스크롤되지 않게 잠근다. Esc로도 닫는다.
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("keydown", onKey);
-    return () => { document.body.style.overflow = prev; document.removeEventListener("keydown", onKey); };
-  }, [open]);
 
   // 시트 버튼에 붙는 배지 — 지금 몇 개가 걸려 있나. 정렬은 조건이 아니라 세지 않는다
   const active = [f.sector, f.sido, f.type, f.closing, f.closed].filter(Boolean).length;
@@ -155,26 +144,19 @@ export function FilterRail() {
         <span className="fsheet-sum">{summary}</span>
       </div>
 
-      {mounted && open && createPortal(
-        <div className="sheet-wrap" role="dialog" aria-modal="true" aria-label="목록 필터">
-          <button type="button" className="sheet-scrim" aria-label="필터 닫기" onClick={close} />
-          <div className="sheet">
-            <div className="sheet-h">
-              <span className="sheet-grip" aria-hidden="true" />
-              <b>필터</b>
-              <button type="button" className="sheet-x" onClick={close} aria-label="닫기">✕</button>
-            </div>
-            <div className="sheet-b">
-              <RailBody />
-            </div>
-            <div className="sheet-f">
-              <button type="button" className="btn lg" onClick={reset} disabled={!on}>초기화</button>
-              <button type="button" className="btn ink lg" onClick={close}>{shown}건 보기</button>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
+      <Sheet
+        open={open}
+        onClose={close}
+        title="필터"
+        footer={
+          <>
+            <button type="button" className="btn lg" onClick={reset} disabled={!on}>초기화</button>
+            <button type="button" className="btn ink lg" onClick={close}>{shown}건 보기</button>
+          </>
+        }
+      >
+        <RailBody />
+      </Sheet>
     </>
   );
 }

@@ -7,6 +7,46 @@
 
 ---
 
+## 지금 상태 (2026-09-15, 50차 세션)
+
+**바텀시트와 팝업을 fitin-app(`C:/Users/cware/project/fitin-app`)과 같은 물건으로 갈았다** (사용자 요청).
+거기 `common_bottom_sheet` · `common_confirm_dialog`의 동작·수치·조판을 그대로 옮겼다.
+
+### 새로 생긴 것 둘
+
+- **`web/src/lib/overlay.ts`** — ESC 스택 · 배경 스크롤 잠금 · 큐빅 베지어 트윈 · `useMedia`.
+  fitin은 `motion/react`로 애니메이션하지만 web의 의존성은 `next`·`react`·`pg` 셋뿐이라 **rAF로 같은 곡선을 직접 돈다**
+  (사진 뷰어가 이미 쓰던 방침). CSS transition으로는 못 한다 — 끌기 중에는 transition이 없어야 손을 따라오고,
+  스크림 투명도는 끈 거리에 맞춰 같은 프레임에 같이 옅어져야 한다.
+- **`web/src/components/sheet.tsx`** — 공용 `<Sheet>`. 768px 미만은 아래에서 올라오는 시트, 이상은 가운데 뜨는 창.
+
+### 옮겨온 수치 (fitin 상수 그대로)
+
+진입 360ms `cubic-bezier(.32,.72,0,1)` · 퇴장 220ms `(.4,0,1,1)` · 제자리 복귀 250ms `(.25,.46,.45,.94)` ·
+창(넓은 화면) 진입·퇴장 180ms · 닫기 문턱 **100px 또는 500px/s** · 스크림은 화면 높이 **60%** 지점에서 완전 투명 ·
+ghost click 차단 **400ms** · 상호작용 허용 **500ms**.
+
+### 갈아 끼운 자리 셋
+
+1. `filter-rail.tsx` — 손으로 짠 시트를 `<Sheet>`로. 스크롤 잠금·ESC·포털을 컴포넌트가 가져갔다.
+2. `calc-dock.tsx` — 헤더 밑에 떠 있던 **스크림 없는 패널**을 `<Sheet size="sm">`으로. 좁은 화면에선 시트, 넓은 화면에선
+   블러 스크림 위 가운데 창이 된다. `.calc`·`.calc-panel`·`.calc-head`·`.calc-x` CSS는 지웠다(내용 조판만 남았다).
+3. `photo-viewer.tsx` — 제 keydown으로 ESC를 받던 것을 **공용 스택**으로, body overflow 잠금을 `useScrollLock`으로.
+
+셀렉트 목록(`.selmenu`)의 진입도 fitin 팝업과 같은 곡선으로 바꿨다 — 옛 `mo-pop`은 1→1.16→0.97로 튀어올랐다.
+
+### 함정 — 좁은 화면 확인은 창 크기로 못 한다
+
+`resize_window`는 성공을 보고하지만 **최대화된 크롬 창에는 안 먹는다**(실측). 뷰포트가 그대로 1400px이라
+시트 모드가 아예 안 뜬다. `DESKTOP_QUERY`를 `(min-width: 4000px)`로 잠깐 뒤집어 확인하고 되돌렸다.
+확인한 것: 시트 진입 · 손잡이 끌어 내려 닫기 · ghost click 차단(연 직후 스크림 클릭은 무시) · 400ms 뒤 스크림 클릭 닫기 ·
+ESC · 닫은 뒤 여는 버튼으로 초점 복귀 · 사진 뷰어 닫고 스크롤 자리 유지.
+
+**합성 드래그로는 제자리 복귀(snap back)를 못 본다** — `left_click_drag`는 한 프레임에 끝나 속도가 무한대로 잡혀
+거리가 짧아도 닫기로 판정된다. 실제 손가락은 그렇지 않다.
+
+---
+
 ## 지금 상태 (2026-09-15, 49차 세션)
 
 **검색 오픈(구글·네이버) 전 SEO 점검과 조치.** 프로덕션(zipgonggo.com) HTML을 직접 받아 대조했다.
