@@ -23,6 +23,15 @@ const SH: AgencyLabels = {
   originalDoc: "SH 원문 공고문",
 };
 
+// 서울시 청년안심주택 게시판(민간임대). source_url은 게시글, portal_url은 임대사업자의 청약 신청 페이지
+const SEOUL_YOUTH: AgencyLabels = {
+  original: "서울시 청년안심주택 공고와 첨부 보기 ↗",
+  originalListItem: "서울시 청년안심주택 게시글 (공고문 첨부 포함)",
+  portal: "사업자 청약 신청 페이지 ↗",
+  portalListItem: "임대사업자 청약 신청 페이지",
+  originalDoc: "청년안심주택 원문 공고문",
+};
+
 const DEFAULT: AgencyLabels = {
   original: "기관 원문 공고 보기 ↗",
   originalListItem: "기관 원문 공고",
@@ -32,5 +41,7 @@ const DEFAULT: AgencyLabels = {
 };
 
 export function agencyLabels(n: Pick<NoticeListItem, "agency">): AgencyLabels {
-  return n.agency === "SH" ? SH : DEFAULT;
+  if (n.agency === "SH") return SH;
+  if (n.agency === "서울시") return SEOUL_YOUTH;
+  return DEFAULT;
 }

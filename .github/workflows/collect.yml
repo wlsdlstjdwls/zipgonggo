@@ -73,6 +73,15 @@ jobs:
           echo "slugs=$(jq -c '.new_slugs' stats.json)" >> "$GITHUB_OUTPUT"
           echo "count=$(jq '.new_slugs | length' stats.json)" >> "$GITHUB_OUTPUT"
 
+      # 민간임대 축. 목록 JSON에 본문이 실려 와 1쪽(10건, 요청 1회)이면 하루치 새 글을 다 본다.
+      # 첨부 파서가 없어 상세(ingest) 잡에는 넘기지 않는다 — stats.json의 slugs와 섞지 않는다
+      - name: S1 서울시 청년안심주택 게시판
+        if: always()
+        run: |
+          set -o pipefail
+          python -m zipgonggo_pipeline.stages.s1_youth --max-pages 1 > youth.json
+          cat youth.json
+
       - name: 요약
         if: always()
         run: |
@@ -85,6 +94,12 @@ jobs:
                 && jq -r '"- 오류\n```\n" + (.errors | join("\n")) + "\n```"' stats.json || true
             else
               echo "- 목록 수집이 실패했다"
+            fi
+            if [ -f youth.json ]; then
+              echo "- 청년안심주택(민간임대) — 신규 **$(jq '.new_slugs | length' youth.json)건** / 갱신 $(jq '.updated' youth.json)건"
+              jq -r '.new_slugs[] | "  - `\(.)`"' youth.json
+            else
+              echo "- 청년안심주택 목록 수집이 실패했다"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 

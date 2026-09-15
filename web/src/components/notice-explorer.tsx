@@ -108,7 +108,7 @@ export function NoticeExplorer({ initial, title }: Props) {
         {head}
         <EmptyState
           lead={f.sector === "민간임대"
-            ? "민간임대는 청년안심주택 등 수집을 준비 중입니다. 지역이나 유형을 넓혀 보세요."
+            ? "조건에 맞는 민간임대 공고가 없습니다. 민간임대는 서울시 청년안심주택 공고만 모으고 있습니다. 지역이나 유형을 넓혀 보세요."
             : "지역이나 유형을 넓히거나, 마감 임박 필터를 풀어 보세요."}
           onReset={reset}
         />

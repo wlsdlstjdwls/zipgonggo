@@ -45,6 +45,14 @@
   - 청약유형 → enum: 국민공공임대주택→국민임대, 장기전세주택→장기전세, 도시형생활주택·두레주택·수요자맞춤형→매입임대, 재개발임대주택→재개발임대, 청년안심주택→청년안심주택, 희망하우징→공공기숙사. 상가임대·용지분양·장기안심주택은 적재 안 함
   - status: 모집마감→접수마감, 제목 `[수정]`→정정공고중, 모집중→접수중
   - `source_key = ish:{i-sh seq}`, slug `sh-{연도}-{seq}-{유형}`
+- **청년안심주택(민간임대) 경로 ✅ (2026-09-15)**: 서울시 게시판 목록 JSON에 본문이 실려 온다. `sources/youth.py` + `stages/s1_youth.py`
+  ```
+  python -m zipgonggo_pipeline.stages.s1_youth --max-pages 1   # 매시(collect.yml) · 10행 · 요청 1회
+  python -m zipgonggo_pipeline.stages.s1_youth                 # 전량 49쪽 486행 · 요청 49회 · 적재 22분
+  ```
+  - 본문 라벨 앵커로 단지명·주소·공급호수·사업주체·청약 기간과 시각·청약 페이지·전화를 읽는다. 「[공공임대]」 글은 SH 원본이 따로 있어 건너뛴다
+  - `source = youth_scrape`, `agency = 서울시`, `housing_type = 공공지원민간임대`(→ `sector = 민간임대`), `source_key = youth:{boardId}`, slug `youth-{연도}-{boardId}-mingan`
+  - 단지 1줄을 `notice_complex`에 넣는다(S6 좌표 대상). 첨부 PDF(호실별 임대조건)는 아직 안 읽는다 → 보증금·임대료 비어 있음
 - **GH**: 미구현. 경기주택도시공사 사이트 실사 필요
 
 ### S2 — 상태·마감 추적
