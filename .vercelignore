@@ -1,0 +1,16 @@
+# 배포 업로드에서 뺀다. Root Directory가 web이라 빌드에 안 쓰이는 것들.
+# pipeline/data는 수 GB라 100MB 업로드 제한에 걸린다.
+pipeline/data
+pipeline/cache
+node_modules
+**/node_modules
+.next
+web/.next
+.venv
+venv
+__pycache__
+**/__pycache__
+.pytest_cache
+*.pyc
+.git
+design

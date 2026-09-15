@@ -68,9 +68,10 @@
 
 ### 다음에 할 일
 
-0. **배포** — 46차 커밋 넷과 오늘 것이 아직 프로덕션 전이다. `web/vercel.json`의 `git.deploymentEnabled.main: false`(2026-09-14 사용자 결정)라
-   푸시로는 안 나간다. **Deploy Hook을 때려야** 한다(`automation.md` 「배포」 절). Hook URL은 저장소에 없다. 확인 —
-   `curl -s https://zipgonggo.com/notice/youth-2026-6658-mingan | grep -o "내 조건에 맞는 주택형"`
+0. ~~**배포**~~ — **2026-09-15 끝냈다.** 46·47차 분 전부 프로덕션에 있다(`dpl_9kdq32XG…`, `zipgonggo.com` alias).
+   배포 경로가 바뀌었다 — 저장소 루트에 `.vercelignore`를 두어 `pipeline/data`(3.3GB)를 뺀다.
+   이제 **`npx vercel deploy --prod --yes`를 저장소 루트에서 치면 된다**(Deploy Hook URL 없이도).
+   실측 — `curl -s https://zipgonggo.com/notice/youth-2026-6658-mingan | grep -c "내 조건에 맞는 주택형"` → 1
 1. **계층 「전체」 41줄** — 공고문 표에 계층이 안 적힌 줄. 본문(`raw.labels`)이나 공고 제목에서 끌어올 여지를 본다.
    이게 풀리면 위 「구분 미확인」도 같이 줄어든다.
 2. **적재 속도** — 건당 Neon 왕복 12회. 매시 20건엔 문제 없어 미뤄 둔다.
@@ -664,8 +665,9 @@ CRON_TRIGGER_SECRET && npx wrangler deploy` 한 번이면 붙는다(시크릿은
 
 **배포에 함정 둘.** ① Vercel env는 **빌드 시점에 박힌다** — 넣은 뒤 재배포해야 붙는다
 (`vercel redeploy <URL>`이면 업로드 없이 된다). 이걸 안 해서 501이 계속 나왔다.
-② `vercel deploy`를 CLI로 직접 돌리면 안 된다 — Root Directory가 `web`이라 저장소 루트에서 올려야 하는데
-`pipeline/data/` 1.8GB가 딸려 가 100MB 제한에 걸린다. **배포는 git push(Git 연동)로 한다.**
+② (2026-09-15 해결) CLI 배포가 막혔던 건 Root Directory가 `web`이라 저장소 루트에서 올리는데
+`pipeline/data/`(지금 3.3GB)가 딸려 가 100MB 제한에 걸려서였다. 루트 `.vercelignore`로 빼 뒀다 —
+이제 **`npx vercel deploy --prod --yes`**가 돌아간다(Hook URL 없는 세션은 이 길로).
 ③ **푸시 자동 배포는 꺼져 있다(2026-09-14)** — `web/vercel.json` `git.deploymentEnabled.main: false`.
 푸시해도 빌드 안 돈다. 배포는 Vercel 대시보드 Settings → Git → Deploy Hooks(`main`)의 URL에
 `curl -X POST`, 또는 Deployments → Redeploy. 「커밋·푸시했으니 배포됐겠지」는 이제 틀린 가정이다 —
