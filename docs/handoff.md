@@ -7,6 +7,63 @@
 
 ---
 
+## 지금 상태 (2026-09-15, 48차 세션)
+
+**민간임대 단지에 사진과 평면도가 붙었다.** 「민간임대 공고를 보면 이미지가 없다」는 사용자 지적에서 시작했다.
+
+### 왜 없었나 — 두 겹
+
+1. 이미지 소스가 SH주택정보 **하나뿐**이었다. 민간 단지는 거기 없어 `sh_bizns_cd`가 NULL이고 질의가 빈 배열을 돌렸다.
+2. 화면 문구도 틀렸다 — 민간임대에 「준공 전 신규 공급 단지라 SH주택정보에 자료가 없다」고 적고 있었다.
+   민간은 준공 전이라 없는 게 아니라 **SH 소관이 아니라** 영원히 없다.
+
+### 공고문 PDF에서 도면을 뽑는 길은 없다 (전수 확인)
+
+첨부 452건을 전부 열었다. 그림이 한 장이라도 든 PDF 121, 평면도 크기(200×150pt 초과) 그림이 든 PDF **50**(대개 1장).
+그 50건을 까 보니 위치 약도(5646 33쪽)·시행사 로고·표를 통째로 앉힌 그림(5659 2·8쪽)·A4 스캔쪽(5671은 23쪽 전부, 텍스트 레이어 0)이다.
+**주택형 평면도를 실은 공고는 사실상 없다.** 래스터 추출은 파 봐야 나올 게 없다.
+
+### 대신 청년안심주택 포털 「주택찾기」 — SH주택정보의 민간판
+
+경로·함정은 [`data-sources.md` 2d](data-sources.md)와 `sources/youth_house.py` 머리글에 있다. 요약:
+
+| 만든 것 | 하는 일 |
+|---|---|
+| `db/migrations/0026_youth_house_image.sql` | `notice_complex.youth_home_code` + `youth_house_image`(0023과 같은 모양) |
+| `pipeline/src/.../sources/youth_house.py` | 목록 JSON(96곳, 요청 1회)·상세 HTML 이미지 파서 |
+| `pipeline/scripts/collect_youth_house_assets.py` | `houses` → `match [--write]` → `fetch [--only]` → `load` |
+| `pipeline/tests/test_youth_house.py` | 픽스처는 맹그로브창천 상세 원본. 함정 셋을 회귀로 묶었다 |
+| `web/scripts/upload-house-images.mjs` | 옛 `upload-sh-house.mjs`를 출처 인자 받게 합침 (`sh` \| `youth`) |
+
+**결과: 단지 행 465 중 445에 코드가 붙었다(고유 90곳 / 포털 96곳). 이미지 710장 — 평면도 431 · 전경 90 · 편의시설 182 · 투시도 7.**
+못 붙인 20개는 모집이 끝나 포털에서 내려간 옛 단지다. 평면도가 없는 단지는 1곳(상봉역 상봉생활), 그림 0장은 없다.
+
+### 함정 넷 (전부 주석·테스트에 박아 뒀다)
+
+1. **목록 렌더링 스크립트 안에 가짜 `<img>` 템플릿이 있다** (`src='…fileId+ "&fileSn='`). 그냥 긁으면 전 단지에 액박.
+2. **Content-Type을 믿을 수 없다.** 같은 PNG를 `image/png`로도 `application/octet-stream`으로도 준다.
+   타입으로 거르면 편의시설 사진이 통째로 날아간다 — 머리 바이트로 가른다.
+3. **한 파일을 fileSn 1·2로 두 번 준다**(맹그로브창천). 그대로 실으면 같은 그림이 「전경」과 「투시도」로 두 번 뜬다.
+   `fetch`가 (파일명, 바이트)로 거르고 `load`가 묵은 행을 지운다.
+4. **편의시설 캡션은 HTML에서 사진과 1:1로 안 붙는다**(석조 격자라 순서가 어긋난다). 대신 **파일명이 캡션이다**
+   (`커뮤니티라운지.png`·`무인세탁실.png`). `_label_from_file`이 그걸 쓴다.
+
+### 배포에도 켰다 (사용자 결정)
+
+평면도 그림이 시행사 홈페이지 캡처인 단지가 있다는 걸 알린 뒤 **PoC로 켜기로 했다.**
+
+- Blob 스토어에 `youth/{homeCode}/{file_name}`로 올린다(SH는 예전부터 최상단을 쓰고 있어 경로를 안 건드렸다).
+- `NEXT_PUBLIC_YOUTH_HOUSE_BASE=https://7rk03a9qvljtxnq3.public.blob.vercel-storage.com/youth` — production·preview env.
+- 내리려면 그 값을 지우고 **재배포**한다. `NEXT_PUBLIC_*`은 빌드 때 박혀서 값만 지워선 안 내려간다.
+
+### 곁가지 — dev 서버가 물렸던 건
+
+공고상세만 500이 나고 코드는 git clean이었다. 500 본문에 `Jest worker encountered 2 child process exceptions,
+exceeding retry limit` — Next dev의 렌더 워커가 반복해 죽은 것이다. **재시작으로 끝났다.** 증상 정리는 메모리
+`dev-restart-after-migration`에 세 번째 사례로 붙였다.
+
+---
+
 ## 지금 상태 (2026-09-15, 47차 세션)
 
 46차가 남긴 1번(「내 조건에 맞는 단지」 민간임대)을 했다. **민간임대 467건 중 공급현황이 있는 432건에 「내 조건에 맞는 주택형」이 붙었다.**
