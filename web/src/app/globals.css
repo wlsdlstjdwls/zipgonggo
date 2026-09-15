@@ -1223,8 +1223,19 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .fit-list h3 b { color: var(--acc); }
 .fit-list h3 small { font-weight: 700; font-size: 11px; color: var(--dim); }
 .fit-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.fit-rows a { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main tag" "sub tag" "prior tag"; column-gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-btn); transition: transform 240ms var(--sp), border-color 200ms var(--ease); }
+.fit-rows a, .fit-rows .fit-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main tag" "sub tag" "prior tag"; column-gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-btn); transition: transform 240ms var(--sp), border-color 200ms var(--ease); }
 .fit-rows a:hover { transform: translateY(-1.5px); border-color: var(--acc); }
+/* 민간임대 주택형 줄은 갈 곳이 없어 링크가 아니다(단지가 하나뿐이라 이 공고가 곧 그 단지다) */
+.fit-rows .fit-row.can { border-color: var(--acc); background: var(--acc-soft); }
+.fit-rows .fit-row:not(.can) { opacity: 0.72; }
+/* 특별공급 | 일반공급 두 갈래를 나란히 — 한쪽에서 떨어져도 다른 쪽은 열려 있다 */
+.mg-tracks { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.mg-track { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-btn); background: var(--sub); }
+.mg-track.ok { border-color: rgba(21, 128, 61, 0.3); background: #fbfefc; }
+.mg-track > b { font-weight: 900; font-size: 13.5px; }
+.mg-track > em { margin-left: 6px; font-style: normal; font-weight: 700; font-size: 12px; color: var(--mut); }
+.mg-track.ok > em { color: var(--acc); }
+.mg-track .elig-why { margin-top: 6px; }
 .fit-row-main { grid-area: main; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .fit-row-main b { font-weight: 800; font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fit-row-main small { flex: none; font-weight: 600; font-size: 11px; color: var(--dim); }

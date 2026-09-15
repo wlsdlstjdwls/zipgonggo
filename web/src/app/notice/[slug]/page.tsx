@@ -10,12 +10,14 @@ import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
 import { NoticeEligibilitySection } from "@/components/notice-eligibility";
 import { NoticeFit } from "@/components/notice-fit";
+import { NoticeFitMingan } from "@/components/notice-fit-mingan";
 import { SaveButton } from "@/components/save-button";
 import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { agencyLabels } from "@/lib/agency";
 import { HOUSEHOLD_MAX, ruleLines } from "@/lib/eligibility";
 import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, NO_DATE, num, won, wonKo, wonShort } from "@/lib/format";
+import { MINGAN_INCOME_PCTS, minganRuleCards } from "@/lib/mingan-fit";
 import { moveInLabel } from "@/lib/notice-view";
 import {
   getAmendChain, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition,
@@ -86,10 +88,21 @@ export default async function NoticePage({ params }: Params) {
   // 갈려 시드 한 줄로는 거짓말이었다(사용자 지적 2026-09-14). 없는 공고만 아래 제도 일반 기준(supply_type)으로 후퇴한다.
   // supply_type.housing_type이 notice.housing_type과 잇는 고리(0020). 유형마다 조건 종류가 달라
   // null인 항목은 그 유형에서 안 보는 기준이라 화면에서도 뺀다.
-  const eligTypes = noticeElig ? [] : eligRules.types.filter((t) => t.housing_type === n.housing_type);
+  // 민간임대(청년안심주택)는 사업자마다 조판이 달라 공고문 자격 묶음을 못 읽는다. 자격은 단지가 달라도 같은 제도 고정 규칙이라
+  // 시드 카드(ppmh_*, 일반공급을 「자산·자동차 기준 없음」으로 적는다) 대신 공고문에서 확인한 규칙을 직접 그린다(lib/mingan-fit.ts)
+  const isMingan = !noticeElig && n.housing_type === "공공지원민간임대";
+  const eligTypes = noticeElig || isMingan ? [] : eligRules.types.filter((t) => t.housing_type === n.housing_type);
+  const minganCards = isMingan ? minganRuleCards(eligRules.types) : [];
+  // 공급현황 표를 못 읽은 공고(첨부가 안내문이거나 CID 폰트)는 고를 주택형이 없어 「내 조건」을 띄우지 않는다
+  const minganFit = isMingan && supply.length > 0;
+  const ruleCards = minganCards.length
+    ? minganCards.map((c) => ({ key: c.title, title: c.title, sub: c.sub, right: null as string | null, lines: c.lines, note: null as string | null }))
+    : eligTypes.map((t) => ({ key: t.code, title: t.category, sub: t.name, right: t.ranking_method, lines: ruleLines(t), note: t.note }));
   const noticeYear = n.posted_at ? new Date(n.posted_at).getFullYear() : null;
   // 신청자격에 실제로 쓰인 %만 열로 추린다 — 8종 전부 보여주면 모바일에서 표가 너무 넓어진다
-  const incomePcts = [...new Set(eligTypes.map((t) => t.income_pct).filter((p): p is number => p !== null))].sort((a, b) => a - b);
+  const incomePcts = minganCards.length
+    ? [...MINGAN_INCOME_PCTS]
+    : [...new Set(eligTypes.map((t) => t.income_pct).filter((p): p is number => p !== null))].sort((a, b) => a - b);
   const incomeRows = incomePcts.length
     ? Array.from({ length: HOUSEHOLD_MAX }, (_, i) => i + 1).map((h) => ({
         household: h,
@@ -207,8 +220,8 @@ export default async function NoticePage({ params }: Params) {
           <nav className="d-nav" aria-label="이 페이지 차례">
             {complexes.length > 0 && <a href="#complexes">단지 {num(complexes.length, "곳")}</a>}
             <a href="#schedule">일정</a>
-            {noticeElig && <a href="#fit">내 조건</a>}
-            {(noticeElig || eligTypes.length > 0) && <a href="#eligibility">신청자격</a>}
+            {(noticeElig || minganFit) && <a href="#fit">내 조건</a>}
+            {(noticeElig || ruleCards.length > 0) && <a href="#eligibility">신청자격</a>}
             {showAreaTable && areas.length > 0 && <a href="#areas">지역별 호수</a>}
             <a href="#info">공고 정보</a>
           </nav>
@@ -280,43 +293,62 @@ export default async function NoticePage({ params }: Params) {
             </section>
           )}
 
+          {minganFit && (
+            <section className="dsec lead" id="fit">
+              <h2>내 조건에 맞는 주택형</h2>
+              <p className="note" style={{ margin: "0 0 12px" }}>
+                청년안심주택 민간임대의 소득과 자산, 순위 기준에 내 조건을 대 보고 넣을 수 있는 주택형을 추립니다. 값은 어디로도 보내지 않습니다.
+              </p>
+              <NoticeFitMingan
+                supply={supply} types={eligRules.types} income={eligRules.income} tiers={eligRules.tiers}
+                complexGu={complexes[0]?.sigungu ?? n.sigungu ?? null} incomeYear={eligRules.incomeYear} noticeYear={noticeYear}
+              />
+            </section>
+          )}
+
           {noticeElig && (
             <NoticeEligibilitySection elig={noticeElig} incomeYear={eligRules.incomeYear} noticeYear={noticeYear} originalDoc={L.originalDoc} />
           )}
 
-          {eligTypes.length > 0 && (
+          {ruleCards.length > 0 && (
             <section className="dsec" id="eligibility">
-              <h2>신청자격 <small className="dsec-src">{n.housing_type} 제도 일반 기준</small></h2>
+              <h2>신청자격 <small className="dsec-src">{minganCards.length ? "청년안심주택 민간임대 제도 기준" : `${n.housing_type} 제도 일반 기준`}</small></h2>
               <p className="ne-sum">
-                유형 {eligTypes.length}개. 이 공고가 실제로 모집하는 유형과 세부 조건은 {L.originalDoc} 기준.{" "}
+                {minganCards.length
+                  ? <>특별공급과 일반공급으로 나뉩니다. 이 공고가 실제로 모집하는 계층과 세부 조건은 {L.originalDoc} 기준.</>
+                  : <>유형 {eligTypes.length}개. 이 공고가 실제로 모집하는 유형과 세부 조건은 {L.originalDoc} 기준.</>}{" "}
                 <Link href={ROUTES.eligibility}>내 조건으로 진단하기 →</Link>
               </p>
               {/* 표(가로 스크롤)는 좁은 화면에서 유형 열이 밀려나 안 보인다는 지적(2026-09-09) — 자가진단
                   카드(elig-card/elig-why)와 같은 모양으로 유형 하나당 카드 하나씩 쌓는다 */}
               <ul className="elig-list">
-                {eligTypes.map((t) => (
-                  <li key={t.code} className="elig-card">
+                {ruleCards.map((c) => (
+                  <li key={c.key} className="elig-card">
                     <div className="elig-card-h">
-                      <b>{t.category}</b>
-                      <span>{t.name}</span>
-                      {t.ranking_method && <span className="elig-card-r"><small>{t.ranking_method}</small></span>}
+                      <b>{c.title}</b>
+                      <span>{c.sub}</span>
+                      {c.right && <span className="elig-card-r"><small>{c.right}</small></span>}
                     </div>
                     <ul className="elig-why">
-                      {ruleLines(t).map((l) => (
+                      {c.lines.map((l) => (
                         <li key={l.label}><span>{l.label}</span><p>{l.text}</p></li>
                       ))}
                     </ul>
-                    {t.note && <p className="elig-memo">{t.note}</p>}
+                    {c.note && <p className="elig-memo">{c.note}</p>}
                   </li>
                 ))}
               </ul>
 
               {incomeRows.length > 0 && (
                 <details className="ne-fold">
-                  {/* 공고는 통계청 발표 전년도 소득을 쓴다 — 「2025년」만 쓰면 옛 값처럼 읽힌다(사용자 지적 2026-09-14) */}
+                  {/* 공고는 통계청 발표 전년도 소득을 쓴다 — 「2025년」만 쓰면 옛 값처럼 읽힌다(사용자 지적 2026-09-14).
+                      시드보다 오래된 공고에 「이 공고에 적용」이라 적으면 거짓말이다(당시엔 다른 표를 썼다) */}
                   <summary>
                     <b>가구원수별 월평균소득 기준</b>
-                    <small>{eligRules.incomeYear}년 소득 통계 기준{noticeYear ? `, ${noticeYear}년 공고에 적용` : ""}</small>
+                    <small>
+                      {eligRules.incomeYear}년 소득 통계 기준
+                      {noticeYear ? (noticeYear > eligRules.incomeYear ? `, ${noticeYear}년 공고에 적용` : `, 지금 기준이라 ${noticeYear}년 공고 당시와 다릅니다`) : ""}
+                    </small>
                   </summary>
                   <div className="tbl ne-fold-body">
                     <table>

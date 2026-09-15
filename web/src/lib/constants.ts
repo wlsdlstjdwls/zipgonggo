@@ -12,6 +12,8 @@ export const SAVED_STORAGE_KEY = "zipgonggo.saved.v1";
 // 「내 조건에 맞는 단지」 입력값 localStorage 키. 공고를 오가도 내 조건은 그대로다(사용자 요청 2026-09-14) —
 // 공고마다 다른 항목(공급 구분·면적·계층·신청유형)은 읽을 때 그 공고에 있는 값인지 확인해 없으면 기본값으로 돌린다
 export const FIT_STORAGE_KEY = "zipgonggo.fit.v1";
+// 민간임대(청년안심주택) 공고의 「내 조건」 입력값. 묻는 항목이 공공 공고와 달라 키를 따로 둔다
+export const FIT_MINGAN_STORAGE_KEY = "zipgonggo.fit-mingan.v1";
 export const TOAST_MS = 2100;
 
 // ISR·unstable_cache 갱신 주기. 파이프라인이 DB를 갱신해도 이 시간 안엔 반영된다

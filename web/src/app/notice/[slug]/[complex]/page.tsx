@@ -20,6 +20,7 @@ import { ExternalLink } from "@/components/external-link";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
 import { NoticeFit } from "@/components/notice-fit";
+import { NoticeFitMingan } from "@/components/notice-fit-mingan";
 import { ConvertTable } from "@/components/convert-table";
 import { Pending } from "@/components/pending";
 import { PriceTable } from "@/components/price-table";
@@ -90,12 +91,15 @@ export default async function ComplexPage({ params }: Params) {
   const f = await load(params);
   if (!f) notFound();
   const { n, c, siblings } = f;
-  const [supply, units, images, noticeElig] = await Promise.all([
+  // 민간임대(청년안심주택)는 공고문 자격 묶음이 없고 제도 고정 규칙으로 판정한다(lib/mingan-fit.ts) — 시드 규칙만 있으면 된다
+  const isMingan = n.housing_type === "공공지원민간임대";
+  const [supply, units, images, noticeElig, minganRules] = await Promise.all([
     getComplexSupply(n.id, c.id, c.name),
     getComplexUnits(c.id),
     // 파일 자리가 안 정해진 배포에서는 질의도 하지 않는다 — 행만 있으면 액박이 된다(lib/complex-images 머리글)
     imagesEnabled ? getComplexImages(c.sh_bizns_cd) : Promise.resolve([]),
     getNoticeEligibility(n.id),
+    isMingan ? getEligibilityRules() : Promise.resolve(null),
   ]);
   // 「내 조건에 맞는 단지」를 단지 상세에도(사용자 요청 2026-09-14) — 공고 상세와 같은 자격 묶음·공급현황으로 판정하고
   // 이 단지가 드는지 먼저 말한다. 자격 묶음이 있는 공고만 질의한다
@@ -340,6 +344,20 @@ export default async function ComplexPage({ params }: Params) {
             <section className="dsec">
               <h2>{unitLabel} | {num(units.length, "호")}</h2>
               <UnitTable units={units} />
+            </section>
+          )}
+
+          {minganRules && !noticeElig && supply.length > 0 && (
+            <section className="dsec lead" id="fit">
+              <h2>내 조건에 맞는 주택형</h2>
+              <p className="note" style={{ margin: "0 0 12px" }}>
+                청년안심주택 민간임대의 소득과 자산, 순위 기준에 내 조건을 대 보고 넣을 수 있는 주택형을 추립니다. 값은 어디로도 보내지 않습니다.
+              </p>
+              <NoticeFitMingan
+                supply={supply} types={minganRules.types} income={minganRules.income} tiers={minganRules.tiers}
+                complexGu={c.sigungu ?? null} incomeYear={minganRules.incomeYear}
+                noticeYear={n.posted_at ? new Date(n.posted_at).getFullYear() : null}
+              />
             </section>
           )}
 
