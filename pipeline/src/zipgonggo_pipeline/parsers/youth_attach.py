@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import re
@@ -31,6 +32,9 @@ log = logging.getLogger(__name__)
 
 # 표 위에서 제목·단위를 찾는 띠 높이(pt). 「■ 임대보증금 및 월 임대료 / (1) 특별공급 / - 청년(40세대) / (단위 : 만원)」 네 줄이 든다
 CONTEXT_HEIGHT = 130
+
+# 깨진 PDF를 다시 적을 때 쓰는 줄바꿈
+CRLF = b"\r\n"
 
 _WS = re.compile(r"\s+")
 _UNIT = re.compile(r"단\s*위\s*[:：]?\s*(원|만\s*원|천\s*원)")
@@ -48,10 +52,12 @@ _RENT_RANGE = (10_000, 20_000_000)
 _PAREN = re.compile(r"[(（]([^)）]*)[)）]")
 _NUM_CELL = re.compile(r"^[\d,.\s]+$")
 _SUBTOTAL = re.compile(r"^(소\s*계|합\s*계|계|총\s*계)$")
+_DASH = re.compile(r"[-－—\s]+")
 _TENANT_JOIN = re.compile(r"\s*(?:or|또는|및|/|·|,|&|과|와)\s*")
 # 유형 칸의 「특별」「일반」 — 「청년⏎특별」처럼 「공급」 없이 줄만 바꿔 적기도 한다
 _KIND_ANY = re.compile(r"(특별|일반)\s*(?:공급)?")
 _MONEY_DOT = re.compile(r"^\d{1,3}(?:\.\d{3})+$")
+_CURRENCY = re.compile(r"[₩￦\\Ww]|원$")
 
 
 # ---------------------------------------------------------------- PDF → 표
@@ -69,11 +75,33 @@ class RawTable:
         return asdict(self)
 
 
-def tables_from_pdf(path: str | Path) -> list[RawTable]:
+def _open_pdf(path: str | Path):
+    """PDF 하나를 연다. 마지막 증분 갱신이 깨진 파일은 그 조각을 떼고 앞 판으로 연다.
+
+    실측(캐시 452건 중 16건, 전부 같은 사업자 편집기): 파일 끝 xref 스트림의 `/Length`가 실제 스트림보다 커서
+    pdfminer가 여는 순간 `Unexpected EOF`로 죽는다. 그 객체 바로 앞에서 자르고 `/Prev`가 가리키는 앞 판을
+    startxref로 다시 적으면 열린다 — 앞 판은 파일 안에 온전히 들어 있다(본문은 증분 갱신 전이나 후나 같다).
+    """
     import pdfplumber  # 무거워서 여기서만
 
+    try:
+        return pdfplumber.open(str(path))
+    except Exception as exc:  # noqa: BLE001
+        data = Path(path).read_bytes()
+        i = data.rfind(b"startxref")
+        tail = data[i + 9:].split() if i > 0 else []
+        off = int(tail[0]) if tail and tail[0].isdigit() else 0
+        m = re.search(rb"/Prev\s+(\d+)", data[off:off + 400]) if off else None
+        if not m:
+            raise
+        log.warning("%s: 마지막 증분 갱신이 깨져 앞 판으로 연다(%s)", Path(path).name, exc)
+        fixed = data[:off] + b"startxref" + CRLF + str(int(m.group(1))).encode() + CRLF + b"%%EOF" + CRLF
+        return pdfplumber.open(io.BytesIO(fixed))
+
+
+def tables_from_pdf(path: str | Path) -> list[RawTable]:
     out: list[RawTable] = []
-    with pdfplumber.open(str(path)) as pdf:
+    with _open_pdf(path) as pdf:
         for i, page in enumerate(pdf.pages, 1):
             w, h = page.width, page.height
             halves = [("a", page.crop((0, 0, w / 2, h))), ("b", page.crop((w / 2, 0, w, h)))] if w > h else [("", page)]
@@ -200,6 +228,10 @@ _AREA_WORDS = ("전용", "㎡", "m2", "m²", "타입", "TYPE", "Type", "주택�
 
 
 def _role(label: str, group: str) -> str:
+    # 「최대전환시 임대조건」 — 보증금을 더 낮추거나 올렸을 때의 값이라 공급 조건이 아니다(2019 공공임대 병기 양식).
+    # 읽으면 「(-)」 줄이 보증금 828만원짜리 공급 줄로 새어 나온다
+    if "전환" in group:
+        return "skip"
     if not label:
         # 머리가 빈 열 — 가로로 병합된 머리의 오른쪽 조각. 「주택형 | (빈칸)」이면 면적, 「공급유형 | (빈칸) | (빈칸)」이면
         # 유형 칸의 조각(「청년 | 일반공급 | 1701호」)이라 칸 내용으로 다시 가른다
@@ -212,12 +244,14 @@ def _role(label: str, group: str) -> str:
         return "skip"
     if "옵션" in label:
         return "option"
-    if "보증금" in label or label == "계":
-        return "deposit"
+    if "보증금" in label or (label == "계" and "보증금" in group):
+        return "deposit"     # 「계」는 묶음 머리가 보증금일 때만. 「신청자격별 공급호수 | 계」의 계는 호수다
     if any(k in label for k in _AREA_WORDS):
         return "area"        # 「주거전용(타입)호수」 — 호수보다 먼저. 「공급호수」엔 면적 낱말이 없다
     if "호수" in label or "세대수" in label:
         return "count"
+    if _SUBTOTAL.match(label) and any(k in group for k in ("호수", "세대")):
+        return "count"       # 「신청자격별 공급호수 | 계 | 특별 | 일반」의 계
     if "층" in label:
         return "floor"
     if "계약개시" in label or "입주" in label or "시작일" in label:
@@ -269,6 +303,8 @@ def _money(cell: str | None) -> Decimal | None:
     쉼표 뒤가 세 자리가 아닌데 되돌릴 수도 없는 칸(「69,000,00」)은 버린다 — 틀린 금액을 싣느니 비우는 게 낫다.
     """
     t = _norm(cell).replace(" ", "")
+    # 원 표시를 붙여 적은 칸 — 「\60,000,000」(￦가 역슬래시로 뽑힌다) 「60,000,000원」
+    t = _CURRENCY.sub("", t)
     if not t or t in ("-", "－", "미정", "—"):
         return None
     if _MONEY_DOT.match(t):          # 「9.880」 — 쉼표를 마침표로 잘못 친 칸
@@ -417,14 +453,16 @@ def _lines_from_table(t: RawTable, table_scale: int | None = None) -> list[Suppl
                     carry[c.idx] = v
                 elif c.idx in carry:
                     v = carry[c.idx]
-                if not v:
-                    continue
+                if not v or _DASH.fullmatch(v):
+                    continue          # 「-」는 그 자격에 배정이 없다는 뜻이지 계층 이름이 아니다(「대학생-」)
                 if _SUBTOTAL.match(_flat(v)):
                     class_text_parts.append(v)
                     continue
                 if re.fullmatch(r"\d{1,3}(?:\.\d{1,2})?", v):
-                    # 「공급유형(TYPE)」 열에 면적만 적은 2020년 양식
-                    area = Decimal(v)
+                    # 「공급유형(TYPE)」 열에 면적만 적은 2020년 양식. 면적 열을 이미 읽었으면 덮지 않는다 —
+                    # 옆의 공급호수 조각(「13」)이 면적으로 들어앉는다
+                    if area is None:
+                        area = Decimal(v)
                     continue
                 m = _ROOM.search(v)
                 if m and room is None:
@@ -501,6 +539,51 @@ def _lines_from_table(t: RawTable, table_scale: int | None = None) -> list[Suppl
             reserve_only=reserve and not count, room=room, floor=floor if floor else (_floor_of_room(room)),
             move_in=move_in, options=options, page=t.page,
         ))
+    return _fix_digit_typos(out)
+
+
+# 표 하나 안에서 「면적 × 비율」당 보증금이 중앙값의 몇 배 밖이면 원문 오타로 본다. 되돌린 값은 2배 안에 들어야 한다
+_TYPO_FAR = 5
+_TYPO_NEAR = 2
+
+
+def _fix_digit_typos(lines: list[SupplyLine]) -> list[SupplyLine]:
+    """한 표 안에서 보증금은 「면적 × 비율」에 거의 비례한다 — 0을 더 찍거나 뺀 칸을 여기서 잡는다.
+
+    실측: 길동역 길동생활(A동) 2025 「106000」(단위 만원 → 10.6억). 같은 표의 17㎡/33㎡/34㎡ 줄은 ㎡·비율당 값이 고른데
+    36.49㎡ 줄만 10배다. 한 줄 안에 비율 옵션이 하나뿐이라 `_drop_inconsistent`(줄 안 비교)로는 안 걸린다.
+
+    10배·100배로 되돌린 값이 중앙값의 2배 안에 드는 배율이 하나뿐일 때만 고치고, 아니면 그 옵션을 버린다.
+    견줄 줄이 3개 미만이면 손대지 않는다 — 중앙값을 믿을 수 없다.
+    """
+    norms = [(ln, o, Decimal(o.deposit) / (ln.area * (o.ratio or 100)))
+             for ln in lines if ln.area for o in ln.options if o.deposit is not None]
+    if len(norms) < 3:
+        return lines
+    mid = sorted(n for _, _, n in norms)[len(norms) // 2]
+    if mid <= 0:
+        return lines
+    fixed: dict[int, Option] = {}
+    for _, o, n in norms:
+        if mid / _TYPO_FAR <= n <= mid * _TYPO_FAR:
+            continue
+        fits = [f for f in (Decimal(10), Decimal("0.1"), Decimal(100), Decimal("0.01"))
+                if mid / _TYPO_NEAR <= n * f <= mid * _TYPO_NEAR]
+        if len(fits) == 1:
+            dep = int(Decimal(o.deposit) * fits[0])
+            log.warning("자릿수 오타를 되돌린다: %s %s원 → %s원", o.label, o.deposit, dep)
+            fixed[id(o)] = Option(label=o.label, ratio=o.ratio, deposit=dep, rent=o.rent)
+        else:
+            log.warning("표 안에서 비율·면적에 안 맞는 보증금을 버린다: %s %s원", o.label, o.deposit)
+            fixed[id(o)] = None
+    if not fixed:
+        return lines
+    out: list[SupplyLine] = []
+    for ln in lines:
+        opts = [fixed.get(id(o), o) for o in ln.options]
+        ln.options = [o for o in opts if o is not None]
+        if ln.options:
+            out.append(ln)
     return out
 
 

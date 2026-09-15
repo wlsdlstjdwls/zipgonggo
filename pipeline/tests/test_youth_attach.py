@@ -215,3 +215,30 @@ def test_subtotal_row_with_merged_class_cell():
     """2026 역삼역 더원역삼 — 「합 계」 줄에 금액이 있고 옆 칸이 세로 병합으로 계층을 물려받아 온다. 집계 줄은 세지 않는다."""
     ls = lines("2026_theone_add")
     assert len(ls) == 1 and ls[0].room == "1006" and ls[0].options[0].deposit == 123_000_000
+
+
+def test_digit_typo_fixed_from_neighbour_rows():
+    """2025 길동역 길동생활(A동) — 「106000」(만원, 10.6억). 같은 표의 17·32·34㎡ 줄과 견주면 ㎡·비율당 10배다.
+    한 줄에 비율 옵션이 하나뿐이라 줄 안 비교로는 안 걸린다 — 표 전체의 중앙값으로 되돌린다."""
+    ls = lines("2025_gildong_add")
+    assert [(x.type_code, x.options[0].label, x.options[0].deposit) for x in ls] == [
+        ("17A", "40%", 65_000_000), ("32A", "40%", 99_000_000), ("34A", "35%", 89_000_000), ("36A", "40%", 106_000_000),
+    ]
+
+
+def test_conversion_columns_and_count_total_column():
+    """2019 충정로역 어바니엘 — 공공임대 병기 양식. 「최대전환시 임대조건」은 공급 조건이 아니라 건너뛰고,
+    「신청자격별 공급호수 | 계」는 보증금이 아니라 호수다. 배정 없는 칸의 「-」는 계층 이름이 아니다."""
+    ls = lines("2019_urbaniel_public")
+    assert [(x.tenant_class, x.supply_type, x.count, x.options[0].deposit, x.options[0].rent) for x in ls] == [
+        ("대학생", "16", 13, 16_560_000, 70_000), ("청년", "17", 17, 19_120_000, 80_000),
+        ("신혼부부", "35", 9, 40_360_000, 160_000), ("신혼부부", "35", 10, 40_920_000, 160_000),
+    ]
+
+
+def test_won_sign_prefixed_amounts():
+    """2025 서울대입구역 BX201 — 금액 칸이 「\60,000,000」(￦가 역슬래시로 뽑힌다). 표는 있는데 금액을 통째로 버리던 양식."""
+    ls = lines("2025_bx201_add")
+    assert [(x.tenant_class, x.count, x.options[0].deposit, x.options[0].rent) for x in ls] == [
+        ("청년", 1, 60_000_000, 382_000), ("청년/신혼부부", 2, 100_000_000, 665_000),
+    ]
