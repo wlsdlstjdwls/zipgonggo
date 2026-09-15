@@ -77,7 +77,13 @@ export const SITEMAP_PRIORITY_CLOSED = 0.3;
 export const SITEMAP_MAX_URLS = 40_000;
 
 // 검색엔진 사이트 소유확인 코드. 구글 서치콘솔·네이버 서치어드바이저가 발급하는 문자열을
-// <meta>로 심어야 사이트맵 제출 화면이 열린다. HTML에 그대로 노출되는 값이라 비밀은 아니지만,
-// 발급처가 달라 env로 둔다. 비어 있으면 <meta> 자체를 안 그린다(빈 content는 확인이 실패한다).
-export const GOOGLE_SITE_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION ?? "";
-export const NAVER_SITE_VERIFICATION = process.env.NAVER_SITE_VERIFICATION ?? "";
+// <meta>로 심어야 사이트맵 제출 화면이 열린다.
+//
+// **값을 여기 그대로 적어 둔다 — 비밀이 아니다.** 어차피 모든 페이지 HTML에 평문으로 나가는 값이고,
+// env로만 두면 재배포 환경이 바뀔 때 조용히 빠져 소유확인이 풀린다(그러면 색인 요청도 같이 막힌다).
+// env가 있으면 env가 이긴다 — 속성을 새로 파거나 도메인을 옮길 때 배포만으로 갈아끼우는 길을 남겨 둔다.
+// 둘 다 비면 <meta> 자체를 안 그린다(빈 content는 「태그는 있는데 값이 다르다」로 확인이 실패한다).
+const GOOGLE_SITE_VERIFICATION_DEFAULT = "4YwNAZM8ctR9A74l-us2VDNj3-WGmoL7tz0bjQcj16Y";
+const NAVER_SITE_VERIFICATION_DEFAULT = "9caffcdfcc6a4c64e9b80c272295345edcf2d871";
+export const GOOGLE_SITE_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION || GOOGLE_SITE_VERIFICATION_DEFAULT;
+export const NAVER_SITE_VERIFICATION = process.env.NAVER_SITE_VERIFICATION || NAVER_SITE_VERIFICATION_DEFAULT;
