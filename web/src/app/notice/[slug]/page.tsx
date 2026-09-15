@@ -19,7 +19,7 @@ import { agencyLabels } from "@/lib/agency";
 import { AREA_MIN_COUNT } from "@/lib/constants";
 import { HOUSEHOLD_MAX, ruleLines } from "@/lib/eligibility";
 import { noticeGraph } from "@/lib/jsonld";
-import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, moneyOf, NO_DATE, num, won, wonKo, wonShort } from "@/lib/format";
+import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, isClosed, moneyOf, NO_DATE, num, won, wonKo, wonShort } from "@/lib/format";
 import { MINGAN_INCOME_PCTS, minganRuleCards } from "@/lib/mingan-fit";
 import { moveInLabel } from "@/lib/notice-view";
 import {
@@ -45,7 +45,8 @@ async function load(params: Params["params"]) {
 /** meta description과 JSON-LD가 **같은 문장**을 쓴다 — 둘이 어긋나면 구조화 데이터가 스팸으로 읽힌다 */
 function noticeDescription(n: Notice): string {
   const d = daysUntil(n.apply_end_at);
-  const dday = d === null ? "" : d < 0 ? "(마감)" : `(D-${d})`;
+  // 발표가 끝난 공고는 마감일이 몇 년 뒤로 적혀 있어도 마감이다(lib/format.ts isClosed 주석)
+  const dday = isClosed(n) ? "(마감)" : d === null ? "" : `(D-${d})`;
   const supply = n.supply_count != null ? num(n.supply_count, "호") : "";
   return `${n.agency} ${n.title}. 접수 ${dateK(n.apply_start_at)}~${dateK(n.apply_end_at)}${dday}. ${regionLabel(n)} ${supply}. 최소 보증금 ${won(n.min_deposit)}, 최소 월임대료 ${won(n.min_rent)}.`;
 }

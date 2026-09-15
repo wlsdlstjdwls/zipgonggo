@@ -61,9 +61,26 @@ export type DdayChip = {
   /** 지금 움직여야 하는 상태(오늘 접수 시작·모집 중·오늘 마감·마감·D-4 이내). 색을 꽉 채워 강조한다(사용자 요청 2026-09-09) */
   solid?: boolean;
 };
-export function ddayChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "status">): DdayChip {
+/** 당첨자 발표일이 지났으면 접수는 이미 끝난 것이다.
+ * 마이홈 API의 endDe는 「예비입주자 명부 유효기간」이 들어오는 공고가 있어(LH 예비입주자 정례모집: 접수
+ * 2025-09-29~10-01인데 endDe 2029-10-01) 마감일만 보면 4년 뒤까지 접수 중으로 보인다. 발표일이 지났다는
+ * 사실이 그보다 확실하다 — SH도 같은 규칙으로 status를 매긴다(사용자 지적 2026-09-15). */
+export function announced(n: Pick<NoticeListItem, "announce_at">): boolean {
+  const toAnnounce = daysUntil(n.announce_at);
+  return toAnnounce !== null && toAnnounce < 0;
+}
+
+/** 마감인가 — 상태·마감일·발표일 셋 중 하나라도 지났으면 마감. queries.ts의 CLOSED와 같은 규칙이다. */
+export function isClosed(n: Pick<NoticeListItem, "apply_end_at" | "announce_at" | "status">): boolean {
+  if (n.status === "접수마감") return true;
+  const toEnd = daysUntil(n.apply_end_at);
+  return (toEnd !== null && toEnd < 0) || announced(n);
+}
+
+export function ddayChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "announce_at" | "status">): DdayChip {
   const toEnd = daysUntil(n.apply_end_at);
   const toStart = daysUntil(n.apply_start_at);
+  if (announced(n)) return { num: "마감", unit: "종료", tone: "soft", days: toEnd, solid: true };
   if (toEnd === null) {
     if (n.status === "접수중") return { num: "모집", unit: "진행 중", tone: "acc", days: null, solid: true };
     if (n.status === "정정공고중") return { num: "정정", unit: "공고 중", tone: "warn", days: null, solid: true };
@@ -146,11 +163,14 @@ export type ApplyPhase = {
   live: string | null;
   tone: "hot" | "warn" | "acc" | "soft" | "soon";
 };
-export function applyPhase(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at">): ApplyPhase {
+export function applyPhase(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "announce_at">): ApplyPhase {
   const toStart = daysUntil(n.apply_start_at);
   const toEnd = daysUntil(n.apply_end_at);
   const span = n.apply_start_at || n.apply_end_at ? `${dateK(n.apply_start_at, true)} ~ ${dateK(n.apply_end_at, true)}` : null;
   const endNote = n.apply_end_at ? `${dateK(n.apply_end_at, true)} 마감` : null;
+
+  // 발표가 끝난 공고는 마감일이 뭐라고 적혀 있든 접수가 끝났다(위 announced 주석)
+  if (announced(n)) return { kind: "closed", label: "접수 마감", note: `${dateK(n.announce_at, true)} 발표 완료`, live: null, tone: "soft" };
 
   // 오늘 시작은 이미 접수 중이라 acc. 같은 날 마감까지면 마감이 더 급하니 hot
   if (toStart === 0 && toEnd === 0) return { kind: "today-close", label: "오늘 접수 시작, 오늘 마감", note: span, live: "오늘 마감", tone: "hot" };
@@ -165,8 +185,9 @@ export function applyPhase(n: Pick<NoticeListItem, "apply_start_at" | "apply_end
 }
 
 /** 우측 카드용 — 접수 시작과 무관하게 항상 "마감"을 센다(사용자 요청 2026-09-09: 마감 D-day를 없애지 말 것). */
-export function deadlineChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "status">): DdayChip {
+export function deadlineChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "announce_at" | "status">): DdayChip {
   const toEnd = daysUntil(n.apply_end_at);
+  if (announced(n)) return { num: "마감", unit: "종료", tone: "soft", days: toEnd };
   if (toEnd === null) return ddayChip(n);
   if (toEnd < 0) return { num: "마감", unit: "종료", tone: "soft", days: toEnd };
   if (toEnd === 0) return { num: "오늘", unit: "마감", tone: "hot", days: 0 };

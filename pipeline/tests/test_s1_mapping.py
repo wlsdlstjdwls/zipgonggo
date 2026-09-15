@@ -91,6 +91,21 @@ def test_status_rules(src, begin, end, today, expected):
     assert derive_status(src, begin, end, today) == expected
 
 
+@pytest.mark.parametrize(
+    ("end", "announce", "today", "expected"),
+    [
+        # LH 예비입주자 정례모집 — endDe가 명부 유효기간(4년 뒤)이라 발표일로 마감을 안다
+        (date(2029, 10, 1), date(2026, 1, 30), date(2026, 9, 15), "접수마감"),
+        # 상시모집 — 발표일도 미래라 그대로 접수 중
+        (date(2027, 7, 31), date(2027, 7, 31), date(2026, 9, 15), "접수중"),
+        # 발표일이 없으면 종전대로 마감일만 본다
+        (date(2026, 9, 30), None, date(2026, 9, 15), "접수중"),
+    ],
+)
+def test_status_closes_after_announcement(end, announce, today, expected):
+    assert derive_status("일반공고", date(2026, 1, 1), end, today, announce) == expected
+
+
 def test_sector():
     assert derive_sector("공공지원민간임대") == "민간임대"
     assert derive_sector("매입임대") == "공공임대"

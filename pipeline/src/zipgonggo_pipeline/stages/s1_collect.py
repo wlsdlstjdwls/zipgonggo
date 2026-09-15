@@ -37,16 +37,25 @@ def source_key(item: dict[str, Any]) -> str:
     return f"{item['pblancId']}:{item.get('houseSn', 0)}"
 
 
-def derive_status(source_status: str | None, begin: date | None, end: date | None, today: date) -> str:
+def derive_status(source_status: str | None, begin: date | None, end: date | None, today: date,
+                  announce: date | None = None) -> str:
     """notice_status 도출.
 
     | 조건                                  | 결과       |
     | end 있고 today > end                  | 접수마감   |
+    | announce 있고 today > announce        | 접수마감   |
     | 원문 상태에 '정정' 포함               | 정정공고중 |
     | begin 있고 today >= begin             | 접수중     |
     | 그 외 (접수 시작 전)                  | 공고중     |
+
+    발표일을 보는 이유: API의 endDe에 「예비입주자 명부 유효기간」이 들어오는 공고가 있다. LH 울산 국민임대
+    예비입주자 정례모집(2025-09-15 공고)은 접수가 2025-09-29~10-01인데 endDe가 2029-10-01이라 마감일만
+    믿으면 4년 동안 접수 중이다. 당첨자 발표(2026-01-30)가 끝났다는 사실이 더 확실하다(사용자 지적 2026-09-15).
+    상시·수시모집은 발표일도 함께 미래로 잡혀 있어 이 규칙에 걸리지 않는다. SH도 같은 규칙(derive_status_sh).
     """
     if end and today > end:
+        return "접수마감"
+    if announce and today > announce:
         return "접수마감"
     if source_status and "정정" in source_status:
         return "정정공고중"
@@ -91,6 +100,7 @@ def map_notice(group: list[dict[str, Any]], today: date) -> Mapped:
         raise ValueError(f"공고일 없음: {source_key(head)}")
     begin = parse_date(head.get("beginDe"))
     end = parse_date(head.get("endDe"))
+    announce = parse_date(head.get("przwnerPresnatnDe"))
     src_status = nz(head.get("sttusNm"))
 
     # 시군구별 공급호수 합산
@@ -130,8 +140,8 @@ def map_notice(group: list[dict[str, Any]], today: date) -> Mapped:
         "posted_at": posted,
         "apply_start_at": begin,
         "apply_end_at": end,
-        "announce_at": parse_date(head.get("przwnerPresnatnDe")),
-        "status": derive_status(src_status, begin, end, today),
+        "announce_at": announce,
+        "status": derive_status(src_status, begin, end, today, announce),
         "source_status": src_status,
         "source_url": nz(head.get("url")) or nz(head.get("pcUrl")) or "",
         "portal_url": nz(head.get("pcUrl")),

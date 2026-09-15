@@ -6,7 +6,7 @@ import type { EligibilityRules, IncomeStandard, JanggiRule, RegionTier, SupplyTy
 import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_ELIGIBILITY, CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
-import { todayKST } from "./format";
+import { isClosed, todayKST } from "./format";
 import type { ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorResultRow, Sector, YouthHouse } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
@@ -46,24 +46,33 @@ const CANONICAL_ONLY = `canonical_id IS NULL`;
 // 마감 7일 내: 오늘 포함 7일 안에 접수 마감. KPI·칩 카운트·목록 필터가 같은 식을 쓴다
 const CLOSING_7D = `apply_end_at >= ${TODAY} AND apply_end_at < ${TODAY} + 7`;
 
-// 마감: 상태가 접수마감이거나 마감일이 지났다. 기본 목록에서 감추고 「마감 포함」 칩으로만 꺼낸다.
+// 마감: 상태가 접수마감이거나, 마감일이 지났거나, 당첨자 발표일이 지났다. 기본 목록에서 감추고 「마감 포함」 칩으로만 꺼낸다.
 // URL은 남는다(CLAUDE.md 하지 말 것 6) — 목록에서 감출 뿐 상세는 그대로 열린다.
-const NOT_CLOSED = `NOT (status = '접수마감' OR (apply_end_at IS NOT NULL AND apply_end_at < ${TODAY}))`;
+// 발표일 조건이 필요한 이유: 마이홈 API의 endDe에 「예비입주자 명부 유효기간」이 들어오는 공고가 있다.
+// LH 예비입주자 정례모집(울산 2025-09-15)은 접수가 2025-09-29~10-01인데 endDe가 2029-10-01이라
+// 마감일만 보면 4년 뒤까지 접수 중이다 — 발표(2026-01-30)가 끝났다는 사실이 더 확실하다(사용자 지적 2026-09-15).
+// 상시·수시모집은 발표일도 함께 미래로 잡혀 있어 이 조건에 걸리지 않는다. format.ts의 isClosed와 같은 규칙.
+const CLOSED = `(status = '접수마감'
+  OR (apply_end_at IS NOT NULL AND apply_end_at < ${TODAY})
+  OR (announce_at IS NOT NULL AND announce_at < ${TODAY}))`;
+const NOT_CLOSED = `NOT ${CLOSED}`;
 
 function whereSql(where: string[]): string {
   return where.length ? "WHERE " + where.join(" AND ") : "";
 }
 
 // 마감 임박순 정렬키. 아직 안 지난 마감일 오름차순 → 마감 지난 것 → 마감일 없는 것.
-const DEADLINE_RANK = `CASE WHEN apply_end_at IS NULL THEN 2 WHEN apply_end_at >= ${TODAY} THEN 0 ELSE 1 END`;
-const DEADLINE_KEY = `CASE WHEN apply_end_at >= ${TODAY} THEN apply_end_at END`;
+// 「마감 포함」으로 켜서 볼 때 발표까지 끝난 공고가 먼 마감일(위 CLOSED 주석)만 믿고 맨 앞에 서지 않게 rank 1로 내린다.
+const DEADLINE_RANK = `CASE WHEN apply_end_at IS NULL THEN 2 WHEN apply_end_at >= ${TODAY} AND NOT ${CLOSED} THEN 0 ELSE 1 END`;
+const DEADLINE_KEY = `CASE WHEN apply_end_at >= ${TODAY} AND NOT ${CLOSED} THEN apply_end_at END`;
 
 // 커서: posted → "posted_at|id". deadline → "rank|apply_end_at|posted_at|id". 정렬키 전체를 담아야 같은 값이 겹쳐도 빠지지 않는다.
 // 커서는 정렬 키를 그대로 담는다. source_rank는 NULL일 수 있어 빈 칸으로 싣고 아래에서 최댓값으로 되돌린다.
 function encodeCursor(n: NoticeListItem, sort: NoticeSort): string {
   if (sort === "posted") return `${n.posted_at}|${n.source_rank ?? ""}|${n.id}`;
   const today = todayKST();
-  const rank = n.apply_end_at === null ? 2 : n.apply_end_at >= today ? 0 : 1;
+  // DEADLINE_RANK와 같은 식이어야 한다 — 어긋나면 다음 페이지가 통째로 빠지거나 겹친다
+  const rank = n.apply_end_at === null ? 2 : n.apply_end_at >= today && !isClosed(n) ? 0 : 1;
   return `${rank}|${n.apply_end_at ?? ""}|${n.posted_at}|${n.source_rank ?? ""}|${n.id}`;
 }
 
@@ -139,7 +148,7 @@ async function listNoticesPageRaw(f: NoticeFilters, cursor: string | null, limit
 /** 목록 1페이지. cursor는 이전 페이지의 nextCursor. */
 export const listNoticesPage = unstable_cache(
   (f: NoticeFilters, cursor: string | null = null, limit: number = PAGE_SIZE) => listNoticesPageRaw(f, cursor, limit),
-  ["notice-page-v4"],
+  ["notice-page-v5"],
   CACHE_OPTS,
 );
 
@@ -161,7 +170,7 @@ export const listFilterOptions = cache(unstable_cache(
     const pick = (k: string) => rows.filter((r) => r.kind === k).map(({ value, count }) => ({ value, count }));
     return { sector: pick("sector").sort((a, b) => a.value.localeCompare(b.value, "ko")), sido: pick("sido"), type: pick("type") };
   },
-  ["notice-filter-options-v3"],
+  ["notice-filter-options-v4"],
   CACHE_OPTS,
 ));
 
@@ -205,7 +214,7 @@ async function listFacetsRaw(f: NoticeFilters): Promise<Facets> {
 /** 스코프 바·필터 바가 쓰는 수량 묶음. 필터가 바뀌면 /api/facets로 다시 받는다. */
 export const listFacets = unstable_cache(
   (f: NoticeFilters) => listFacetsRaw(f),
-  ["notice-facets-v1"],
+  ["notice-facets-v2"],
   CACHE_OPTS,
 );
 
@@ -366,11 +375,11 @@ export const listSitemapNotices = unstable_cache(
   async (limit: number): Promise<SitemapNotice[]> =>
     query<SitemapNotice>(
       `SELECT slug, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
-              (status = '접수마감' OR (apply_end_at IS NOT NULL AND apply_end_at < ${TODAY})) AS closed
+              ${CLOSED} AS closed
        FROM notice WHERE canonical_id IS NULL ORDER BY posted_at DESC, id DESC LIMIT $1`,
       [limit],
     ),
-  ["notice-sitemap"],
+  ["notice-sitemap-v2"],
   CACHE_OPTS,
 );
 
