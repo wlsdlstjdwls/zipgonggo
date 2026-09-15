@@ -292,14 +292,18 @@ small { font-size: 12px; }
 /* 값이 걸린 셀렉트는 활성 칩과 같은 잉크 반전 — 어떤 필터가 켜졌는지 한눈에 */
 .sel.on { background-color: var(--ink); border-color: var(--ink); color: #fff; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1.5 1.5l4 4 4-4' fill='none' stroke='%23ffffff' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 .sel.on:hover { background-color: var(--ink); }
-/* 셀렉트 목록 — OS 드롭다운 대신 사이트 톤으로. 버튼 바로 아래 붙고, 스크롤하면 닫힌다(components/select.tsx) */
+/* 셀렉트 목록 — OS 드롭다운 대신 사이트 톤으로. 버튼 바로 아래 붙고 스크롤을 따라 움직인다(components/select.tsx).
+   body로 포털해 position:fixed로 띄운다 — 자리(left·top·min-width·max-height)는 select.tsx가 재서 인라인으로 준다.
+   좁은 화면 필터 시트(.sheet-b)가 스크롤 컨테이너라 안에 두면 잘렸다(사용자 지적 2026-09-15).
+   z-index는 시트(.sheet-wrap 60)보다 위 */
 .selw { position: relative; display: inline-flex; flex: none; min-width: 0; }
-.selmenu { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: max(100%, 190px); overflow-x: hidden; max-width: 320px; max-height: 320px; overflow-y: auto; overscroll-behavior: contain;
+.selmenu { position: fixed; z-index: 70; overflow-x: hidden; max-width: min(320px, calc(100vw - 16px)); overflow-y: auto; overscroll-behavior: contain;
   list-style: none; margin: 0; padding: 5px; background: var(--bg); border: 1px solid var(--line2); border-radius: var(--r-panel); box-shadow: var(--shadow-float);
   transform-origin: top center;
   /* fitin 팝업과 같은 진입 — 살짝 작게, 8px 아래에서 뜨며 옅음에서 진해진다(예전 mo-pop은 튀어올랐다) */
   animation: sheet-pop-in 180ms var(--ease) both; }
-.selmenu.end { left: auto; right: 0; transform-origin: top right; }
+/* 위로 뒤집힌 목록은 아래 끝이 버튼에 붙는다 — 커지는 방향도 그쪽이라 기준점을 아래로 옮긴다 */
+.selmenu.up { transform-origin: bottom center; }
 .selmenu li { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: var(--radius-sm); cursor: pointer;
   font-weight: 700; font-size: 13px; color: var(--mut); white-space: nowrap; }
 .selmenu li > span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; }
@@ -1139,6 +1143,8 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* 거주지는 톤앤매너를 맞춘 공용 Select(components/select.tsx)를 쓴다 — OS 기본 드롭다운이 아니다.
    기본은 내용 폭만 차지해(inline-flex) 좁은 폼 칸 안에서 오그라들어 보였다(사용자 지적 2026-09-09) */
 .elig-f .selw, .elig-f .sel { width: 100%; }
+/* 기준 공고가 한 회차뿐이면 고를 게 없다 — 셀렉트 대신 이름만 적는다 */
+.elig-src { margin: 0; font-weight: 700; font-size: 12.5px; color: var(--mut); }
 .elig-seg { display: flex; gap: 6px; }
 .elig-seg button { flex: 1; height: 38px; border: 1px solid var(--line2); border-radius: var(--r-btn); background: var(--bg); font-weight: 800; font-size: 13px; color: var(--mut); cursor: pointer; transition: all var(--duration-fast) var(--ease); }
 .elig-seg button.on { border-color: var(--ink); background: var(--ink); color: #fff; }

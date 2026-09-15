@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import { classOptions, diagnoseAll, HOUSEHOLD_MAX, type Marital, type Profile, type Verdict } from "@/lib/eligibility";
 import { fitJanggi, janggiAreas, type FitProfile, type FitVerdict } from "@/lib/notice-fit";
 import { noticePath } from "@/lib/routes";
-import type { EligibilityRules } from "@/types/eligibility";
+import type { EligibilityRules, JanggiRule } from "@/types/eligibility";
 import { Select } from "./select";
 
 const MAN = 10_000;
@@ -29,19 +29,38 @@ const DEFAULT: Profile = {
 };
 
 // 장기전세 세부 조건 — 면적·순위·출생자녀·맞벌이·청약 회차. supply_type 한 줄(income_pct)로는 매트릭스를 못 푼다(handoff 0-1).
-// 기준은 가장 최근 장기전세 공고문(rules.janggi)의 표다. 공고마다 같은 양식이라 다음 공고에도 거의 그대로 간다.
+// 기준은 장기전세 공고문의 표다. 공고마다 같은 양식이라 다음 공고에도 거의 그대로 가지만, 회차마다 소득 기준액과
+// 공급 구분이 조금씩 갈린다 — 그래서 기본은 최신 회차로 두고 화면에서 회차를 바꿔 볼 수 있게 열어 뒀다(사용자 요청 2026-09-15).
+/** 셀렉트에 걸 짧은 이름 — 「제51차 (2026.08.31)」. 회차를 못 읽으면 제목 앞머리를 쓴다 */
+function janggiLabel(o: JanggiRule): string {
+  const cha = /제\s*(\d+)\s*차/.exec(o.title);
+  const head = cha ? `제${cha[1]}차` : o.title.slice(0, 14);
+  return `${head} (${o.posted_at.replace(/-/g, ".")})`;
+}
+
 type JanggiExtra = { group: string | null; area: string | null; dual: boolean; newborns: number; olderMinor: boolean; deposits: number };
 
 export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
   const [p, setP] = useState<Profile>(DEFAULT);
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setP((prev) => ({ ...prev, [k]: v }));
-  const jg = rules.janggi ?? null;
+  const jgList = rules.janggi ?? [];
+  // 기준 회차 — 기본은 맨 앞(최신). 회차를 바꾸면 그 공고문의 표로 다시 푼다
+  const [jgSlug, setJgSlug] = useState<string>(() => jgList[0]?.slug ?? "");
+  const jg = jgList.find((o) => o.slug === jgSlug) ?? jgList[0] ?? null;
   const [jx, setJx] = useState<JanggiExtra>(() => ({
     group: jg?.data.rank_tables[0]?.group ?? null,
     area: jg?.data.rank_tables[0] ? janggiAreas(jg.data.rank_tables[0])[0] ?? null : null,
     dual: false, newborns: 0, olderMinor: false, deposits: 24,
   }));
   const setJ = <K extends keyof JanggiExtra>(k: K, v: JanggiExtra[K]) => setJx((prev) => ({ ...prev, [k]: v }));
+  // 회차를 갈아타면 공급 구분과 면적은 그 회차 표의 첫 값으로 되돌린다 — 없는 구분이 남으면 진단이 빈손이 된다
+  const pickJanggi = (slug: string) => {
+    const next = jgList.find((o) => o.slug === slug);
+    if (!next) return;
+    setJgSlug(slug);
+    const t = next.data.rank_tables[0];
+    setJx((prev) => ({ ...prev, group: t?.group ?? null, area: t ? janggiAreas(t)[0] ?? null : null }));
+  };
   const jgTable = jg?.data.rank_tables.find((t) => t.group === jx.group) ?? jg?.data.rank_tables[0];
   const jgAreas = useMemo(() => (jgTable ? janggiAreas(jgTable) : []), [jgTable]);
   const jgVerdict: FitVerdict | null = useMemo(() => {
@@ -121,8 +140,24 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
 
         {jg && (
           <fieldset className="elig-cls">
-            <legend>장기전세 세부 조건 <small>기준: {jg.title}</small></legend>
+            <legend>장기전세 세부 조건</legend>
             <div className="elig-grid">
+              {/* 어느 회차의 표로 볼지. 기본은 최신 회차고, 지난 회차 표로 견줘 볼 수도 있다 */}
+              <div className="elig-f wide">
+                <span>기준 공고</span>
+                {jgList.length > 1 ? (
+                  <Select
+                    value={jg.slug}
+                    options={jgList.map((o) => ({ value: o.slug, label: janggiLabel(o) }))}
+                    onChange={(v) => pickJanggi(v || jgList[0].slug)}
+                    placeholder={janggiLabel(jgList[0])}
+                    ariaLabel="기준 공고"
+                    allowAll={false}
+                  />
+                ) : (
+                  <p className="elig-src">{janggiLabel(jg)}</p>
+                )}
+              </div>
               {jg.data.rank_tables.length > 1 && (
                 <div className="elig-f wide">
                   <span>공급 구분</span>
@@ -186,7 +221,7 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
   );
 }
 
-function Card({ v, janggi, janggiRef, area }: { v: Verdict; janggi?: FitVerdict | null; janggiRef?: EligibilityRules["janggi"]; area?: string | null }) {
+function Card({ v, janggi, janggiRef, area }: { v: Verdict; janggi?: FitVerdict | null; janggiRef?: JanggiRule | null; area?: string | null }) {
   const t = v.type;
   const failed = v.checks.filter((c) => !c.ok);
   return (

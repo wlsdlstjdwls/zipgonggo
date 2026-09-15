@@ -32,13 +32,17 @@ export type SupplyType = {
 export type IncomeStandard = { household: number; pct: number; monthly_won: number };
 export type RegionTier = { name: string; kind: "sido" | "sigungu" | string; tier: "서울" | "연접" | string };
 
+/** 한 공고문에서 읽은 장기전세 자격 묶음. 기준 회차를 고를 때 화면이 쓰는 단위 */
+export type JanggiRule = { slug: string; title: string; posted_at: string; data: NoticeEligibilityData };
+
 export type EligibilityRules = {
   types: SupplyType[];
   income: IncomeStandard[];
   tiers: RegionTier[];
   incomeYear: number;
-  /** 가장 최근 장기전세 공고문에서 읽은 자격 묶음. /eligibility가 면적×순위 매트릭스를 풀 때 쓴다. 없으면 null */
-  janggi?: { slug: string; title: string; data: NoticeEligibilityData } | null;
+  /** 장기전세 공고문에서 읽은 자격 묶음 — 최근 회차부터. /eligibility가 면적×순위 매트릭스를 풀 때 쓰고,
+      화면에서 기준 회차를 고를 수 있다(사용자 요청 2026-09-15). 표를 읽어 둔 공고가 없으면 빈 배열 */
+  janggi?: JanggiRule[];
 };
 
 // ── 공고문에서 읽은 신청자격 묶음 (notice_eligibility, 0024) ──

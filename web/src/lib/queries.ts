@@ -2,7 +2,7 @@
 // 발행 상태(publish) 필터는 S8이 생기기 전까지 걸지 않는다 — 지금은 전부 'parsed'.
 // 목록·옵션은 unstable_cache로 REVALIDATE_SEC 캐시한다. 파이프라인이 DB를 갱신해도 그 안엔 반영된다(page.tsx revalidate와 동일).
 import { unstable_cache } from "next/cache";
-import type { EligibilityRules, IncomeStandard, RegionTier, SupplyType, NoticeEligibility } from "@/types/eligibility";
+import type { EligibilityRules, IncomeStandard, JanggiRule, RegionTier, SupplyType, NoticeEligibility } from "@/types/eligibility";
 import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_ELIGIBILITY, CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
@@ -35,24 +35,28 @@ function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
   return where;
 }
 
+// 오늘(KST). Neon의 TimeZone은 GMT라 CURRENT_DATE를 그대로 쓰면 KST 00시~09시 동안 UTC 어제가 나온다 —
+// 그 아홉 시간엔 어제 마감된 공고가 목록에 남고 화면 D-day(todayKST)만 「마감」으로 떠 서로 어긋났다(사용자 지적 2026-09-15).
+const TODAY = `(now() AT TIME ZONE 'Asia/Seoul')::date`;
+
 // 정본만. 같은 공고가 기관 seq 여러 개로 들어와도 목록엔 한 번만 나온다(S2가 canonical_id를 채운다).
 // 딸림 글의 URL은 살아 있고 상세도 열린다 — 목록에서만 뺀다(CLAUDE.md 하지 말 것 6).
 const CANONICAL_ONLY = `canonical_id IS NULL`;
 
 // 마감 7일 내: 오늘 포함 7일 안에 접수 마감. KPI·칩 카운트·목록 필터가 같은 식을 쓴다
-const CLOSING_7D = `apply_end_at >= CURRENT_DATE AND apply_end_at < CURRENT_DATE + 7`;
+const CLOSING_7D = `apply_end_at >= ${TODAY} AND apply_end_at < ${TODAY} + 7`;
 
 // 마감: 상태가 접수마감이거나 마감일이 지났다. 기본 목록에서 감추고 「마감 포함」 칩으로만 꺼낸다.
 // URL은 남는다(CLAUDE.md 하지 말 것 6) — 목록에서 감출 뿐 상세는 그대로 열린다.
-const NOT_CLOSED = `NOT (status = '접수마감' OR (apply_end_at IS NOT NULL AND apply_end_at < CURRENT_DATE))`;
+const NOT_CLOSED = `NOT (status = '접수마감' OR (apply_end_at IS NOT NULL AND apply_end_at < ${TODAY}))`;
 
 function whereSql(where: string[]): string {
   return where.length ? "WHERE " + where.join(" AND ") : "";
 }
 
 // 마감 임박순 정렬키. 아직 안 지난 마감일 오름차순 → 마감 지난 것 → 마감일 없는 것.
-const DEADLINE_RANK = `CASE WHEN apply_end_at IS NULL THEN 2 WHEN apply_end_at >= CURRENT_DATE THEN 0 ELSE 1 END`;
-const DEADLINE_KEY = `CASE WHEN apply_end_at >= CURRENT_DATE THEN apply_end_at END`;
+const DEADLINE_RANK = `CASE WHEN apply_end_at IS NULL THEN 2 WHEN apply_end_at >= ${TODAY} THEN 0 ELSE 1 END`;
+const DEADLINE_KEY = `CASE WHEN apply_end_at >= ${TODAY} THEN apply_end_at END`;
 
 // 커서: posted → "posted_at|id". deadline → "rank|apply_end_at|posted_at|id". 정렬키 전체를 담아야 같은 값이 겹쳐도 빠지지 않는다.
 // 커서는 정렬 키를 그대로 담는다. source_rank는 NULL일 수 있어 빈 칸으로 싣고 아래에서 최댓값으로 되돌린다.
@@ -362,7 +366,7 @@ export const listSitemapNotices = unstable_cache(
   async (limit: number): Promise<SitemapNotice[]> =>
     query<SitemapNotice>(
       `SELECT slug, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
-              (status = '접수마감' OR (apply_end_at IS NOT NULL AND apply_end_at < CURRENT_DATE)) AS closed
+              (status = '접수마감' OR (apply_end_at IS NOT NULL AND apply_end_at < ${TODAY})) AS closed
        FROM notice WHERE canonical_id IS NULL ORDER BY posted_at DESC, id DESC LIMIT $1`,
       [limit],
     ),
@@ -370,6 +374,9 @@ export const listSitemapNotices = unstable_cache(
   CACHE_OPTS,
 );
 
+
+// 자격진단 화면이 고를 수 있는 장기전세 기준 회차 수. 더 옛 회차는 표 양식이 달라 쓸모가 적다
+const JANGGI_RULE_MAX = 6;
 
 /* ── 자격진단 사양 (0020) ────────────────────────────────
    공고와 무관한 제도 규칙이라 공고 캐시 태그(CACHE_TAG_NOTICE)를 쓰지 않는다 — 따로 태그를 둔다.
@@ -390,14 +397,15 @@ export const getEligibilityRules = unstable_cache(
           WHERE year = (SELECT max(year) FROM income_standard) ORDER BY household, pct`,
       ),
       query<RegionTier>(`SELECT name, kind, tier FROM region_tier ORDER BY tier, name`),
-      // 가장 최근 장기전세 공고문의 자격 묶음 — /eligibility가 면적×순위 매트릭스를 풀 때 기준으로 쓴다(공고마다 같은 표 양식)
-      query<{ slug: string; title: string; data: EligibilityRules["janggi"] extends infer J ? (J extends { data: infer D } ? D : never) : never }>(
-        `SELECT n.slug, n.title, e.data FROM notice_eligibility e JOIN notice n ON n.id = e.notice_id
+      // 표를 읽어 둔 장기전세 공고문들 — 최근 회차가 기본이고, 화면에서 다른 회차로 바꿔 볼 수 있다.
+      // 한 건이 5KB 남짓이라 몇 회차를 통째로 실어도 가볍다(실측 2026-09-15)
+      query<JanggiRule>(
+        `SELECT n.slug, n.title, n.posted_at, e.data FROM notice_eligibility e JOIN notice n ON n.id = e.notice_id
           WHERE n.housing_type = '장기전세' AND e.verified AND COALESCE(e.data->>'kind', 'janggi') = 'janggi'
-          ORDER BY n.posted_at DESC, n.id DESC LIMIT 1`,
+          ORDER BY n.posted_at DESC, n.id DESC LIMIT ${JANGGI_RULE_MAX}`,
       ),
     ]);
-    return { types, income, tiers, incomeYear: income[0]?.year ?? 0, janggi: janggi[0] ?? null };
+    return { types, income, tiers, incomeYear: income[0]?.year ?? 0, janggi };
   },
   ["eligibility-rules"],
   { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_ELIGIBILITY] },
