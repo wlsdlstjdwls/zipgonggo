@@ -67,17 +67,11 @@ function RailBody() {
           <button type="button" className={`chip-f${!f.sector ? " on" : ""}`} aria-pressed={!f.sector} onClick={() => set({ sector: undefined })}>
             전체 <small>{facets.total}</small>
           </button>
-          {SECTORS.map((s) =>
-            s === "민간임대" ? (
-              <span key={s} className="chip-f dis" aria-disabled="true" title="수집 준비 중">
-                민간임대 <small>준비 중</small>
-              </span>
-            ) : (
-              <button key={s} type="button" className={`chip-f${f.sector === s ? " on" : ""}`} aria-pressed={f.sector === s} onClick={() => set({ sector: s })}>
-                {s} <small>{countOf(s)}</small>
-              </button>
-            ),
-          )}
+          {SECTORS.map((s) => (
+            <button key={s} type="button" className={`chip-f${f.sector === s ? " on" : ""}`} aria-pressed={f.sector === s} onClick={() => set({ sector: s })}>
+              {s} <small>{countOf(s)}</small>
+            </button>
+          ))}
         </div>
       </div>
 
