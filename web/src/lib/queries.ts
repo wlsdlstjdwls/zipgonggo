@@ -11,8 +11,16 @@ import type { ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComp
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
+// 화면에 싣는 제목. 기관 원문의 「[민간임대] 」 접두어만 뗀다(사용자 결정 2026-09-16).
+// 유형 태그(「공공지원민간임대」)가 이미 같은 말을 해서 목록에서 한 줄에 두 번 읽혔다.
+// **DB의 title은 원문 그대로 둔다** — 벗기는 건 읽는 이 자리뿐이라 원문 대조가 언제든 된다.
+// SELECT에서 하는 이유: 지면·메타·RSS·JSON-LD·OG가 전부 이 행을 받아 쓴다. 그리는 쪽에서 하면
+// 열몇 자리 중 하나를 빠뜨려 어디선 붙고 어디선 떨어진다.
+const titleCol = (alias = "") =>
+  `regexp_replace(${alias}title, '^\\s*\\[민간임대\\]\\s*', '') AS title`;
+
 const LIST_COLS = `
-  id, slug, title, agency, housing_type::text AS housing_type, sector::text AS sector, house_type, sido, sigungu, complex_name,
+  id, slug, ${titleCol()}, agency, housing_type::text AS housing_type, sector::text AS sector, house_type, sido, sigungu, complex_name,
   supply_count, min_deposit, min_rent, posted_at, apply_start_at, apply_end_at, announce_at,
   status::text AS status, source_status, amends_source_key, source_url, address, source_rank`;
 
@@ -540,7 +548,7 @@ export const getEligibilityRules = unstable_cache(
       // 표를 읽어 둔 장기전세 공고문들 — 최근 회차가 기본이고, 화면에서 다른 회차로 바꿔 볼 수 있다.
       // 한 건이 5KB 남짓이라 몇 회차를 통째로 실어도 가볍다(실측 2026-09-15)
       query<JanggiRule>(
-        `SELECT n.slug, n.title, n.posted_at, e.data FROM notice_eligibility e JOIN notice n ON n.id = e.notice_id
+        `SELECT n.slug, ${titleCol("n.")}, n.posted_at, e.data FROM notice_eligibility e JOIN notice n ON n.id = e.notice_id
           WHERE n.housing_type = '장기전세' AND e.verified AND COALESCE(e.data->>'kind', 'janggi') = 'janggi'
           ORDER BY n.posted_at DESC, n.id DESC LIMIT ${JANGGI_RULE_MAX}`,
       ),
@@ -576,7 +584,7 @@ export function noticeFamily(title: string, housingType: string): string {
 export async function getPriorCompetition(n: Pick<Notice, "id" | "agency" | "housing_type" | "title" | "posted_at">): Promise<PriorCompetition | null> {
   // 1) 결과 표가 있는 같은 유형의 앞선 공고 — 최근 것부터 몇 건만 보고 계열이 같은 첫 공고를 고른다
   const cands = await query<{ id: number; slug: string; title: string; posted_at: string }>(
-    `SELECT n.id, n.slug, n.title, n.posted_at::text AS posted_at
+    `SELECT n.id, n.slug, ${titleCol("n.")}, n.posted_at::text AS posted_at
        FROM notice n
       WHERE n.agency = $1 AND n.housing_type::text = $2 AND n.posted_at < $3::date AND n.id <> $4
         AND EXISTS (SELECT 1 FROM notice_result r WHERE r.notice_id = n.id AND r.reconciled)
