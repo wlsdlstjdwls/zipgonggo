@@ -38,6 +38,10 @@ export function NoticeRow({ n, stagger }: Props) {
   const d = ddayChip(n);
   const qty = n.supply_count != null ? num(n.supply_count, "호") : null;
   const meta = [n.agency, regionShort(n), n.housing_type, qty].filter(Boolean).join(" | ");
+  // 공공임대냐 민간임대냐가 안 보인다는 지적(2026-09-16). 메타 줄에 글자로만 섞어 두면
+  // 기관·지역·유형 사이에 묻히고, 폭이 좁으면 말줄임에 제일 먼저 잘려 나간다 —
+  // 그래서 줄 맨 앞에 색 있는 칩으로 떼어 둔다(잘리지 않는 자리)
+  const mingan = n.sector === "민간임대";
   const style = stagger === undefined ? undefined : ({ "--stagger": `${stagger}ms` } as CSSProperties);
 
   return (
@@ -55,7 +59,10 @@ export function NoticeRow({ n, stagger }: Props) {
         </span>
         <span className="row-body">
           {/* 접수 상태는 왼쪽 D-day 칩이 이미 말한다 — 메타 줄에 「접수 중」을 겹쳐 쓰지 않는다(사용자 지적 2026-09-09) */}
-          <Trunc className="row-meta" text={`${meta}${n.amends_source_key ? " | 정정" : ""}`} />
+          <span className="row-metaline">
+            <b className={`sect ${mingan ? "priv" : "pub"}`}>{n.sector}</b>
+            <Trunc className="row-meta" text={`${meta}${n.amends_source_key ? " | 정정" : ""}`} />
+          </span>
           <Trunc className="row-title" text={n.title} />
           <span className="row-dates">
             <Dt k="공고" v={dateK(n.posted_at)} />
