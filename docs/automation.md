@@ -164,47 +164,34 @@ Vercel 대시보드 → Settings → Git → Deploy Hooks에서 `main` 브랜치
 대시보드 Deployments → Redeploy로도 된다. Deploy Hook은 `github.enabled=false`일 때만 막히고
 `git.deploymentEnabled`엔 영향받지 않는다(공식 문서 2026-09-14 확인).
 
-### 방아쇠 둘 — 겹쳐 둔다
+### 방아쇠 — Vercel Cron 하나로 모았다 (2026-09-16)
 
-**① Cloudflare Worker (주 방아쇠, PC 무관).** `worker/`. 10분마다 `collect`와 `patrol`을 차례로 때린다.
-시크릿은 Worker secret에 두고 **`x-cron-secret` 헤더로** 보낸다 — URL 쿼리로 안 넘기는 건 남의 로그에
-평문으로 남지 않게 하기 위해서다.
+전엔 셋이었다 — Cloudflare Worker(10분), GitHub 스케줄, Windows 예약 작업. 셋이 같은 일을
+서로 모르게 했고, 그중 GitHub 스케줄은 하루 24회 중 네댓 번만 그것도 1~2시간 늦게 발화했다.
+**Worker를 세운 이유였던 「Hobby 크론은 하루 1회」가 사라졌다** — 플랜이 Pro라 분 단위가 된다
+(`docs/handoff.md`의 Vercel 플랜 절). 그래서 Worker와 GitHub 스케줄을 걷어내고 여기로 모았다.
 
-```bash
-cd worker
-npx wrangler secret put CRON_TRIGGER_SECRET   # Vercel env와 같은 값
-npx wrangler deploy
-npx wrangler tail                              # 실행 로그를 실시간으로
-```
+**① Vercel Cron (주 방아쇠).** `web/vercel.json`의 `crons` — 10분마다 `/api/cron/collect`와
+`/api/cron/patrol`을 때린다. 크론은 **프로덕션 배포에만** 걸리므로 vercel.json을 고친 뒤
+한 번 배포해야 등록된다(`npx vercel deploy --prod --yes`). 등록 확인은 대시보드 → Settings → Cron Jobs.
 
-배포한 Worker에는 손으로 확인할 구멍도 있다(같은 헤더로 잠가 둔다):
-
-```bash
-curl -H "x-cron-secret: <시크릿>" https://zipgonggo-cron.<계정>.workers.dev/
-```
-
-무료 플랜으로 충분하다 — 크론 트리거는 횟수 제한이 없고 하루 144회는 요청 한도(10만/일)에 한참 못 미친다.
-
-**배포 전에 로컬로 발화시켜 볼 수 있다.** Cloudflare 로그인 없이 된다:
+열쇠가 둘인 이유: Vercel Cron은 **제 값(`CRON_SECRET` 환경변수)을 `Authorization: Bearer`로** 보낸다.
+규격이라 고를 수 없어 라우트가 그 문을 따로 연다. `x-cron-secret`(= `CRON_TRIGGER_SECRET`)은
+콘솔·curl·바깥 모니터용으로 그대로 남는다. 둘은 **다른 값이어도 된다** — 서로 모르는 두 열쇠다.
 
 ```bash
-cd worker
-printf 'CRON_TRIGGER_SECRET=<시크릿>
-' > .dev.vars   # 저장소 밖으로 새지 않게 gitignore돼 있다
-npx wrangler dev --test-scheduled                      # 8787로 뜬다
-curl "http://127.0.0.1:8787/__scheduled?cron=*/10+*+*+*+*"   # 크론과 같은 경로로 발화
-curl -H "x-cron-secret: <시크릿>" http://127.0.0.1:8787/     # 응답 본문까지 본다
+npx vercel env add CRON_SECRET production    # Vercel Cron이 보낼 값. 아무 난수
+curl -H "x-cron-secret: <CRON_TRIGGER_SECRET>" https://zipgonggo.com/api/cron/collect
 ```
 
-> **함정: `scheduled()`에서 `ctx.waitUntil()`로 던지면 안 된다.** 핸들러가 먼저 끝나면서 작업이
-> 통째로 버려진다. 2026-09-10 로컬 발화에서 응답이 **34ms에 끝나고 로그가 0줄**로 잡혔다.
-> `await runAll(env)`로 붙들자 1380ms에 두 잡 다 200이 돌아왔다. 크론은 조용히 실패하면
-> 아무도 모르니, 배포 전에 이 테스트를 꼭 한 번 돌린다.
+> Cloudflare Worker(`worker/`)는 지웠다. Cloudflare 쪽에 배포된 것도 같이 내려야 이중 발화가 끝난다 —
+> `npx wrangler delete --name zipgonggo-cron`(Cloudflare 로그인 필요). 안 내려도 사고는 안 난다,
+> 라우트가 `skipped: fresh`로 되돌리기 때문에. 다만 방아쇠가 둘로 남는다.
 
 **② Windows 예약 작업 `zipgonggo-cron` (보조).** 같은 PC에서 10분마다 당긴다.
 스크립트는 `~/.zipgonggo/cron-trigger.ps1`(시크릿이 들어 있어 저장소 밖에 둔다), 로그는 같은 폴더의
-`cron-trigger.log`. **PC가 켜져 있을 때만 도는 게 약점**이라 Worker를 주 방아쇠로 올렸다.
-Worker가 붙은 뒤엔 지워도 되지만, 겹쳐도 안전하니 그냥 둔다.
+`cron-trigger.log`. **PC가 켜져 있을 때만 도는 게 약점**이라 주 방아쇠는 Vercel Cron이다.
+지워도 되지만, 겹쳐도 안전하니 그냥 둔다 — 라우트가 `skipped: fresh`로 되돌린다.
 
 ```powershell
 schtasks /Query /TN "zipgonggo-cron" /FO LIST     # 다음 회차 확인
@@ -230,15 +217,15 @@ GitHub 실행 상태. 다 뚫려도 워크플로의 `concurrency` 그룹이 줄�
 | 실제 워크플로 | 같은 초에 회차 생성 → `completed success` (run 34455885407) |
 | 연타 3회 | 200 `skipped: fresh` — 감시 잡이 곧바로 `ingest_log`를 남겨 1분 안에 차단이 걸린다 |
 | `patrol` | 200 `skipped: fresh`, `ageMin: 128 / needMin: 1200` |
-| **`x-cron-secret` 헤더** | **`collect` 200 · `patrol` 200** — Worker가 쓸 경로. 헤더 없음 401, 틀린 값 401, 모르는 잡 404 |
+| **`x-cron-secret` 헤더** | **`collect` 200 · `patrol` 200** — 손수 확인·바깥 모니터가 쓸 경로. 헤더 없음 401, 틀린 값 401, 모르는 잡 404 |
 
 ## 왜 Actions인가
 
 **주의 — 이 절의 전제가 2026-09-16에 하나 바뀌었다. 플랜은 Hobby가 아니라 Pro다.**
 그래서 「Vercel Cron은 하루 1회가 최소라 못 쓴다」는 더는 이유가 아니다(Pro는 분 단위로 여러 개 걸린다).
 남은 이유는 하나뿐이다 — **파이프라인이 Python이고 첨부 파싱이 무겁다**(pyhwp·pdfplumber·pandas).
-그걸 함수로 옮기는 값이 Actions를 유지하는 값보다 크다. Cloudflare Worker(바깥 방아쇠)도
-「Hobby 크론이 하루 1회라서」 세운 것이니, 이제 Vercel Cron으로 갈음할 수 있는지 다시 볼 일이다.
+그걸 함수로 옮기는 값이 Actions를 유지하는 값보다 크다. 「Hobby 크론이 하루 1회라서」 세웠던
+Cloudflare Worker는 2026-09-16에 Vercel Cron으로 갈음하고 걷어냈다(위 「방아쇠」 절).
 
 ## 한국에서 나가는 구멍 (`/api/egress`)
 

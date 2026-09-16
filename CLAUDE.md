@@ -54,7 +54,6 @@
 web/        화면·라우팅·SEO 메타. DB는 읽기만. 파싱 로직 두지 않는다
 pipeline/   수집·파싱·정규화·좌표매칭·발행. 화면 로직 두지 않는다
 db/         스키마와 마이그레이션. 두 쪽 모두의 계약
-worker/     Cloudflare Worker 크론. web의 /api/cron/{잡}을 때리기만 한다. 로직 두지 않는다
 egress/     한국에서 나가는 구멍(Vercel icn1). 대신 GET/POST 해 줄 뿐, 파싱도 DB도 없다
 docs/       설계 문서. 결정이 바뀌면 코드보다 먼저 여기를 고친다
 ```

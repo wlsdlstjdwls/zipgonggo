@@ -9,9 +9,10 @@ name: 공고 수집
 # 준비물은 docs/automation.md 참고. Secrets 5개와 juso-data 릴리스가 있어야 돈다.
 
 on:
-  schedule:
-    # UTC. 정각은 GitHub이 붐벼 10~20분씩 밀리므로 비켜 둔다. 분 단위 정확도는 기대하지 않는다
-    - cron: "17 * * * *"
+  # 스케줄 블록을 뗐다(2026-09-16). GitHub 스케줄은 하루 24회 중 네댓 번만, 그것도 1~2시간 늦게
+  # 발화했다(docs/automation.md 「GitHub 스케줄은 방아쇠로 못 쓴다」). 방아쇠는 Vercel Cron 하나다 —
+  # web/vercel.json의 crons가 10분마다 /api/cron/collect를 때리고, 라우트가 부를지 말지 판단해 여기를 dispatch한다.
+  # 손으로 돌리는 길은 아래 workflow_dispatch와 관리자 콘솔의 「지금 돌리기」가 그대로 갖는다
   workflow_dispatch:
     inputs:
       force:

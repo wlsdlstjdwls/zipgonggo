@@ -4,5 +4,9 @@
     "deploymentEnabled": {
       "main": false
     }
-  }
+  },
+  "crons": [
+    { "path": "/api/cron/collect", "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/patrol", "schedule": "*/10 * * * *" }
+  ]
 }

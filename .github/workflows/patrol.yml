@@ -12,9 +12,7 @@ name: 게시판 순찰
 # 게시판에서 새 공고가 나오면 상세 파싱은 「공고 수집」에 넘긴다 — 상세 로직을 두 벌 두지 않는다.
 
 on:
-  schedule:
-    # UTC 21:40 = KST 06:40. 매시 잡(:17)과 겹치지 않게 비켜 둔다
-    - cron: "40 21 * * *"
+  # 스케줄 블록을 뗐다(2026-09-16) — collect.yml과 같은 이유. 방아쇠는 Vercel Cron 하나(web/vercel.json)
   workflow_dispatch:
     inputs:
       since_year:
