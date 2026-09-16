@@ -7,6 +7,84 @@
 
 ---
 
+## 지금 상태 (2026-09-16, 57차 세션)
+
+**56차가 고쳐 놓고 안 올린 것을 올리고, 55차가 남긴 줄을 값어치 순으로 훑었다.** 다섯 덩이.
+
+| # | 한 일 | 실측 |
+|---|---|---|
+| 0 | soft 404 고침 **배포** | 프로덕션 `/notice/nope` · `/area/nope` · `/area/nope/nope` · `/type/nope` · `/notice/{공고}/nope-9999` 전부 **404**. 홈·공고·단지·지역 200, OG png 200(49KB) |
+| 3 | 단지·유형·지역 URL을 IndexNow에 | **742건 제출**(200). 다시 돌리면 submitted 0 / known 742 |
+| 4 | 「[민간임대] 」 접두어를 화면에서 뗀다 | 467건. 제목 중간에 박힌 경우 0건 |
+| 7-1 | 방아쇠를 Vercel Cron 하나로 | 크론 definitions 둘 등록 확인. Bearer 정문 200, 틀린 열쇠 401 |
+| 7-3 | web의 `EGRESS_SECRET` 삭제 | Vercel 프로덕션에서 제거(라우트가 egress 프로젝트로 옮겨 가 안 쓴다) |
+
+### IndexNow 발행기가 둘이 됐다
+
+`publish()`는 여전히 **공고 상세**만 맡는다(0028 내용 해시). 나머지 지면 — 단지 · 유형 허브 ·
+지역×유형 · 지역 · 정책문서 — 은 `publish_sitemap()`이 **배포된 `/sitemap.xml`을 읽어** 민다(0030).
+
+**왜 사이트맵을 원천으로 삼나.** 「무엇을 발행하는가」의 판정식이 web에 하나뿐이다
+(`sitemap.ts` → `queries.ts`의 `COMPLEX_FIELDS` · `AREA_MIN_COUNT` · `AREA_TYPE_MIN_COUNT`).
+pipeline이 같은 기준을 SQL로 베끼면 두 벌이 되고, 한쪽만 고치는 날 색인 대상과 발행 대상이 갈린다.
+HTTP로 읽는 건 import가 아니라 디렉터리 경계도 안 넘는다.
+
+**왜 「처음 본 URL」만 쏘고 lastmod를 안 보나.** 허브·지역의 lastmod는 「가장 최근 공고의 updated_at」이라
+수집이 돌 때마다 움직인다. 그걸 신호로 삼으면 같은 60장을 매시 다시 던진다 — 반복 제출은
+IndexNow가 하지 말라는 짓이다. 단지 지면의 변화는 제 공고가 바뀔 때 0028 경로로 이미 알려진다.
+
+손으로 밀 때: `python pipeline/scripts/indexnow.py --only sitemap --limit 1000 [--dry-run]`.
+
+### 제목 접두어는 SELECT에서 뗀다 — 그리는 쪽이 아니라
+
+`queries.ts`의 `titleCol()` 하나가 `regexp_replace`로 벗긴다. 지면·메타·RSS·JSON-LD·OG가 전부
+이 행을 받아 쓰므로 자리 하나만 고치면 어디서도 어긋나지 않는다. **DB의 title은 원문 그대로**라
+원문 대조가 언제든 되고, 되돌리기도 이 함수 하나다.
+
+### 방아쇠는 이제 하나다
+
+`web/vercel.json`의 `crons` 둘이 10분마다 `/api/cron/{collect,patrol}`을 때린다. 부를지 말지는
+전처럼 라우트가 판단한다(`lib/jobs.ts`). **Cloudflare Worker(`worker/`)와 GitHub 스케줄 블록은 지웠다.**
+
+- 열쇠가 둘인 이유: Vercel Cron은 **제 값(`CRON_SECRET`)을 `Authorization: Bearer`로** 보낸다.
+  규격이라 고를 수 없어 문을 따로 냈다. `x-cron-secret`(= `CRON_TRIGGER_SECRET`)은 콘솔·curl·모니터용.
+  **두 값은 달라도 된다.**
+- **크론은 프로덕션 배포에만 걸린다.** `vercel.json`을 고쳤으면 배포해야 등록된다.
+- **환경변수를 바꾸면 배포를 한 번 더 해야 반영된다** — 값이 배포에 물려 들어간다. `CRON_SECRET`을
+  갈아 끼우고 곧바로 쟀더니 401이었고, 재배포하니 200이었다(실측).
+- `npx vercel env pull`은 **Secret 타입 값을 가려서 준다**(11자 자리표). 그 파일로 헤더를 만들면 401이다.
+
+### 함정
+
+- **`indexnow_url`은 행을 지우지 않는다.** 어떤 URL을 다시 쏘고 싶으면 그 행만 DELETE 하면
+  다음 회차가 새 URL로 본다.
+- `schema.sql`과 `db/migrations/README.md`가 **0021부터 밀려 있었다.** 이번에 0030까지 맞췄다.
+  마이그레이션을 새로 만들면 그 둘도 같이 고친다.
+- 55차가 `ys_priv_general`에 혼인 7년을 넣으면서 `pipeline/tests/test_eligibility_seed.py`가
+  빨간불이었다. 화면은 「무관 + 년수 = 미혼이거나 혼인 N년 이내」를 이미 제대로 읽어서 **테스트가 낡은 쪽**이었다.
+  DB를 고치는 변경을 하면 `pipeline` 테스트도 한 번 돌린다(`.venv/Scripts/python.exe -m pytest`).
+  이 venv에는 pip이 없다 — 개발 의존성은 `uv pip install`로 넣는다.
+
+### 다음에 할 일 (57차가 남긴 것)
+
+0. **Cloudflare Worker를 내린다.** 코드는 지웠지만 배포된 Worker는 아직 10분마다 때린다 —
+   `npx wrangler delete --name zipgonggo-cron`(Cloudflare 로그인 필요). 안 내려도 사고는 안 난다
+   (라우트가 `skipped: fresh`로 막는다). 내린 뒤 **Vercel Cron이 혼자 도는지** ingest_log로 확인한다.
+1. **마이홈 `continue-on-error` 떼기 — 아직 이르다.** egress로 옮겨 붙은 게 오늘 05:00이고
+   그 뒤 5회 전부 성공(207→218건)인데 **7시간치**다. 며칠 뒤 다시 본다:
+   `select source, count(*) filter (where not ok), count(*) from ingest_log
+   where finished_at > now() - interval '3 days' group by 1`.
+   실패가 0에 가까우면 `.github/workflows/collect.yml`의 `continue-on-error: true`를 뗀다.
+2. **색인 추적 — 며칠 뒤에.** 단지 665장·유형 60장이 사이트맵에 오른 게 오늘이라 서치콘솔
+   「크롤링됨 — 현재 색인이 생성되지 않음」 판정이 아직 안 쌓였다. 저장소에 GSC API 연동이 없어
+   브라우저로만 본다. 단지 쪽에 몰리면 `queries.ts`의 `COMPLEX_MIN_FIELDS`를 8 → 9(665 → 446장).
+3. **못 맞춘 좌표 14건** — 행안부 요약DB 다음 달 스냅샷 대기. 재개 조건은 55차 5번 그대로.
+4. `/type/{유형}` 글 유지보수 — 지금은 13개 유형 전부 글이 있다(2026-09-16 확인). 새 housing_type이
+   들어오면 `lib/housing-types.ts`에 한 칸을 더한다. **키가 숫자로 시작하는 유형이 둘 있다**
+   (`"10년임대"` · `"50년임대"`) — 정규식으로 셀 때 빠뜨리기 쉽다.
+
+---
+
 ## 지금 상태 (2026-09-16, 56차 세션)
 
 **모든 동적 경로가 내던 soft 404를 고쳤다.** 55차가 「원인부터 찾으라」고 남긴 자리다.
