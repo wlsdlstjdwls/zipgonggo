@@ -5,7 +5,7 @@
 // 못 읽으면 원문을 그대로 보여준다 — 화면이 죽는 것보다 못난 표가 낫다.
 import Link from "next/link";
 import { isAdmin } from "@/lib/admin-auth";
-import { elapsed, ingestFacets, listIngest, parseIngestMessage, stampKST } from "@/lib/admin";
+import { elapsed, ingestPageData, parseIngestMessage, stampKST } from "@/lib/admin";
 import { JOBS, workflowRunsUrl } from "@/lib/jobs";
 import { ROUTES } from "@/lib/routes";
 import { RunButton } from "../run-button";
@@ -30,23 +30,21 @@ export default async function AdminIngest({ searchParams }: { searchParams: Prom
 
   const sp = await searchParams;
   const cur: Search = { stage: sp.stage, source: sp.source, fails: sp.fails, before: sp.before };
-  const [facets, rows] = await Promise.all([
-    ingestFacets(),
-    listIngest({
-      stage: cur.stage,
-      source: cur.source,
-      failsOnly: cur.fails === "1",
-      before: cur.before ? Number(cur.before) : undefined,
-      limit: PAGE,
-    }),
-  ]);
+  // 목록·필터 칩·실패 수를 질의 하나로 받는다(왕복 하나)
+  const { rows, stages, sources, fails30d } = await ingestPageData({
+    stage: cur.stage,
+    source: cur.source,
+    failsOnly: cur.fails === "1",
+    before: cur.before ? Number(cur.before) : undefined,
+    limit: PAGE,
+  });
   const last = rows.at(-1);
 
   return (
     <div className="adm-page">
       <header className="adm-head">
         <h1>수집 이력</h1>
-        <p className="adm-sub">최근 30일 실패 {facets.fails30d}회</p>
+        <p className="adm-sub">최근 30일 실패 {fails30d}회</p>
       </header>
 
       <div className="adm-runs">
@@ -63,13 +61,13 @@ export default async function AdminIngest({ searchParams }: { searchParams: Prom
           실패만
         </Link>
         <span className="adm-chip-gap" aria-hidden="true" />
-        {facets.stages.map((s) => (
+        {stages.map((s) => (
           <Link key={s} href={href(cur, { stage: cur.stage === s ? undefined : s })} className={cur.stage === s ? "on" : ""}>
             {s}
           </Link>
         ))}
         <span className="adm-chip-gap" aria-hidden="true" />
-        {facets.sources.map((s) => (
+        {sources.map((s) => (
           <Link key={s} href={href(cur, { source: cur.source === s ? undefined : s })} className={cur.source === s ? "on" : ""}>
             {s}
           </Link>

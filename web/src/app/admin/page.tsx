@@ -2,18 +2,7 @@
 // 숫자를 클릭해 파고드는 화면은 아직 없다. 여기서 이상을 보고 수집 이력으로 넘어가는 게 지금의 동선이다.
 import Link from "next/link";
 import { isAdmin } from "@/lib/admin-auth";
-import {
-  ago,
-  elapsed,
-  listIngest,
-  noticeStats,
-  parseIngestMessage,
-  pipelineHealth,
-  queueStats,
-  sourceBreakdown,
-  stampKST,
-  type JobHealth,
-} from "@/lib/admin";
+import { ago, dashboardData, elapsed, parseIngestMessage, stampKST, type JobHealth } from "@/lib/admin";
 import { JOBS, workflowRunsUrl } from "@/lib/jobs";
 import { ROUTES } from "@/lib/routes";
 import { RunButton } from "./run-button";
@@ -65,13 +54,8 @@ export default async function AdminDashboard() {
   // 레이아웃이 이미 걸렀지만 한 번 더 본다 — 자식 세그먼트는 레이아웃과 나란히 렌더될 수 있다
   if (!(await isAdmin())) return null;
 
-  const [health, stats, queue, sources, recent] = await Promise.all([
-    pipelineHealth(),
-    noticeStats(),
-    queueStats(),
-    sourceBreakdown(),
-    listIngest({ limit: 8 }),
-  ]);
+  // 질의 하나로 전부 받는다 — 나눠 던지면 왕복이 늘고, 동시에 던지면 커넥션을 새로 여느라 더 걸린다
+  const { health, stats, queue, sources, recent } = await dashboardData();
 
   const broken = health.filter((h) => h.ok === false || h.late);
 

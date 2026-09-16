@@ -4,6 +4,11 @@
 //
 // 캐시를 걸지 않는다. 다른 화면은 ISR로 한 시간 묵은 값을 보여도 되지만, 여기는
 // 「지금 파이프라인이 살아 있나」를 보는 자리라 묵은 숫자가 거짓말이 된다.
+//
+// **화면 하나에 질의 하나.** 처음엔 화면마다 대여섯 개를 Promise.all로 던졌는데, 그게 느렸다 —
+// 질의 자체는 다 20ms 안쪽이고 걸리는 건 **왕복**이다(로컬 한국 → Neon us-east-1 실측 216ms/회).
+// 게다가 동시에 던지면 풀에 없는 커넥션을 새로 여느라 되레 더 걸린다(600~1800ms까지 봤다).
+// 그래서 CTE로 묶어 jsonb 한 줄로 받는다. 왕복 6번이 1번이 된다.
 import { query } from "@/lib/db";
 import { CANONICAL_ONLY, NOT_CLOSED, TODAY } from "@/lib/queries";
 
@@ -18,17 +23,15 @@ export type JobSpec = {
   label: string;
   /** 정상이라면 이 주기로 돈다(분). null이면 조건부 실행이라 지연 판정을 하지 않는다 */
   everyMin: number | null;
-  /** 이 기록을 남기는 워크플로. 「지금 돌리기」 버튼이 붙는 자리 */
-  job?: "collect" | "patrol";
 };
 
 export const PIPELINE: JobSpec[] = [
-  { stage: "S1", source: "sh_scrape", label: "서울주거포털 목록", everyMin: 60, job: "collect" },
-  { stage: "S1", source: "youth_scrape", label: "청년안심주택 게시판", everyMin: 60, job: "collect" },
-  { stage: "S1", source: "ish_board", label: "i-sh 게시판(m_241)", everyMin: 24 * 60, job: "patrol" },
-  { stage: "S1", source: "ish_247", label: "i-sh 게시판(m_247)", everyMin: 24 * 60, job: "patrol" },
-  { stage: "S1", source: "myhome_api", label: "마이홈 API", everyMin: 24 * 60, job: "patrol" },
-  { stage: "S3", source: "ish_result", label: "결과 글 파싱", everyMin: 24 * 60, job: "patrol" },
+  { stage: "S1", source: "sh_scrape", label: "서울주거포털 목록", everyMin: 60 },
+  { stage: "S1", source: "youth_scrape", label: "청년안심주택 게시판", everyMin: 60 },
+  { stage: "S1", source: "ish_board", label: "i-sh 게시판(m_241)", everyMin: 24 * 60 },
+  { stage: "S1", source: "ish_247", label: "i-sh 게시판(m_247)", everyMin: 24 * 60 },
+  { stage: "S1", source: "myhome_api", label: "마이홈 API", everyMin: 24 * 60 },
+  { stage: "S3", source: "ish_result", label: "결과 글 파싱", everyMin: 24 * 60 },
   { stage: "S3", source: "sh_attach", label: "SH 첨부 공고문", everyMin: null },
   { stage: "S3", source: "youth_attach", label: "민간임대 첨부", everyMin: null },
   { stage: "S2", source: "dedupe", label: "정본 묶기", everyMin: null },
@@ -40,7 +43,7 @@ export const PIPELINE: JobSpec[] = [
 export const LATE_FACTOR = 2;
 
 export type JobHealth = JobSpec & {
-  lastAt: Date | null;
+  lastAt: string | null;
   ok: boolean | null;
   itemCount: number | null;
   ageMin: number | null;
@@ -52,32 +55,69 @@ export type JobHealth = JobSpec & {
   unknown?: boolean;
 };
 
-type HealthRow = {
+export type NoticeStats = {
+  total: number;
+  canonical: number;
+  open: number;
+  closing7d: number;
+  new24h: number;
+  updated24h: number;
+  indexnowPending: number;
+};
+
+export type QueueStats = {
+  reviewOpen: number;
+  reviewReasons: { reason: string; count: number }[];
+  resultUnparsed: number;
+  resultUnlinked: number;
+  complexNoGeo: number;
+  openNoSchedule: number;
+};
+
+export type SourceRow = {
+  source: string;
+  agency: string;
+  total: number;
+  open: number;
+  noEnd: number;
+  complexes: number;
+  noGeo: number;
+  lastPosted: string | null;
+};
+
+export type IngestRow = {
+  id: number;
   stage: string;
   source: string;
   ok: boolean;
   item_count: number;
-  started_at: Date;
+  message: string | null;
+  /** jsonb를 거쳐 와서 ISO 문자열이다. stampKST·elapsed가 문자열을 그대로 받는다 */
+  started_at: string;
+  finished_at: string;
+};
+
+type HealthRaw = {
+  stage: string;
+  source: string;
+  ok: boolean;
+  item_count: number;
+  started_at: string;
   age_min: number;
   runs7d: number;
   fails7d: number;
 };
 
-export async function pipelineHealth(): Promise<JobHealth[]> {
-  const rows = await query<HealthRow>(`
-    WITH last AS (
-      SELECT DISTINCT ON (stage, source) stage, source, ok, item_count, started_at
-      FROM ingest_log ORDER BY stage, source, started_at DESC
-    ), agg AS (
-      SELECT stage, source, count(*) AS runs, count(*) FILTER (WHERE NOT ok) AS fails
-      FROM ingest_log WHERE finished_at > now() - interval '7 days' GROUP BY 1, 2
-    )
-    SELECT l.stage, l.source, l.ok, l.item_count, l.started_at,
-           EXTRACT(EPOCH FROM (now() - l.started_at)) / 60 AS age_min,
-           coalesce(a.runs, 0)  AS "runs7d",
-           coalesce(a.fails, 0) AS "fails7d"
-    FROM last l LEFT JOIN agg a USING (stage, source)`);
+export type Dashboard = {
+  health: JobHealth[];
+  stats: NoticeStats;
+  queue: QueueStats;
+  sources: SourceRow[];
+  recent: IngestRow[];
+};
 
+/** 잡 목록과 DB 기록을 맞춰 신호등 배열을 만든다. 질의 결과를 화면 말로 옮기는 자리 */
+function toHealth(rows: HealthRaw[]): JobHealth[] {
   const byKey = new Map(rows.map((r) => [`${r.stage}|${r.source}`, r]));
   const health: JobHealth[] = PIPELINE.map((spec) => {
     const r = byKey.get(`${spec.stage}|${spec.source}`);
@@ -94,7 +134,6 @@ export async function pipelineHealth(): Promise<JobHealth[]> {
       late: spec.everyMin !== null && ageMin !== null && ageMin > spec.everyMin * LATE_FACTOR,
     };
   });
-
   // 목록에 없던 (stage, source)도 버리지 않고 뒤에 붙인다 — 파이프라인이 늘었는데
   // 여기 상수를 안 고쳐서 새 스테이지가 조용히 안 보이는 일을 막는다
   for (const r of byKey.values()) {
@@ -116,55 +155,48 @@ export async function pipelineHealth(): Promise<JobHealth[]> {
   return health;
 }
 
-// ── 공고 숫자 ──────────────────────────────────────────────────────
-
-export type NoticeStats = {
-  total: number;
-  canonical: number;
-  open: number;
-  closing7d: number;
-  new24h: number;
-  updated24h: number;
-  indexnowPending: number;
-};
-
-export async function noticeStats(): Promise<NoticeStats> {
-  const [r] = await query<NoticeStats>(`
-    SELECT count(*)::int AS total,
-           count(*) FILTER (WHERE ${CANONICAL_ONLY})::int AS canonical,
-           count(*) FILTER (WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED})::int AS open,
-           count(*) FILTER (WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED}
-                              AND apply_end_at >= ${TODAY} AND apply_end_at < ${TODAY} + 7)::int AS "closing7d",
-           count(*) FILTER (WHERE created_at > now() - interval '24 hours')::int AS "new24h",
-           count(*) FILTER (WHERE updated_at > now() - interval '24 hours')::int AS "updated24h",
-           -- 아직 한 번도 IndexNow에 안 알린 열린 공고. 발행기가 고르는 조건(마감 14일·공고일 60일)과
-           -- 똑같지는 않다 — 여기서는 「알릴 게 남았나」를 크게 보는 용도다
-           count(*) FILTER (WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED} AND indexnow_at IS NULL)::int AS "indexnowPending"
-    FROM notice`);
-  return r;
-}
-
-// ── 사람이 봐야 할 줄 ───────────────────────────────────────────────
-
-export type QueueStats = {
-  reviewOpen: number;
-  reviewReasons: { reason: string; count: number }[];
-  resultUnparsed: number;
-  resultUnlinked: number;
-  complexNoGeo: number;
-  openNoSchedule: number;
-};
-
-export async function queueStats(): Promise<QueueStats> {
-  const [reasons, [rest]] = await Promise.all([
-    query<{ reason: string; count: number }>(
-      `SELECT reason, count(*)::int AS count FROM review_queue WHERE NOT resolved GROUP BY 1 ORDER BY 2 DESC`,
-    ),
-    query<Omit<QueueStats, "reviewReasons" | "reviewOpen">>(`
-      SELECT (SELECT count(*) FROM result_post WHERE parsed_at IS NULL)::int   AS "resultUnparsed",
-             (SELECT count(*) FROM result_post WHERE notice_id IS NULL)::int   AS "resultUnlinked",
+/** 대시보드가 쓰는 값 전부. **질의 한 번**(왕복 하나)에 받는다 */
+export async function dashboardData(): Promise<Dashboard> {
+  const [row] = await query<{
+    health: HealthRaw[];
+    stats: NoticeStats;
+    queue: Omit<QueueStats, "reviewOpen" | "reviewReasons">;
+    reasons: { reason: string; count: number }[];
+    sources: SourceRow[];
+    recent: IngestRow[];
+  }>(`
+    WITH last AS (
+      SELECT DISTINCT ON (stage, source) stage, source, ok, item_count, started_at
+      FROM ingest_log ORDER BY stage, source, started_at DESC
+    ), agg AS (
+      SELECT stage, source, count(*) AS runs, count(*) FILTER (WHERE NOT ok) AS fails
+      FROM ingest_log WHERE finished_at > now() - interval '7 days' GROUP BY 1, 2
+    ), health AS (
+      SELECT l.stage, l.source, l.ok, l.item_count, l.started_at,
+             (EXTRACT(EPOCH FROM (now() - l.started_at)) / 60)::int AS age_min,
+             coalesce(a.runs, 0)::int  AS "runs7d",
+             coalesce(a.fails, 0)::int AS "fails7d"
+      FROM last l LEFT JOIN agg a USING (stage, source)
+    ), stats AS (
+      SELECT count(*)::int AS total,
+             count(*) FILTER (WHERE ${CANONICAL_ONLY})::int AS canonical,
+             count(*) FILTER (WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED})::int AS open,
+             count(*) FILTER (WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED}
+                                AND apply_end_at >= ${TODAY} AND apply_end_at < ${TODAY} + 7)::int AS "closing7d",
+             count(*) FILTER (WHERE created_at > now() - interval '24 hours')::int AS "new24h",
+             count(*) FILTER (WHERE updated_at > now() - interval '24 hours')::int AS "updated24h",
+             -- 아직 한 번도 IndexNow에 안 알린 열린 공고. 발행기가 고르는 조건(마감 14일·공고일 60일)과
+             -- 똑같지는 않다 — 여기서는 「알릴 게 남았나」를 크게 보는 용도다
+             count(*) FILTER (WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED} AND indexnow_at IS NULL)::int
+               AS "indexnowPending"
+      FROM notice
+    ), reasons AS (
+      SELECT reason, count(*)::int AS count FROM review_queue WHERE NOT resolved GROUP BY 1
+    ), queue AS (
+      SELECT (SELECT count(*) FROM result_post WHERE parsed_at IS NULL)::int AS "resultUnparsed",
+             (SELECT count(*) FROM result_post WHERE notice_id IS NULL)::int AS "resultUnlinked",
              -- 열린 공고에 걸린 단지 중 좌표를 못 붙인 것. 지도에 못 찍히는 지면이다.
-             -- 마감 판정 식(CLOSED)은 컬럼 이름을 그대로 쓰므로 notice만 있는 안쪽 질의에 가둔다 —
+             -- 마감 판정식(CLOSED)은 컬럼 이름을 맨몸으로 쓰므로 notice만 있는 안쪽 질의에 가둔다 —
              -- 밖에서 조인해 별칭을 붙이면 같은 식을 손으로 고쳐 쓰게 되고, 그때부터 목록과 어긋난다
              (SELECT count(*) FROM notice_complex
                WHERE geom IS NULL
@@ -172,60 +204,50 @@ export async function queueStats(): Promise<QueueStats> {
                AS "complexNoGeo",
              -- 접수 마감일이 아예 없는 열린 공고. D-day를 못 그리고 마감 판정도 발표일에만 기댄다
              (SELECT count(*) FROM notice
-               WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED} AND apply_end_at IS NULL)::int AS "openNoSchedule"`),
-  ]);
+               WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED} AND apply_end_at IS NULL)::int AS "openNoSchedule"
+    ), sources AS (
+      SELECT source, agency,
+             count(*)::int AS total,
+             count(*) FILTER (WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED})::int AS open,
+             count(*) FILTER (WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED} AND apply_end_at IS NULL)::int AS "noEnd",
+             coalesce(sum(g.c), 0)::int      AS complexes,
+             coalesce(sum(g.nogeom), 0)::int AS "noGeo",
+             max(posted_at)::text AS "lastPosted"
+      FROM notice
+      LEFT JOIN LATERAL (
+        SELECT count(*) AS c, count(*) FILTER (WHERE geom IS NULL) AS nogeom
+        FROM notice_complex WHERE notice_id = notice.id
+      ) g ON true
+      GROUP BY 1, 2
+    ), recent AS (
+      SELECT id, stage, source, ok, item_count, message, started_at, finished_at
+      FROM ingest_log ORDER BY id DESC LIMIT 8
+    )
+    -- jsonb_agg는 CTE의 ORDER BY를 물려받지 않는다. 정렬은 여기서 다시 말해야 한다
+    SELECT (SELECT coalesce(jsonb_agg(to_jsonb(h)), '[]'::jsonb) FROM health h)         AS health,
+           (SELECT to_jsonb(s) FROM stats s)                                            AS stats,
+           (SELECT to_jsonb(q) FROM queue q)                                            AS queue,
+           (SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY r.count DESC), '[]'::jsonb)
+              FROM reasons r)                                                           AS reasons,
+           (SELECT coalesce(jsonb_agg(to_jsonb(s) ORDER BY s.open DESC, s.total DESC), '[]'::jsonb)
+              FROM sources s)                                                           AS sources,
+           (SELECT coalesce(jsonb_agg(to_jsonb(i) ORDER BY i.id DESC), '[]'::jsonb)
+              FROM recent i)                                                            AS recent`);
+
   return {
-    reviewOpen: reasons.reduce((a, r) => a + r.count, 0),
-    reviewReasons: reasons,
-    ...rest,
+    health: toHealth(row.health),
+    stats: row.stats,
+    queue: {
+      reviewOpen: row.reasons.reduce((a, r) => a + r.count, 0),
+      reviewReasons: row.reasons,
+      ...row.queue,
+    },
+    sources: row.sources,
+    recent: row.recent,
   };
 }
 
-// ── 출처별 현황 ────────────────────────────────────────────────────
-
-export type SourceRow = {
-  source: string;
-  agency: string;
-  total: number;
-  open: number;
-  noEnd: number;
-  complexes: number;
-  noGeo: number;
-  lastPosted: string | null;
-};
-
-export async function sourceBreakdown(): Promise<SourceRow[]> {
-  // notice에 별칭을 안 붙인다 — CLOSED·CANONICAL_ONLY가 컬럼 이름을 그대로 쓰는 식이라
-  // 별칭을 붙이는 순간 그 식을 손으로 고쳐 써야 하고, 그러면 목록 화면과 기준이 갈린다
-  const rows = await query<SourceRow>(`
-    SELECT source, agency,
-           count(*)::int AS total,
-           count(*) FILTER (WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED})::int AS open,
-           count(*) FILTER (WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED} AND apply_end_at IS NULL)::int AS "noEnd",
-           coalesce(sum(g.c), 0)::int      AS complexes,
-           coalesce(sum(g.nogeom), 0)::int AS "noGeo",
-           max(posted_at)::text AS "lastPosted"
-    FROM notice
-    LEFT JOIN LATERAL (
-      SELECT count(*) AS c, count(*) FILTER (WHERE geom IS NULL) AS nogeom
-      FROM notice_complex WHERE notice_id = notice.id
-    ) g ON true
-    GROUP BY 1, 2 ORDER BY open DESC, total DESC`);
-  return rows;
-}
-
 // ── 수집 이력 ──────────────────────────────────────────────────────
-
-export type IngestRow = {
-  id: number;
-  stage: string;
-  source: string;
-  ok: boolean;
-  item_count: number;
-  message: string | null;
-  started_at: Date;
-  finished_at: Date;
-};
 
 export type IngestFilter = {
   stage?: string;
@@ -237,37 +259,43 @@ export type IngestFilter = {
   limit?: number;
 };
 
-export async function listIngest(f: IngestFilter = {}): Promise<IngestRow[]> {
-  return query<IngestRow>(
-    `SELECT id, stage, source, ok, item_count, message, started_at, finished_at
-     FROM ingest_log
-     WHERE ($1::text   IS NULL OR stage  = $1)
-       AND ($2::text   IS NULL OR source = $2)
-       AND ($3::bool   IS NULL OR ok     = false)
-       AND ($4::bigint IS NULL OR id     < $4)
-     ORDER BY id DESC LIMIT $5`,
+export type IngestPage = {
+  rows: IngestRow[];
+  stages: string[];
+  sources: string[];
+  fails30d: number;
+};
+
+/** 이력 화면이 쓰는 값 전부(목록 + 필터 칩 + 실패 수). 여기도 **질의 한 번**이다.
+ *  필터 칩 값은 코드 상수가 아니라 **DB에 실제로 있는 값**을 보여준다 */
+export async function ingestPageData(f: IngestFilter = {}): Promise<IngestPage> {
+  const [row] = await query<IngestPage>(
+    `WITH rows AS (
+       SELECT id, stage, source, ok, item_count, message, started_at, finished_at
+       FROM ingest_log
+       WHERE ($1::text   IS NULL OR stage  = $1)
+         AND ($2::text   IS NULL OR source = $2)
+         AND ($3::bool   IS NULL OR ok     = false)
+         AND ($4::bigint IS NULL OR id     < $4)
+       ORDER BY id DESC LIMIT $5
+     )
+     SELECT (SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY r.id DESC), '[]'::jsonb) FROM rows r) AS rows,
+            (SELECT coalesce(jsonb_agg(DISTINCT stage), '[]'::jsonb) FROM ingest_log)  AS stages,
+            (SELECT coalesce(jsonb_agg(DISTINCT source), '[]'::jsonb) FROM ingest_log) AS sources,
+            (SELECT count(*)::int FROM ingest_log
+              WHERE NOT ok AND finished_at > now() - interval '30 days')               AS "fails30d"`,
     [f.stage ?? null, f.source ?? null, f.failsOnly ? true : null, f.before ?? null, f.limit ?? 50],
   );
+  // jsonb_agg(DISTINCT …)는 정렬을 보장하지 않는다. 칩 순서는 화면 몫이라 여기서 세운다
+  return { ...row, stages: [...row.stages].sort(), sources: [...row.sources].sort() };
 }
 
-/** 최근 30일 실패 회차 수. 탭 뱃지 하나를 위한 값이라 따로 뽑는다 */
+/** 탭 뱃지용 실패 수. 레이아웃이 페이지와 **나란히** 도는 유일한 질의라 작게 유지한다 */
 export async function recentFailCount(): Promise<number> {
   const [r] = await query<{ n: number }>(
     `SELECT count(*)::int AS n FROM ingest_log WHERE NOT ok AND finished_at > now() - interval '30 days'`,
   );
   return r.n;
-}
-
-/** 필터 칩에 쓸 값 목록. 코드 상수가 아니라 **DB에 실제로 있는 값**을 보여준다 */
-export async function ingestFacets(): Promise<{ stages: string[]; sources: string[]; fails30d: number }> {
-  const [stages, sources, [f]] = await Promise.all([
-    query<{ v: string }>(`SELECT DISTINCT stage AS v FROM ingest_log ORDER BY 1`),
-    query<{ v: string }>(`SELECT DISTINCT source AS v FROM ingest_log ORDER BY 1`),
-    query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM ingest_log WHERE NOT ok AND finished_at > now() - interval '30 days'`,
-    ),
-  ]);
-  return { stages: stages.map((r) => r.v), sources: sources.map((r) => r.v), fails30d: f.n };
 }
 
 // ── ingest_log.message 읽기 ────────────────────────────────────────
