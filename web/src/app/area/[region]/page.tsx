@@ -16,17 +16,19 @@ export const dynamicParams = true;
 // DB(us-east-1)와 리전을 맞춘다 — layout.tsx와 같은 값 유지
 export const preferredRegion = "iad1";
 
-type Params = { params: Promise<{ sido: string }> };
+// 세그먼트 이름은 region — 이 자리엔 시도가 오지만, 한 단 아래 [type]에서는 같은 자리에 시군구가 온다
+// (/area/{시도}와 /area/{시군구}/{유형}, docs/url-structure.md). Next는 같은 깊이의 이름이 하나여야 한다
+type Params = { params: Promise<{ region: string }> };
 
 /** 3건 이상인 시도만 빌드 시 생성 — 얇은 페이지 방지 규칙(CLAUDE.md 4). */
 export async function generateStaticParams() {
   const options = await listFilterOptions(undefined);
-  return options.sido.filter((o) => o.count >= AREA_MIN_COUNT).map((o) => ({ sido: o.value }));
+  return options.sido.filter((o) => o.count >= AREA_MIN_COUNT).map((o) => ({ region: o.value }));
 }
 
 async function loadSido(params: Params["params"]): Promise<string> {
-  const { sido } = await params;
-  return decodeURIComponent(sido);
+  const { region } = await params;
+  return decodeURIComponent(region);
 }
 
 /** meta description과 JSON-LD가 같은 문장을 쓴다 */

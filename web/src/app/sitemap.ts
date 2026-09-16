@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { AREA_MIN_COUNT, SITEMAP_MAX_URLS, SITEMAP_PRIORITY_CLOSED, SITEMAP_PRIORITY_OPEN } from "@/lib/constants";
-import { listFilterOptions, listSitemapComplexes, listSitemapNotices } from "@/lib/queries";
-import { areaPath, noticeComplexPath, noticePath, ROUTES } from "@/lib/routes";
+import { AREA_TYPE_MIN_COUNT, listAreaTypePairs, listFilterOptions, listSitemapComplexes, listSitemapNotices, listTypeHubs } from "@/lib/queries";
+import { areaPath, areaTypePath, noticeComplexPath, noticePath, ROUTES, typePath } from "@/lib/routes";
+import { housingTypeDoc } from "@/lib/housing-types";
 import { absoluteUrl } from "@/lib/site-url";
 
 // 색인 대상 URL의 단일 원천. 홈 + 정책 문서 + 지역(/area) + 공고 상세 + 기준을 채운 단지.
@@ -12,10 +13,12 @@ import { absoluteUrl } from "@/lib/site-url";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [notices, options, complexes] = await Promise.all([
+  const [notices, options, complexes, hubs, pairs] = await Promise.all([
     listSitemapNotices(SITEMAP_MAX_URLS),
     listFilterOptions(undefined),
     listSitemapComplexes(SITEMAP_MAX_URLS),
+    listTypeHubs(),
+    listAreaTypePairs(),
   ]);
   const latest = notices[0] ? new Date(notices[0].updated_at) : new Date();
   return [
@@ -25,6 +28,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 정책 문서 — 내용이 거의 안 바뀌지만 색인은 시켜 둔다(신뢰 신호)
     { url: absoluteUrl(ROUTES.terms), lastModified: latest, changeFrequency: "yearly", priority: 0.2 },
     { url: absoluteUrl(ROUTES.privacy), lastModified: latest, changeFrequency: "yearly", priority: 0.2 },
+    // 유형 허브 — 직접 쓴 제도 설명이 있는 유형만. 페이지 자체가 그 기준으로 404를 낸다
+    ...hubs.filter((h) => housingTypeDoc(h.housing_type)).map((h) => ({
+      url: absoluteUrl(typePath(h.housing_type)),
+      lastModified: latest,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    })),
+    // 지역×유형 — 5건 이상만(얇은 페이지 방지). 미달 쌍은 페이지도 noindex다
+    ...pairs.filter((p) => p.count >= AREA_TYPE_MIN_COUNT).map((p) => ({
+      url: absoluteUrl(areaTypePath(p, p.housing_type)),
+      lastModified: latest,
+      changeFrequency: "daily" as const,
+      priority: 0.6,
+    })),
     ...options.sido.filter((o) => o.count >= AREA_MIN_COUNT).map((o) => ({
       url: absoluteUrl(areaPath(o.value)),
       lastModified: latest,

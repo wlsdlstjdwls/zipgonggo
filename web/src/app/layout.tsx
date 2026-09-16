@@ -10,10 +10,11 @@ import {
   AREA_MIN_COUNT, BOOT_SCOPE_JS, CONTACT_EMAIL, GOOGLE_SITE_VERIFICATION, NAVER_SITE_VERIFICATION,
   SITE_DESCRIPTION, SITE_NAME, SITE_TITLE,
 } from "@/lib/constants";
-import { areaPath, ROUTES } from "@/lib/routes";
+import { areaPath, ROUTES, typePath } from "@/lib/routes";
 import Link from "next/link";
-import { listFacets, listFilterOptions } from "@/lib/queries";
+import { listFacets, listFilterOptions, listTypeHubs } from "@/lib/queries";
 import { sidoShort } from "@/lib/sido";
+import { housingTypeDoc } from "@/lib/housing-types";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
@@ -43,8 +44,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // 필터가 걸리면 ListStateProvider가 /api/facets로 다시 받아 갈아끼운다.
   // 푸터 지역 링크 — 사이트맵과 **같은 원천·같은 기준**(listFilterOptions + AREA_MIN_COUNT)이어야 한다.
   // 사이트맵에만 있고 링크가 없으면 /area/{시도}는 고아 페이지가 된다(2026-09-15 점검: 홈 HTML에 /area 링크 0개).
-  const [facets, options] = await Promise.all([listFacets({}), listFilterOptions(undefined)]);
+  const [facets, options, hubs] = await Promise.all([listFacets({}), listFilterOptions(undefined), listTypeHubs()]);
   const areas = options.sido.filter((o) => o.count >= AREA_MIN_COUNT);
+  // 유형 허브(/type)로 가는 유일한 내부 링크. 설명을 써 둔 유형만 발행하므로 그 기준을 그대로 쓴다
+  const types = hubs.filter((h) => housingTypeDoc(h.housing_type));
   return (
     // 부트 스크립트가 하이드레이션 전에 data-booting을 걸어 서버 HTML과 어긋난다 — 의도된 차이라 경고를 끈다
     <html lang="ko" suppressHydrationWarning>
@@ -104,6 +107,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                       <li key={o.value}>
                         <Link href={areaPath(o.value)}>
                           {sidoShort(o.value)} <em>{o.count}</em>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              )}
+              {types.length > 0 && (
+                <nav className="foot-area" aria-label="유형별 안내">
+                  <b>유형별 안내</b>
+                  <ul>
+                    {types.map((h) => (
+                      <li key={h.housing_type}>
+                        <Link href={typePath(h.housing_type)}>
+                          {h.housing_type} <em>{h.total}</em>
                         </Link>
                       </li>
                     ))}

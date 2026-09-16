@@ -1,11 +1,13 @@
 // 앱 내부 경로 빌더. 경로 형식은 docs/url-structure.md — 타입 세그먼트는 영어, 식별자는 한글(인코딩).
 import { noticeFiltersToParams } from "./notice-filters";
+import { sidoShort } from "./sido";
 import type { NoticeFilters } from "@/types/notice";
 
 export const ROUTES = {
   home: "/",
   notice: "/notice",
   area: "/area",
+  type: "/type",
   api: "/api",
   apiNotices: "/api/notices",
   apiFacets: "/api/facets",
@@ -53,6 +55,26 @@ export function areaPath(sido: string, f: NoticeFilters = {}): string {
   const q = noticeFiltersToParams(rest).toString();
   const base = `${ROUTES.area}/${encodeURIComponent(sido)}`;
   return q ? `${base}?${q}` : base;
+}
+
+/**
+ * /area/{시군구}/{유형} 지역×유형 경로. docs/url-structure.md.
+ *
+ * 같은 이름의 시군구가 여러 시도에 있으면(북구는 부산/울산/광주에 다 있다) 시도 통칭을 앞에 붙인다 —
+ * 「울산 북구」처럼 한국 사람이 실제로 말로 구분하는 방식 그대로다.
+ * 이름이 하나뿐이면 붙이지 않는다(「강동구」). 붙였다 뗐다 하는 기준은 DB의 시군구 이름 중복 여부 하나다.
+ */
+export function areaTypeSegment(p: { sido: string; sigungu: string; ambiguous: boolean }): string {
+  return p.ambiguous ? `${sidoShort(p.sido)} ${p.sigungu}` : p.sigungu;
+}
+
+export function areaTypePath(p: { sido: string; sigungu: string; ambiguous: boolean }, housingType: string): string {
+  return `${ROUTES.area}/${encodeURIComponent(areaTypeSegment(p))}/${encodeURIComponent(housingType)}`;
+}
+
+/** /type/{유형} 유형 허브 경로. */
+export function typePath(housingType: string): string {
+  return `${ROUTES.type}/${encodeURIComponent(housingType)}`;
 }
 
 /** 다음 페이지 API 경로. */

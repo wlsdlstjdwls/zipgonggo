@@ -368,6 +368,81 @@ export async function getAmendChain(n: Pick<Notice, "source_key" | "amends_sourc
   return { original: original[0] ?? null, amendments };
 }
 
+/* ── 유형 허브(/type)와 지역×유형(/area/{시군구}/{유형}) ────────────────────
+   docs/url-structure.md의 남은 두 축. 둘 다 서버가 목록을 그대로 그리는 착지 페이지다 —
+   홈처럼 클라이언트 필터 상태(ListStateProvider)를 태우지 않는다. 검색에서 바로 들어오는 자리라
+   URL 하나에 결과 하나가 맞고, ISR 캐시도 한 장으로 끝난다.
+
+   지역은 notice.sigungu가 아니라 **notice_area**로 센다 — 여러 시군구에 걸친 공고가 있어
+   notice.sigungu 한 칸만 보면 시군구 89개, notice_area로 보면 132개다(실측 2026-09-16). */
+
+/** 지역×유형 발행 최소 건수 — 얇은 페이지 방지 규칙(CLAUDE.md 4: 지역×유형은 5건 이상) */
+export const AREA_TYPE_MIN_COUNT = 5;
+
+export type AreaTypePair = { sido: string; sigungu: string; housing_type: string; count: number; ambiguous: boolean };
+
+/** (시군구, 유형) 쌍 **전부**. 발행 대상은 `count >= AREA_TYPE_MIN_COUNT`인 것만이지만,
+ *  미달 쌍도 URL로 들어올 수 있어(링크를 지우지 않는다 — CLAUDE.md 5) 페이지가 제 건수를 알아야 한다.
+ *  ambiguous면 같은 이름의 시군구가 다른 시도에도 있어 URL 앞에 시도 통칭을 붙인다. 180행 남짓이라 통째로 받는다 */
+export const listAreaTypePairs = cache(unstable_cache(
+  async (): Promise<AreaTypePair[]> =>
+    query<AreaTypePair>(
+      `WITH pair AS (
+         SELECT a.sido, a.sigungu, n.housing_type::text AS housing_type, count(DISTINCT n.id)::int AS count
+           FROM notice_area a JOIN notice n ON n.id = a.notice_id
+          WHERE n.canonical_id IS NULL AND a.sigungu IS NOT NULL
+          GROUP BY 1, 2, 3),
+       dup AS (SELECT sigungu FROM notice_area WHERE sigungu IS NOT NULL GROUP BY 1 HAVING count(DISTINCT sido) > 1)
+       SELECT p.*, (p.sigungu IN (SELECT sigungu FROM dup)) AS ambiguous
+         FROM pair p ORDER BY p.count DESC, p.sido, p.sigungu`,
+    ),
+  ["area-type-pairs-v1"],
+  CACHE_OPTS,
+));
+
+export type TypeHub = { housing_type: string; total: number; open: number; sidos: number };
+
+/** 유형별 전국 현황. /type/{유형}의 「전국 공고 현황」과 유형 목록이 같이 쓴다 */
+export const listTypeHubs = cache(unstable_cache(
+  async (): Promise<TypeHub[]> =>
+    query<TypeHub>(
+      `SELECT housing_type::text AS housing_type, count(*)::int AS total,
+              count(*) FILTER (WHERE ${NOT_CLOSED})::int AS open,
+              count(DISTINCT sido)::int AS sidos
+         FROM notice WHERE ${CANONICAL_ONLY} GROUP BY 1 ORDER BY 2 DESC`,
+    ),
+  ["type-hubs-v1"],
+  CACHE_OPTS,
+));
+
+/** 착지 페이지가 그리는 목록. 진행 중을 먼저, 그다음 최신순. 페이징 없이 limit까지만 */
+export const listLandingNotices = unstable_cache(
+  async (f: { type: string; sido?: string; sigungu?: string }, limit: number): Promise<NoticeListItem[]> => {
+    const params: unknown[] = [f.type];
+    const where = [CANONICAL_ONLY, `housing_type::text = $1`];
+    if (f.sigungu) {
+      params.push(f.sigungu);
+      const pSigungu = params.length;
+      params.push(f.sido ?? null);
+      const pSido = params.length;
+      where.push(`EXISTS (SELECT 1 FROM notice_area a
+                           WHERE a.notice_id = notice.id AND a.sigungu = $${pSigungu}
+                             AND ($${pSido}::text IS NULL OR a.sido = $${pSido}))`);
+    } else if (f.sido) {
+      params.push(f.sido);
+      where.push(`sido = $${params.length}`);
+    }
+    params.push(limit);
+    return query<NoticeListItem>(
+      `SELECT ${LIST_COLS} FROM notice ${whereSql(where)}
+        ORDER BY (${CLOSED}), posted_at DESC, source_rank ASC NULLS LAST, id DESC LIMIT $${params.length}`,
+      params,
+    );
+  },
+  ["landing-notices-v1"],
+  CACHE_OPTS,
+);
+
 /* ── 단지 페이지 색인 기준 (docs/url-structure.md 얇은 페이지 방지) ──────────────
    단지 상세는 호실 상세 자리를 대신 채우고 있어 그 기준을 그대로 받는다 — 「고유 필드 8개 이상 + 건물 단위 좌표」.
    전에는 좌표가 아예 없어 전량 noindex였다(2026-09-09 주석). S6가 도로명주소 요약DB를 오프라인 조인해
