@@ -58,7 +58,14 @@ def test_지역등급은_서울과_연접만(seed):
     assert any(t["kind"] == "sido" for t in seed["region_tiers"]), "인천광역시는 시도 단위로 들어온다"
 
 
-def test_혼인기간_제한이_있으면_혼인_유형이다(seed):
+def test_혼인기간_제한은_미혼_유형에_붙지_않는다(seed):
+    """「혼인 N년 이내」는 혼인 유형뿐 아니라 **무관** 유형에도 붙는다.
+
+    청년안심주택 민간임대 일반공급(`ys_priv_general`)이 그렇다 — 만 39세 이하 청년이거나
+    혼인 7년 이내면 신청할 수 있다. 화면도 그렇게 읽는다(`web/src/lib/eligibility.ts`의
+    `marital === "무관"` 가지 → 「미혼이거나 혼인 N년 이내」).
+    말이 안 되는 조합은 **미혼 + 혼인기간**뿐이다. 그것만 막는다.
+    """
     for t in seed["supply_types"]:
         if t["marital_max_yr"]:
-            assert t["marital"] == "혼인", t["code"]
+            assert t["marital"] in ("혼인", "무관"), t["code"]
