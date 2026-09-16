@@ -6,7 +6,7 @@
 // 그래서 여기 숫자는 「구글 애널리틱스보다 작게」 나오는 게 정상이다.
 import Link from "next/link";
 import { isAdmin } from "@/lib/admin-auth";
-import { pathKind, RANGES, rangeOf, visitorReport, ONLINE_MIN } from "@/lib/analytics";
+import { DEFAULT_RANGE, pathKind, RANGES, rangeOf, visitorReport, ONLINE_MIN } from "@/lib/analytics";
 import { ROUTES } from "@/lib/routes";
 import { VisitChart } from "./visit-chart";
 
@@ -50,18 +50,21 @@ export default async function AdminVisitors({ searchParams }: { searchParams: Pr
           value={report.totalVisitors}
           note={`${report.totalViews.toLocaleString("ko-KR")}뷰`}
         />
-        <Stat
-          label={`${range.label} 방문`}
-          value={report.rangeVisitors}
-          note={`${report.rangeViews.toLocaleString("ko-KR")}뷰`}
-        />
+        {/* 기본 기간(1일)에서는 이 칸이 「오늘 방문」과 글자까지 같은 값이 된다. 같은 숫자를 두 번 놓지 않는다 */}
+        {range.days > 1 && (
+          <Stat
+            label={`${range.label} 방문`}
+            value={report.rangeVisitors}
+            note={`${report.rangeViews.toLocaleString("ko-KR")}뷰`}
+          />
+        )}
       </div>
 
       <div className="adm-chips" role="group" aria-label="기간">
         {RANGES.map((x) => (
           <Link
             key={x.key}
-            href={x.key === RANGES[1].key ? ROUTES.adminVisitors : `${ROUTES.adminVisitors}?r=${x.key}`}
+            href={x.key === DEFAULT_RANGE.key ? ROUTES.adminVisitors : `${ROUTES.adminVisitors}?r=${x.key}`}
             className={x.key === range.key ? "on" : ""}
           >
             {x.label}

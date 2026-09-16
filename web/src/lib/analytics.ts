@@ -97,8 +97,11 @@ export const RANGES = [
 
 export type RangeKey = (typeof RANGES)[number]["key"];
 
+/** 아무것도 안 고른 기본 기간. 첫 화면은 「오늘 어떤가」를 보는 자리다 */
+export const DEFAULT_RANGE = RANGES[0];
+
 export function rangeOf(key: string | undefined): (typeof RANGES)[number] {
-  return RANGES.find((r) => r.key === key) ?? RANGES[1];
+  return RANGES.find((r) => r.key === key) ?? DEFAULT_RANGE;
 }
 
 export type VisitorSummary = {
