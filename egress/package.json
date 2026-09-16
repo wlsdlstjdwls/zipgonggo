@@ -1,0 +1,6 @@
+{
+  "name": "zipgonggo-egress",
+  "private": true,
+  "type": "module",
+  "description": "한국에서 나가는 구멍. web도 pipeline도 아니다 — 리전만 다른 네트워크 경로다"
+}

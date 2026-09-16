@@ -22,10 +22,31 @@
 같은 시각 한국 회선에선 전부 0.04초에 붙는다. 마이홈만의 문제가 아니라 **매시 잡의 본줄기인
 SH 목록도 같은 식으로 죽는다**(09-16 01:20Z 실행이 그렇게 실패했다).
 
-**플랜이 Pro다**(사용자 확인 2026-09-16). 그래서 `preferredRegion = "icn1"` 함수를 세워
-한국에서 나가는 경로를 만들 수 있다 — 09-09에 적어 둔 「Hobby라 함수 리전이 iad1 고정」은
-**더는 사실이 아니다**(`layout.tsx`·`db.ts` 주석을 고쳤다). 아래 「다음에 할 일」 참고.
-이번 세션은 그 전에 **자주 두드려 확률로 이긴다**까지만 했다.
+**플랜이 Pro다**(사용자 확인 2026-09-16). 09-09에 적어 둔 「Hobby라 함수 리전이 iad1 고정」은
+**더는 사실이 아니다**(`layout.tsx`·`db.ts` 주석을 고쳤다).
+
+### 서울 출구 — `egress/` (별도 Vercel 프로젝트)
+
+그래서 web에 `preferredRegion = "icn1"` 라우트를 뒀는데 **안 먹었다.** 200은 오는데
+`x-egress-region`이 `iad1`이었다 — `zipgonggo` 프로젝트는 **Fluid Compute**가 켜져 있고
+(`functionDefaultRegions: ["iad1"]`), **Fluid는 함수별 리전 지정을 무시하고 프로젝트 기본 리전에서
+전부 돌린다.** Pro라서 되는 게 아니라 Fluid라서 안 되는 것이었다.
+그 상태로 켜면 버지니아를 한 번 더 거쳐 같은 차단을 맞는다 — 실측 안 했으면 그대로 켤 뻔했다.
+
+web의 Fluid를 끄면 사용자 화면이 느려지니 **리전만 다른 별도 프로젝트**로 뗐다.
+
+| 자리 | 몫 |
+|---|---|
+| `egress/api/index.js` | 받은 URL로 GET/POST 하고 바이트를 그대로 돌려준다. **파싱도 DB도 없다.** 허용 호스트 6개, `EGRESS_SECRET` 검사, 리다이렉트는 `Location`만 넘긴다 |
+| `egress/vercel.json` | `regions: ["icn1"]`. 프로젝트 `zipgonggo-egress`, rootDirectory `egress` |
+| `pipeline/.../sources/egress.py` | 켤지와 이 URL이 대상인지를 판단한다. `ThrottledHttp`와 `juso_search`가 같이 쓴다 |
+
+**환경변수 둘이 다 있어야 켜진다** — `EGRESS_PROXY_URL` · `EGRESS_SECRET`(ASCII로. HTTP 헤더 값이다).
+비우면 지금까지처럼 직접 나간다. **로컬(한국)은 비워 두는 게 맞다.**
+허용 호스트를 늘릴 땐 **양쪽을 같이 고친다** — 한쪽만 늘리면 403이 돌아온다.
+
+**배포 뒤에는 반드시 `x-egress-region`을 확인한다**(`egress/README.md`에 curl 한 줄). `icn1`이
+아니면 우회가 통째로 무의미하다.
 
 ### 고친 것 넷
 
