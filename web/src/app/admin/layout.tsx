@@ -1,7 +1,7 @@
 // 관리자 콘솔의 껍데기. 셋을 한다 — 출입 확인, 탭, 색인 차단.
 //
 // 로그인 화면을 **따로 URL로 두지 않는다**: 안 들어온 사람에게는 이 레이아웃이 children 대신
-// 토큰 입력칸을 그린다. /admin/login 같은 자리를 만들면 그 자리만 이 레이아웃의 확인을 비껴가야 해서
+// 로그인 칸을 그린다. /admin/login 같은 자리를 만들면 그 자리만 이 레이아웃의 확인을 비껴가야 해서
 // 「가드가 안 걸리는 예외 경로」가 생긴다 — 예외가 하나 생기는 순간 실수가 들어온다.
 //
 // 데이터 보호는 화면이 아니라 이 확인 하나에 달려 있다(회원 시스템이 없어 DB 쪽 RLS가 없다).
@@ -9,7 +9,7 @@
 // 서버 컴포넌트는 먼저 돌 수 있기 때문이다.
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { adminToken, isAdmin } from "@/lib/admin-auth";
+import { adminCreds, isAdmin } from "@/lib/admin-auth";
 import { recentFailCount } from "@/lib/admin";
 import { AdminNav } from "./admin-nav";
 import { LoginForm } from "./login-form";
@@ -24,8 +24,8 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // 토큰을 안 정한 배포에는 콘솔이 아예 없다 — 빈 값끼리 맞아떨어지는 사고를 원천에서 막는다
-  if (!adminToken()) notFound();
+  // 계정을 안 정한 배포에는 콘솔이 아예 없다 — 빈 값끼리 맞아떨어지는 사고를 원천에서 막는다
+  if (!adminCreds()) notFound();
   if (!(await isAdmin())) return <LoginForm />;
 
   const fails30d = await recentFailCount();

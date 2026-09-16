@@ -62,7 +62,9 @@ docs/       설계 문서. 결정이 바뀌면 코드보다 먼저 여기를 고
 
 `web/src/app/admin`은 운영자 콘솔(`/admin`)이다. **여기도 DB를 읽기만 한다** — 숫자를 보여줄 뿐,
 고치는 일은 pipeline 스테이지를 돌려서 한다. 콘솔이 하는 유일한 바깥 행동은 GitHub 워크플로 dispatch.
-출입은 `ADMIN_TOKEN` 하나(회원 시스템 없음). 값이 비면 콘솔 전체가 404다.
+출입은 `ADMIN_EMAIL` + `ADMIN_PASSWORD_HASH` 둘(회원 시스템 없음, DB에 계정 표를 두지 않는다).
+비밀번호는 scrypt 해시로만 둔다 — `node web/scripts/admin-password.mjs '비밀번호'`로 만든다.
+둘 중 하나라도 비면 콘솔 전체가 404다.
 
 ## URL 규칙
 

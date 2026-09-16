@@ -1,6 +1,7 @@
 "use client";
 
-// 관리자 토큰 입력. 회원 시스템이 없어 아이디 칸도 없다 — `ADMIN_TOKEN` 한 줄이 전부다.
+// 운영자 로그인. 계정은 env 두 줄(ADMIN_EMAIL · ADMIN_PASSWORD_HASH)이 전부다 —
+// 회원 표도, 가입도, 비밀번호 찾기도 없다. 비밀번호를 바꾸는 길은 해시를 새로 넣고 배포하는 것뿐.
 import { useActionState } from "react";
 import { signIn, type ActionState } from "./actions";
 
@@ -9,15 +10,22 @@ export function LoginForm() {
   return (
     <form action={action} className="adm-login">
       <h1>관리자 콘솔</h1>
-      <p>운영자 토큰을 넣으세요.</p>
+      <p>운영자 계정으로 들어가세요.</p>
+      <input
+        type="email"
+        name="email"
+        autoComplete="username"
+        placeholder="이메일"
+        aria-label="이메일"
+        autoFocus
+        required
+      />
       <input
         type="password"
-        name="token"
+        name="password"
         autoComplete="current-password"
-        // 비밀번호 관리자가 채우도록 이름을 준다. 토큰은 서버에만 있고 화면엔 안 돌아온다
-        placeholder="ADMIN_TOKEN"
-        aria-label="관리자 토큰"
-        autoFocus
+        placeholder="비밀번호"
+        aria-label="비밀번호"
         required
       />
       <button type="submit" disabled={pending}>
