@@ -234,9 +234,36 @@ GitHub 실행 상태. 다 뚫려도 워크플로의 `concurrency` 그룹이 줄�
 
 ## 왜 Actions인가
 
-Vercel Cron은 못 쓴다. **Hobby는 하루 1회가 최소**고 `0 * * * *` 같은 식은 배포 자체가 실패한다
-([Vercel 문서](https://vercel.com/docs/cron-jobs/usage-and-pricing), 2026-09-10 확인).
-요금제를 올려도 파이프라인이 Python이라(pyhwp·pdfplumber) 함수로 옮기는 값이 더 크다.
+**주의 — 이 절의 전제가 2026-09-16에 하나 바뀌었다. 플랜은 Hobby가 아니라 Pro다.**
+그래서 「Vercel Cron은 하루 1회가 최소라 못 쓴다」는 더는 이유가 아니다(Pro는 분 단위로 여러 개 걸린다).
+남은 이유는 하나뿐이다 — **파이프라인이 Python이고 첨부 파싱이 무겁다**(pyhwp·pdfplumber·pandas).
+그걸 함수로 옮기는 값이 Actions를 유지하는 값보다 크다. Cloudflare Worker(바깥 방아쇠)도
+「Hobby 크론이 하루 1회라서」 세운 것이니, 이제 Vercel Cron으로 갈음할 수 있는지 다시 볼 일이다.
+
+## 한국에서 나가는 구멍 (`/api/egress`)
+
+`apis.data.go.kr` · `business.juso.go.kr` · `housing.seoul.go.kr` 셋 다 GitHub 러너(Azure 미국)
+IP의 **TCP 연결**을 간헐로 안 받는다. 재시도 4/4 전멸으로 끝나고, 같은 시각 한국 회선에선
+전부 0.04초에 붙는다(2026-09-16 실측). 응답이 아니라 연결이 안 되는 거라 키·파라미터 문제가 아니다.
+
+Pro는 라우트별 `preferredRegion`이 실제로 먹는다. **DB를 안 만지는 라우트 하나만 서울(icn1)에 두고**
+파이프라인이 그리로 우회한다. Neon은 us-east-1이라 나머지 라우트는 iad1 그대로다.
+
+| 자리 | 몫 |
+|---|---|
+| `web/src/app/api/egress/route.ts` | 받은 URL로 GET/POST 하고 바이트를 그대로 돌려준다. **파싱 안 한다.** 허용 호스트 6개, `EGRESS_SECRET` 검사, 리다이렉트는 안 따라가고 `Location`만 넘긴다 |
+| `pipeline/src/zipgonggo_pipeline/sources/egress.py` | 켤지 말지와 이 URL이 대상인지를 판단한다. `ThrottledHttp`와 `juso_search`가 같이 쓴다 |
+
+**환경변수 둘이 다 있어야 켜진다** — `EGRESS_PROXY_URL` · `EGRESS_SECRET`. 비우면 지금까지처럼
+직접 나간다. **로컬(한국)에서는 비워 두는 게 맞다** — 직접 붙는 게 빠르고 한 단계를 덜 탄다.
+되돌리려면 워크플로 `env`에서 그 두 줄을 지우면 된다.
+
+함정 둘.
+- **비밀값은 ASCII로.** HTTP 헤더 값으로 실려 나간다 — 한글을 넣으면 httpx가 인코딩에서 죽는다.
+- **허용 호스트는 라우트 쪽이 문지기다.** `PROXIED_HOSTS`만 늘리고 `ALLOWED_HOSTS`를 안 늘리면 403이 돌아온다.
+
+CLAUDE.md의 「web과 pipeline은 DB 스키마로만 통신한다」에 뚫은 **두 번째 예외**다(사용자 승인 2026-09-16).
+좁게 지키는 방법 셋 — 파싱 안 함, 허용 호스트만, 비밀값 검사. 이 셋을 지키는 한 「네트워크 경로」지 「로직」이 아니다.
 
 ## 비용
 

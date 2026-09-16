@@ -41,10 +41,14 @@ env:
   JUSO_SEARCH_API_KEY: ${{ secrets.JUSO_SEARCH_API_KEY }}
   WEB_REVALIDATE_URL: ${{ secrets.WEB_REVALIDATE_URL }}
   REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-  # 한국에서 나가는 구멍(web /api/egress, icn1). 정부·서울시 사이트가 러너 IP의 연결을
-  # 간헐로 안 받아 그쪽으로 우회한다(pipeline/sources/egress.py). 둘 중 하나라도 비면
-  # 꺼진 채라 지금까지처럼 직접 나간다 — 되돌리려면 이 두 줄을 지우면 된다
-  EGRESS_PROXY_URL: "https://zipgonggo.com/api/egress"
+  # 한국에서 나가는 구멍(pipeline/sources/egress.py). **아직 꺼 둔다.**
+  # web의 /api/egress는 preferredRegion="icn1"을 적어 뒀지만 **안 먹는다** — 이 프로젝트는
+  # Fluid Compute가 켜져 있고(resourceConfig.fluid=true, functionDefaultRegions=["iad1"]),
+  # Fluid는 함수별 리전 지정을 무시하고 프로젝트 기본 리전에서 전부 돌린다.
+  # 2026-09-16 실측: 라우트가 200을 주는데 x-egress-region이 iad1이었다.
+  # 그 상태로 켜면 버지니아를 한 번 더 거쳐 같은 차단을 맞는다 — 지연만 늘고 이득이 없다.
+  # 서울에서 실제로 나가는 자리를 만든 뒤 이 줄에 그 주소를 넣는다
+  EGRESS_PROXY_URL: ""
   EGRESS_SECRET: ${{ secrets.EGRESS_SECRET }}
   # IndexNow 발행 키. **비밀이 아니라 Secret으로 두지 않는다** — 규격이 web/public/{키}.txt 로
   # 공개하라고 요구한다. 값을 바꾸려면 그 파일도 같이 바꿔 재배포해야 한다
