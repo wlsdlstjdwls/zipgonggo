@@ -74,13 +74,55 @@ Actions가 함수에 닿지도 못하고, 파이프라인엔 200도 401도 아�
 빨간불을 켜면 한 시간에 한 번씩 헛경보가 된다. 대신 실패한 회차가 `ingest_log`에 ok=false로 남아
 콘솔에서 보인다 — 이게 위 첫 줄을 고친 이유다.
 
+### 끝나고 실측한 것 (러너에서, 구멍 켠 상태)
+
+| 워크플로 | 결론 | 받은 것 |
+|---|---|---|
+| 공고 수집 `35045845437` | **success** (2분) | SH 20행 / 요청 2회 · 청년안심주택 10행 · 마이홈 318행 → 공고 207건(신규 8) · IndexNow 8건 |
+| 게시판 순찰 `35046000905` | **success** | i-sh m_247 30행 · m_241 30행(**POST**) · 정본 묶기 5건 |
+
+**여섯 축 전부 재시도 0회, 타임아웃 0회.** 그중 넷이 아침엔 `ConnectTimeout`으로 죽던 자리다.
+`ingest_log`에도 러너가 남긴 줄이 `ok=true`로 들어왔다(`sh_scrape` 3초 · `youth_scrape` 1초 · `myhome_api` 65초).
+
 ### 함정
 
-- **`gh run list`가 초록이어도 믿지 말 것.** 이제는 빨간불이 뜨지만, 마이홈 매시 실패는 여전히 초록이다.
-  진짜 근거는 `ingest_log`의 소스별 마지막 성공 시각이다.
-- 열린 이슈 8개(#2~#9)는 전부 이번 건이다. 확인하고 닫으면 된다.
-- 마이홈이 **매시** 도니 하루 190건×24회 upsert가 는다. 지금은 문제없지만 「적재 속도」(아래 4번)가
+- **`gh run list`가 초록이어도 믿지 말 것.** 이제는 빨간불이 뜨지만, 마이홈 매시 실패는 여전히 초록이다
+  (`continue-on-error`). 진짜 근거는 `ingest_log`의 소스별 마지막 성공 시각이다.
+- **마이홈 매시 잡은 실패해도 잡을 안 죽인다.** 구멍을 켠 뒤로는 실패가 사라졌지만, 그 관용을 없애기 전에
+  며칠 `ingest_log`로 실패율을 먼저 재 볼 것.
+- 마이홈이 **매시** 도니 하루 200건×24회 upsert가 는다. 지금은 문제없지만 「적재 속도」가
   이제 좀 더 값어치가 있다.
+- **`egress/`는 별도 Vercel 프로젝트라 `web/vercel.json`의 「main 자동 배포 끄기」가 안 걸린다.**
+  main에 푸시하면 `zipgonggo-egress`는 자동 배포되고, `zipgonggo`(web)는 **CLI로만** 올라간다 —
+  `npx vercel deploy --prod --yes`를 저장소 루트에서.
+- **CLI에 `--cwd ..`를 쓰지 말 것.** 그 디렉터리의 `.vercel`을 읽어 **엉뚱한 프로젝트로 배포한다**
+  (09-16에 egress를 올리려다 web으로 나갔다). egress는 그냥 푸시로 배포된다.
+
+### 이 세션이 만진 바깥 상태
+
+| 곳 | 무엇 |
+|---|---|
+| GitHub Secrets | `EGRESS_SECRET` 추가 |
+| Vercel `zipgonggo` | 환경변수 `EGRESS_SECRET` 추가(프로덕션). **지금은 안 쓴다** — 라우트를 egress로 옮겼다. 지워도 된다 |
+| Vercel `zipgonggo-egress` | 새 프로젝트. rootDirectory `egress`, 리전 icn1, 깃 연결, **SSO 껐다**, 환경변수 `EGRESS_SECRET` |
+| GitHub Issues | #2~#9 여덟 개를 원인 적고 닫았다 |
+
+### 다음에 할 일 (54차가 남긴 것)
+
+0. **며칠 지켜본다.** 구멍이 실제로 얼마나 버는지는 `ingest_log`가 말해 준다 —
+   `select source, count(*) filter (where not ok), max(finished_at) from ingest_log
+   where finished_at > now() - interval '3 days' group by 1`.
+   실패가 0에 가까우면 마이홈 잡의 `continue-on-error`를 떼고 정직하게 빨간불을 켠다.
+1. **Cloudflare Worker가 필요한지 다시 본다.** 그걸 세운 이유가 「Hobby 크론은 하루 1회」였는데
+   플랜이 Pro다. Vercel Cron을 분 단위로 걸 수 있으니 `worker/`를 통째로 걷어낼 수 있다.
+   다만 **GitHub 스케줄이 이제 발화하긴 한다**(하루 24회 중 네댓 번, 1~2시간 늦게). 방아쇠가
+   셋이 되지 않게 하나로 정리하는 게 요점이다.
+2. **`egress` 허용 호스트를 늘릴 땐 양쪽을 같이 고친다** — `egress/api/index.js`의 `ALLOWED_HOSTS`와
+   `pipeline/.../sources/egress.py`의 `PROXIED_HOSTS`. 한쪽만 늘리면 403이 돌아온다.
+   첨부(PDF·HWP) 내려받기가 25MB를 넘으면 `MAX_BYTES`에 걸린다 — 아직 걸린 적은 없다.
+3. **`web`의 `EGRESS_SECRET` 환경변수는 이제 안 쓴다.** 지우려면 Vercel 대시보드에서.
+4. 53차가 남긴 것들(색인 추적 · 동적 OG 이미지 · `/type` `/area` 미구현 · 계층 「전체」 41줄 ·
+   적재 속도 · 못 맞춘 좌표 14건 · `/eligibility` 시드)은 그대로 살아 있다. 아래 53차 절 참고.
 
 ---
 
