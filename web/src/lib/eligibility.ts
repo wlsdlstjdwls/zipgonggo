@@ -89,7 +89,13 @@ function checkAge(t: SupplyType, p: Profile): Check | null {
 }
 
 function checkMarital(t: SupplyType, p: Profile): Check | null {
-  if (t.marital === "무관") return null;
+  if (t.marital === "무관") {
+    // 미혼도 기혼도 받지만 기혼이면 혼인기간을 본다 — 청년안심주택 일반공급이 그렇다
+    // (「19~39세 미혼 청년 또는 혼인 7년 이내 신혼부부」가 공통 요건이고, 일반공급은 소득·지역만 안 본다).
+    if (!t.marital_max_yr || p.marital !== "기혼") return null;
+    const ok = p.marriedYears <= t.marital_max_yr;
+    return { label: "혼인기간", ok, detail: `미혼이거나 혼인 ${t.marital_max_yr}년 이내, 입력 ${p.marriedYears}년차` };
+  }
   if (t.marital === "미혼") {
     return { label: "혼인", ok: p.marital === "미혼", detail: "미혼만 신청할 수 있다" };
   }
@@ -193,7 +199,7 @@ export function ageRuleText(t: SupplyType): string {
 }
 
 export function maritalRuleText(t: SupplyType): string | null {
-  if (t.marital === "무관") return null;
+  if (t.marital === "무관") return t.marital_max_yr ? `미혼이거나 혼인 ${t.marital_max_yr}년 이내` : null;
   if (t.marital === "미혼") return "미혼만 신청 가능";
   const yr = t.marital_max_yr ? `혼인 ${t.marital_max_yr}년 이내` : "혼인기간 제한 없음";
   const newborn = t.newborn_exempt ? ", 2세 이하 자녀가 있으면 기간 면제" : "";
@@ -230,7 +236,7 @@ export function regionRuleText(t: SupplyType): string | null {
 export function ruleLines(t: SupplyType): { label: string; text: string }[] {
   const lines: { label: string; text: string }[] = [{ label: "나이", text: ageRuleText(t) }];
   const marital = maritalRuleText(t);
-  if (marital) lines.push({ label: t.marital === "미혼" ? "혼인" : "혼인기간", text: marital });
+  if (marital) lines.push({ label: t.marital === "혼인" ? "혼인기간" : "혼인", text: marital });
   const cls = classRuleText(t);
   if (cls) lines.push({ label: "계층", text: cls });
   lines.push({ label: "무주택", text: `${t.homeless_scope} 기준 무주택이어야 한다` });
