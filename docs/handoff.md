@@ -7,6 +7,73 @@
 
 ---
 
+## 지금 상태 (2026-09-16, 56차 세션)
+
+**모든 동적 경로가 내던 soft 404를 고쳤다.** 55차가 「원인부터 찾으라」고 남긴 자리다.
+
+### 원인 — notFound()는 Suspense 경계 **아래**에서 부르면 코드가 200으로 남는다
+
+화면은 멀쩡히 `not-found.tsx`가 그려져서 눈으로는 안 보인다. 응답 코드만 200이다.
+경계를 만드는 건 둘 — **`loading.tsx`**, 그리고 **직접 쓴 `<Suspense>`**.
+
+로컬 3100에서 한 칸씩 지워 가며 잰 값(전부 실측, 짐작 아님):
+
+| 놓은 자리 | 응답 |
+|---|---|
+| page에서 notFound() + 위에 경계 없음 | **404** |
+| page에서 notFound() + 같은 세그먼트에 `loading.tsx` | 200 |
+| page에서 notFound() + 루트 레이아웃의 `<Suspense>` | 200 |
+| **layout**에서 notFound() + 같은 세그먼트에 `loading.tsx` | **404** ← 같은 세그먼트라도 layout이 loading보다 위다 |
+| 자식 layout에서 notFound() + **부모** 세그먼트의 `loading.tsx` | 200 |
+
+즉 **판정은 그 세그먼트의 `layout.tsx`에서 한다**. 그리고 부모의 `loading.tsx`는 자식까지 덮으므로
+형제가 있는 세그먼트에서는 경계를 **라우트 그룹에 가둬야** 한다.
+
+### 고친 것 셋
+
+| 자리 | 무엇 |
+|---|---|
+| `web/src/app/layout.tsx` | `<Suspense>`로 `{children}`을 감싸던 걸 **걷어냈다**. 이게 전 경로를 한꺼번에 200으로 만들던 뿌리다. 옛날 `useSearchParams` 때문에 있던 건데 지금 `src`에 그 훅을 쓰는 자리가 없다(`usePathname`은 경계가 필요 없다) |
+| `notice/[slug]/` | `page`·`loading`을 **`(detail)/` 그룹**으로 옮기고 `(detail)/layout.tsx`가 공고 존재를 판정한다. 그룹에 가둔 이유는 `SkeletonDetail` 경계가 형제인 `[complex]`까지 덮어서다. `[complex]`에는 제 몫의 `layout.tsx`(판정)와 `loading.tsx`(골격)를 새로 뒀다 |
+| `area/[region]/` | 같은 꼴 — `(sido)/` 그룹 + `(sido)/layout.tsx`가 판정(없는 시도 404, 3건 미만 308). **판정을 `[region]/layout.tsx`로 올리면 안 된다**: 한 단 아래 `[type]`에서는 같은 자리에 시군구가 와서 지역×유형이 통째로 404가 된다 |
+
+`opengraph-image.tsx`는 `[slug]` 자리에 그대로 뒀다 — 그룹으로 옮기면 `[complex]`가 물려받던 OG 이미지가 끊긴다.
+
+`getNoticeBySlug`·`getNoticeComplexes`를 **react `cache()`로 묶었다.** 가드 layout이 하나 늘었는데
+그 전에도 `generateMetadata`와 `page`가 같은 질의를 따로 쏘고 있었다 — 묶어서 셋이 한 번만 간다.
+
+### 실측 (로컬 3100, 고친 뒤)
+
+| 경로 | 전 | 후 |
+|---|---|---|
+| `/notice/nope-nope-nope` | 200 | **404** |
+| `/notice/{있는공고}/nope-9999` | 200 | **404** |
+| `/area/nope` · `/area/nope/nope` | 200 | **404** |
+| `/type/nope` | 200 | **404** |
+| `/nope`(정적 미매칭) | 404 | 404 |
+| 진짜 공고·단지·시도·OG 이미지 | 200 | 200 (단지 본문·OG png 그대로) |
+
+`npx tsc --noEmit` 통과. **프로덕션 실측은 아직 안 했다** — 아래 「다음에 할 일」 0번.
+
+### 함정
+
+- **루트 레이아웃의 `{children}`을 다시 `<Suspense>`로 감싸면 전부 원위치**다. 감싸야 할 일이 생기면
+  경계를 그 페이지 쪽으로 내리고, 판정은 경계 위 layout에 남긴다.
+- **`loading.tsx`를 `(detail)`·`(sido)` 그룹 밖으로 옮기지 말 것.** 형제 세그먼트까지 덮어 soft 404가 되살아난다.
+- 새 동적 경로를 만들 때 규칙: **발행 여부 판정은 layout, 그리기는 page.** 새로 만든 뒤에는
+  `curl -sI .../없는주소`로 404를 한 번 확인한다.
+- `[complex]/layout.tsx`의 찾기 규칙은 `[complex]/page.tsx`의 `load()`와 **같아야 한다**. 한쪽만 고치면 갈린다.
+
+### 다음에 할 일 (56차가 남긴 것)
+
+0. **프로덕션에서 다시 잰다.** 배포 뒤 `curl -sI https://zipgonggo.com/notice/nope-nope-nope` → 404여야 한다.
+   `/area/nope`, `/type/nope`, `/notice/{있는공고}/nope-9999`도 같이. 진짜 페이지 200과 OG png도 함께 본다.
+   배포는 저장소 루트에서 `npx vercel deploy --prod --yes`(web은 CLI로만 올라간다).
+1. 55차 2~7번(색인 추적 · IndexNow에 새 URL · 「[민간임대] 」 접두어 사용자 판단 · 좌표 14건 ·
+   `/type` 글 유지보수 · 54차 잔여)은 그대로 살아 있다. 아래 55차 절 참고.
+
+---
+
 ## 지금 상태 (2026-09-16, 55차 세션)
 
 **53차가 남긴 것들을 훑었다.** 값어치 순으로 일곱 덩이. 코드로 끝낼 수 있는 건 다 끝냈고,

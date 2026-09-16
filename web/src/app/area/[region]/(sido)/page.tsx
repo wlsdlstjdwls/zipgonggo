@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { notFound, permanentRedirect } from "next/navigation";
 import { FilterRail } from "@/components/filter-rail";
 import { JsonLd } from "@/components/json-ld";
 import { NoticeExplorer } from "@/components/notice-explorer";
@@ -49,15 +48,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function AreaPage({ params }: Params) {
   const sido = await loadSido(params);
 
-  // options는 이 시도가 발행 대상인지 확인하는 용도다(칩·셀렉트 수량은 레이아웃 → ListStateProvider가 담당).
-  // 먼저 기다렸다가 목록을 쏘면 왕복이 직렬로 쌓인다 — 둘 다 한 번에 쏜다.
-  const [options, page] = await Promise.all([
-    listFilterOptions(undefined),
-    listNoticesPage({ sido }, null, PAGE_SIZE),
-  ]);
-  const match = options.sido.find((o) => o.value === sido);
-  if (!match) notFound();
-  if (match.count < AREA_MIN_COUNT) permanentRedirect(ROUTES.home);
+  // 발행 대상인지(그리고 얇지 않은지)는 (sido)/layout.tsx가 이미 걸렀다 — 여기서 다시 보지 않는다.
+  // 그 판정을 layout으로 올린 이유는 404 응답 코드다(layout.tsx 머리글).
+  const page = await listNoticesPage({ sido }, null, PAGE_SIZE);
 
   return (
     <div className="stage list-stage">

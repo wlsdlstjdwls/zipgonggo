@@ -218,7 +218,9 @@ export const listFacets = unstable_cache(
   CACHE_OPTS,
 );
 
-export async function getNoticeBySlug(slug: string): Promise<Notice | null> {
+/** 공고 한 건. 같은 요청 안에서 가드 layout·generateMetadata·page가 각각 부르므로 react cache()로 묶는다 —
+ * 안 묶으면 한 페이지에 같은 질의가 세 번 나간다(왕복이 곧 시간, 55차 「적재는 왕복 수가 곧 시간이다」). */
+export const getNoticeBySlug = cache(async (slug: string): Promise<Notice | null> => {
   const rows = await query<Notice>(
     `SELECT ${LIST_COLS}, source_key, pnu, heating, total_household,
             min_down_payment, min_interim, min_balance, portal_url, contact,
@@ -232,7 +234,7 @@ export async function getNoticeBySlug(slug: string): Promise<Notice | null> {
     [slug],
   );
   return rows[0] ?? null;
-}
+});
 
 export async function getNoticeAreas(noticeId: number): Promise<NoticeArea[]> {
   return query<NoticeArea>(
@@ -246,8 +248,9 @@ export async function getNoticeAreas(noticeId: number): Promise<NoticeArea[]> {
  * tenant_classes는 이 단지의 공급현황에 적힌 공급대상(청년·신혼부부·고령자…)을 모은 것이다 —
  * 탐색기의 공급대상 필터가 쓴다(사용자 요청 2026-09-09). 공급현황이 없는 공고는 빈 배열이다.
  * 청년은 소득 조건까지 붙여 「청년 소득있음」·「청년 소득없음」으로 가른다(사용자 요청 2026-09-09) —
- * 자격도 배점도 갈리는 서로 다른 줄이라 하나로 묶으면 필터가 뜻을 잃는다. */
-export async function getNoticeComplexes(noticeId: number): Promise<NoticeComplex[]> {
+ * 자격도 배점도 갈리는 서로 다른 줄이라 하나로 묶으면 필터가 뜻을 잃는다.
+ * 단지 상세도 가드 layout·generateMetadata·page가 같이 부른다 — getNoticeBySlug와 같은 이유로 cache()로 묶는다. */
+export const getNoticeComplexes = cache(async (noticeId: number): Promise<NoticeComplex[]> => {
   return query<NoticeComplex>(
     `SELECT c.id, c.name, c.sido, c.sigungu, c.road_address, c.is_new, c.complex_code, c.source_page,
             c.heating, c.unit_count, c.min_deposit, c.min_rent, c.area_min, c.area_max,
@@ -264,7 +267,7 @@ export async function getNoticeComplexes(noticeId: number): Promise<NoticeComple
      ORDER BY c.sido <> '서울특별시', c.sigungu, c.name`,
     [noticeId],
   );
-}
+});
 
 const SUPPLY_COLS = `
   id, complex_name, supply_type, accessible, tenant_class, income_option, is_new,

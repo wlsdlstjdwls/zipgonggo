@@ -88,13 +88,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <CalcButton />
             </div>
           </header>
-          {/* 목록 상태(부문·유형·마감·정렬)는 URL이 아니라 이 Provider가 들고 있다 — 스코프 바·필터 바·목록이 함께 구독한다 */}
-          <Suspense fallback={null}>
-            {/* 필터는 목록 페이지 안의 왼쪽 레일이 담당한다 — 헤더 아래 전폭 스코프 바는 걷어냈다(2026-09-09) */}
-            <ListStateProvider initialFacets={facets}>
-              <main className="shell">{children}</main>
-            </ListStateProvider>
-          </Suspense>
+          {/* 목록 상태(부문·유형·마감·정렬)는 URL이 아니라 이 Provider가 들고 있다 — 스코프 바·필터 바·목록이 함께 구독한다.
+              **여기를 <Suspense>로 감싸지 말 것**(2026-09-16 제거). 경계가 children 위에 있으면 아래 어느 페이지가
+              notFound()를 불러도 응답이 200으로 남아 모든 동적 경로가 soft 404가 된다 —
+              화면은 not-found.tsx가 그려져서 눈으로는 안 보인다. 자세한 건 notice/[slug]/(detail)/layout.tsx 머리글.
+              예전엔 useSearchParams 때문에 경계가 필요했지만 지금 src에 그 훅을 쓰는 자리가 없다(usePathname은 경계가 필요 없다). */}
+          <ListStateProvider initialFacets={facets}>
+            <main className="shell">{children}</main>
+          </ListStateProvider>
           <footer className="site-footer">
             <div className="bar">
               {/* 지역별 착지 페이지로 가는 유일한 내부 링크. 크롤러가 공고 상세까지 닿는 길이 여기서 갈라진다 —
