@@ -14,7 +14,7 @@ function createPool(): Pool {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL 이 없다. web/.env.local 확인");
   // (2026-09-09) DB를 Neon us-east-1로 옮기기 전엔 ap-southeast-1까지 새 커넥션 수립이 ~550ms였다.
-  // 지금은 Vercel Hobby 고정 함수 리전(iad1)과 같은 물리 리전이라 그 정도로 느리진 않지만,
+  // 지금은 함수 리전(iad1)과 같은 물리 리전이라 그 정도로 느리진 않지만,
   // idle 10분 유지는 그대로 둔다 — 매 방문마다 새 커넥션 여는 비용 자체는 없느니만 못하다.
   return new Pool({ connectionString, max: 5, idleTimeoutMillis: 600_000, keepAlive: true });
 }

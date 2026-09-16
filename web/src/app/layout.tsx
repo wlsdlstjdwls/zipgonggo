@@ -17,8 +17,9 @@ import { sidoShort } from "@/lib/sido";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
-// DB를 Neon us-east-1(버지니아)로 옮겼다 — Hobby 플랜은 함수 리전이 iad1 고정이라 preferredRegion을 못 바꾼다(2026-09-09 실측).
-// 지금은 no-op이지만 Pro로 올리면 이 값이 실제로 먹으니 DB 리전과 맞춰 둔다.
+// DB를 Neon us-east-1(버지니아)로 옮겼다. **플랜이 Pro라 이 값은 실제로 먹는다**(2026-09-16 확인) —
+// 09-09에 「Hobby라 iad1 고정이라 no-op」이라고 적어 둔 건 더는 사실이 아니다.
+// DB를 읽는 라우트는 iad1에 둔다. 한국 사이트로 나가는 라우트만 icn1로 따로 뗀다.
 export const preferredRegion = "iad1";
 
 export const metadata: Metadata = {

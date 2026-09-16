@@ -17,11 +17,15 @@
 
 ### 정부 API가 해외 IP를 간헐로 막는다
 
-`apis.data.go.kr`(마이홈)과 `business.juso.go.kr`(주소 검색) 둘 다 GitHub 러너(Azure 미국)에서
-**TCP ConnectTimeout**으로 끝난다 — 재시도 4/4 전멸. 같은 시각 한국 회선에선 0.03초에 붙는다.
-**한국 IP에서 돌릴 무료 경로가 지금은 없다**: Vercel Hobby는 함수 리전이 iad1 고정이고(09-09 실측,
-`layout.tsx` 주석), Cloudflare Worker는 요청자 근처 엣지에서 돈다. 남은 길은 자기 PC에 self-hosted
-러너를 다는 것뿐인데 그건 PC 의존으로 되돌아가는 것이다. 그래서 **자주 두드려 확률로 이긴다**로 갔다.
+`apis.data.go.kr`(마이홈) · `business.juso.go.kr`(주소 검색) · `housing.seoul.go.kr`(SH 서울주거포털)
+**셋 다** GitHub 러너(Azure 미국)에서 **TCP ConnectTimeout**으로 끝난다 — 재시도 4/4 전멸.
+같은 시각 한국 회선에선 전부 0.04초에 붙는다. 마이홈만의 문제가 아니라 **매시 잡의 본줄기인
+SH 목록도 같은 식으로 죽는다**(09-16 01:20Z 실행이 그렇게 실패했다).
+
+**플랜이 Pro다**(사용자 확인 2026-09-16). 그래서 `preferredRegion = "icn1"` 함수를 세워
+한국에서 나가는 경로를 만들 수 있다 — 09-09에 적어 둔 「Hobby라 함수 리전이 iad1 고정」은
+**더는 사실이 아니다**(`layout.tsx`·`db.ts` 주석을 고쳤다). 아래 「다음에 할 일」 참고.
+이번 세션은 그 전에 **자주 두드려 확률로 이긴다**까지만 했다.
 
 ### 고친 것 넷
 
