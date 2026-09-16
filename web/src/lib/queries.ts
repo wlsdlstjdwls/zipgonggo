@@ -368,6 +368,59 @@ export async function getAmendChain(n: Pick<Notice, "source_key" | "amends_sourc
   return { original: original[0] ?? null, amendments };
 }
 
+/* ── 단지 페이지 색인 기준 (docs/url-structure.md 얇은 페이지 방지) ──────────────
+   단지 상세는 호실 상세 자리를 대신 채우고 있어 그 기준을 그대로 받는다 — 「고유 필드 8개 이상 + 건물 단위 좌표」.
+   전에는 좌표가 아예 없어 전량 noindex였다(2026-09-09 주석). S6가 도로명주소 요약DB를 오프라인 조인해
+   좌표를 채운 뒤로는 1,920장 중 1,894장에 건물 좌표가 있다 — 이제 갈림길은 필드 수다.
+
+   세는 필드는 「그 단지에만 있는 값」 열둘. 공고에서 물려받는 값(기관·유형·접수일정)은 세지 않는다 —
+   같은 공고의 단지끼리 똑같아서 그걸로는 페이지가 두꺼워지지 않는다.
+   실측(2026-09-16): 7개와 8개 사이에서 646장 → 236장으로 끊긴다. 기준선이 데이터의 결을 타고 있다. */
+const COMPLEX_FIELDS = `
+  (c.road_address IS NOT NULL)::int + (c.heating IS NOT NULL)::int + (c.unit_count IS NOT NULL)::int
+  + (c.min_deposit IS NOT NULL)::int + (c.min_rent IS NOT NULL)::int
+  + (c.area_min IS NOT NULL)::int + (c.area_max IS NOT NULL)::int
+  + (EXISTS (SELECT 1 FROM notice_supply s WHERE s.notice_id = c.notice_id AND (s.complex_id = c.id OR s.complex_name = c.name)))::int
+  + (EXISTS (SELECT 1 FROM unit u WHERE u.notice_complex_id = c.id))::int
+  + (EXISTS (SELECT 1 FROM sh_house_image i WHERE i.bizns_cd = c.sh_bizns_cd))::int
+  + (EXISTS (SELECT 1 FROM youth_house_image i WHERE i.home_code = c.youth_home_code))::int
+  + (EXISTS (SELECT 1 FROM youth_house y WHERE y.home_code = c.youth_home_code))::int`;
+
+/** docs/url-structure.md: 호실 상세는 고유 필드 8개 이상 & 좌표 건물 단위 */
+export const COMPLEX_MIN_FIELDS = 8;
+const COMPLEX_INDEXABLE = `(c.geom IS NOT NULL AND (${COMPLEX_FIELDS}) >= ${COMPLEX_MIN_FIELDS})`;
+
+/** 단지 한 곳을 색인해도 되나. generateMetadata가 부른다 — 왕복 1회, 캐시는 목록과 같은 태그. */
+export const isComplexIndexable = unstable_cache(
+  async (complexId: number): Promise<boolean> => {
+    const rows = await query<{ ok: boolean }>(
+      `SELECT ${COMPLEX_INDEXABLE} AS ok FROM notice_complex c WHERE c.id = $1`,
+      [complexId],
+    );
+    return rows[0]?.ok ?? false;
+  },
+  ["complex-indexable-v1"],
+  CACHE_OPTS,
+);
+
+export type SitemapComplex = { slug: string; name: string; complex_code: string | null; updated_at: string; closed: boolean };
+
+/** 사이트맵에 실을 단지. 기준을 못 채운 장은 아예 싣지 않는다 — 페이지는 살아 있고 공고 지도가 앵커다. */
+export const listSitemapComplexes = unstable_cache(
+  async (limit: number): Promise<SitemapComplex[]> =>
+    query<SitemapComplex>(
+      `SELECT n.slug, c.name, c.complex_code,
+              to_char(n.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
+              ${CLOSED} AS closed
+         FROM notice_complex c JOIN notice n ON n.id = c.notice_id
+        WHERE n.canonical_id IS NULL AND ${COMPLEX_INDEXABLE}
+        ORDER BY n.posted_at DESC, c.id LIMIT $1`,
+      [limit],
+    ),
+  ["complex-sitemap-v1"],
+  CACHE_OPTS,
+);
+
 export type SitemapNotice = { slug: string; updated_at: string; closed: boolean };
 
 /** 사이트맵용 전 공고. 마감 여부로 priority를 가른다. */

@@ -1,6 +1,8 @@
 // 단지 상세 — /notice/{공고}/{단지명}-{단지코드}. docs/url-structure.md의 호실 상세 자리를 지금 있는 최소 단위(단지)로 채운다.
-// 좌표를 저장하지 않아(CLAUDE.md 하지 말 것 1) 「얇은 페이지 방지 규칙」의 "좌표 건물 단위"를 못 채운다 → noindex,
-// 공고 지도의 앵커로만 노출한다(docs/url-structure.md 표). unit 테이블이 차면 호실 단위로 내려간다.
+// 색인 여부는 장마다 다르다 — 「고유 필드 8개 이상 + 건물 단위 좌표」를 채운 장만 index한다(lib/queries의 COMPLEX_FIELDS).
+// 전에는 좌표가 아예 없어 전량 noindex였는데, S6가 도로명주소 요약DB를 오프라인 조인해 좌표를 채우고
+// 사진과 평면도, 관리비가 붙어 절반 가까이가 기준을 넘겼다(2026-09-16 실측 1,920장 중 665장).
+// 기준을 못 채운 장은 그대로 noindex이고 공고 지도의 앵커로만 노출한다.
 //
 // 2026-09-09 개편(사용자 요청): 제원과 공급현황을 한 섹션으로 합치고, 그 위에 요약 스트립을 놓아
 // "중요한 정보가 뭔지"를 먼저 보이게 했다. 값이 없는 자리는 감추지 않고 「준비 중」으로 말한다.
@@ -35,7 +37,7 @@ import { complexGraph } from "@/lib/jsonld";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
 import { applyPhase, count, dateK, deadlineChip, NO_DATE, num, wonKo } from "@/lib/format";
 import { areaText, classLabel, commonArea, complexPriceGroups, complexPriceRows, CONVERT_HINT, m2, moveInLabel, typeLabel, unitPriceRows } from "@/lib/notice-view";
-import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition, getYouthHouse } from "@/lib/queries";
+import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition, getYouthHouse, isComplexIndexable } from "@/lib/queries";
 import { ComplexGallery } from "@/components/complex-gallery";
 import { imagesEnabled, shownImages } from "@/lib/complex-images";
 import { complexSegment, noticeComplexPath, noticePath, ROUTES } from "@/lib/routes";
@@ -73,12 +75,13 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!f) return { title: "단지를 찾을 수 없습니다", robots: { index: false, follow: false } };
   const { n, c } = f;
   const area = areaText(c);
+  // 얇은 페이지 방지(docs/url-structure.md) — 기준을 못 채운 장은 색인하지 않고 링크만 따라가게 둔다
+  const indexable = await isComplexIndexable(c.id);
   return {
     title: `${c.name} ${area ? `전용 ${area} ` : ""}보증금/임대료 | ${n.title}`.replace(/\s+/g, " "),
     description: complexDescription(n, c),
     alternates: { canonical: noticeComplexPath(n.slug, c) },
-    // 좌표가 건물 단위로 확보되기 전까지 색인하지 않는다(docs/url-structure.md 얇은 페이지 방지)
-    robots: { index: false, follow: true },
+    robots: { index: indexable, follow: true },
   };
 }
 
