@@ -18,6 +18,7 @@
 | 4 | 「[민간임대] 」 접두어를 화면에서 뗀다 | 467건. 제목 중간에 박힌 경우 0건 |
 | 7-1 | 방아쇠를 Vercel Cron 하나로 | 크론 definitions 둘 등록 확인. Bearer 정문 200, 틀린 열쇠 401 |
 | 7-3 | web의 `EGRESS_SECRET` 삭제 | Vercel 프로덕션에서 제거(라우트가 egress 프로젝트로 옮겨 가 안 쓴다) |
+| 7-1+ | Cloudflare Worker 실제 삭제 | `wrangler delete` 뒤 **03:50:42Z에 「공고 수집」이 저절로 떴다** — Vercel Cron 단독 발화 확인 |
 
 ### IndexNow 발행기가 둘이 됐다
 
@@ -45,6 +46,8 @@ IndexNow가 하지 말라는 짓이다. 단지 지면의 변화는 제 공고가
 
 `web/vercel.json`의 `crons` 둘이 10분마다 `/api/cron/{collect,patrol}`을 때린다. 부를지 말지는
 전처럼 라우트가 판단한다(`lib/jobs.ts`). **Cloudflare Worker(`worker/`)와 GitHub 스케줄 블록은 지웠다.**
+Cloudflare 쪽 배포도 내렸다(`wrangler delete`). 그 뒤 손 안 대고 **03:50:42Z에 「공고 수집」이 떴다** —
+직전 회차(02:51Z)와 한 시간 간격으로, 전과 같은 리듬이다. 방아쇠가 하나로 줄어도 리듬은 그대로다.
 
 - 열쇠가 둘인 이유: Vercel Cron은 **제 값(`CRON_SECRET`)을 `Authorization: Bearer`로** 보낸다.
   규격이라 고를 수 없어 문을 따로 냈다. `x-cron-secret`(= `CRON_TRIGGER_SECRET`)은 콘솔·curl·모니터용.
@@ -67,9 +70,10 @@ IndexNow가 하지 말라는 짓이다. 단지 지면의 변화는 제 공고가
 
 ### 다음에 할 일 (57차가 남긴 것)
 
-0. **Cloudflare Worker를 내린다.** 코드는 지웠지만 배포된 Worker는 아직 10분마다 때린다 —
-   `npx wrangler delete --name zipgonggo-cron`(Cloudflare 로그인 필요). 안 내려도 사고는 안 난다
-   (라우트가 `skipped: fresh`로 막는다). 내린 뒤 **Vercel Cron이 혼자 도는지** ingest_log로 확인한다.
+0. **~~Cloudflare Worker 내리기~~ — 끝났다(2026-09-16).** 내린 뒤 Vercel Cron 단독 발화까지 확인했다.
+   다음 세션이 볼 것은 **하루치 리듬**이다: `gh run list --limit 20`에서 「공고 수집」이 한 시간에
+   한 번꼴로 꾸준한지, `ingest_log`에 구멍이 없는지. 끊기면 방아쇠가 하나뿐이라 대체가 없다 —
+   그때는 `web/vercel.json`의 crons와 Vercel 대시보드 → Settings → Cron Jobs를 먼저 본다.
 1. **마이홈 `continue-on-error` 떼기 — 아직 이르다.** egress로 옮겨 붙은 게 오늘 05:00이고
    그 뒤 5회 전부 성공(207→218건)인데 **7시간치**다. 며칠 뒤 다시 본다:
    `select source, count(*) filter (where not ok), count(*) from ingest_log
