@@ -60,6 +60,9 @@ docs/       설계 문서. 결정이 바뀌면 코드보다 먼저 여기를 고
 
 `web`과 `pipeline`은 **DB 스키마로만 통신한다.** 서로 import 하지 않는다.
 
+**web이 DB에 쓰는 자리는 딱 하나 — `/api/track`의 `page_view` 표다**(사용자 결정 2026-09-16).
+방문은 브라우저에서만 생기는 사실이라 파이프라인이 알 길이 없어서 둔 예외다. 그 표 말고는 web이 쓰지 않는다.
+
 `web/src/app/admin`은 운영자 콘솔(`/admin`)이다. **여기도 DB를 읽기만 한다** — 숫자를 보여줄 뿐,
 고치는 일은 pipeline 스테이지를 돌려서 한다. 콘솔이 하는 유일한 바깥 행동은 GitHub 워크플로 dispatch.
 출입은 `ADMIN_EMAIL` + `ADMIN_PASSWORD_HASH` 둘(회원 시스템 없음, DB에 계정 표를 두지 않는다).

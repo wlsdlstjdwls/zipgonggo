@@ -10,6 +10,7 @@
 // 게다가 동시에 던지면 풀에 없는 커넥션을 새로 여느라 되레 더 걸린다(600~1800ms까지 봤다).
 // 그래서 CTE로 묶어 jsonb 한 줄로 받는다. 왕복 6번이 1번이 된다.
 import { query } from "@/lib/db";
+import { VISIT_SUMMARY_SQL, type VisitCards } from "@/lib/analytics";
 import { CANONICAL_ONLY, NOT_CLOSED, TODAY } from "@/lib/queries";
 
 // ── 파이프라인 신호등 ───────────────────────────────────────────────
@@ -110,6 +111,7 @@ type HealthRaw = {
 
 export type Dashboard = {
   health: JobHealth[];
+  visits: VisitCards;
   stats: NoticeStats;
   queue: QueueStats;
   sources: SourceRow[];
@@ -164,6 +166,7 @@ export async function dashboardData(): Promise<Dashboard> {
     reasons: { reason: string; count: number }[];
     sources: SourceRow[];
     recent: IngestRow[];
+    visits: VisitCards;
   }>(`
     WITH last AS (
       SELECT DISTINCT ON (stage, source) stage, source, ok, item_count, started_at
@@ -222,6 +225,7 @@ export async function dashboardData(): Promise<Dashboard> {
     ), recent AS (
       SELECT id, stage, source, ok, item_count, message, started_at, finished_at
       FROM ingest_log ORDER BY id DESC LIMIT 8
+    ), visits AS (${VISIT_SUMMARY_SQL}
     )
     -- jsonb_agg는 CTE의 ORDER BY를 물려받지 않는다. 정렬은 여기서 다시 말해야 한다
     SELECT (SELECT coalesce(jsonb_agg(to_jsonb(h)), '[]'::jsonb) FROM health h)         AS health,
@@ -232,7 +236,8 @@ export async function dashboardData(): Promise<Dashboard> {
            (SELECT coalesce(jsonb_agg(to_jsonb(s) ORDER BY s.open DESC, s.total DESC), '[]'::jsonb)
               FROM sources s)                                                           AS sources,
            (SELECT coalesce(jsonb_agg(to_jsonb(i) ORDER BY i.id DESC), '[]'::jsonb)
-              FROM recent i)                                                            AS recent`);
+              FROM recent i)                                                            AS recent,
+           (SELECT to_jsonb(v) FROM visits v)                                           AS visits`);
 
   return {
     health: toHealth(row.health),
@@ -244,6 +249,7 @@ export async function dashboardData(): Promise<Dashboard> {
     },
     sources: row.sources,
     recent: row.recent,
+    visits: row.visits,
   };
 }
 

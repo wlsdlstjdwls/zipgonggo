@@ -9,6 +9,7 @@ export const ROUTES = {
   api: "/api",
   apiNotices: "/api/notices",
   apiFacets: "/api/facets",
+  apiTrack: "/api/track",
   eligibility: "/eligibility",
   terms: "/terms",
   privacy: "/privacy",
@@ -16,6 +17,7 @@ export const ROUTES = {
   // 운영자 콘솔. 색인 대상이 아니다 — robots.ts가 막고 페이지도 noindex를 단다
   admin: "/admin",
   adminIngest: "/admin/ingest",
+  adminVisitors: "/admin/visitors",
 } as const;
 
 /** /notice/{slug}. slug에 한글·콜론이 들어가므로 항상 인코딩한다. */

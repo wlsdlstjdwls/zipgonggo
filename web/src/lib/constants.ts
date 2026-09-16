@@ -16,6 +16,13 @@ export const FIT_STORAGE_KEY = "zipgonggo.fit.v1";
 export const FIT_MINGAN_STORAGE_KEY = "zipgonggo.fit-mingan.v1";
 export const TOAST_MS = 2100;
 
+// 방문 집계용 난수 식별자(localStorage). **브라우저가 만든다** — 서버가 심는 쿠키가 아니라
+// 사이트 데이터를 지우면 다음 방문은 남남이 된다(개인정보처리방침 2항).
+export const VISITOR_STORAGE_KEY = "zipgonggo.visitor.v1";
+// 이 표식이 있는 브라우저는 집계에서 뺀다. 관리자 콘솔에 들어오면 켜진다 —
+// 운영자가 제 사이트를 돌아다닌 것까지 세면 초기 숫자가 통째로 거짓이 된다
+export const VISIT_OPT_OUT_KEY = "zipgonggo.notrack.v1";
+
 // ISR·unstable_cache 갱신 주기. 파이프라인이 DB를 갱신해도 이 시간 안엔 반영된다
 export const REVALIDATE_SEC = 3600;
 export const CACHE_TAG_NOTICE = "notice";

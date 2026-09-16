@@ -1,18 +1,32 @@
 "use client";
 
-// 콘솔 탭. 지금은 둘뿐이라 평평하게 깐다 — 늘어나면 smokespot admin처럼 「검수/운영」으로 묶는다.
+// 콘솔 탭. 지금은 셋뿐이라 평평하게 깐다 — 늘어나면 「검수/운영」처럼 묶는다.
 import Link from "next/link";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "./actions";
 import { ROUTES } from "@/lib/routes";
+import { VISIT_OPT_OUT_KEY } from "@/lib/constants";
 
 const TABS = [
   { href: ROUTES.admin, label: "대시보드" },
   { href: ROUTES.adminIngest, label: "수집 이력" },
+  { href: ROUTES.adminVisitors, label: "방문" },
 ] as const;
 
 export function AdminNav({ fails30d }: { fails30d: number }) {
   const pathname = usePathname();
+
+  // 콘솔에 들어온 브라우저는 방문 집계에서 뺀다. 운영자가 제 사이트를 돌아다닌 것까지 세면
+  // 초기 숫자가 통째로 거짓이 된다(트래픽이 작을수록 더 심하다)
+  useEffect(() => {
+    try {
+      localStorage.setItem(VISIT_OPT_OUT_KEY, "1");
+    } catch {
+      // 저장이 막힌 브라우저면 그냥 넘어간다 — 집계가 조금 부풀 뿐 화면은 멀쩡하다
+    }
+  }, []);
+
   return (
     <nav className="adm-nav" aria-label="관리자 메뉴">
       {TABS.map(({ href, label }) => {

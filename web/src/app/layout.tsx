@@ -4,6 +4,7 @@ import { CalcButton, CalcProvider } from "@/components/calc-context";
 import { CalcDock } from "@/components/calc-dock";
 import { HomeLink } from "@/components/home-link";
 import { SaveProvider } from "@/components/save-context";
+import { VisitTracker } from "@/components/visit-tracker";
 import { ListStateProvider } from "@/components/list-state";
 import {
   AREA_MIN_COUNT, BOOT_SCOPE_JS, CONTACT_EMAIL, GOOGLE_SITE_VERIFICATION, NAVER_SITE_VERIFICATION,
@@ -122,6 +123,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
           </footer>
           <CalcDock />
+          {/* 방문 집계 한 줄(/api/track). 화면에는 아무것도 안 그린다 —
+              봇·자동화 브라우저·운영자는 여기서 걸러 안 쏜다 */}
+          <Suspense fallback={null}>
+            <VisitTracker />
+          </Suspense>
           </CalcProvider>
         </SaveProvider>
       </body>

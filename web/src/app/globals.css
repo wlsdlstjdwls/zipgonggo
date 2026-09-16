@@ -1435,3 +1435,27 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   .adm-page { padding-top: 16px; }
   .adm-stat > b { font-size: 21px; }
 }
+
+/* 일별 방문자 막대. 한 계열뿐이라 범례가 없다 — 제목이 곧 계열 이름이다.
+   SVG가 아니라 div인 이유는 visit-chart.tsx 주석에. 365일이면 가로로 넘긴다 */
+.vz { margin: 0; }
+.vz-plot { display: flex; align-items: flex-end; gap: 2px; height: 148px; padding: 14px 10px 0;
+  border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); overflow-x: auto; }
+.vz-col { position: relative; flex: 1 1 0; min-width: 3px; height: 100%; display: flex; align-items: flex-end; }
+/* 데이터 끝만 둥글게 — 바닥은 축에 붙어 있어야 값이 0에서 시작한다는 뜻이 산다 */
+.vz-bar { display: block; width: 100%; border-radius: 4px 4px 0 0; background: var(--acc); }
+.vz-col:hover .vz-bar { background: var(--primary-hover); }
+/* 모든 막대에 숫자를 얹으면 서로 겹친다. 최댓값 하나만 말한다 */
+.vz-peak { position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+  font-size: 10.5px; font-weight: 800; color: var(--ink); white-space: nowrap; }
+.vz-axis { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 0 2px;
+  font-size: 11px; color: var(--dim); }
+.vz-mid { color: var(--mut); font-weight: 700; }
+.vz-table { margin-top: 8px; }
+.vz-table summary { color: var(--mut); }
+.vz-table table { margin-top: 6px; border: 1px solid var(--line); border-radius: var(--r-btn); overflow: hidden; }
+/* 인기 경로의 주소는 길다. 줄바꿈 대신 줄여서 표가 흔들리지 않게 */
+.adm-path { color: var(--mut); text-decoration: underline; text-underline-offset: 2px;
+  word-break: break-all; }
+.adm-path:hover { color: var(--acc); }
+.adm-sec > h2 small { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--dim); letter-spacing: 0; }

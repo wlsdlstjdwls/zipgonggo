@@ -55,7 +55,7 @@ export default async function AdminDashboard() {
   if (!(await isAdmin())) return null;
 
   // 질의 하나로 전부 받는다 — 나눠 던지면 왕복이 늘고, 동시에 던지면 커넥션을 새로 여느라 더 걸린다
-  const { health, stats, queue, sources, recent } = await dashboardData();
+  const { health, stats, queue, sources, recent, visits } = await dashboardData();
 
   const broken = health.filter((h) => h.ok === false || h.late);
 
@@ -84,6 +84,18 @@ export default async function AdminDashboard() {
             <JobCard key={`${h.stage}|${h.source}`} h={h} />
           ))}
         </ul>
+      </section>
+
+      <section className="adm-sec">
+        <h2>
+          방문
+          <Link href={ROUTES.adminVisitors}>기간별로 보기</Link>
+        </h2>
+        <div className="adm-stats">
+          <Stat label="동시접속" value={visits.online} note="최근 5분" />
+          <Stat label="오늘 방문" value={visits.todayVisitors} note={`${visits.todayViews.toLocaleString("ko-KR")}뷰`} />
+          <Stat label="누적 방문" value={visits.totalVisitors} note={`${visits.totalViews.toLocaleString("ko-KR")}뷰`} />
+        </div>
       </section>
 
       <section className="adm-sec">
