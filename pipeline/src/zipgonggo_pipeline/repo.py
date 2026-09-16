@@ -35,27 +35,42 @@ def _assign(col: str) -> str:
     return f"{col} = EXCLUDED.{col}"
 
 
+# 공고 1건 = **왕복 한 번**. 전에는 upsert + notice_area DELETE + 시군구마다 INSERT로 2+N번을 오갔다.
+# 한국에서 Neon(us-east-1)까지 한 왕복이 230ms 남짓이라(실측 2026-09-16) 왕복 수가 곧 적재 시간이다.
+#
+# 지우고 다시 넣지 않고 **넣을 것은 upsert, 없어진 것만 삭제**한다 — 두 CTE가 건드리는 행이 겹치지 않아야
+# 한 문장 안에서 안전하다. 같은 문장 안에서 DELETE한 행을 곧바로 INSERT하면
+# UNIQUE(notice_id, sido, sigungu)가 삭제를 못 보고 걸릴 수 있다(CTE끼리 실행 순서가 정해져 있지 않다).
 UPSERT_SQL = (
-    f"INSERT INTO notice ({', '.join(NOTICE_COLS)}) VALUES ({', '.join('%(' + c + ')s' for c in NOTICE_COLS)}) "
-    "ON CONFLICT (source_key) DO UPDATE SET "
+    "WITH up AS ("
+    f"  INSERT INTO notice ({', '.join(NOTICE_COLS)}) VALUES ({', '.join('%(' + c + ')s' for c in NOTICE_COLS)})"
+    "  ON CONFLICT (source_key) DO UPDATE SET "
     + ", ".join(_assign(c) for c in _UPDATE_COLS)
     + ", updated_at = now() RETURNING id, (xmax = 0) AS inserted"
+    "), src AS ("
+    "  SELECT (SELECT id FROM up) AS notice_id, a.sido, a.sigungu, a.supply_count"
+    "    FROM jsonb_to_recordset(%(areas)s::jsonb) AS a(sido text, sigungu text, supply_count int)"
+    "), ins AS ("
+    "  INSERT INTO notice_area (notice_id, sido, sigungu, supply_count) SELECT * FROM src"
+    "  ON CONFLICT (notice_id, sido, sigungu) DO UPDATE SET supply_count = EXCLUDED.supply_count"
+    "), del AS ("
+    "  DELETE FROM notice_area x WHERE x.notice_id = (SELECT id FROM up)"
+    "    AND NOT EXISTS (SELECT 1 FROM src s"
+    "                     WHERE s.sido = x.sido AND s.sigungu IS NOT DISTINCT FROM x.sigungu)"
+    ") SELECT id, inserted FROM up"
 )
 
 
 def upsert_notice(cur, notice: dict[str, Any], areas: list[dict[str, Any]]) -> bool:
-    """notice 1행 upsert + notice_area 교체. True면 신규."""
+    """notice 1행 upsert + notice_area 교체를 **한 문장**으로. True면 신규."""
     row = dict(notice)
     row["raw"] = json.dumps(row["raw"], ensure_ascii=False)
+    row["areas"] = json.dumps(
+        [{"sido": a["sido"], "sigungu": a["sigungu"], "supply_count": a["supply_count"]} for a in areas],
+        ensure_ascii=False,
+    )
     cur.execute(UPSERT_SQL, row)
     result = cur.fetchone()
-    notice_id = result["id"]
-    cur.execute("DELETE FROM notice_area WHERE notice_id = %s", (notice_id,))
-    for a in areas:
-        cur.execute(
-            "INSERT INTO notice_area (notice_id, sido, sigungu, supply_count) VALUES (%s, %s, %s, %s)",
-            (notice_id, a["sido"], a["sigungu"], a["supply_count"]),
-        )
     return bool(result["inserted"])
 
 
