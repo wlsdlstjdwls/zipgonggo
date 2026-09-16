@@ -37,6 +37,11 @@ env:
   JUSO_SEARCH_API_KEY: ${{ secrets.JUSO_SEARCH_API_KEY }}
   WEB_REVALIDATE_URL: ${{ secrets.WEB_REVALIDATE_URL }}
   REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+  # 한국에서 나가는 구멍(web /api/egress, icn1). 정부·서울시 사이트가 러너 IP의 연결을
+  # 간헐로 안 받아 그쪽으로 우회한다(pipeline/sources/egress.py). 둘 중 하나라도 비면
+  # 꺼진 채라 지금까지처럼 직접 나간다 — 되돌리려면 이 두 줄을 지우면 된다
+  EGRESS_PROXY_URL: "https://zipgonggo.com/api/egress"
+  EGRESS_SECRET: ${{ secrets.EGRESS_SECRET }}
   # IndexNow 발행 키. **비밀이 아니라 Secret으로 두지 않는다** — 규격이 web/public/{키}.txt 로
   # 공개하라고 요구한다. 값을 바꾸려면 그 파일도 같이 바꿔 재배포해야 한다
   INDEXNOW_KEY: "26b1ed3396f0d701d5f21d04bd0d2801"

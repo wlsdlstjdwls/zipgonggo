@@ -21,6 +21,8 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass, replace
 
+from ..sources.egress import Egress, from_env as egress_from_env
+
 log = logging.getLogger(__name__)
 
 API = "https://business.juso.go.kr/addrlink/addrLinkApi.do"
@@ -68,11 +70,13 @@ def clean_query(address: str | None) -> str:
 class JusoSearch:
     """검색 API 클라이언트. 같은 주소를 두 번 묻지 않게 한 판 동안 답을 기억한다."""
 
-    def __init__(self, confm_key: str, *, delay_sec: float = 0.4):
+    def __init__(self, confm_key: str, *, delay_sec: float = 0.4, egress: Egress | None = None):
         if not confm_key:
             raise RuntimeError("JUSO_SEARCH_API_KEY 가 비어 있다. pipeline/.env 를 확인할 것")
         self.confm_key = confm_key
         self.delay_sec = delay_sec
+        # 서울 구멍(sources/egress.py). 안 켜져 있으면 지금까지처럼 직접 나간다
+        self._egress = egress if egress is not None else egress_from_env()
         self._cache: dict[str, JusoHit | None] = {}
         self.calls = 0
         self.given_up = False   # 회로 차단 — 이번 판에선 API를 포기했다
@@ -161,11 +165,14 @@ class JusoSearch:
         """
         if self.given_up:
             return None
+        # 프록시를 탈 주소면 갈아 끼운다. juso도 해외 IP에서 연결이 안 되는 축이다
+        send_url, headers = (self._egress.wrap(url) if self._egress.targets(url) else (url, {}))
         for attempt in range(1, RETRY + 1):
             try:
                 time.sleep(self.delay_sec)
                 self.calls += 1
-                with urllib.request.urlopen(url, timeout=TIMEOUT) as resp:
+                req = urllib.request.Request(send_url, headers=headers)
+                with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
                     body = resp.read().decode("utf-8")
                 self._misfires = 0
                 return body

@@ -13,6 +13,8 @@ from typing import Any
 
 import httpx
 
+from .egress import Egress, from_env as egress_from_env
+
 log = logging.getLogger(__name__)
 # httpx가 INFO로 요청 URL(serviceKey 포함)을 찍는다. 키 유출 방지.
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -44,6 +46,7 @@ class ThrottledHttp:
         max_retries: int = 4,
         follow_redirects: bool = False,
         http: httpx.Client | None = None,
+        egress: Egress | None = None,
     ):
         self.delay_sec = delay_sec
         self.max_retries = max_retries
@@ -52,8 +55,15 @@ class ThrottledHttp:
             follow_redirects=follow_redirects,
             headers={"User-Agent": USER_AGENT},
         )
+        # 한국 사이트로 나가는 구멍. 환경변수가 없으면 꺼진 채라 지금까지와 똑같이 직접 나간다.
+        # 테스트가 http=MockTransport를 넘길 때 실수로 켜지지 않게, 넘겨받은 게 없으면 환경에서 읽는다
+        self._egress = egress if egress is not None else egress_from_env()
         self.call_count = 0
         self._last_call_at = 0.0
+
+    @property
+    def egress_enabled(self) -> bool:
+        return self._egress.enabled
 
     def _throttle(self) -> None:
         wait = self.delay_sec - (time.monotonic() - self._last_call_at)
@@ -73,6 +83,23 @@ class ThrottledHttp:
         """
         return self._request("GET", url, params=params, label=label, accept_redirect=accept_redirect)
 
+    def _route(
+        self, url: str, params: dict[str, Any] | None
+    ) -> tuple[str, dict[str, Any] | None, dict[str, str]]:
+        """직접 나갈지 서울 구멍으로 나갈지 고른다.
+
+        프록시를 탈 때는 **쿼리까지 붙인 완성된 주소**를 넘긴다 — 프록시는 `url` 파라미터 하나만 보고,
+        거기 안 든 파라미터는 상대 서버에 도착하지 않는다.
+        """
+        if not self._egress.targets(url):
+            return url, params, {}
+        full = str(httpx.URL(url, params=params)) if params else url
+        # 상대가 볼 UA는 **이 클라이언트가 실제로 쓰는 값**이다. 상수를 그대로 넘기면
+        # 남이 http= 로 다른 UA를 주입했을 때 조용히 어긋난다
+        ua = self._http.headers.get("user-agent", USER_AGENT)
+        proxied, headers = self._egress.wrap(full, {"user-agent": ua})
+        return proxied, None, headers
+
     def _request(
         self,
         method: str,
@@ -83,13 +110,16 @@ class ThrottledHttp:
         label: str = "",
         accept_redirect: bool = False,
     ) -> httpx.Response:
+        # 프록시를 탈 주소면 여기서 한 번만 갈아 끼운다. 재시도는 그대로 같은 주소를 두드린다
+        send_url, send_params, extra_headers = self._route(url, params)
+
         backoff = BACKOFF_START_SEC
         for attempt in range(1, self.max_retries + 1):
             self._throttle()
             self._last_call_at = time.monotonic()
             self.call_count += 1
             try:
-                resp = self._http.request(method, url, params=params, data=data)
+                resp = self._http.request(method, send_url, params=send_params, data=data, headers=extra_headers or None)
                 if resp.status_code in RETRYABLE_STATUS:
                     raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
                 if accept_redirect and resp.is_redirect:
