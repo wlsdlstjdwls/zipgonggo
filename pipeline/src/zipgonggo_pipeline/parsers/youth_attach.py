@@ -758,6 +758,37 @@ def parse_pdf(path: str | Path) -> YouthAttachFacts:
     return YouthAttachFacts(lines=lines, pages=sorted({ln.page for ln in lines}))
 
 
+def fill_kind_from_label(facts: YouthAttachFacts, supply_label: str | None) -> int:
+    """표에 특별/일반 구분이 한 줄도 없을 때만, 공고 머리글 「공급호수」 한 줄에서 구분을 끌어와 채운다.
+
+    첨부 표가 구분 열을 안 그린 추가모집 공고(「총 284세대 중 금회 추가공급 공공지원민간임대 1세대 (일반공급 1세대)」)가
+    스무 건 남짓 있다. 그 공고들은 금회 모집이 통째로 한 구분이라 머리글 한 줄이 표보다 확실하다.
+
+    안전장치 셋 — 셋 중 하나라도 어긋나면 비운 채로 둔다. 틀린 구분을 싣느니 「구분 미확인」이 낫다.
+      1) 표에서 읽은 줄 가운데 구분이 하나라도 있으면 손대지 않는다 (파서가 이미 갈랐다)
+      2) 머리글에 특별공급·일반공급이 둘 다 나오면 어느 쪽인지 못 정한다
+      3) 머리글이 말한 세대수와 표에서 센 호수 합이 다르면 머리글이 이 표를 가리키는 게 아니다
+
+    돌려주는 값은 채운 줄 수.
+    """
+    if not supply_label or any(ln.supply_kind for ln in facts.lines):
+        return 0
+    flat = _flat(supply_label)
+    kinds = {m.group(1) for m in _KIND.finditer(flat)}
+    if len(kinds) != 1:
+        return 0
+    kind = f"{kinds.pop()}공급"
+    # 「일반공급 6세대」·「(특별공급 1세대)」 — 구분 바로 뒤 숫자가 금회 모집 호수다
+    m = re.search(rf"{kind[:2]}\s*공급\s*(\d+)\s*(?:세대|호)", flat)
+    counted = sum(ln.count for ln in facts.lines if ln.count)
+    if m and counted and int(m.group(1)) != counted:
+        log.info("공급호수 머리글(%s %s)과 표 합(%d)이 달라 구분을 안 채운다", kind, m.group(1), counted)
+        return 0
+    for ln in facts.lines:
+        ln.supply_kind = kind
+    return len(facts.lines)
+
+
 def supply_rows(facts: YouthAttachFacts, *, complex_name: str, is_new: bool) -> list[dict[str, Any]]:
     """notice_supply 행. 같은 (공급대상, 특별/일반, 유형)은 한 줄로 합친다 — 호실 단위 표는 호실마다 줄이 나오므로."""
     merged: dict[tuple[str, str | None, str], dict[str, Any]] = {}

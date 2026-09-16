@@ -22,7 +22,7 @@ from typing import Any
 
 from ..config import settings
 from ..db import connect
-from ..parsers.youth_attach import YouthAttachFacts, parse_pdf, supply_rows, unit_rows
+from ..parsers.youth_attach import YouthAttachFacts, fill_kind_from_label, parse_pdf, supply_rows, unit_rows
 from ..repo import replace_notice_supply, replace_units, update_notice_attach_facts, update_notice_complex_facts
 from ..sources.http import ThrottledHttp
 from .common import Stats, finish_ingest, stage_main, utc_now
@@ -36,6 +36,7 @@ CACHE_ROOT = Path(__file__).resolve().parents[3] / "data" / "youth"
 SELECT_SQL = """
 SELECT n.id, n.slug, n.title, n.source_status, n.raw->>'file_url' AS file_url,
        n.raw->'youth_list_row'->>'boardId' AS board_id, n.sido, n.sigungu,
+       n.raw->'labels'->>'공급호수' AS supply_label,
        nc.name AS complex_name, nc.road_address
   FROM notice n
   LEFT JOIN LATERAL (SELECT name, road_address FROM notice_complex WHERE notice_id = n.id ORDER BY id LIMIT 1) nc ON true
@@ -125,6 +126,9 @@ def run(args) -> Stats:
             except Exception as exc:  # noqa: BLE001
                 stats.error("parse_error", key, exc)
                 continue
+            filled = fill_kind_from_label(facts, n["supply_label"])
+            if filled:
+                log.info("%s: 표에 특별/일반 구분이 없어 공급호수 머리글에서 %d줄을 채웠다", key, filled)
             if not facts.lines:
                 stats.skip("no_table")
                 log.info("%s %s: 임대조건 표 없음", key, n["title"][:40])
