@@ -8,6 +8,12 @@ export const SITE_URL =
     ? PRODUCTION_ORIGIN
     : (process.env.NEXT_PUBLIC_SITE_URL ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3100"));
 
+/**
+ * 경로 → 절대 URL. 홈("/")만은 **끝 슬래시를 떼어** SITE_URL 그대로 돌려준다.
+ * Next가 metadata.alternates.canonical을 만들 때 루트를 "https://zipgonggo.com"(슬래시 없음)으로 정규화하는데,
+ * 사이트맵·RSS·JSON-LD는 "https://zipgonggo.com/"을 내보내 같은 홈이 두 표기로 갈렸다(2026-09-16 실측).
+ * 같은 URL로 정규화되긴 하지만 색인 신호는 글자 그대로 맞춰 두는 게 낫다 — canonical 쪽 표기로 통일한다.
+ */
 export function absoluteUrl(path: string): string {
-  return `${SITE_URL}${path}`;
+  return path === "/" ? SITE_URL : `${SITE_URL}${path}`;
 }
