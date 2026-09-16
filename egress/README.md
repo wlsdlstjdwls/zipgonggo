@@ -34,6 +34,16 @@ curl -sD- -o/dev/null -H "x-egress-secret: <키>" \
 
 `icn1`이 아니면 우회가 통째로 무의미하다. 그 상태로 켜면 지연만 늘고 같은 차단을 맞는다.
 
+## 배포 보호를 껐다
+
+이 프로젝트는 **Vercel Authentication(SSO)을 꺼 뒀다**(`ssoProtection: null`, 2026-09-16).
+켜져 있으면 `*.vercel.app` 전부가 로그인 화면으로 302를 내서 GitHub Actions가 함수에
+닿지도 못한다 — 파이프라인 쪽에서는 200도 401도 아닌 **HTML 리다이렉트**가 돌아와 증상이 헷갈린다.
+
+대신 문지기는 이 함수 자신이다 — `EGRESS_SECRET` + 허용 호스트 6개 + https만.
+비밀값이 새더라도 할 수 있는 일은 **한국 공개 사이트를 대신 받아 보는 것**뿐이다.
+Automation Bypass를 쓰는 길도 있지만 비밀값이 하나 더 늘 뿐 실익이 같다(둘 다 GitHub Secrets에 산다).
+
 ## 부르는 쪽
 
 `pipeline/src/zipgonggo_pipeline/sources/egress.py`. 환경변수 둘이 다 있어야 켜진다 —
