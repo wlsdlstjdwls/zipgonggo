@@ -13,6 +13,9 @@ export const ROUTES = {
   terms: "/terms",
   privacy: "/privacy",
   rss: "/rss.xml",
+  // 운영자 콘솔. 색인 대상이 아니다 — robots.ts가 막고 페이지도 noindex를 단다
+  admin: "/admin",
+  adminIngest: "/admin/ingest",
 } as const;
 
 /** /notice/{slug}. slug에 한글·콜론이 들어가므로 항상 인코딩한다. */

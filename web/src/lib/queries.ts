@@ -37,11 +37,11 @@ function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
 
 // 오늘(KST). Neon의 TimeZone은 GMT라 CURRENT_DATE를 그대로 쓰면 KST 00시~09시 동안 UTC 어제가 나온다 —
 // 그 아홉 시간엔 어제 마감된 공고가 목록에 남고 화면 D-day(todayKST)만 「마감」으로 떠 서로 어긋났다(사용자 지적 2026-09-15).
-const TODAY = `(now() AT TIME ZONE 'Asia/Seoul')::date`;
+export const TODAY = `(now() AT TIME ZONE 'Asia/Seoul')::date`;
 
 // 정본만. 같은 공고가 기관 seq 여러 개로 들어와도 목록엔 한 번만 나온다(S2가 canonical_id를 채운다).
 // 딸림 글의 URL은 살아 있고 상세도 열린다 — 목록에서만 뺀다(CLAUDE.md 하지 말 것 6).
-const CANONICAL_ONLY = `canonical_id IS NULL`;
+export const CANONICAL_ONLY = `canonical_id IS NULL`;
 
 // 마감 7일 내: 오늘 포함 7일 안에 접수 마감. KPI·칩 카운트·목록 필터가 같은 식을 쓴다
 const CLOSING_7D = `apply_end_at >= ${TODAY} AND apply_end_at < ${TODAY} + 7`;
@@ -52,10 +52,10 @@ const CLOSING_7D = `apply_end_at >= ${TODAY} AND apply_end_at < ${TODAY} + 7`;
 // LH 예비입주자 정례모집(울산 2025-09-15)은 접수가 2025-09-29~10-01인데 endDe가 2029-10-01이라
 // 마감일만 보면 4년 뒤까지 접수 중이다 — 발표(2026-01-30)가 끝났다는 사실이 더 확실하다(사용자 지적 2026-09-15).
 // 상시·수시모집은 발표일도 함께 미래로 잡혀 있어 이 조건에 걸리지 않는다. format.ts의 isClosed와 같은 규칙.
-const CLOSED = `(status = '접수마감'
+export const CLOSED = `(status = '접수마감'
   OR (apply_end_at IS NOT NULL AND apply_end_at < ${TODAY})
   OR (announce_at IS NOT NULL AND announce_at < ${TODAY}))`;
-const NOT_CLOSED = `NOT ${CLOSED}`;
+export const NOT_CLOSED = `NOT ${CLOSED}`;
 
 function whereSql(where: string[]): string {
   return where.length ? "WHERE " + where.join(" AND ") : "";

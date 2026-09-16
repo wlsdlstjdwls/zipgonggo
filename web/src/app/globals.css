@@ -1331,3 +1331,107 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   .elig-grid { grid-template-columns: 1fr; }
 }
 
+
+/* ── 관리자 콘솔(/admin) ──────────────────────────────────────────
+   운영자 혼자 보는 화면이라 장식을 안 넣는다 — 숫자가 크고 이상한 값이 눈에 먼저 띄면 된다.
+   색은 지면과 같은 토큰을 쓴다(빨강 --hot, 노랑 --warn, 초록 --ok). 새 팔레트를 만들지 않는다. */
+.adm { padding-bottom: 40px; }
+.adm-nav { display: flex; align-items: center; gap: 4px; padding: 14px var(--pad) 0; border-bottom: 1px solid var(--line); }
+.adm-nav a { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: var(--r-chip) var(--r-chip) 0 0;
+  font-size: 13.5px; font-weight: 800; color: var(--dim); border-bottom: 2px solid transparent; transition: color 200ms var(--ease); }
+.adm-nav a:hover { color: var(--ink); }
+.adm-nav a.on { color: var(--ink); border-bottom-color: var(--acc); }
+.adm-nav a em { font-style: normal; display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px;
+  padding: 0 5px; border-radius: 999px; background: var(--hot); color: #fff; font-size: 10px; font-weight: 900; }
+.adm-nav form { margin-left: auto; }
+.adm-nav button { padding: 7px 12px; border: 1px solid var(--line2); border-radius: var(--r-chip); background: var(--bg);
+  font-size: 12px; font-weight: 800; color: var(--mut); cursor: pointer; }
+.adm-nav button:hover { color: var(--ink); border-color: var(--ink); }
+
+.adm-page { padding: 22px var(--pad) 0; }
+.adm-head h1 { font-size: 22px; font-weight: 900; }
+.adm-sub { margin: 6px 0 0; font-size: 13px; color: var(--mut); }
+.adm-sub strong { color: var(--hot); }
+.adm-sec { margin-top: 26px; }
+.adm-sec > h2 { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; font-size: 13px; font-weight: 900;
+  letter-spacing: 0.06em; color: var(--dim); }
+.adm-sec > h2 a { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--acc); }
+.adm-note { margin: 10px 0 0; font-size: 11.5px; line-height: 1.7; color: var(--dim); }
+
+/* 잡 카드 — 왼쪽 띠 하나로 상태를 말한다. 조건부 실행 잡은 오래 안 돌아도 회색 그대로다 */
+.adm-jobs { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(216px, 1fr)); }
+.adm-job { display: grid; gap: 2px; padding: 11px 13px; border: 1px solid var(--line); border-left: 3px solid var(--line2);
+  border-radius: var(--r-btn); background: var(--bg); }
+.adm-job.ok { border-left-color: var(--ok); }
+.adm-job.late { border-left-color: var(--warn); background: var(--warn-soft); }
+.adm-job.bad { border-left-color: var(--hot); background: var(--hot-soft); }
+.adm-job.none { border-left-style: dashed; }
+.adm-job b { font-size: 13.5px; font-weight: 800; }
+.adm-job-key { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--dim); }
+.adm-job-key i { margin-left: 5px; font-style: normal; color: var(--acc); }
+.adm-job-when { margin-top: 3px; font-size: 13px; font-weight: 700; color: var(--ink); }
+.adm-job-when em { margin-left: 6px; font-style: normal; font-size: 12px; font-weight: 700; color: var(--mut); }
+.adm-job-meta { font-size: 11px; color: var(--dim); }
+.adm-job-meta strong { color: var(--hot); }
+
+/* 숫자 스트립 */
+.adm-stats { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.adm-stat { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
+.adm-stat > span { display: block; font-size: 11.5px; font-weight: 700; color: var(--dim); }
+.adm-stat > b { display: block; margin-top: 2px; font-size: 25px; font-weight: 900; line-height: 1.15; letter-spacing: -0.03em; }
+.adm-stat > small { display: block; margin-top: 3px; font-size: 11px; line-height: 1.5; color: var(--mut); }
+
+/* 잡 실행 버튼 */
+.adm-runs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.adm-run { display: inline-flex; align-items: center; gap: 8px; }
+.adm-run button { padding: 8px 13px; border: 1px solid var(--line2); border-radius: var(--r-chip); background: var(--bg);
+  font-size: 12.5px; font-weight: 800; color: var(--ink); cursor: pointer; transition: background 200ms var(--ease); }
+.adm-run button:hover:not(:disabled) { background: var(--sub); }
+.adm-run button:disabled { color: var(--dim); cursor: progress; }
+.adm-run-msg { font-size: 12px; font-weight: 700; color: var(--ok); }
+.adm-run-msg.no { color: var(--hot); }
+.adm-run-msg a { margin-left: 6px; color: var(--acc); text-decoration: underline; text-underline-offset: 2px; }
+
+/* 필터 칩 — 전부 링크다. 이 화면엔 상태를 들고 있을 이유가 없다 */
+.adm-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 14px 0 12px; }
+.adm-chips a { padding: 5px 11px; border: 1px solid var(--line2); border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--mut); }
+.adm-chips a:hover { color: var(--ink); border-color: var(--ink); }
+.adm-chips a.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.adm-chip-gap { width: 100%; height: 0; }
+
+/* 표 — 전역 th/td 규칙을 그대로 쓰고 가로 스크롤만 감싼다 */
+.adm-table { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-card); }
+.adm-table table { min-width: 620px; }
+.adm-table tbody tr:last-child td { border-bottom: 0; }
+.adm-table tbody tr.bad { background: var(--hot-soft); }
+.adm-table td small { color: var(--dim); font-size: 11px; }
+.adm-table td i { font-style: normal; font-size: 11px; color: var(--dim); }
+.adm-fail { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--hot); color: #fff !important; font-size: 10px; font-weight: 900; }
+.adm-sum { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: var(--mut); }
+.adm-sum b { font-weight: 800; color: var(--ink); }
+.adm-sum .skip { flex-basis: 100%; color: var(--dim); }
+.adm-sum .err { color: var(--hot); font-weight: 800; }
+.adm-err { flex-basis: 100%; }
+.adm-err summary { cursor: pointer; font-size: 11.5px; font-weight: 800; color: var(--hot); }
+.adm-err ul { margin: 6px 0 0; padding-left: 16px; font-size: 11.5px; line-height: 1.6; color: var(--mut); }
+.adm-err pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; font-size: 11px; color: var(--mut); }
+.adm-more { margin-top: 12px; text-align: center; }
+.adm-more a { display: inline-block; padding: 9px 18px; border: 1px solid var(--line2); border-radius: var(--r-chip);
+  font-size: 12.5px; font-weight: 800; color: var(--mut); }
+.adm-more a:hover { color: var(--ink); border-color: var(--ink); }
+
+/* 로그인 — 콘솔에 못 들어온 사람에게 레이아웃이 children 대신 이걸 그린다 */
+.adm-login { max-width: 320px; margin: 70px auto; padding: 0 var(--pad); display: grid; gap: 10px; }
+.adm-login h1 { font-size: 19px; font-weight: 900; }
+.adm-login p { margin: 0; font-size: 12.5px; color: var(--mut); }
+.adm-login input { height: 42px; padding: 0 12px; border: 1px solid var(--line2); border-radius: var(--r-btn);
+  font-family: inherit; font-size: 14px; background: var(--bg); color: var(--ink); }
+.adm-login button { height: 42px; border: 0; border-radius: var(--r-btn); background: var(--acc); color: #fff;
+  font-size: 14px; font-weight: 800; cursor: pointer; }
+.adm-login button:disabled { background: var(--line2); cursor: progress; }
+.adm-login-err { color: var(--hot); font-weight: 700; }
+
+@media (max-width: 640px) {
+  .adm-page { padding-top: 16px; }
+  .adm-stat > b { font-size: 21px; }
+}
