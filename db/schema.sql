@@ -650,3 +650,105 @@ CREATE TABLE notice_eligibility (
 
 COMMENT ON TABLE  notice_eligibility IS '공고문의 신청자격 묶음(소득기준·신청순위·가산·자산·선정순서·배점표). 공고당 1행, jsonb';
 COMMENT ON COLUMN notice_eligibility.verified IS '소득표 검산 통과 여부. false면 화면은 소득표 금액을 내보내지 않는다';
+
+-- 0025 — 보증금 비율별 옵션 (민간임대 첨부 표)
+-- 같은 호실이 보증금 비율에 따라 여러 (보증금, 월임대료) 짝을 갖는다. 고정 칸으로는 못 담아 배열로 둔다.
+ALTER TABLE notice_supply
+  ADD COLUMN deposit_options jsonb;
+COMMENT ON COLUMN notice_supply.deposit_options IS
+  '보증금 비율별 (보증금, 월임대료) 옵션 목록. 민간임대(youth_attach) 공고문 표에서 채움. deposit·rent는 이 중 보증금이 가장 낮은 옵션';
+
+-- 0026 — 청년안심주택 포털 단지 이미지 + 단지 연결 코드
+ALTER TABLE notice_complex ADD COLUMN youth_home_code text;
+COMMENT ON COLUMN notice_complex.youth_home_code IS
+  '청년안심주택 포털 단지코드(homeCode). 단지명·주소로 대조해 붙인다. 포털에서 내려간 옛 단지는 NULL';
+CREATE INDEX idx_notice_complex_youth_home ON notice_complex (youth_home_code) WHERE youth_home_code IS NOT NULL;
+
+CREATE TABLE youth_house_image (
+  id          bigserial   PRIMARY KEY,
+  home_code   text        NOT NULL,
+  kind        text        NOT NULL,              -- 평면도 · 전경 · 투시도 · 편의시설
+  sply_ty     text        NOT NULL DEFAULT '',   -- 주택형. 포털 평면도는 주택형을 안 밝혀 대개 빈 문자열
+  label       text,                              -- 화면 표기. 편의시설 사진은 포털이 캡션을 짝지어 주지 않아 NULL
+  source_url  text        NOT NULL,              -- 포털 원본 URL. 재수집·출처 표시용
+  file_name   text        NOT NULL,              -- 우리가 저장한 파일명. 지면은 이걸로 찾는다
+  bytes       integer,
+  sort_no     integer     NOT NULL DEFAULT 0,
+  collected_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (home_code, source_url)
+);
+COMMENT ON TABLE youth_house_image IS
+  '청년안심주택 포털 단지 이미지. 공고가 아니라 단지(homeCode)에 붙는다 — 한 단지가 여러 공고에 되풀이 나온다';
+COMMENT ON COLUMN youth_house_image.kind IS
+  '평면도·전경·투시도·편의시설. 포털 상세의 article 구역과 img alt로 가른다';
+COMMENT ON COLUMN youth_house_image.file_name IS
+  '저장 파일명. 지금은 로컬 PoC라 web/public/youth-house/{home_code}/{file_name}에 둔다. 발행 때 스토리지로 옮긴다';
+CREATE INDEX idx_youth_house_image_lookup ON youth_house_image (home_code, kind, sply_ty, sort_no);
+
+-- 0027 — 청년안심주택 포털 단지 사실 (공고문에 없는 관리비·운영사·입주예정일)
+CREATE TABLE youth_house (
+  home_code    text        PRIMARY KEY,           -- 포털 단지코드. notice_complex.youth_home_code가 가리킨다
+  name         text        NOT NULL,              -- 포털 표기(`홍대입구역 맹그로브창천`) — 역세권 접두사가 붙어 있다
+  address      text,
+  sigungu      text,
+  maint_low    integer,
+  maint_high   integer,
+  households   integer,                           -- 총 세대수(movinHoman)
+  manager      text,                              -- 운영사(managerComp)
+  developer    text,                              -- 시행사
+  builder      text,                              -- 시공사
+  movein       date,                              -- 입주(예정)일
+  phone        text,
+  homepage     text,
+  subway       text,                              -- `홍대입구역 2호선, 경의중앙선, 공항철도`
+  scale        text,                              -- `총 288 세대 (공공임대 92 세대, 공공지원민간임대 196 세대)`
+  source_url   text        NOT NULL,
+  collected_at timestamptz NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE youth_house IS
+  '청년안심주택 포털 단지 사실. 공고문 첨부에 없는 값(관리비·운영사·입주예정일)을 지면에 싣는다';
+COMMENT ON COLUMN youth_house.maint_low IS
+  '월 관리비 하한(원). 포털의 청년 기준값. 실제 청구액이 아니라 (예상)관리비다 — 화면에 그렇게 적는다';
+COMMENT ON COLUMN youth_house.maint_high IS
+  '월 관리비 상한(원). 포털의 신혼부부 기준값. 하한과 같으면 화면은 한 값으로 적는다';
+
+-- 0028 — IndexNow 제출 이력(공고). updated_at은 내용과 무관하게 움직여 신호로 못 쓴다 — 지면 내용 해시를 본다
+ALTER TABLE notice ADD COLUMN indexnow_at   timestamptz;
+ALTER TABLE notice ADD COLUMN indexnow_hash text;
+COMMENT ON COLUMN notice.indexnow_at IS
+  'IndexNow에 이 공고 URL을 마지막으로 제출한 시각. NULL이면 아직 한 번도 안 알렸다';
+COMMENT ON COLUMN notice.indexnow_hash IS
+  '마지막 제출 때의 지면 내용 해시. 이 값이 그대로면 다시 쏘지 않는다(updated_at은 내용과 무관하게 움직인다)';
+CREATE INDEX notice_indexnow_pending_idx
+  ON notice (indexnow_at NULLS FIRST, posted_at DESC)
+  WHERE canonical_id IS NULL;
+
+-- 0029 — 방문 집계. web이 직접 쓰는 유일한 표(CLAUDE.md의 예외)
+CREATE TABLE page_view (
+  id            bigserial   PRIMARY KEY,
+  visitor_id    uuid        NOT NULL,          -- 브라우저가 만든 난수. 사람 식별자가 아니다
+  path          text        NOT NULL,          -- 경로만. 쿼리스트링은 떼고 받는다
+  referrer_host text,                          -- 유입 도메인. NULL이면 직접 유입
+  entry         boolean     NOT NULL DEFAULT false,  -- 이 방문의 첫 조회. 유입 집계는 이 행만 센다
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE  page_view IS '방문 집계. web이 직접 쓰는 유일한 표(/api/track). 12개월 뒤 지운다';
+COMMENT ON COLUMN page_view.visitor_id IS 'localStorage의 난수 UUID. 브라우저 데이터를 지우면 새 값이 된다';
+COMMENT ON COLUMN page_view.entry IS
+  '페이지를 새로 연 첫 조회. 클라이언트 라우팅으로 옮겨 다닐 때는 document.referrer가 안 바뀌어 유입 출처가 거짓이 된다';
+CREATE INDEX page_view_recent  ON page_view (created_at DESC);
+CREATE INDEX page_view_path    ON page_view (path, created_at DESC);
+CREATE INDEX page_view_visitor ON page_view (visitor_id, created_at DESC);
+CREATE INDEX page_view_entry   ON page_view (created_at DESC) WHERE entry;
+
+-- 0030 — 공고 아닌 URL의 IndexNow 제출 이력.
+-- 단지·유형 허브·지역은 붙일 행이 없거나(허브·지역) 수집마다 replace되는 표라(단지) URL 자체를 열쇠로 쓴다.
+-- 발행 대상은 배포된 sitemap.xml에서 읽는다 — 판정식이 web에 하나뿐이라 베껴 쓰면 두 벌이 된다.
+CREATE TABLE indexnow_url (
+  url          text PRIMARY KEY,
+  submitted_at timestamptz NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE indexnow_url IS
+  '공고 상세가 아닌 발행 URL(단지/유형/지역/정책문서)의 IndexNow 제출 이력. 있으면 이미 알린 것이다';
+COMMENT ON COLUMN indexnow_url.submitted_at IS
+  '처음 제출한 시각. 갱신하지 않는다 — 이 표는 재발행 신호가 아니라 「알렸다」는 사실만 든다';

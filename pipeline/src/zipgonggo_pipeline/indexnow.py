@@ -14,14 +14,21 @@ web은 키 파일(`/{키}.txt`)을 내주기만 한다.
 updated_at이 새로 찍힌다. 그래서 updated_at이 아니라 **지면 내용 해시**를 본다(0028).
 해시 재료에 자식 표 행 수를 넣는 이유는 S1이 목록만 넣고 S3가 첨부를 파싱해 알맹이를 채우기 때문이다 —
 그때 notice 컬럼은 거의 안 움직이는데 지면은 껍데기에서 알맹이로 바뀐다.
+
+**발행기가 둘인 이유.**
+`publish()`는 공고 상세(`/notice/{공고}`)만 맡는다. 지면의 나머지 — 단지·유형 허브·지역×유형·지역 —
+는 DB 행이 없거나(허브·지역) 수집마다 replace되는 표라(단지) notice처럼 해시를 얹을 데가 없고,
+애초에 「무엇을 발행하는가」의 판정식이 web의 `sitemap.ts` 한 곳에 있다. 그래서 `publish_sitemap()`은
+배포된 `/sitemap.xml`을 읽어 **처음 보는 URL만** 한 번씩 민다(0030). 자세한 근거는 그 마이그레이션에.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import xml.etree.ElementTree as ET
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -135,3 +142,88 @@ def publish(limit: int = BATCH_MAX, *, dry_run: bool = False) -> dict[str, Any]:
 
     log.info("IndexNow 제출 %d건", len(urls))
     return {"submitted": len(urls)}
+
+
+# ── 사이트맵에서 읽는 쪽 (0030) ────────────────────────────────────────────────
+
+SITEMAP_URL = f"{ORIGIN}/sitemap.xml"
+
+# sitemaps.org 0.9. Next의 MetadataRoute.Sitemap이 이 네임스페이스로 낸다
+_SM_NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+
+# 사이트맵 색인(sitemapindex)을 따라 내려갈 깊이. url-structure.md대로 파일당 40,000을 넘기면
+# web이 generateSitemaps로 쪼갤 텐데, 그때 여기를 고치지 않아도 되게 한 단은 따라간다
+_SITEMAP_DEPTH = 1
+
+
+def parse_sitemap(xml: str) -> tuple[list[str], list[str]]:
+    """사이트맵 XML에서 (URL들, 하위 사이트맵들)을 뽑는다. lastmod는 읽지 않는다 — 0030 참고."""
+    root = ET.fromstring(xml)
+    locs = [(e.text or "").strip() for e in root.iter(f"{_SM_NS}loc")]
+    if root.tag == f"{_SM_NS}sitemapindex":
+        return [], [u for u in locs if u]
+    return [u for u in locs if u], []
+
+
+def is_notice_detail(url: str) -> bool:
+    """`/notice/{공고}` 인가. 이건 `publish()`가 해시로 맡으므로 사이트맵 쪽은 건드리지 않는다.
+
+    단지(`/notice/{공고}/{호실}`)는 여기 해당하지 않는다 — slug의 슬래시는 인코딩돼 있어
+    경로 칸 수로 가른다(`notice_url`의 `safe=''`와 같은 약속).
+    """
+    segs = [s for s in urlsplit(url).path.split("/") if s]
+    return len(segs) == 2 and segs[0] == "notice"
+
+
+def sitemap_urls(
+    *, client: Any = None, url: str = SITEMAP_URL, depth: int = _SITEMAP_DEPTH,
+) -> list[str]:
+    """배포된 사이트맵을 읽어 공고 상세를 뺀 URL 목록을 순서대로 돌려준다."""
+    get = client.get if client is not None else httpx.get
+    r = get(url, timeout=30.0)
+    r.raise_for_status()
+    urls, children = parse_sitemap(r.text)
+    if children and depth > 0:
+        for child in children:
+            urls.extend(sitemap_urls(client=client, url=child, depth=depth - 1))
+    # 순서·중복 정리. 사이트맵 순서가 곧 우선순위라(홈 → 허브 → 지역 → 단지) dict로 순서를 지킨다
+    return list(dict.fromkeys(u for u in urls if not is_notice_detail(u)))
+
+
+def publish_sitemap(
+    limit: int = BATCH_MAX, *, dry_run: bool = False, client: Any = None,
+) -> dict[str, Any]:
+    """사이트맵에 새로 생긴 URL을 제출한다. 이미 알린 URL은 다시 쏘지 않는다(0030).
+
+    `publish()`와 마찬가지로 실패해도 예외를 던지지 않는다 — 다음 회차가 같은 URL을 다시 집는다.
+    """
+    api_key = key()
+    if not api_key:
+        log.debug("INDEXNOW_KEY 미설정 — 사이트맵 발행 건너뜀")
+        return {"skipped": "no_key"}
+
+    urls = sitemap_urls(client=client)
+    if not urls:
+        return {"submitted": 0}
+
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT url FROM indexnow_url WHERE url = ANY(%s)", (urls,))
+        known = {r["url"] for r in cur.fetchall()}
+        fresh = [u for u in urls if u not in known][:limit]
+        if not fresh:
+            return {"submitted": 0, "known": len(known)}
+        if dry_run:
+            return {"would_submit": len(fresh), "known": len(known), "urls": fresh[:5]}
+
+        if not submit(fresh, api_key):
+            return {"submitted": 0, "failed": len(fresh)}
+
+        # 제출한 것만 적는다. 중복 키는 조용히 넘긴다 — 두 잡이 겹쳐 돌아도 사고가 안 나게
+        cur.executemany(
+            "INSERT INTO indexnow_url (url) VALUES (%s) ON CONFLICT (url) DO NOTHING",
+            [(u,) for u in fresh],
+        )
+        conn.commit()
+
+    log.info("IndexNow 사이트맵 제출 %d건", len(fresh))
+    return {"submitted": len(fresh), "known": len(known)}

@@ -18,6 +18,7 @@ import httpx
 from ..config import settings
 from ..db import connect
 from ..indexnow import publish as publish_indexnow
+from ..indexnow import publish_sitemap as publish_indexnow_sitemap
 from ..repo import insert_ingest_log, upsert_notice
 
 log = logging.getLogger("stage.common")
@@ -179,4 +180,13 @@ def stage_main(
                 log.info("IndexNow %s", result)
         except Exception as exc:  # noqa: BLE001 — 발행 실패로 수집을 실패 처리하지 않는다
             log.warning("IndexNow 발행 실패(무시): %s", exc)
+        # 단지·유형 허브·지역은 사이트맵에서 읽어 새 URL만 민다(0030).
+        # 공고를 민 **뒤**에 오는 이유: 이번에 새로 생긴 공고의 단지 URL이 사이트맵에 오르는 건
+        # 웹 캐시가 비고 사이트맵이 다시 만들어진 다음이라, 어차피 다음 회차에 잡힌다. 급한 쪽이 먼저다
+        try:
+            result = publish_indexnow_sitemap()
+            if result.get("submitted"):
+                log.info("IndexNow 사이트맵 %s", result)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("IndexNow 사이트맵 발행 실패(무시): %s", exc)
     return 0 if stats.ok else 1
