@@ -4,7 +4,7 @@ name: 게시판 순찰
 #
 # 서울주거포털 목록(s1_sh)에 안 올라오는 물건이 있다. 운영기관 위탁분(특화형 매입임대·사회주택)은
 # 인터넷청약시스템 게시판(m_247)에만 뜨고, 모집공고 게시판(m_241)에도 포털이 놓친 게 섞인다.
-# 경쟁률 결과 글과 마이홈 API(LH 전국분)도 여기서 받는다.
+# 경쟁률 결과 글도 여기서 받는다. 마이홈 API(LH 전국분)는 「공고 수집」으로 옮겼다(2026-09-16).
 #
 # 매시가 아니라 하루 한 번인 이유는 요청 간격이다. m_247은 잡글이 8천 건 섞인 게시판이라
 # 한 회차에 수십 번을 두드린다(CLAUDE.md 「하지 말 것」 7).
@@ -51,7 +51,7 @@ env:
 
 jobs:
   board:
-    name: 순찰 — 게시판과 마이홈 API
+    name: 순찰 — 게시판
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -72,7 +72,7 @@ jobs:
       # 목록만 받는다 — 첨부를 안 읽으니 경량 묶음이면 된다
       - run: pip install -r requirements-collect.txt
 
-      - name: 게시판 두 곳과 마이홈 API
+      - name: 게시판 두 곳
         id: p
         run: |
           SINCE="${{ inputs.since_year }}"
@@ -98,18 +98,9 @@ jobs:
             echo "::endgroup::"
           done
 
-          echo "::group::마이홈 API"
-          if python -m zipgonggo_pipeline.stages.s1_collect > myhome.json; then
-            cat myhome.json
-            jq -r '"- 마이홈 API — 신규 **\(.inserted)건** / 갱신 \(.updated)건"' myhome.json >> "$GITHUB_STEP_SUMMARY"
-          else
-            cat myhome.json || true
-            echo "- 마이홈 API **실패**" >> "$GITHUB_STEP_SUMMARY"
-            fail=1
-          fi
-          echo "::endgroup::"
+          # 마이홈 API는 「공고 수집」으로 옮겼다(2026-09-16). 하루 한 번이면 그 한 번이
+          # 실패한 날은 전국분이 통째로 빈다 — 실제로 사흘이 비었다. 매시 두드리는 쪽이 낫다
 
-          # 상세로 넘길 건 i-sh 공고뿐이다. 마이홈분(LH 전국)은 첨부 양식이 달라 S3이 못 읽는다
           # 게시판은 정정공고를 원 공고와 따로 준다 — 주워 온 다음 정본을 다시 매긴다
           echo "::group::정본 묶기"
           python -m zipgonggo_pipeline.stages.s2_dedupe > dedupe.json || fail=1
@@ -200,3 +191,9 @@ jobs:
             --label "수집" \
             --body "게시판 순찰 중 일부가 실패했다. $RUN" \
             || echo "이슈 생성 실패(라벨 없음?) — 무시"
+
+      # **이슈를 연 회차는 실행도 빨간불이어야 한다.** 예전엔 이 잡이 성공으로 끝나
+      # 워크플로 결론이 success로 떴다 — 마이홈 API가 닷새 연속 죽었는데 실행 목록은
+      # 내내 초록색이었다(2026-09-16). 열린 이슈 8개를 아무도 안 본 이유가 그거다
+      - name: 빨간불로 끝낸다
+        run: exit 1

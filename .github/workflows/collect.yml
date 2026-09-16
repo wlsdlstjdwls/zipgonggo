@@ -88,6 +88,22 @@ jobs:
           cat youth.json
           echo "count=$(jq '.new_slugs | length' youth.json)" >> "$GITHUB_OUTPUT"
 
+      # 마이홈 API(LH 전국분). 「순찰」에서 옮겨 왔다 — 하루 한 번이면 그 한 번이 실패한 날은
+      # 통째로 구멍이다. 실제로 09-13~09-16 사흘이 비었다(2026-09-16 확인).
+      #
+      # 실패해도 잡을 죽이지 않는다. data.go.kr이 해외 IP(GitHub 러너)의 SYN을 간헐로 안 받아
+      # 열 번에 서너 번은 ConnectTimeout으로 끝난다. 매시 두드리면 하루 24번 중 몇 번은 붙고,
+      # 실패한 회차는 ingest_log에 ok=false로 남아 콘솔에서 보인다(stages/common.py log_crash).
+      # 여기서 빨간불을 켜면 한 시간에 한 번씩 헛경보가 울린다
+      - name: S1 마이홈 API
+        id: myhome
+        if: always()
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m zipgonggo_pipeline.stages.s1_collect > myhome.json
+          cat myhome.json
+
       - name: 요약
         if: always()
         run: |
@@ -106,6 +122,11 @@ jobs:
               jq -r '.new_slugs[] | "  - `\(.)`"' youth.json
             else
               echo "- 청년안심주택 목록 수집이 실패했다"
+            fi
+            if [ "${{ steps.myhome.outcome }}" = "success" ]; then
+              echo "- 마이홈 API(LH 전국) — 신규 **$(jq '.inserted' myhome.json)건** / 갱신 $(jq '.updated' myhome.json)건"
+            else
+              echo "- 마이홈 API **못 붙었다** (data.go.kr이 해외 IP를 간헐로 막는다 — 다음 회차가 이어받는다)"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -204,3 +225,6 @@ jobs:
             --label "수집" \
             --body "신규 ${{ needs.watch.outputs.count }}건 중 일부가 파싱되지 않았다. $RUN" \
             || echo "이슈 생성 실패(라벨 없음?) — 무시"
+          # 이슈를 연 회차는 실행도 빨간불로 끝낸다. 초록불만 보고 「잘 돌고 있다」고
+          # 읽는 일을 막는다(2026-09-16)
+          exit 1

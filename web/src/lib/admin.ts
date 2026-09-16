@@ -31,7 +31,10 @@ export const PIPELINE: JobSpec[] = [
   { stage: "S1", source: "youth_scrape", label: "청년안심주택 게시판", everyMin: 60 },
   { stage: "S1", source: "ish_board", label: "i-sh 게시판(m_241)", everyMin: 24 * 60 },
   { stage: "S1", source: "ish_247", label: "i-sh 게시판(m_247)", everyMin: 24 * 60 },
-  { stage: "S1", source: "myhome_api", label: "마이홈 API", everyMin: 24 * 60 },
+  // 「순찰」(하루 1회)에서 「공고 수집」(매시)으로 옮겼다(2026-09-16). data.go.kr이 해외 IP를
+  // 간헐로 막아 한 회차가 통째로 날아가는 일이 잦다 — 자주 두드려 확률로 이긴다.
+  // 지연 판정은 넉넉히 본다: 매시 돌아도 연달아 몇 시간 못 붙는 게 정상 범위다
+  { stage: "S1", source: "myhome_api", label: "마이홈 API", everyMin: 6 * 60 },
   { stage: "S3", source: "ish_result", label: "결과 글 파싱", everyMin: 24 * 60 },
   { stage: "S3", source: "sh_attach", label: "SH 첨부 공고문", everyMin: null },
   { stage: "S3", source: "youth_attach", label: "민간임대 첨부", everyMin: null },

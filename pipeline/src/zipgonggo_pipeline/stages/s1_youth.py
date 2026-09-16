@@ -169,7 +169,7 @@ def run(*, dry_run: bool, max_pages: int | None) -> Stats:
 
 
 def main(argv: list[str] | None = None) -> int:
-    return stage_main("S1 서울시 청년안심주택(민간임대) 수집", lambda a: run(dry_run=a.dry_run, max_pages=a.max_pages), argv=argv)
+    return stage_main("S1 서울시 청년안심주택(민간임대) 수집", lambda a: run(dry_run=a.dry_run, max_pages=a.max_pages), stage=STAGE, source=SOURCE, argv=argv)
 
 
 if __name__ == "__main__":

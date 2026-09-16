@@ -77,7 +77,7 @@ def run(args: argparse.Namespace) -> Stats:
 
 
 def main(argv: list[str] | None = None) -> int:
-    return stage_main("S0 공급유형 자격·배점 시드", run, add_args=add_args, argv=argv)
+    return stage_main("S0 공급유형 자격·배점 시드", run, add_args=add_args, stage=STAGE, source=SOURCE, argv=argv)
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from typing import Any
 import httpx
 
 from ..config import settings
+from ..db import connect
 from ..indexnow import publish as publish_indexnow
 from ..repo import insert_ingest_log, upsert_notice
 
@@ -110,14 +111,41 @@ def notify_web_revalidate(tags: list[str] | None = None) -> None:
         log.warning("웹 캐시 갱신 요청 실패(무시): %s", exc)
 
 
+def log_crash(*, stage: str, source: str, started: datetime, exc: BaseException) -> Stats:
+    """스테이지가 통째로 죽었을 때 ingest_log에 ok=false 한 줄을 남긴다.
+
+    **왜 따로 여느냐**: 죽은 이유가 DB 커넥션이 끊긴 것일 수도 있다(2026-09-15 S6 —
+    느린 juso 호출 중에 Neon이 idle-in-transaction으로 잘랐다). 스테이지가 쥐고 있던
+    연결로 적으려 들면 그 자리에서 또 죽는다. 새로 열어 적고 바로 닫는다.
+
+    로그를 못 남겨도 던지지 않는다 — 원래 예외가 더 중요하다.
+    """
+    stats = Stats()
+    stats.error("stage_crashed", f"{type(exc).__name__}", exc)
+    try:
+        with connect() as conn, conn.cursor() as cur:
+            finish_ingest(cur, stage=stage, source=source, stats=stats, started=started)
+            conn.commit()
+    except Exception as exc2:  # noqa: BLE001
+        log.warning("크래시 기록마저 실패(무시): %s", exc2)
+    return stats
+
+
 def stage_main(
     description: str,
     run: Callable[[argparse.Namespace], Stats],
     *,
+    stage: str | None = None,
+    source: str | None = None,
     add_args: Callable[[argparse.ArgumentParser], None] | None = None,
     argv: list[str] | None = None,
 ) -> int:
-    """공통 CLI. --dry-run · --max-pages · -v 는 모든 스테이지가 갖는다."""
+    """공통 CLI. --dry-run · --max-pages · -v 는 모든 스테이지가 갖는다.
+
+    stage/source를 주면 **run()이 예외로 죽어도 ingest_log에 ok=false를 남긴다.**
+    안 남기면 콘솔에서 그 회차가 아예 없던 일이 된다 — 「마이홈이 사흘째 안 들어온다」를
+    아무도 못 본 이유가 그거였다(2026-09-16). 종료코드는 그대로 1이라 워크플로는 여전히 빨간불이다.
+    """
     ap = argparse.ArgumentParser(description=description)
     ap.add_argument("--dry-run", action="store_true", help="수집·매핑만, DB 쓰기 없음")
     ap.add_argument("--max-pages", type=int, default=None)
@@ -129,7 +157,17 @@ def stage_main(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
-    stats = run(args)
+    started = utc_now()
+    try:
+        stats = run(args)
+    except Exception as exc:  # noqa: BLE001 — 죽은 사실을 DB에 남기고 같은 코드로 끝낸다
+        log.exception("%s 가 중단됐다", description)
+        if stage and source and not args.dry_run:
+            log_crash(stage=stage, source=source, started=started, exc=exc)
+        else:
+            log.warning("stage/source 를 안 넘겨 ingest_log에 못 남겼다")
+        print(json.dumps({"crashed": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False, indent=1))
+        return 1
     print(json.dumps(stats.__dict__, ensure_ascii=False, indent=1))
     if not args.dry_run and stats.ok:
         notify_web_revalidate()

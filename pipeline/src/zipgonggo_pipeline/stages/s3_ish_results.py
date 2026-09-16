@@ -187,7 +187,7 @@ def main(argv: list[str] | None = None) -> int:
         "S3 i-sh 결과 글(경쟁률·당첨자 발표) 적재",
         lambda a: run(dry_run=a.dry_run, max_pages=a.max_pages, since_year=a.since_year,
                       limit=a.limit, relink_only=a.relink, reparse=a.reparse, kinds=set(a.kind) if a.kind else None),
-        add_args=_add_args, argv=argv,
+        add_args=_add_args, stage=STAGE, source=SOURCE, argv=argv,
     )
 
 

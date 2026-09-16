@@ -480,6 +480,7 @@ def main(argv: list[str] | None = None) -> int:
         "S3 SH 첨부 공고문 단지 표 수집",
         lambda a: run(dry_run=a.dry_run, limit=a.limit, slug=a.slug, cached=a.cached),
         add_args=_add_args,
+        stage=STAGE, source=SOURCE,
         argv=argv,
     )
 

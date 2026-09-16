@@ -169,7 +169,7 @@ def main(argv: list[str] | None = None) -> int:
     return stage_main(
         "S1 i-sh 게시판 공고 적재",
         lambda a: run(dry_run=a.dry_run, max_pages=a.max_pages, since_year=a.since_year, board_key=a.board),
-        add_args=add_args, argv=argv,
+        add_args=add_args, stage=STAGE, source=SOURCE, argv=argv,
     )
 
 

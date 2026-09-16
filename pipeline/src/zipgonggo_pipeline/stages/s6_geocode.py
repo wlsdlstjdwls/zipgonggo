@@ -70,6 +70,15 @@ def add_args(ap: argparse.ArgumentParser) -> None:
 
 
 def run(args: argparse.Namespace) -> Stats:
+    """세 판으로 나눠 돈다 — 읽기 / 맞추기 / 쓰기.
+
+    **왜 나누나**: 예전엔 커서를 연 채로 주소를 하나씩 맞췄다. 그 사이 juso 검색 API가 느려지면
+    트랜잭션이 몇 분씩 놀고, Neon이 `idle-in-transaction timeout`으로 커넥션을 끊는다.
+    그러면 다음 execute가 OperationalError로 죽으면서 그때까지 맞춘 좌표를 통째로 잃었다
+    (2026-09-15 실측, 그 회차는 ingest_log에 한 줄도 안 남았다).
+
+    맞추는 판은 Postgres를 아예 안 쥔다 — SQLite 요약DB와 juso API만 본다.
+    """
     stats = Stats()
     started = utc_now()
     precision_count: Counter[str] = Counter()
@@ -80,45 +89,63 @@ def run(args: argparse.Namespace) -> Stats:
     if args.juso_api:
         cfg = settings()
         juso = JusoSearch(cfg.juso_search_api_key, delay_sec=cfg.scrape_delay_sec)
-    conn = connect()
+
     try:
-        with conn.cursor() as cur:
-            targets = ("notice_complex", "complex") if args.target == "both" else (args.target,)
-            for table in targets:
-                sql = NOTICE_COMPLEX_SQL if table == "notice_complex" else COMPLEX_SQL
-                cur.execute(sql, {"refresh": args.refresh, "limit": args.limit})
-                rows = cur.fetchall()
-                stats.fetched_rows += len(rows)
-                setter = set_notice_complex_geom if table == "notice_complex" else set_complex_geom
-                for row in rows:
-                    match = store.lookup_address(row["road_address"], sido=row["sido"])
-                    if match is None and juso is not None:
-                        match = _via_juso(juso, store, row)
-                    if match is None and args.dong_fallback:
-                        match = store.lookup_dong_address(row["road_address"], sido=row["sido"])
-                    if match is None:
-                        stats.skip(f"{table}_no_match")
-                        if len(misses) < 200:
-                            misses.append(f"{table}#{row['id']} {row['name']} | {row['road_address']}")
-                        continue
-                    precision_count[match.precision] += 1
-                    if args.dry_run:
-                        stats.skip("dry_run")
-                        continue
-                    upsert_address_match(cur, match)
-                    setter(cur, row["id"], match)
-                    stats.updated += 1
-        if not args.dry_run:
+        # 1) 읽기 — 대상 행을 다 받아 두고 트랜잭션을 끝낸다
+        targets = ("notice_complex", "complex") if args.target == "both" else (args.target,)
+        todo: list[tuple[str, dict]] = []
+        conn = connect()
+        try:
             with conn.cursor() as cur:
-                finish_ingest(cur, stage=STAGE, source=SOURCE, stats=stats, started=started,
-                              precision=dict(precision_count), misses=misses[:20])
+                for table in targets:
+                    sql = NOTICE_COMPLEX_SQL if table == "notice_complex" else COMPLEX_SQL
+                    cur.execute(sql, {"refresh": args.refresh, "limit": args.limit})
+                    rows = cur.fetchall()
+                    stats.fetched_rows += len(rows)
+                    todo.extend((table, row) for row in rows)
             conn.commit()
+        finally:
+            conn.close()
+
+        # 2) 맞추기 — 여기서 Postgres를 안 쥔다. 느려도 끊길 게 없다
+        matched: list[tuple[str, int, object]] = []
+        for table, row in todo:
+            match = store.lookup_address(row["road_address"], sido=row["sido"])
+            if match is None and juso is not None:
+                match = _via_juso(juso, store, row)
+            if match is None and args.dong_fallback:
+                match = store.lookup_dong_address(row["road_address"], sido=row["sido"])
+            if match is None:
+                stats.skip(f"{table}_no_match")
+                if len(misses) < 200:
+                    misses.append(f"{table}#{row['id']} {row['name']} | {row['road_address']}")
+                continue
+            precision_count[match.precision] += 1
+            if args.dry_run:
+                stats.skip("dry_run")
+                continue
+            matched.append((table, row["id"], match))
+
+        # 3) 쓰기 — 다시 열어 한 번에 넣는다
+        if not args.dry_run:
+            conn = connect()
+            try:
+                with conn.cursor() as cur:
+                    for table, row_id, match in matched:
+                        setter = set_notice_complex_geom if table == "notice_complex" else set_complex_geom
+                        upsert_address_match(cur, match)
+                        setter(cur, row_id, match)
+                        stats.updated += 1
+                    finish_ingest(cur, stage=STAGE, source=SOURCE, stats=stats, started=started,
+                                  precision=dict(precision_count), misses=misses[:20])
+                conn.commit()
+            finally:
+                conn.close()
     finally:
-        conn.close()
         store.close()
 
     if juso is not None:
-        log.info("juso 검색 API 호출 %d회", juso.calls)
+        log.info("juso 검색 API 호출 %d회%s", juso.calls, " (도중에 끊었다)" if juso.given_up else "")
     log.info("정확도 %s", dict(precision_count))
     for m in misses[:20]:
         log.info("못 맞춤: %s", m)
@@ -141,7 +168,7 @@ def _via_juso(juso: JusoSearch, store: EntranceStore, row: dict) -> object | Non
 
 
 def main(argv: list[str] | None = None) -> int:
-    return stage_main("S6 주소-좌표 오프라인 조인", run, add_args=add_args, argv=argv)
+    return stage_main("S6 주소-좌표 오프라인 조인", run, add_args=add_args, stage=STAGE, source=SOURCE, argv=argv)
 
 
 if __name__ == "__main__":

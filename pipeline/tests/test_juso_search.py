@@ -51,3 +51,83 @@ def test_시도가_다른_후보는_먼저_걸러낸다():
     hits = [hit(main=1, name="가"), JusoHit("", "x", False, 2, 0, "경기도", "고양시", "행신동", "나")]
     got = _pick(hits, "고덕동 693 가")
     assert got.main_no == 1
+
+
+# ── 회로 차단기 ────────────────────────────────────────────────
+# 서버가 통째로 안 받는 판에서 주소마다 20초씩 세 번을 기다리면 회차가 타임아웃까지 간다.
+# 연속 실패가 GIVE_UP_AFTER에 닿으면 그 판은 접는다(2026-09-16).
+
+import urllib.error
+
+import pytest
+
+from zipgonggo_pipeline.geo import juso_search
+
+
+def _client(monkeypatch, answers):
+    """_get을 갈아 끼운다. answers는 호출마다 돌려줄 값 — Exception이면 던진다."""
+    c = JusoSearch("key", delay_sec=0)
+    seq = list(answers)
+
+    def fake_open(url, timeout=None):
+        got = seq.pop(0) if seq else urllib.error.URLError("timed out")
+        if isinstance(got, BaseException):
+            raise got
+        raise AssertionError("이 테스트는 성공 응답을 안 쓴다")
+
+    monkeypatch.setattr(juso_search.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(juso_search.urllib.request, "urlopen", fake_open)
+    return c
+
+
+def test_연속_실패가_쌓이면_그_판을_접는다(monkeypatch):
+    c = _client(monkeypatch, [])
+    for _ in range(juso_search.GIVE_UP_AFTER):
+        c.find("강동구 상일동 36-3 강동리엔파크")
+        # 캐시에 걸리지 않게 주소를 바꿔 준다
+        c._cache.clear()
+    assert c.given_up
+
+
+def test_접은_뒤에는_한_번도_안_부른다(monkeypatch):
+    c = _client(monkeypatch, [])
+    for _ in range(juso_search.GIVE_UP_AFTER):
+        c.find("강동구 상일동 36-3 강동리엔파크")
+        c._cache.clear()
+    before = c.calls
+    assert c.find("성북구 장위동 62-1 장위자이") is None
+    assert c.calls == before
+
+
+def test_중간에_한_번_붙으면_연속이_끊긴다(monkeypatch):
+    """한 번이라도 답이 오면 연속 실패는 0으로 돌아간다 — 특정 주소만 안 나오는 것과 구분한다."""
+    c = JusoSearch("key", delay_sec=0)
+    monkeypatch.setattr(juso_search.time, "sleep", lambda *_: None)
+
+    # 실패 4번(GIVE_UP_AFTER=5에 하나 모자라게) → 성공 1번 → 다시 실패 4번.
+    # _get 한 번이 안에서 RETRY회 두드리므로 결과는 _get 단위로 정한다
+    plan = ["fail"] * (juso_search.GIVE_UP_AFTER - 1) + ["ok"] + ["fail"] * (juso_search.GIVE_UP_AFTER - 1)
+    now = {"outcome": "fail"}
+
+    class Body:
+        def read(self):
+            return b'{"results": {"common": {"errorCode": "0"}, "juso": []}}'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_open(url, timeout=None):
+        if now["outcome"] == "fail":
+            raise urllib.error.URLError("timed out")
+        return Body()
+
+    monkeypatch.setattr(juso_search.urllib.request, "urlopen", fake_open)
+
+    for n, outcome in enumerate(plan):
+        now["outcome"] = outcome
+        c._get("https://x.test/?n=%d" % n)
+    assert not c.given_up, "성공 한 번이 연속 실패를 0으로 안 돌렸다"
+    assert c._misfires == juso_search.GIVE_UP_AFTER - 1

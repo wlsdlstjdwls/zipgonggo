@@ -161,7 +161,7 @@ def _link_amend_chain(cur, main: dict[str, Any], rest: list[dict[str, Any]]) -> 
 
 
 def main(argv: list[str] | None = None) -> int:
-    return stage_main("S2 중복 공고 정본 묶기", run, add_args=add_args, argv=argv)
+    return stage_main("S2 중복 공고 정본 묶기", run, add_args=add_args, stage=STAGE, source=SOURCE, argv=argv)
 
 
 if __name__ == "__main__":

@@ -207,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
         "S1 마이홈 모집공고 수집",
         lambda a: run(dry_run=a.dry_run, max_pages=a.max_pages, page_size=a.page_size),
         add_args=_add_args,
+        stage=STAGE, source=SOURCE,
         argv=argv,
     )
 

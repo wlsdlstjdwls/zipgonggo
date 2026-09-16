@@ -171,7 +171,7 @@ def add_args(ap) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    return stage_main("S3 청년안심주택(민간임대) 첨부 공고문 표", run, add_args=add_args, argv=argv)
+    return stage_main("S3 청년안심주택(민간임대) 첨부 공고문 표", run, add_args=add_args, stage=STAGE, source=SOURCE, argv=argv)
 
 
 if __name__ == "__main__":

@@ -100,20 +100,33 @@ export async function dispatchJob(name: string, opts: { force?: boolean } = {}):
     return { status: 200, body: { job: name, skipped: "fresh", ageMin, needMin: job.minIntervalMin } };
   }
 
-  // 2) 이미 도는 중이면 또 부르지 않는다. GitHub 자신의 상태라 우리가 적어 둔 것보다 정확하다
-  const running = await gh(
-    `/repos/${repo}/actions/workflows/${job.workflow}/runs?per_page=1&status=in_progress`,
-    token,
-  );
-  const queued = await gh(`/repos/${repo}/actions/workflows/${job.workflow}/runs?per_page=1&status=queued`, token);
-  if (!running.ok || !queued.ok) {
-    const detail = await running.text().catch(() => "");
+  // 2) GitHub 쪽 실행 목록. 도는 중인지와 **마지막 회차가 언제 시작했는지**를 같이 본다.
+  //
+  // ingest_log만 보면 안 되는 이유: GitHub 자신의 schedule이 회차를 만든 직후엔 아직
+  // ingest_log에 아무것도 없다. 그 틈에 이쪽이 dispatch를 쏘면 같은 잡이 두 벌 돈다 —
+  // 2026-09-16 00:20에 20초 차로 실제로 그랬다(dispatch 00:20:15Z · schedule 00:20:36Z).
+  // 크래시로 ingest_log를 못 남긴 회차도 여기서는 보인다.
+  //
+  // 한 번만 부른다 — status 필터 없이 최근 것부터 받아서 둘 다 여기서 센다.
+  const res0 = await gh(`/repos/${repo}/actions/workflows/${job.workflow}/runs?per_page=10&branch=main`, token);
+  if (!res0.ok) {
+    const detail = await res0.text().catch(() => "");
     return { status: 502, body: { error: "GitHub 실행 목록 조회 실패", detail: detail.slice(0, 200) } };
   }
-  const busy =
-    ((await running.json()) as { total_count: number }).total_count +
-    ((await queued.json()) as { total_count: number }).total_count;
-  if (busy > 0) return { status: 200, body: { job: name, skipped: "running", ageMin } };
+  const { workflow_runs: runs = [] } = (await res0.json()) as {
+    workflow_runs?: { status: string; created_at: string }[];
+  };
+  if (runs.some((r) => r.status !== "completed")) {
+    return { status: 200, body: { job: name, skipped: "running", ageMin } };
+  }
+  const lastRun = runs.reduce<number | null>((max, r) => {
+    const t = Date.parse(r.created_at);
+    return Number.isNaN(t) ? max : Math.max(max ?? t, t);
+  }, null);
+  const runAgeMin = lastRun === null ? null : Math.floor((now - lastRun) / 60_000);
+  if (!opts.force && runAgeMin !== null && runAgeMin < job.minIntervalMin) {
+    return { status: 200, body: { job: name, skipped: "fresh", ageMin: runAgeMin, needMin: job.minIntervalMin } };
+  }
 
   // 3) 부른다. GITHUB_TOKEN이든 PAT든 workflow_dispatch는 언제나 실행을 만든다
   const res = await gh(`/repos/${repo}/actions/workflows/${job.workflow}/dispatches`, token, {
