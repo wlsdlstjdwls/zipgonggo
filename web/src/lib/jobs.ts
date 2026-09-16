@@ -125,7 +125,9 @@ export async function dispatchJob(name: string, opts: { force?: boolean } = {}):
   }, null);
   const runAgeMin = lastRun === null ? null : Math.floor((now - lastRun) / 60_000);
   if (!opts.force && runAgeMin !== null && runAgeMin < job.minIntervalMin) {
-    return { status: 200, body: { job: name, skipped: "fresh", ageMin: runAgeMin, needMin: job.minIntervalMin } };
+    // 이름을 따로 둔다 — 「ingest_log가 최신이라」 건너뛴 것과 「방금 회차가 떠서」 건너뛴 것은
+    // 다른 얘기다. 뒤엣것만 자꾸 뜨면 워크플로가 돌긴 도는데 기록을 못 남기고 있다는 뜻이다
+    return { status: 200, body: { job: name, skipped: "run_just_started", ageMin: runAgeMin, needMin: job.minIntervalMin } };
   }
 
   // 3) 부른다. GITHUB_TOKEN이든 PAT든 workflow_dispatch는 언제나 실행을 만든다

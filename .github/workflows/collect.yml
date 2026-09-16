@@ -101,8 +101,13 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          python -m zipgonggo_pipeline.stages.s1_collect > myhome.json
-          cat myhome.json
+          if python -m zipgonggo_pipeline.stages.s1_collect > myhome.json; then
+            cat myhome.json
+          else
+            # 죽은 회차도 {"crashed": …} 한 줄을 남긴다 — 로그에 찍어 둬야 무엇에 막혔는지 보인다
+            cat myhome.json || true
+            exit 1
+          fi
 
       - name: 요약
         if: always()
