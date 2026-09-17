@@ -50,7 +50,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const types = hubs.filter((h) => housingTypeDoc(h.housing_type));
   return (
     // 부트 스크립트가 하이드레이션 전에 data-booting을 걸어 서버 HTML과 어긋난다 — 의도된 차이라 경고를 끈다
-    <html lang="ko" suppressHydrationWarning>
+    <html lang="ko" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         {/* RSS 자동발견. metadata.alternates에 두면 안 된다 — 자식 페이지가 canonical을 넣으며
             alternates를 통째로 덮어써서 조용히 사라진다(2026-09-15 실측). <head>에 직접 박는다 */}
