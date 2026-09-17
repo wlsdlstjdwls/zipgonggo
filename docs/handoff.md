@@ -575,6 +575,12 @@ Actions가 함수에 닿지도 못하고, 파이프라인엔 200도 401도 아�
 대신 **레이아웃이 children 대신 토큰 입력칸을 그린다.** 각 page도 제 몫으로 `isAdmin()`을 한 번 더 본다
 (자식 세그먼트는 레이아웃과 나란히 렌더될 수 있다). `ADMIN_EMAIL`·`ADMIN_PASSWORD_HASH` 중 하나라도 비면 콘솔 전체가 404다.
 
+**그래서 프로덕션에서 `/admin`이 404였다 (2026-09-17, 고침).** `.env`를 커밋하지 않으니 두 값이
+`web/.env.local`에만 있었고 Vercel에는 한 번도 안 올라갔다 — dev는 200, 프로덕션은 404. 증상이
+「URL이 바뀌었나」로 보이지만 라우트는 그대로다. `vercel env add ADMIN_EMAIL production`,
+`vercel env add ADMIN_PASSWORD_HASH production` 두 줄을 넣고 재배포해서 200(로그인 칸)으로 돌아왔다.
+**Production에만 넣었다** — 프리뷰 URL에 콘솔을 열어 두지 않으려고.
+
 ### 로그인은 이메일 + 비밀번호 (2026-09-16 사용자 요청으로 토큰에서 바꿈)
 
 env 두 줄이 계정의 전부다 — 가입도, 비밀번호 찾기도, DB 계정 표도 없다. 비밀번호를 바꾸는 길은
