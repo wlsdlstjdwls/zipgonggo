@@ -525,3 +525,151 @@ def upsert_notice_eligibility(cur, notice_id: int, *, source: str, source_pages:
         {"notice_id": notice_id, "source": source, "source_pages": source_pages,
          "data": json.dumps(data, ensure_ascii=False), "verified": verified},
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# S5 — 마이홈 단지정보·대기현황 (complex · complex_type · waitlist, 0031·0032)
+# ─────────────────────────────────────────────────────────────
+
+# 한 표를 **한 문장**으로 쓴다. 한국에서 Neon(us-east-1)까지 한 왕복이 230ms 남짓이라(실측 2026-09-16)
+# 단지 240곳을 행마다 오가면 1분이 그냥 간다. jsonb_to_recordset으로 통째로 밀어 넣는다.
+
+_COMPLEX_COLS = [
+    ("slug", "text"), ("complex_code", "text"), ("name", "text"), ("agency", "text"),
+    ("housing_type", "housing_type"), ("road_address", "text"), ("pnu", "char(19)"),
+    ("sido", "text"), ("sido_code", "text"), ("sigungu", "text"), ("sigungu_code", "text"),
+    ("household_cnt", "integer"), ("completed_on", "date"),
+    ("heating", "text"), ("building_style", "text"), ("elevator", "text"), ("parking_cnt", "integer"),
+]
+
+
+def _recordset(cols: list[tuple[str, str]]) -> str:
+    return ", ".join(f"{c} {t}" for c, t in cols)
+
+
+def upsert_complexes(cur, rows: list[dict[str, Any]]) -> int:
+    """단지 원장 upsert. 좌표(geom)는 목록에 없어 손대지 않는다 — S6이 채운 값이 살아남아야 한다."""
+    if not rows:
+        return 0
+    names = [c for c, _ in _COMPLEX_COLS]
+    cur.execute(
+        f"""
+        INSERT INTO complex ({', '.join(names)}, raw)
+        SELECT {', '.join('s.' + c for c in names)}, s.raw
+          FROM jsonb_to_recordset(%(rows)s::jsonb) AS s({_recordset(_COMPLEX_COLS)}, raw jsonb)
+        ON CONFLICT (complex_code) DO UPDATE SET
+          {', '.join(f'{c} = EXCLUDED.{c}' for c in names if c != 'complex_code')},
+          raw = EXCLUDED.raw, updated_at = now()
+        """,
+        {"rows": json.dumps(rows, ensure_ascii=False, default=str)},
+    )
+    return len(rows)
+
+
+_TYPE_COLS = [
+    ("style_name", "text"), ("housing_type", "housing_type"), ("house_type", "text"),
+    ("exclusive_area", "numeric"), ("exclusive_area_max", "numeric"),
+    ("common_area", "numeric"), ("common_area_max", "numeric"),
+    ("base_deposit", "bigint"), ("base_rent", "bigint"), ("conversion_deposit_limit", "bigint"),
+    ("row_count", "integer"),
+]
+
+
+def upsert_complex_types(cur, rows: list[dict[str, Any]]) -> int:
+    """형 줄 교체. complex_code로 단지를 찾아 붙이고, 이번에 안 온 줄은 그 단지에서만 지운다.
+
+    지우는 범위를 **이번에 받은 단지**로 좁히는 이유: S5는 공고가 가리키는 단지만 받는다.
+    표 전체를 기준으로 지우면 지난 회차에 받아 둔 다른 단지의 형이 통째로 날아간다.
+    """
+    if not rows:
+        return 0
+    names = [c for c, _ in _TYPE_COLS]
+    payload = json.dumps(rows, ensure_ascii=False, default=str)
+    cur.execute(
+        f"""
+        INSERT INTO complex_type (complex_id, {', '.join(names)}, raw)
+        SELECT c.id, {', '.join('s.' + n for n in names)}, s.raw
+          FROM jsonb_to_recordset(%(rows)s::jsonb) AS s(complex_code text, {_recordset(_TYPE_COLS)}, raw jsonb)
+          JOIN complex c ON c.complex_code = s.complex_code
+        ON CONFLICT ON CONSTRAINT complex_type_identity DO UPDATE SET
+          {', '.join(f'{n} = EXCLUDED.{n}' for n in names if n not in ('style_name', 'housing_type', 'base_deposit', 'base_rent'))},
+          raw = EXCLUDED.raw, updated_at = now()
+        """,
+        {"rows": payload},
+    )
+    cur.execute(
+        f"""
+        DELETE FROM complex_type t
+         USING complex c
+         WHERE t.complex_id = c.id
+           AND c.complex_code IN (SELECT DISTINCT complex_code FROM jsonb_to_recordset(%(rows)s::jsonb)
+                                    AS s(complex_code text))
+           AND NOT EXISTS (
+                 SELECT 1 FROM jsonb_to_recordset(%(rows)s::jsonb)
+                   AS s(complex_code text, style_name text, housing_type housing_type,
+                        base_deposit bigint, base_rent bigint)
+                  WHERE s.complex_code = c.complex_code
+                    AND s.style_name = t.style_name
+                    AND s.housing_type IS NOT DISTINCT FROM t.housing_type
+                    AND s.base_deposit IS NOT DISTINCT FROM t.base_deposit
+                    AND s.base_rent IS NOT DISTINCT FROM t.base_rent)
+        """,
+        {"rows": payload},
+    )
+    return len(rows)
+
+
+def link_notice_complex_codes(cur, links: list[tuple[str, str]], evaluated: list[str]) -> int:
+    """S5가 좁힌 (공고 slug → 단지 코드)를 notice.complex_code에 박는다.
+
+    S1의 UPSERT 컬럼 목록(NOTICE_COLS)에 complex_code가 없어 매시 도는 목록 수집이 덮어쓰지 않는다.
+    새 컬럼을 NOTICE_COLS에 넣는 날은 이 값이 날아가니 그때 다시 본다(0032 주석).
+
+    **이번에 살펴봤는데 못 좁힌 공고는 연결을 지운다.** 좁히는 규칙을 고치면(이름 유사도 문턱 같은 것)
+    어제 붙인 연결이 오늘은 틀린 연결이 된다. 지우지 않으면 지면이 남의 단지를 계속 싣는다.
+    `evaluated`는 이번 회차가 실제로 후보를 따져 본 공고 전부 — 안 본 공고는 건드리지 않는다.
+    """
+    if not evaluated:
+        return 0
+    cur.execute(
+        """
+        WITH link AS (
+          SELECT * FROM jsonb_to_recordset(%(rows)s::jsonb) AS s(slug text, complex_code text)
+        )
+        UPDATE notice n SET complex_code = l.complex_code
+          FROM unnest(%(evaluated)s::text[]) AS e(slug)
+          LEFT JOIN link l ON l.slug = e.slug
+         WHERE n.slug = e.slug AND n.complex_code IS DISTINCT FROM l.complex_code
+        """,
+        {"rows": json.dumps([{"slug": s, "complex_code": c} for s, c in links], ensure_ascii=False),
+         "evaluated": evaluated},
+    )
+    return cur.rowcount
+
+
+_WAIT_COLS = [
+    ("complex_code", "text"), ("agency", "text"), ("complex_name", "text"), ("road_address", "text"),
+    ("sido", "text"), ("sigungu", "text"), ("housing_type", "housing_type"), ("house_type", "text"),
+    ("style_name", "text"), ("draw_unit", "text"),
+    ("waiting_cnt", "integer"), ("vacated_cnt", "integer"), ("surveyed_on", "date"),
+]
+
+
+def upsert_waitlist(cur, rows: list[dict[str, Any]]) -> int:
+    """대기현황 스냅샷. 기준일 필드가 API에 없어 수집일(surveyed_on)이 키의 일부다 — 날마다 한 벌씩 쌓인다."""
+    if not rows:
+        return 0
+    names = [c for c, _ in _WAIT_COLS]
+    cur.execute(
+        f"""
+        INSERT INTO waitlist ({', '.join(names)}, complex_id, raw)
+        SELECT {', '.join('s.' + n for n in names)}, c.id, s.raw
+          FROM jsonb_to_recordset(%(rows)s::jsonb) AS s({_recordset(_WAIT_COLS)}, raw jsonb)
+          LEFT JOIN complex c ON c.complex_code = s.complex_code
+        ON CONFLICT (complex_code, housing_type, style_name, draw_unit, surveyed_on) DO UPDATE SET
+          waiting_cnt = EXCLUDED.waiting_cnt, vacated_cnt = EXCLUDED.vacated_cnt,
+          complex_id = EXCLUDED.complex_id, raw = EXCLUDED.raw
+        """,
+        {"rows": json.dumps(rows, ensure_ascii=False, default=str)},
+    )
+    return len(rows)

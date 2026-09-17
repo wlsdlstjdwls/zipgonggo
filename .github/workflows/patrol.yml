@@ -10,6 +10,9 @@ name: 게시판 순찰
 # 한 회차에 수십 번을 두드린다(CLAUDE.md 「하지 말 것」 7).
 #
 # 게시판에서 새 공고가 나오면 상세 파싱은 「공고 수집」에 넘긴다 — 상세 로직을 두 벌 두지 않는다.
+#
+# 단지정보·대기현황(S5)도 여기서 돈다(2026-09-17). 시군구마다 한 번씩 부르는 API라 매시는 과하고,
+# 준공일·세대수·형별 금액은 하루 사이에 안 바뀐다.
 
 on:
   # 스케줄 블록을 뗐다(2026-09-16) — collect.yml과 같은 이유. 방아쇠는 Vercel Cron 하나(web/vercel.json)
@@ -220,11 +223,53 @@ jobs:
             jq -r '"- 채움 \(.updated)건 / 못 맞춤 \(.skipped | to_entries | map(.value) | add // 0)건"' s6.json
           } >> "$GITHUB_STEP_SUMMARY"
 
+  complex:
+    name: 단지 — 마이홈 단지정보와 대기현황
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: pipeline
+    outputs:
+      fail: ${{ steps.c.outputs.fail }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pipeline/requirements-collect.txt
+
+      # API만 부른다 — 첨부도 좌표도 안 건드려 경량 묶음이면 된다
+      - run: pip install -r requirements-collect.txt
+
+      # 하루 한 번인 이유는 호출 수다. 시군구마다 한 번(78회) + 시도마다 한 번(17회)이라
+      # 매시 돌리면 개발계정 일 1,000건 한도를 그날 오전에 다 쓴다.
+      # 값도 하루 사이에 거의 안 바뀐다 — 준공일·세대수·형별 금액은 몇 년째 같은 값이고
+      # 움직이는 건 대기 인원뿐이다.
+      - name: S5 단지정보와 대기현황
+        id: c
+        run: |
+          fail=0
+          if python -m zipgonggo_pipeline.stages.s5_complex > s5.json; then
+            cat s5.json
+            {
+              echo "## 단지"
+              jq -r '"- 단지 \(.inserted)곳 / 형 \(.updated)줄"' s5.json
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat s5.json || true
+            echo "- 단지정보 **실패**" >> "$GITHUB_STEP_SUMMARY"
+            fail=1
+          fi
+          echo "fail=$fail" >> "$GITHUB_OUTPUT"
+
   # 파싱이 조용히 실패하면 빈 상세 페이지가 남는다. 사람이 볼 자리를 만든다
   alert:
     name: 실패하면 이슈
-    needs: [board, results, detail, geocode]
-    if: always() && (failure() || needs.board.outputs.fail == '1' || needs.results.outputs.fail == '1')
+    needs: [board, results, detail, geocode, complex]
+    if: always() && (failure() || needs.board.outputs.fail == '1' || needs.results.outputs.fail == '1' || needs.complex.outputs.fail == '1')
     runs-on: ubuntu-latest
     steps:
       - name: 이슈 열기

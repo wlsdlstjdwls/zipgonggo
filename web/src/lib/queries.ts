@@ -7,7 +7,7 @@ import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_ELIGIBILITY, CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { isClosed, todayKST } from "./format";
-import type { ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorResultRow, Sector, YouthHouse } from "@/types/notice";
+import type { ComplexFacts, ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorResultRow, Sector, YouthHouse } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
@@ -230,7 +230,7 @@ export const listFacets = unstable_cache(
  * 안 묶으면 한 페이지에 같은 질의가 세 번 나간다(왕복이 곧 시간, 55차 「적재는 왕복 수가 곧 시간이다」). */
 export const getNoticeBySlug = cache(async (slug: string): Promise<Notice | null> => {
   const rows = await query<Notice>(
-    `SELECT ${LIST_COLS}, source_key, pnu, heating, total_household,
+    `SELECT ${LIST_COLS}, source_key, pnu, complex_code, heating, total_household,
             min_down_payment, min_interim, min_balance, portal_url, contact,
             max_deposit, max_rent, schedule_source, schedule_steps,
             to_char(apply_start_tm, 'HH24:MI') AS apply_start_tm,
@@ -297,6 +297,50 @@ export async function getComplexSupply(noticeId: number, complexId: number, comp
      ORDER BY ${SUPPLY_ORDER}`,
     [noticeId, complexId, complexName],
   );
+}
+
+/** 마이홈 단지정보로 채운 단지 사실 + 형 표 + 대기현황(S5, 0031·0032).
+ *
+ *  **왜 공고 지면에 이게 필요했나.** 마이홈 API 공고(LH 328건)는 첨부를 못 열어 자식 표가 한 줄도 없다 —
+ *  robots.txt가 LH 첨부 경로를 막는다(docs/data-sources.md 6절). 목록 필드만 실은 지면이라
+ *  구글이 「크롤링됨 — 현재 색인이 생성되지 않음」으로 밀어냈다(2026-09-17 실측).
+ *  공고문 대신 **개방 API가 주는 단지 쪽 사실**을 싣는다.
+ *
+ *  형·대기는 **이 공고의 공급유형 것만** 추린다. 한 단지에 영구임대와 50년임대가 같이 있는 경우가 흔해
+ *  전부 실으면 이 공고로 신청할 수 없는 금액이 표에 섞인다.
+ *  코드가 없으면(PNU 후보가 여럿이라 S5가 안 이은 공고) null을 돌려 화면이 섹션을 통째로 접는다. */
+export async function getComplexFacts(complexCode: string | null, housingType: string): Promise<ComplexFacts | null> {
+  if (!complexCode) return null;
+  const rows = await query<ComplexFacts>(
+    `SELECT c.complex_code, c.name, c.agency, c.road_address, c.completed_on::text AS completed_on,
+            c.household_cnt, c.parking_cnt, c.building_style, c.elevator, c.heating,
+            COALESCE(t.types, '[]'::json) AS types,
+            COALESCE(w.rows, '[]'::json) AS waitlist,
+            w.surveyed_on::text AS surveyed_on
+       FROM complex c
+       LEFT JOIN LATERAL (
+         SELECT json_agg(json_build_object(
+                  'style_name', style_name, 'exclusive_area', exclusive_area, 'exclusive_area_max', exclusive_area_max,
+                  'common_area', common_area, 'common_area_max', common_area_max,
+                  'base_deposit', base_deposit, 'base_rent', base_rent,
+                  'conversion_deposit_limit', conversion_deposit_limit)
+                ORDER BY exclusive_area, style_name) AS types
+           FROM complex_type WHERE complex_id = c.id AND housing_type::text = $2
+       ) t ON true
+       LEFT JOIN LATERAL (
+         SELECT max(surveyed_on) AS surveyed_on,
+                json_agg(json_build_object(
+                  'style_name', style_name, 'draw_unit', draw_unit,
+                  'waiting_cnt', waiting_cnt, 'vacated_cnt', vacated_cnt)
+                ORDER BY style_name, draw_unit) AS rows
+           FROM waitlist
+          WHERE complex_code = c.complex_code AND housing_type::text = $2
+            AND surveyed_on = (SELECT max(surveyed_on) FROM waitlist WHERE complex_code = c.complex_code)
+       ) w ON true
+      WHERE c.complex_code = $1`,
+    [complexCode, housingType],
+  );
+  return rows[0] ?? null;
 }
 
 /** 단지 1곳의 포털 사실(0027). 공고문 첨부에 없는 값 — **관리비**·운영사·시행사·입주예정일·연락처.

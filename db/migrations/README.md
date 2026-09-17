@@ -63,3 +63,4 @@ python db\migrate.py --status   # 적용 현황
 | `0028_notice_indexnow.sql` | `notice.indexnow_at` · `indexnow_hash` — 공고 URL의 IndexNow 제출 이력. updated_at 대신 내용 해시를 신호로 | Neon 2026-09-16 |
 | `0029_page_view.sql` | `page_view` — 방문 집계. web이 직접 쓰는 유일한 표(`/api/track`) | Neon 2026-09-16 |
 | `0030_indexnow_url.sql` | `indexnow_url` — 공고 아닌 발행 URL(단지/유형/지역)의 IndexNow 제출 이력. 대상은 배포된 sitemap.xml에서 읽는다 | Neon 2026-09-16 |
+| `0031_complex_type_identity.sql` | `complex_type` 자연키에 기본 금액을 넣고 면적 범위 두 칸 추가 — 같은 형이 동마다 면적만 다른 행으로 여러 번 온다(실측 28,623행) | Neon 2026-09-17 |

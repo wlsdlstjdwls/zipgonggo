@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalcSeed } from "@/components/calc-context";
 import { ComplexExplorer } from "@/components/complex-explorer";
+import { ComplexFactsSection } from "@/components/complex-facts";
 import { DetailAside } from "@/components/detail-aside";
 import { DetailHeadBar } from "@/components/detail-headbar";
 import { ExternalLink } from "@/components/external-link";
@@ -23,7 +24,7 @@ import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, isClosed, moneyOf, 
 import { MINGAN_INCOME_PCTS, minganRuleCards } from "@/lib/mingan-fit";
 import { moveInLabel } from "@/lib/notice-view";
 import {
-  getAmendChain, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition,
+  getAmendChain, getComplexFacts, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition,
   listFilterOptions,
 } from "@/lib/queries";
 import { areaPath, noticePath, ROUTES } from "@/lib/routes";
@@ -89,7 +90,7 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
 export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
-  const [areas, chain, complexes, supply, eligRules, noticeElig, prior, options] = await Promise.all([
+  const [areas, chain, complexes, supply, eligRules, noticeElig, prior, options, facts] = await Promise.all([
     getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id), getNoticeSupply(n.id), getEligibilityRules(),
     getNoticeEligibility(n.id),
     // 「내 조건」에 붙일 직전 같은 계열 공고의 경쟁률(사용자 요청 2026-09-14). 결과 표가 없는 계열은 null
@@ -97,6 +98,9 @@ export default async function NoticePage({ params }: Params) {
     // 이 시도가 /area로 발행되는지 — 미달 시도는 /로 301이라 빵부스러기·태그가 리다이렉트를 가리키면 안 된다.
     // 레이아웃도 같은 함수를 부르지만 React cache가 한 요청 안에서 한 번만 돌린다
     listFilterOptions(undefined),
+    // 마이홈 단지정보로 채운 단지 사실(S5). 첨부를 못 여는 LH 공고에 실을 수 있는 유일한 단지 쪽 사실이다.
+    // S5가 PNU 후보를 하나로 못 좁힌 공고는 complex_code가 비어 있어 null이 온다 — 섹션을 안 그린다
+    getComplexFacts(n.complex_code, n.housing_type),
   ]);
   // 빵부스러기(JSON-LD BreadcrumbList) — 화면의 「← 목록」·지역 태그와 같은 길이어야 한다
   const areaLink = (options.sido.find((o) => o.value === n.sido)?.count ?? 0) >= AREA_MIN_COUNT ? areaPath(n.sido) : null;
@@ -246,6 +250,7 @@ export default async function NoticePage({ params }: Params) {
           {/* 긴 페이지의 차례 — 무엇이 어디 있는지 먼저 보인다(사용자 지적 2026-09-14: "나열식이라 보기 힘들다") */}
           <nav className="d-nav" aria-label="이 페이지 차례">
             {complexes.length > 0 && <a href="#complexes">단지 {num(complexes.length, "곳")}</a>}
+            {facts && <a href="#complex">단지 정보</a>}
             <a href="#schedule">일정</a>
             {(noticeElig || minganFit) && <a href="#fit">내 조건</a>}
             {(noticeElig || ruleCards.length > 0) && <a href="#eligibility">신청자격</a>}
@@ -271,6 +276,11 @@ export default async function NoticePage({ params }: Params) {
               <p className="note">지도 위치는 주소 기준 근사치입니다. 핀이나 로드뷰 버튼을 누르면 거리뷰가 열립니다. {n.address}</p>
             </section>
           )}
+
+          {/* 첨부를 못 여는 공고(LH)에 단지 쪽 사실을 싣는 자리. 지도 바로 밑이 맞다 —
+              「여기가 어디인가」 다음에 오는 물음이 「이 단지는 어떤 단지인가」다.
+              단지가 여럿인 공고는 위 탐색기가 그 자리를 이미 맡고 있어 S5가 코드를 안 붙인다 */}
+          {facts && <ComplexFactsSection facts={facts} housingType={n.housing_type} />}
 
           {(chain.original || chain.amendments.length > 0) && (
             <section className="dsec">
@@ -434,9 +444,11 @@ export default async function NoticePage({ params }: Params) {
               <Spec label="공고일" value={dateK(n.posted_at)} />
               <Spec label="공급 유형" value={<Term>{n.housing_type}</Term>} />
               <Spec label="단지명" value={n.complex_name} />
-              <Spec label="총세대수" value={n.total_household != null ? num(n.total_household, "세대") : null} />
-              <Spec label="난방" value={n.heating} />
-              <Spec label="주소" value={n.address} wide />
+              {/* 총세대수·난방·주소는 단지 정보 섹션이 더 정확한 값(마이홈 단지정보)으로 이미 말한다 —
+                  한 값은 한 곳. 두 벌을 나란히 두면 387세대와 388세대가 같은 지면에 뜬다 */}
+              {!facts && <Spec label="총세대수" value={n.total_household != null ? num(n.total_household, "세대") : null} />}
+              {!facts && <Spec label="난방" value={n.heating} />}
+              {!facts && <Spec label="주소" value={n.address} wide />}
             </SpecList>
           </section>
 

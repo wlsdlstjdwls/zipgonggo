@@ -190,8 +190,10 @@ CREATE TABLE complex_type (
   style_name      text        NOT NULL,        -- 형명 (API styleNm). '36' '39' '59A' …
   housing_type    housing_type,                -- 같은 단지에 공급유형이 섞일 수 있어 형 단위에 둔다
   house_type      text,                        -- API houseTyNm. 매입임대는 빈값
-  exclusive_area  numeric(7,2),                -- 공급 전용면적 ㎡ (API suplyPrvuseAr)
-  common_area     numeric(7,2),                -- 공급 공용면적 ㎡ (API suplyCmnuseAr)
+  exclusive_area  numeric(7,2),                -- 공급 전용면적 ㎡ (API suplyPrvuseAr). 합쳐진 줄이면 하한 (0031)
+  exclusive_area_max numeric(7,2),             -- 합쳐진 행들의 전용면적 상한. 하한과 같으면 NULL (0031)
+  common_area     numeric(7,2),                -- 공급 공용면적 ㎡ (API suplyCmnuseAr). 합쳐진 줄이면 하한
+  common_area_max numeric(7,2),                -- 공용면적 상한. 하한과 같으면 NULL (0031)
   heating         text,                        -- API heatMthdDetailNm
   building_style  text,                        -- API buldStleNm
   has_elevator    boolean,                     -- API elvtrInstlAtNm
@@ -199,10 +201,14 @@ CREATE TABLE complex_type (
   base_deposit    bigint,                      -- 기본 임대보증금(원) (API bassRentGtn)
   base_rent       bigint,                      -- 기본 월임대료(원) (API bassMtRntchrg)
   conversion_deposit_limit bigint,             -- 기본 전환보증금 한도 (API bassCnvrsGtnLmt)
+  row_count       integer     NOT NULL DEFAULT 1,  -- 이 줄로 합쳐진 API 행 수 (0031)
   raw             jsonb,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
-  UNIQUE NULLS NOT DISTINCT (complex_id, housing_type, style_name)
+  -- 금액까지 자연키에 넣는다(0031). 같은 형이 동·라인마다 면적만 조금 다른 행으로 여러 번 오는데
+  -- 금액이 같으면 한 줄로 합쳐 면적을 범위로 적고, 금액이 다르면 실제로 다른 공급 조건이라 줄을 나눈다
+  CONSTRAINT complex_type_identity
+    UNIQUE NULLS NOT DISTINCT (complex_id, housing_type, style_name, base_deposit, base_rent)
 );
 
 COMMENT ON TABLE complex_type IS '단지 안의 면적 타입. 호실(unit)이 없어도 단지 페이지에 형별 보증금·임대료 표를 만든다';

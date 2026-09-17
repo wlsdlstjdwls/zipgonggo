@@ -61,6 +61,8 @@ export type Notice = NoticeListItem & {
   /** 흐름도의 접수·발표 외 단계(서류심사 대상자 발표, 서류 제출, 계약 체결). 순서대로 온다(0017) */
   schedule_steps: ScheduleStep[] | null;
   pnu: string | null;
+  /** S5가 PNU와 공급유형으로 좁힌 마이홈 단지 코드(0032). 후보가 둘 이상이면 null — 남의 단지를 싣지 않는다 */
+  complex_code: string | null;
   heating: string | null;
   total_household: number | null;
   min_down_payment: number | null;
@@ -247,4 +249,48 @@ export type PriorCompetition = {
   rows: PriorResultRow[];
   /** 그 공고 전체 — 소계 줄 합산. 단지가 안 겹쳐도 「지난 회차는 평균 n:1」은 말할 수 있다 */
   summary: { complexes: number; units: number; applicants: number; ratio: number | null };
+};
+
+/** 마이홈 단지정보(15110581)로 채운 단지 원장 한 행 + 그 단지의 형·대기 줄(S5, 0031·0032).
+ *  공고문 첨부를 못 여는 LH 공고(robots.txt가 첨부 경로를 막는다)에 실을 수 있는 유일한 단지 사실이다. */
+export type ComplexFacts = {
+  complex_code: string;
+  name: string;
+  agency: string;
+  road_address: string | null;
+  /** 준공일. 없는 단지가 있다(매입임대·신축) */
+  completed_on: string | null;
+  household_cnt: number | null;
+  /** 주차 대수. 0은 「없음」이 아니라 「안 들어옴」이라 파이프라인이 NULL로 넣는다 */
+  parking_cnt: number | null;
+  /** 복도식 · 계단식 · 혼합식 */
+  building_style: string | null;
+  /** 전체동 설치 · 일부동 설치 · 미설치. boolean으로 접지 않는다 */
+  elevator: string | null;
+  heating: string | null;
+  types: ComplexTypeRow[];
+  waitlist: WaitRow[];
+  /** 대기현황을 받아 온 날. API에 기준일 필드가 없어 수집일이다 */
+  surveyed_on: string | null;
+};
+
+/** 단지 안의 면적 타입 한 줄. 면적이 범위인 건 같은 형이 동마다 조금씩 다르기 때문이다 */
+export type ComplexTypeRow = {
+  style_name: string;
+  exclusive_area: number | null;
+  exclusive_area_max: number | null;
+  common_area: number | null;
+  common_area_max: number | null;
+  /** 단지의 기본 보증금·월임대료. 이번 공고의 금액이 아니라 제도상 기본값이다 */
+  base_deposit: number | null;
+  base_rent: number | null;
+  conversion_deposit_limit: number | null;
+};
+
+/** 형별 예비 입주 대기. waiting_cnt는 대기 순번이 아니라 **기다리는 사람 수**다 */
+export type WaitRow = {
+  style_name: string;
+  draw_unit: string;
+  waiting_cnt: number | null;
+  vacated_cnt: number | null;
 };

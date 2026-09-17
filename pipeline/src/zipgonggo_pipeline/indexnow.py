@@ -46,12 +46,17 @@ ORIGIN = f"https://{HOST}"
 BATCH_MAX = 200
 
 # 지면에 실제로 나가는 값들. 하나라도 바뀌면 다시 알린다.
-# 자식 표는 행 수만 본다 — 내용까지 해시하면 좌표 하나 붙어도 전량 재발행이 된다
+# 자식 표는 행 수만 본다 — 내용까지 해시하면 좌표 하나 붙어도 전량 재발행이 된다.
+#
+# `complex_code`가 들어 있는 이유(2026-09-17): 이 값이 붙는 순간 지면에 「단지 정보」 섹션이 통째로
+# 생긴다(제원 + 주택형별 금액 + 예비 대기). 껍데기가 알맹이로 바뀌는 변화라 다시 알려야 한다.
+# **대기 인원(waitlist)은 일부러 안 넣었다** — 날마다 움직이는 값이라 넣으면 단지 붙은 공고 전량을
+# 매일 다시 쏘게 된다. 반복 제출은 IndexNow가 하지 말라는 짓이다(0028 주석).
 _HASH_SQL = """
   md5(ROW(
     n.title, n.status::text, n.housing_type::text, n.agency,
     n.apply_start_at, n.apply_end_at, n.announce_at,
-    n.supply_count, n.min_deposit, n.min_rent, n.canonical_id,
+    n.supply_count, n.min_deposit, n.min_rent, n.canonical_id, n.complex_code,
     (SELECT count(*) FROM notice_supply     s WHERE s.notice_id = n.id),
     (SELECT count(*) FROM notice_complex    c WHERE c.notice_id = n.id),
     (SELECT count(*) FROM notice_eligibility e WHERE e.notice_id = n.id)
