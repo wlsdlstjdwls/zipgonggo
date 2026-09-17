@@ -6,9 +6,12 @@
 // 그래서 여기 숫자는 「구글 애널리틱스보다 작게」 나오는 게 정상이다.
 import Link from "next/link";
 import { isAdmin } from "@/lib/admin-auth";
-import { DEFAULT_RANGE, pathKind, RANGES, rangeOf, visitorReport, ONLINE_MIN } from "@/lib/analytics";
+import {
+  analyticsOn, ANALYTICS_START, DEFAULT_RANGE, pathKind, RANGES, rangeOf, visitorReport, ONLINE_MIN,
+} from "@/lib/analytics";
 import { ROUTES } from "@/lib/routes";
 import { VisitChart } from "./visit-chart";
+import { TrackToggle } from "./track-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +39,14 @@ export default async function AdminVisitors({ searchParams }: { searchParams: Pr
         <p className="adm-sub">
           봇과 운영자는 빼고 센다. 최근 {ONLINE_MIN}분 안에 움직인 사람을 동시접속으로 본다
         </p>
+        {/* 집계 시작일 전에는 라우트가 204만 돌려주고 한 줄도 안 적는다. 그 사실을 화면에 안 적어 두면
+            「숫자가 0이다」와 「집계가 꺼져 있다」를 구분할 길이 없다(2026-09-17에 한 번 겪었다) */}
+        {!analyticsOn() && (
+          <p className="adm-sub">
+            <strong>집계가 아직 안 켜졌다.</strong> {ANALYTICS_START}부터 적는다 — 그때까지는 무엇을
+            해도 0이다(env ANALYTICS_START로 당길 수 있고, 개인정보처리방침 시행일도 같이 옮겨야 한다)
+          </p>
+        )}
       </header>
 
       <div className="adm-stats">
@@ -149,6 +160,18 @@ export default async function AdminVisitors({ searchParams }: { searchParams: Pr
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="adm-sec">
+        <h2>
+          이 브라우저
+          <small>표식은 브라우저마다 따로 둔다</small>
+        </h2>
+        <TrackToggle />
+        <p className="adm-note">
+          콘솔에 처음 들어온 브라우저는 집계에서 빠진다 — 운영자가 제 사이트를 돌아다닌 것까지 세면
+          초기 숫자가 통째로 거짓이 된다. 집계가 도는지 직접 확인할 때만 잠깐 켜고, 확인이 끝나면 다시 뺀다.
+        </p>
       </section>
     </div>
   );

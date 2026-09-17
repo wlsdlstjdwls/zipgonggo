@@ -4,7 +4,7 @@ export const SITE_NAME = "집공고";
 export const SITE_TITLE = `${SITE_NAME} — 공공임대 모집공고 지도`;
 // 문의·권리침해 신고 접수 주소. 이용약관·개인정보처리방침·푸터가 함께 쓴다.
 // 실제 수신되는 주소로 열고 여기만 바꾸면 전체에 반영된다.
-export const CONTACT_EMAIL = "contact@zipgonggo.com";
+export const CONTACT_EMAIL = "wlsdlstjdwls12@gmail.com";
 export const SITE_DESCRIPTION = "LH, SH, 지방공사 공공임대 입주자모집공고를 지역별 단지별로 모아 보증금과 임대료, 마감일을 한눈에.";
 
 // 저장(★) 목록 localStorage 키. 서버 저장 없음 — 사용자 식별이 생기면 옮긴다
@@ -19,8 +19,10 @@ export const TOAST_MS = 2100;
 // 방문 집계용 난수 식별자(localStorage). **브라우저가 만든다** — 서버가 심는 쿠키가 아니라
 // 사이트 데이터를 지우면 다음 방문은 남남이 된다(개인정보처리방침 2항).
 export const VISITOR_STORAGE_KEY = "zipgonggo.visitor.v1";
-// 이 표식이 있는 브라우저는 집계에서 뺀다. 관리자 콘솔에 들어오면 켜진다 —
-// 운영자가 제 사이트를 돌아다닌 것까지 세면 초기 숫자가 통째로 거짓이 된다
+// 이 표식이 "1"인 브라우저는 집계에서 뺀다. 관리자 콘솔에 처음 들어오면 켜진다 —
+// 운영자가 제 사이트를 돌아다닌 것까지 세면 초기 숫자가 통째로 거짓이 된다.
+// **값이 없을 때만 콘솔이 "1"을 심는다.** 운영자가 방문 화면에서 끄면 "0"이 들어가고,
+// 그 뒤로는 콘솔을 몇 번 더 열어도 다시 안 켜진다 — 안 그러면 끄는 버튼이 한 번도 안 먹는다
 export const VISIT_OPT_OUT_KEY = "zipgonggo.notrack.v1";
 
 // ISR·unstable_cache 갱신 주기. 파이프라인이 DB를 갱신해도 이 시간 안엔 반영된다

@@ -1397,6 +1397,8 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .adm-run button:disabled { color: var(--dim); cursor: progress; }
 .adm-run-msg { font-size: 12px; font-weight: 700; color: var(--ok); }
 .adm-run-msg.no { color: var(--hot); }
+/* 켜고 끄는 스위치의 「꺼짐」. 고장이 아니라 평상시라 붉게 칠하지 않는다 */
+.adm-run-msg.off { color: var(--dim); font-weight: 600; }
 .adm-run-msg a { margin-left: 6px; color: var(--acc); text-decoration: underline; text-underline-offset: 2px; }
 
 /* 필터 칩 — 전부 링크다. 이 화면엔 상태를 들고 있을 이유가 없다 */

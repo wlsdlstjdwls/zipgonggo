@@ -4,9 +4,11 @@ import { CONTACT_EMAIL, SITE_NAME } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
 
 export const PRIVACY_TITLE = "개인정보처리방침";
-// 방문 통계(3항)를 더하면서 바꾼 날. 9항이 「시행 7일 전 공지」를 약속하므로 시행일을 7일 뒤로 잡고,
-// 집계 코드도 이 날부터 기록한다(lib/analytics.ts ANALYTICS_START). **둘은 같은 날이어야 한다.**
-export const PRIVACY_EFFECTIVE_DATE = "2026-09-23";
+// 방문 통계(3항)를 담은 방침이 서는 날. 집계 코드도 이 날부터 기록한다
+// (lib/analytics.ts ANALYTICS_START). **둘은 같은 날이어야 한다.**
+// 서비스를 열며 방침을 처음 세우는 자리라 같은 날 시행한다(사용자 결정 2026-09-17).
+// 10항의 「7일 전 공지」는 앞으로의 변경에 거는 약속이다 — 다음부터는 이 날짜를 7일 뒤로 잡는다.
+export const PRIVACY_EFFECTIVE_DATE = "2026-09-17";
 
 // 개인정보처리방침 본문 — /privacy 페이지가 쓴다.
 // 집공고는 로그인도 회원도 없다. 서버에 남는 것은 방문 통계 넉 줄뿐이라 그 사실을 그대로 적는다.
@@ -108,8 +110,8 @@ export function PrivacyContent() {
 
       <LegalSection title="10. 고지">
         <p>
-          이 방침은 {PRIVACY_EFFECTIVE_DATE}부터 적용됩니다. 내용을 바꾸면 시행 7일 전 서비스 안에
-          공지합니다. <Link href={ROUTES.terms}>이용약관 보기</Link>
+          이 방침은 {PRIVACY_EFFECTIVE_DATE}부터 적용됩니다. 앞으로 내용을 바꿀 때는 시행 7일 전에
+          서비스 안에 공지합니다. <Link href={ROUTES.terms}>이용약관 보기</Link>
         </p>
       </LegalSection>
     </>
