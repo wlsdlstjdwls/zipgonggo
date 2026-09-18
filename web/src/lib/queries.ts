@@ -160,6 +160,19 @@ export const listNoticesPage = unstable_cache(
   CACHE_OPTS,
 );
 
+/** 저장(★) 목록 화면(/my)이 쓰는 조회 — id 묶음을 한 번에 읽는다.
+ *  마감분도 빼지 않는다: 저장해 둔 공고가 마감됐다는 사실 자체가 그 화면이 알려 줄 일이다.
+ *  정본 필터(CANONICAL_ONLY)도 걸지 않는다 — 딸림 글을 저장했어도 그 상세는 살아 있다(CLAUDE.md 하지 말 것 5).
+ *  **unstable_cache로 감싸지 않는다** — id 조합이 사람마다 달라 캐시 키가 매번 새로 생긴다(캐시가 아니라 쓰레기가 된다). */
+export async function listNoticesByIds(ids: number[]): Promise<NoticeListItem[]> {
+  if (ids.length === 0) return [];
+  return query<NoticeListItem>(
+    `SELECT ${LIST_COLS} FROM notice WHERE id = ANY($1::bigint[])
+     ORDER BY ${DEADLINE_RANK}, ${DEADLINE_KEY} ASC NULLS LAST, posted_at DESC, id DESC`,
+    [ids],
+  );
+}
+
 /** 탭·셀렉트 옵션. sector가 정해지면 그 안에서의 시도·유형 분포. 왕복 1회로 합친다.
  * 같은 요청 안(layout + page)에서 같은 sector로 두 번 불려도 react cache()가 한 번만 쏜다. */
 export const listFilterOptions = cache(unstable_cache(

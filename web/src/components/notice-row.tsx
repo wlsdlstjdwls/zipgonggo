@@ -16,6 +16,8 @@ type Props = {
   n: NoticeListItem;
   /** 등장 스태거(ms). undefined면 애니메이션 없음 */
   stagger?: number;
+  /** 흐리게. 저장 목록(/my)에서 방금 저장을 푼 행 — 지우지 않고 남겨 둬야 잘못 누른 ★을 다시 켤 수 있다 */
+  muted?: boolean;
 };
 
 /** "09.07–09.12". 날짜를 못 읽은 공고는 「원문 확인」 — 기관 목록의 「모집중」을 접수 기간인 척 쓰지 않는다(사용자 지적 2026-09-09) */
@@ -34,7 +36,7 @@ function Dt({ k, v }: { k: string; v: string }) {
   );
 }
 
-export function NoticeRow({ n, stagger }: Props) {
+export function NoticeRow({ n, stagger, muted }: Props) {
   const d = ddayChip(n);
   const qty = n.supply_count != null ? num(n.supply_count, "호") : null;
   const meta = [n.agency, regionShort(n), n.housing_type, qty].filter(Boolean).join(" | ");
@@ -45,7 +47,7 @@ export function NoticeRow({ n, stagger }: Props) {
   const style = stagger === undefined ? undefined : ({ "--stagger": `${stagger}ms` } as CSSProperties);
 
   return (
-    <li>
+    <li className={muted ? "muted" : undefined}>
       <Link
         href={noticePath(n.slug)}
         className={`row${stagger === undefined ? " static" : ""}`}

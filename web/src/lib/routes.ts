@@ -10,9 +10,13 @@ export const ROUTES = {
   type: "/type",
   api: "/api",
   apiNotices: "/api/notices",
+  // 저장(★) 목록이 id 묶음으로 공고를 받아 오는 자리. 개인 목록이라 캐시하지 않는다
+  apiNoticesByIds: "/api/notices/by-ids",
   apiFacets: "/api/facets",
   apiTrack: "/api/track",
   eligibility: "/eligibility",
+  // 저장(★)해 둔 공고를 모아 보는 자리. 브라우저 localStorage만 보는 개인 화면이라 색인 대상이 아니다
+  my: "/my",
   terms: "/terms",
   privacy: "/privacy",
   rss: "/rss.xml",

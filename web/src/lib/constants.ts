@@ -15,6 +15,9 @@ export const FIT_STORAGE_KEY = "zipgonggo.fit.v1";
 // 민간임대(청년안심주택) 공고의 「내 조건」 입력값. 묻는 항목이 공공 공고와 달라 키를 따로 둔다
 export const FIT_MINGAN_STORAGE_KEY = "zipgonggo.fit-mingan.v1";
 export const TOAST_MS = 2100;
+// 저장 목록(/my)이 한 번에 불러오는 공고 수 상한. localStorage가 아무리 불어나도 질의는 여기서 끊는다 —
+// 브라우저가 보내는 id 배열을 그대로 믿고 IN 절에 꽂으면 URL 길이와 질의 시간이 남의 손에 달린다
+export const SAVED_MAX_IDS = 200;
 
 // 방문 집계용 난수 식별자(localStorage). **브라우저가 만든다** — 서버가 심는 쿠키가 아니라
 // 사이트 데이터를 지우면 다음 방문은 남남이 된다(개인정보처리방침 2항).

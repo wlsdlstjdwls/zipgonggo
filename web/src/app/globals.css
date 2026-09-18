@@ -128,6 +128,11 @@ small { font-size: 12px; }
 .site-nav { display: flex; gap: 18px; font-size: 13px; font-weight: 700; color: var(--dim); }
 .site-nav a { transition: color 200ms var(--ease); }
 .site-nav a:hover, .site-nav a.on { color: var(--ink); }
+/* 저장(★) 목록으로 가는 메뉴. 건수 배지는 저장이 하나라도 있을 때만 붙는다 */
+.site-nav .saved-nav { display: inline-flex; align-items: center; gap: 5px; }
+.nav-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px; padding: 0 5px;
+  border-radius: 9px; background: var(--acc); color: #fff; font-style: normal; font-weight: 800; font-size: 10.5px; line-height: 1;
+  font-variant-numeric: tabular-nums; }
 /* 헤더 오른쪽 버튼(계산기). 링크가 아니라 창을 여는 버튼이라 테두리로 구분한다 */
 .nav-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 13px; border: 1px solid var(--line2); border-radius: var(--r-chip);
   background: var(--bg); color: var(--mut); font-family: inherit; font-weight: 800; font-size: 12.5px; cursor: pointer; white-space: nowrap;
@@ -137,7 +142,9 @@ small { font-size: 12px; }
 .nav-btn.on { background: var(--acc); border-color: var(--acc); color: #fff; }
 .stage { animation: mo-stage 380ms var(--sp) both; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-@media (max-width: 900px) { .site-nav { display: none; } }
+/* 좁은 화면에서는 헤더 메뉴를 감춘다 — 단, 저장 목록만은 남긴다.
+   ★은 모바일에서 제일 많이 눌리는데 들어갈 문이 없으면 저장이 그대로 사라진 것과 같다(2026-09-18) */
+@media (max-width: 900px) { .site-nav { gap: 0; } .site-nav a:not(.saved-nav) { display: none; } }
 /* 본문과 푸터 사이 숨 — 목록 마지막 카드가 푸터에 붙어 보였다(사용자 지적 2026-09-09) */
 .site-footer { margin-top: 56px; padding: 20px var(--pad) 26px; border-top: 1px solid var(--line); background: var(--sub); color: var(--dim); font-size: 11.5px; line-height: 1.8; font-weight: 500; }
 .site-footer .bar { max-width: var(--maxw); margin: 0 auto; }
@@ -533,6 +540,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .list-top > span { flex: none; font-weight: 800; font-size: 12.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
 
 /* ── 빈 상태 · 404 ───────────────────────────────────────── */
+/* 저장 목록(/my) — 보관 위치를 밝히는 한 줄과, 방금 저장을 푼 행 */
+.saved-note { margin: 0; padding: 0 var(--pad) 12px; font-size: 11.5px; font-weight: 600; line-height: 1.6; color: var(--dim); }
+.rows li.muted { opacity: 0.42; transition: opacity 200ms var(--ease); }
+.rows li.muted:hover, .rows li.muted:focus-within { opacity: 1; }
 .state-wrap { padding: 24px var(--pad) 32px; }
 .empty-box { padding: 40px 26px; border-radius: var(--r-panel); border: 1px dashed var(--line2); text-align: center; }
 .empty-box .ico { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; margin: 0 auto 16px; border-radius: 14px; background: var(--acc-soft); }

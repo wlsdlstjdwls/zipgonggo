@@ -8,6 +8,9 @@ import { SAVED_STORAGE_KEY, TOAST_MS } from "@/lib/constants";
 
 type Ctx = {
   saved: ReadonlySet<number>;
+  /** localStorage를 한 번 읽고 난 뒤 true. 저장 목록 화면이 "아직 모른다"와 "하나도 없다"를 구별하는 데 쓴다 —
+   *  구별하지 않으면 재방문자에게 빈 화면이 한 번 번쩍였다가 목록이 들어온다 */
+  ready: boolean;
   isSaved: (id: number) => boolean;
   toggle: (id: number) => void;
   /** 방금 토글된 id — 팝 애니메이션 대상. 460ms 후 해제 */
@@ -29,6 +32,7 @@ function read(): Set<number> {
 
 export function SaveProvider({ children }: { children: ReactNode }) {
   const [saved, setSaved] = useState<Set<number>>(() => new Set());
+  const [ready, setReady] = useState(false);
   const [popped, setPopped] = useState<number | null>(null);
   const [toastText, setToastText] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -36,6 +40,7 @@ export function SaveProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setSaved(read());
+    setReady(true);
     // 다른 탭에서 바꾸면 따라간다
     const onStorage = (e: StorageEvent) => { if (e.key === SAVED_STORAGE_KEY) setSaved(read()); };
     window.addEventListener("storage", onStorage);
@@ -62,7 +67,7 @@ export function SaveProvider({ children }: { children: ReactNode }) {
     popTimer.current = setTimeout(() => setPopped(null), 460);
   }, [toast]);
 
-  const value = useMemo<Ctx>(() => ({ saved, isSaved: (id) => saved.has(id), toggle, popped, toast }), [saved, toggle, popped, toast]);
+  const value = useMemo<Ctx>(() => ({ saved, ready, isSaved: (id) => saved.has(id), toggle, popped, toast }), [saved, ready, toggle, popped, toast]);
 
   return (
     <SaveCtx.Provider value={value}>
