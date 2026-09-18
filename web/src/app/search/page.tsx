@@ -109,7 +109,7 @@ export default async function SearchPage({ searchParams }: Props) {
 
       {hits.length > 0 && (
         <section className="srch-sec">
-          <h2>공고 {count(open.length)}</h2>
+          <h2>공고{open.length > 0 && <em>{count(open.length)}</em>}</h2>
           {open.length > 0 ? (
             <ul className="rows v-card">
               {open.map((n) => <NoticeRow key={n.id} n={n} />)}
@@ -126,7 +126,7 @@ export default async function SearchPage({ searchParams }: Props) {
 
       {complexHits.length > 0 && (
         <section className="srch-sec">
-          <h2>단지 {count(cxOpen.length, "곳")}</h2>
+          <h2>단지{cxOpen.length > 0 && <em>{count(cxOpen.length, "곳")}</em>}</h2>
           {cxOpen.length > 0 ? (
             <ComplexList rows={cxOpen} />
           ) : (

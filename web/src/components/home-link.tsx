@@ -10,7 +10,9 @@ import { ROUTES } from "@/lib/routes";
 export function HomeLink() {
   return (
     <Link href={ROUTES.home} className="logo">
-      <BrandMark size={22} />{SITE_NAME}
+      <BrandMark size={22} />
+      {/* 워드마크를 b로 싼다 — 좁은 화면에서 이것만 접는다(상세 머리바 .dhb-logo와 같은 순서) */}
+      <b>{SITE_NAME}</b>
     </Link>
   );
 }
