@@ -7,7 +7,8 @@ export const SITE_TITLE = `${SITE_NAME} — 공공임대 모집공고 지도`;
 export const CONTACT_EMAIL = "wlsdlstjdwls12@gmail.com";
 export const SITE_DESCRIPTION = "LH, SH, 지방공사 공공임대 입주자모집공고를 지역별 단지별로 모아 보증금과 임대료, 마감일을 한눈에.";
 
-// 저장(★) 목록 localStorage 키. 서버 저장 없음 — 사용자 식별이 생기면 옮긴다
+// 관심 공고(★) 목록 localStorage 키. 서버 저장 없음 — 사용자 식별이 생기면 옮긴다.
+// **키 이름의 saved는 그대로 둔다** — 바꾸면 이미 담아 둔 목록이 통째로 날아간다(화면 문구만 「관심 공고」다)
 export const SAVED_STORAGE_KEY = "zipgonggo.saved.v1";
 // 「내 조건에 맞는 단지」 입력값 localStorage 키. 공고를 오가도 내 조건은 그대로다(사용자 요청 2026-09-14) —
 // 공고마다 다른 항목(공급 구분·면적·계층·신청유형)은 읽을 때 그 공고에 있는 값인지 확인해 없으면 기본값으로 돌린다
@@ -15,7 +16,7 @@ export const FIT_STORAGE_KEY = "zipgonggo.fit.v1";
 // 민간임대(청년안심주택) 공고의 「내 조건」 입력값. 묻는 항목이 공공 공고와 달라 키를 따로 둔다
 export const FIT_MINGAN_STORAGE_KEY = "zipgonggo.fit-mingan.v1";
 export const TOAST_MS = 2100;
-// 저장 목록(/my)이 한 번에 불러오는 공고 수 상한. localStorage가 아무리 불어나도 질의는 여기서 끊는다 —
+// 관심 공고(/my)가 한 번에 불러오는 공고 수 상한. localStorage가 아무리 불어나도 질의는 여기서 끊는다 —
 // 브라우저가 보내는 id 배열을 그대로 믿고 IN 절에 꽂으면 URL 길이와 질의 시간이 남의 손에 달린다
 export const SAVED_MAX_IDS = 200;
 

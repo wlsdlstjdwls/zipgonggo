@@ -16,7 +16,7 @@ type Props = {
   n: NoticeListItem;
   /** 등장 스태거(ms). undefined면 애니메이션 없음 */
   stagger?: number;
-  /** 흐리게. 저장 목록(/my)에서 방금 저장을 푼 행 — 지우지 않고 남겨 둬야 잘못 누른 ★을 다시 켤 수 있다 */
+  /** 흐리게. 관심 공고(/my)에서 방금 ★을 뺀 행 — 지우지 않고 남겨 둬야 잘못 누른 걸 되돌릴 수 있다 */
   muted?: boolean;
 };
 

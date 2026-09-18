@@ -100,9 +100,9 @@
 ### 필터 결과 `?type=&closing=&sort=`
 - **noindex.** canonical은 파라미터 없는 스코프 URL로(`/` 또는 `/area/{시도}`)
 
-### 저장한 공고 `/my` — 1 (2026-09-18 구현)
-- ★로 저장해 둔 공고를 접수 마감 임박순으로 모아 보는 개인 화면. 저장 목록은 **브라우저
-  localStorage에만** 있다(`zipgonggo.saved.v1`) — 서버는 이 화면의 내용을 모른다
+### 관심 공고 `/my` — 1 (2026-09-18 구현)
+- ★로 담아 둔 공고를 접수 마감 임박순으로 모아 보는 개인 화면. 목록은 **브라우저
+  localStorage에만** 있다(`zipgonggo.saved.v1` — 화면 문구는 「관심 공고」지만 키는 안 바꾼다)
 - 화면이 id 묶음을 `/api/notices/by-ids`에 물어 행을 받는다. 응답은 `private, no-store`
 - **noindex, follow.** 사람마다 내용이 다르고 크롤러에겐 언제나 빈 화면이라 얇은 페이지다.
   robots.txt로 경로를 막지는 않는다 — 막으면 크롤러가 이 meta를 읽지도 못한 채 URL만 기억한다

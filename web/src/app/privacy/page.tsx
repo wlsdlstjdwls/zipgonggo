@@ -6,7 +6,7 @@ import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = {
   title: PRIVACY_TITLE,
-  description: `${SITE_NAME}가 다루는 정보 — 개인정보를 수집하지 않으며, 저장(★) 목록과 화면 설정은 브라우저에만 남습니다.`,
+  description: `${SITE_NAME}가 다루는 정보 — 개인정보를 수집하지 않으며, 관심 공고(★)와 화면 설정은 브라우저에만 남습니다.`,
   alternates: { canonical: ROUTES.privacy },
 };
 

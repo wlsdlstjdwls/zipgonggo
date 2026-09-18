@@ -1,6 +1,7 @@
 "use client";
 
-// ★/☆ 저장 토글. 행 안(34×34)과 상세 패널(큰 버튼) 두 모양.
+// ★/☆ 관심 공고 토글. 행 안(34×34)과 상세 패널(큰 버튼) 두 모양.
+// 화면 문구는 「관심 공고」로 통일한다(사용자 결정 2026-09-18) — 「저장」은 브라우저가 파일을 받는 말과 겹친다.
 // 행 안에서는 링크 이동을 막아야 하므로 preventDefault + stopPropagation.
 //
 // 하이드레이션 함정(2026-09-14): SaveProvider는 layout에 있고 상세 페이지는 loading.tsx(Suspense) 안에 있다.
@@ -24,12 +25,12 @@ export function SaveButton({ id, variant = "icon" }: { id: number; variant?: "ic
   if (variant === "panel") {
     return (
       <button type="button" className={`btn lg${on ? " saved" : ""}${pop ? " pop" : ""}`} onClick={onClick} aria-pressed={on}>
-        {on ? "★" : "☆"} {on ? "저장한 공고" : "공고 저장"}
+        {on ? "★" : "☆"} {on ? "담아 둔 공고" : "관심 공고 담기"}
       </button>
     );
   }
   return (
-    <button type="button" className={`save${on ? " on" : ""}${pop ? " pop" : ""}`} onClick={onClick} aria-pressed={on} aria-label={on ? "저장 해제" : "저장"}>
+    <button type="button" className={`save${on ? " on" : ""}${pop ? " pop" : ""}`} onClick={onClick} aria-pressed={on} aria-label={on ? "관심 공고에서 빼기" : "관심 공고 담기"}>
       {on ? "★" : "☆"}
     </button>
   );

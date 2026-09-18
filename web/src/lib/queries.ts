@@ -160,9 +160,9 @@ export const listNoticesPage = unstable_cache(
   CACHE_OPTS,
 );
 
-/** 저장(★) 목록 화면(/my)이 쓰는 조회 — id 묶음을 한 번에 읽는다.
- *  마감분도 빼지 않는다: 저장해 둔 공고가 마감됐다는 사실 자체가 그 화면이 알려 줄 일이다.
- *  정본 필터(CANONICAL_ONLY)도 걸지 않는다 — 딸림 글을 저장했어도 그 상세는 살아 있다(CLAUDE.md 하지 말 것 5).
+/** 관심 공고(★) 화면(/my)이 쓰는 조회 — id 묶음을 한 번에 읽는다.
+ *  마감분도 빼지 않는다: 담아 둔 공고가 마감됐다는 사실 자체가 그 화면이 알려 줄 일이다.
+ *  정본 필터(CANONICAL_ONLY)도 걸지 않는다 — 딸림 글을 담았어도 그 상세는 살아 있다(CLAUDE.md 하지 말 것 5).
  *  **unstable_cache로 감싸지 않는다** — id 조합이 사람마다 달라 캐시 키가 매번 새로 생긴다(캐시가 아니라 쓰레기가 된다). */
 export async function listNoticesByIds(ids: number[]): Promise<NoticeListItem[]> {
   if (ids.length === 0) return [];

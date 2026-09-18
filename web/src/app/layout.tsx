@@ -84,7 +84,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {/* 자격진단은 공고 목록과 나란한 한 갈래다 — 헤더에서 바로 닿게 둔다 */}
                 <nav className="site-nav" aria-label="주요 메뉴">
                   <Link href={ROUTES.eligibility}>자격진단</Link>
-                  {/* ★로 저장해 둔 공고를 다시 찾아가는 유일한 길. 저장만 되고 볼 자리가 없었다(2026-09-18) */}
+                  {/* ★로 담아 둔 공고를 다시 찾아가는 유일한 길. 담기만 되고 볼 자리가 없었다(2026-09-18) */}
                   <SavedLink />
                 </nav>
               </div>

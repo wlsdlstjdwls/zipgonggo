@@ -1,12 +1,12 @@
 "use client";
 
-// 저장(★) 목록 본문(/my). 서버는 이 화면의 내용을 모른다 — 저장은 브라우저 localStorage에만 있다.
+// 관심 공고(★) 목록 본문(/my). 서버는 이 화면의 내용을 모른다 — 목록은 브라우저 localStorage에만 있다.
 // 그래서 순서가 이렇다: 마운트 → localStorage 읽기(SaveProvider) → id 묶음을 /api/notices/by-ids에 묻기 → 행 그리기.
 //
 // 두 가지를 일부러 이렇게 뒀다.
 // 1) **지운 행을 바로 치우지 않는다.** ★을 다시 눌러 끄면 흐려지기만 하고 자리에 남는다 —
 //    잘못 눌렀을 때 되돌릴 길이 있어야 한다. 다음에 이 화면을 열면 그때 빠진다.
-// 2) **ready 전에는 빈 상태를 그리지 않는다.** 저장이 있는 사람에게 「저장한 공고가 없습니다」가
+// 2) **ready 전에는 빈 상태를 그리지 않는다.** 담아 둔 게 있는 사람에게 「담아 둔 공고가 없습니다」가
 //    한 번 번쩍였다가 목록이 들어오면 그게 더 나쁜 거짓말이다.
 
 import Link from "next/link";
@@ -60,12 +60,12 @@ export function SavedNotices() {
 
   const reload = useCallback(() => setRetry((n) => n + 1), []);
 
-  // 머리 건수는 화면에 깔린 행 수가 아니라 **지금 저장돼 있는 수**다 — 저장을 푼 행은 자리에만 남아 있다.
+  // 머리 건수는 화면에 깔린 행 수가 아니라 **지금 담겨 있는 수**다 — 뺀 행은 자리에만 남아 있다.
   // 헤더 배지와 같은 수를 말해야 한다(둘이 어긋나면 어느 쪽이 거짓말인지 알 길이 없다)
   const savedCount = items ? items.filter((n) => isSaved(n.id)).length : 0;
   const head = (
     <div className="list-top">
-      <h1>저장한 공고</h1>
+      <h1>관심 공고</h1>
       {savedCount > 0 && <span>{count(savedCount)}</span>}
     </div>
   );
@@ -85,7 +85,7 @@ export function SavedNotices() {
       <>
         {head}
         <p className="feed-error">
-          저장한 공고를 불러오지 못했습니다. <button type="button" className="btn" onClick={reload}>다시 시도</button>
+          관심 공고를 불러오지 못했습니다. <button type="button" className="btn" onClick={reload}>다시 시도</button>
         </p>
       </>
     );
@@ -98,7 +98,7 @@ export function SavedNotices() {
         <div className="state-wrap">
           <div className="empty-box" role="status">
             <span className="ico" aria-hidden="true"><i /></span>
-            <h2>저장한 공고가 없습니다</h2>
+            <h2>아직 담아 둔 공고가 없습니다</h2>
             <p>공고 목록이나 상세 화면에서 ☆를 누르면 여기 모입니다. 접수 마감이 가까운 순서로 보여 줍니다.</p>
             <Link href={ROUTES.home} className="btn ink">공고 둘러보기</Link>
           </div>
@@ -111,7 +111,7 @@ export function SavedNotices() {
     <div className="ex-list">
       {head}
       <p className="saved-note">
-        이 브라우저에만 저장됩니다. 사이트 데이터를 지우거나 다른 기기에서 열면 목록은 비어 있습니다.
+        이 목록은 이 브라우저에만 남습니다. 사이트 데이터를 지우거나 다른 기기에서 열면 비어 있습니다.
       </p>
       <ul className={`rows v-${view}`}>
         {items.map((n, i) => (

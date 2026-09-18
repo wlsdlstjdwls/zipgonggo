@@ -1,6 +1,7 @@
 "use client";
 
-// ★ 저장 목록 + 토스트. 서버 저장 없음 — localStorage에만 둔다(사용자 식별이 생기면 옮긴다).
+// ★ 관심 공고 목록 + 토스트. 서버 저장 없음 — localStorage에만 둔다(사용자 식별이 생기면 옮긴다).
+// 화면 문구는 「관심 공고」로 통일한다(사용자 결정 2026-09-18). 코드의 save/saved는 그대로 둔다 — 키 이름까지 바꾸면 이미 저장된 목록이 날아간다.
 // 마운트 후에 읽어야 SSR HTML(전부 ☆)과 첫 렌더가 일치한다(hydration mismatch 방지).
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -8,7 +9,7 @@ import { SAVED_STORAGE_KEY, TOAST_MS } from "@/lib/constants";
 
 type Ctx = {
   saved: ReadonlySet<number>;
-  /** localStorage를 한 번 읽고 난 뒤 true. 저장 목록 화면이 "아직 모른다"와 "하나도 없다"를 구별하는 데 쓴다 —
+  /** localStorage를 한 번 읽고 난 뒤 true. 관심 공고 화면이 "아직 모른다"와 "하나도 없다"를 구별하는 데 쓴다 —
    *  구별하지 않으면 재방문자에게 빈 화면이 한 번 번쩍였다가 목록이 들어온다 */
   ready: boolean;
   isSaved: (id: number) => boolean;
@@ -59,7 +60,7 @@ export function SaveProvider({ children }: { children: ReactNode }) {
       const on = !next.has(id);
       if (on) next.add(id); else next.delete(id);
       try { window.localStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify([...next])); } catch { /* 프라이빗 모드 등 — 메모리에만 */ }
-      toast(on ? "저장했습니다" : "저장을 해제했습니다");
+      toast(on ? "관심 공고에 담았습니다" : "관심 공고에서 뺐습니다");
       return next;
     });
     setPopped(id);
