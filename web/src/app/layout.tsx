@@ -5,6 +5,7 @@ import { CalcDock } from "@/components/calc-dock";
 import { HomeLink } from "@/components/home-link";
 import { SaveProvider } from "@/components/save-context";
 import { SavedLink } from "@/components/saved-link";
+import { SiteSearch } from "@/components/site-search";
 import { VisitTracker } from "@/components/visit-tracker";
 import { ListStateProvider } from "@/components/list-state";
 import {
@@ -88,6 +89,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <SavedLink />
                 </nav>
               </div>
+              {/* 검색칸 — 필터로는 못 닿던 길(이름을 아는 사람). 좁은 화면에서는 이게 헤더의 주인공이라 가운데를 차지한다 */}
+              <SiteSearch />
               <CalcButton />
             </div>
           </header>

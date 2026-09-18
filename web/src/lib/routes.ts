@@ -13,8 +13,12 @@ export const ROUTES = {
   // 저장(★) 목록이 id 묶음으로 공고를 받아 오는 자리. 개인 목록이라 캐시하지 않는다
   apiNoticesByIds: "/api/notices/by-ids",
   apiFacets: "/api/facets",
+  // 헤더 검색칸이 미리보기를 받아 오는 자리
+  apiSearch: "/api/search",
   apiTrack: "/api/track",
   eligibility: "/eligibility",
+  // 검색 결과 지면. 색인 대상이 아니다 — 얇은 페이지 방지 규칙(CLAUDE.md 4)에 걸린다. 페이지가 noindex를 단다
+  search: "/search",
   // 저장(★)해 둔 공고를 모아 보는 자리. 브라우저 localStorage만 보는 개인 화면이라 색인 대상이 아니다
   my: "/my",
   terms: "/terms",
@@ -79,6 +83,12 @@ export function areaTypePath(p: { sido: string; sigungu: string; ambiguous: bool
 /** /type/{유형} 유형 허브 경로. */
 export function typePath(housingType: string): string {
   return `${ROUTES.type}/${encodeURIComponent(housingType)}`;
+}
+
+/** /search?q=… 검색 결과 경로. 빈 말이면 빈 검색 지면으로 보낸다. */
+export function searchPath(q: string): string {
+  const t = q.trim();
+  return t ? `${ROUTES.search}?q=${encodeURIComponent(t)}` : ROUTES.search;
 }
 
 /** 다음 페이지 API 경로. */

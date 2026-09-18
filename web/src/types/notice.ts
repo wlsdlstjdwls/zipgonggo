@@ -294,3 +294,39 @@ export type WaitRow = {
   waiting_cnt: number | null;
   vacated_cnt: number | null;
 };
+
+/* ── 검색 (0033) ─────────────────────────────────────────
+   자유 입력 한 칸이 세 갈래를 한꺼번에 받는다 — 이미 발행해 둔 착지 지면(바로 가기), 공고, 단지. */
+
+/** 착지 지면으로 바로 보내는 줄. 지역·유형·지역×유형이 같은 모양으로 온다 */
+export type SearchShortcut = {
+  /** 목록 key 겸 중복 제거용. "sido:서울특별시" · "type:장기전세" · "pair:시도|시군구|유형" */
+  key: string;
+  label: string;
+  /** 어떤 갈래인지 한 마디 — 「지역 전체」 「유형 안내」 「지역과 유형」 */
+  sub: string;
+  href: string;
+  count: number;
+};
+
+/** 검색에 걸린 단지 한 곳. 같은 이름이 여러 공고에 나오면 가장 최근 공고 하나로 접는다 */
+export type SearchComplexHit = {
+  id: number;
+  name: string;
+  complex_code: string | null;
+  sido: string;
+  sigungu: string;
+  road_address: string;
+  notice_slug: string;
+  notice_title: string;
+  posted_at: string;
+  closed: boolean;
+};
+
+export type SearchResult = {
+  /** 사용자가 친 말 그대로. 지면 제목과 입력칸 되채우기에 쓴다 */
+  q: string;
+  shortcuts: SearchShortcut[];
+  notices: NoticeListItem[];
+  complexes: SearchComplexHit[];
+};

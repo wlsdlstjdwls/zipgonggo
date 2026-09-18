@@ -7,7 +7,7 @@ import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_ELIGIBILITY, CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { isClosed, todayKST } from "./format";
-import type { ComplexFacts, ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorResultRow, Sector, YouthHouse } from "@/types/notice";
+import type { ComplexFacts, ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorResultRow, SearchComplexHit, Sector, YouthHouse } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
@@ -444,8 +444,9 @@ export async function getAmendChain(n: Pick<Notice, "source_key" | "amends_sourc
    지역은 notice.sigungu가 아니라 **notice_area**로 센다 — 여러 시군구에 걸친 공고가 있어
    notice.sigungu 한 칸만 보면 시군구 89개, notice_area로 보면 132개다(실측 2026-09-16). */
 
-/** 지역×유형 발행 최소 건수 — 얇은 페이지 방지 규칙(CLAUDE.md 4: 지역×유형은 5건 이상) */
-export const AREA_TYPE_MIN_COUNT = 5;
+/** 지역×유형 발행 최소 건수 — 얇은 페이지 방지 규칙(CLAUDE.md 4: 지역×유형은 5건 이상).
+ *  값은 constants.ts에 있다(검색이 pg를 물지 않고 보려고). 부르는 쪽이 옮겨 다니지 않게 여기서 재수출한다 */
+export { AREA_TYPE_MIN_COUNT } from "./constants";
 
 export type AreaTypePair = { sido: string; sigungu: string; housing_type: string; count: number; ambiguous: boolean };
 
@@ -510,6 +511,50 @@ export const listLandingNotices = unstable_cache(
   ["landing-notices-v1"],
   CACHE_OPTS,
 );
+
+/* ── 검색 (0033·0034) ──────────────────────────────────────
+   자유 입력 한 칸. 필터로는 못 닿던 길 — 「고덕리엔파크」나 「강동구」처럼 **이름을 아는 사람**이 들어오는 문이다.
+
+   말 다듬기(공백 제거·소문자)는 lib/search.ts의 searchNorm이 하고, DB 쪽 search_norm()과 규칙이 같다.
+   찾는 식은 마이그레이션이 굳혀 둔 함수(notice_search_key·complex_search_key)를 그대로 부른다 —
+   **식을 여기서 풀어 쓰면 GIN 인덱스가 안 잡힌다**(0034 머리글).
+
+   unstable_cache로 감싸지 않는다. 찾는 말이 사람마다 달라 캐시 키가 매번 새로 생긴다(listNoticesByIds와 같은 이유) —
+   같은 말을 또 치는 건 CDN이 /api/search 응답 한 장으로 받는 게 맞는 층이다. */
+
+/** 이 말이 들어간 공고. 제목으로 시작하는 것 → 진행 중 → 최신 순. */
+export async function searchNotices(term: string, limit: number): Promise<NoticeListItem[]> {
+  return query<NoticeListItem>(
+    `SELECT ${LIST_COLS} FROM notice
+      WHERE ${CANONICAL_ONLY}
+        AND notice_search_key(title, complex_name, address, agency, sido, sigungu) LIKE '%' || $1 || '%'
+      ORDER BY (search_norm(title) LIKE $1 || '%') DESC, (${CLOSED}), posted_at DESC, id DESC
+      LIMIT $2`,
+    [term, limit],
+  );
+}
+
+/** 이 말이 들어간 단지. 같은 단지가 여러 공고에 나오므로 이름+주소로 접고 가장 최근 공고를 업고 온다.
+ *  단지 지면은 공고에 매달려 있어(/notice/{공고}/{단지}) 어느 공고를 업느냐가 곧 어느 URL로 보내느냐다 —
+ *  진행 중인 공고를 먼저 고른다. 지난 공고밖에 없으면 그거라도 준다(URL을 죽이지 않는다 — CLAUDE.md 5). */
+export async function searchComplexes(term: string, limit: number): Promise<SearchComplexHit[]> {
+  return query<SearchComplexHit>(
+    `WITH hit AS (
+       SELECT DISTINCT ON (search_norm(c.name), search_norm(c.road_address))
+              c.id, c.name, c.complex_code, c.sido, c.sigungu, c.road_address,
+              n.slug AS notice_slug, ${titleCol("n.")}, n.posted_at::text AS posted_at, ${CLOSED} AS closed
+         FROM notice_complex c JOIN notice n ON n.id = c.notice_id
+        WHERE n.canonical_id IS NULL
+          AND complex_search_key(c.name, c.road_address, c.sido, c.sigungu) LIKE '%' || $1 || '%'
+        ORDER BY search_norm(c.name), search_norm(c.road_address), (${CLOSED}), n.posted_at DESC, c.id
+     )
+     SELECT id, name, complex_code, sido, sigungu, road_address, notice_slug, title AS notice_title, posted_at, closed
+       FROM hit
+      ORDER BY (search_norm(name) LIKE $1 || '%') DESC, closed, posted_at DESC, name
+      LIMIT $2`,
+    [term, limit],
+  );
+}
 
 /* ── 단지 페이지 색인 기준 (docs/url-structure.md 얇은 페이지 방지) ──────────────
    단지 상세는 호실 상세 자리를 대신 채우고 있어 그 기준을 그대로 받는다 — 「고유 필드 8개 이상 + 건물 단위 좌표」.

@@ -36,6 +36,9 @@ export const CACHE_TAG_NOTICE = "notice";
 export const CACHE_TAG_ELIGIBILITY = "eligibility";
 // /api/notices 응답 캐시. s-maxage는 REVALIDATE_SEC와 맞춘다
 export const API_CACHE_CONTROL = `public, s-maxage=${REVALIDATE_SEC}, stale-while-revalidate=600`;
+// /api/search 응답 캐시. 목록보다 짧게 잡는다 — 타이핑 한 글자마다 URL이 갈려 한 장이 오래 살아 봐야 쓸모가 적고,
+// 새 공고가 올라온 직후 「없다」고 답한 장이 한 시간 남아 있는 편이 손해다
+export const SEARCH_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=600";
 
 // 목록 페이징
 export const PAGE_SIZE = 24;
@@ -74,6 +77,9 @@ if(p==="/"||p.indexOf("/area/")===0){
 export const VIEW_STORAGE_KEY = "zipgonggo.view.v1";
 // /area/{시도} 발행 최소 공고 수 — 얇은 페이지 방지 규칙(CLAUDE.md 4: 지역은 3건 이상)
 export const AREA_MIN_COUNT = 3;
+// /area/{시군구}/{유형} 발행 최소 공고 수 — 같은 규칙의 다른 축(CLAUDE.md 4: 지역×유형은 5건 이상).
+// queries.ts가 재수출한다 — 검색(lib/search.ts)이 이 값을 보는데, 거기서 queries.ts를 물면 pg가 클라이언트 번들로 딸려 간다
+export const AREA_TYPE_MIN_COUNT = 5;
 
 // 네이버 Web Dynamic Map SDK. 좌표가 없어 geocoder 서브모듈로 브라우저 실시간 변환(저장 안 함 — CLAUDE.md 하지 말 것 1)
 export const NAVER_MAP_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ?? "";
