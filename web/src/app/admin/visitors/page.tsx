@@ -9,8 +9,10 @@ import { isAdmin } from "@/lib/admin-auth";
 import {
   analyticsOn, ANALYTICS_START, DEFAULT_RANGE, pathKind, RANGES, rangeOf, visitorReport, ONLINE_MIN,
 } from "@/lib/analytics";
+import { foldChannels, UTM_HINTS, UTM_HOST, channelOf } from "@/lib/analytics";
 import { ROUTES } from "@/lib/routes";
 import { VisitChart } from "./visit-chart";
+import { BarCell, RankBars, type BarRow } from "./rank-bars";
 import { TrackToggle } from "./track-toggle";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +33,23 @@ export default async function AdminVisitors({ searchParams }: { searchParams: Pr
   const { r } = await searchParams;
   const range = rangeOf(r);
   const report = await visitorReport(range.days);
+
+  // 도메인을 채널로 접는다. `l.instagram.com`과 `instagram.com`은 같은 인스타그램이다
+  const channels = foldChannels(report.refs);
+  const refTotal = channels.reduce((n, c) => n + c.visitors, 0);
+  const sns = channels.filter((c) => c.kind === "sns");
+  const snsTotal = sns.reduce((n, c) => n + c.visitors, 0);
+  const direct = channels.find((c) => c.kind === "direct");
+  const pathMax = Math.max(...report.paths.map((p) => p.visitors), 1);
+
+  const toRow = (c: (typeof channels)[number]): BarRow => ({
+    key: c.key,
+    label: c.label,
+    kind: c.kind,
+    visitors: c.visitors,
+    views: c.views,
+    detail: c.hosts.map((h) => h.host).filter((h): h is string => Boolean(h)),
+  });
 
   return (
     <div className="adm-page">
@@ -114,7 +133,9 @@ export default async function AdminVisitors({ searchParams }: { searchParams: Pr
                       {decodeURIComponent(p.path)}
                     </a>
                   </td>
-                  <td className="num">{p.visitors}</td>
+                  <td className="num">
+                    <BarCell value={p.visitors} max={pathMax} views={p.views} />
+                  </td>
                   <td className="num">{p.views}</td>
                 </tr>
               ))}
@@ -130,35 +151,67 @@ export default async function AdminVisitors({ searchParams }: { searchParams: Pr
 
       <section className="adm-sec">
         <h2>
-          유입 출처
-          <small>페이지를 새로 연 첫 조회만</small>
+          유입 채널
+          <small>페이지를 새로 연 첫 조회만 | {range.label} 기준</small>
         </h2>
-        <div className="adm-table">
-          <table>
-            <thead>
-              <tr>
-                <th className="num">#</th>
-                <th>출처</th>
-                <th className="num">방문</th>
-                <th className="num">조회</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.refs.map((x, i) => (
-                <tr key={x.host ?? "direct"}>
-                  <td className="num">{i + 1}</td>
-                  <td>{x.host ?? "직접 유입"}</td>
-                  <td className="num">{x.visitors}</td>
-                  <td className="num">{x.views}</td>
-                </tr>
-              ))}
-              {report.refs.length === 0 && (
+        <RankBars rows={channels.map(toRow)} total={refTotal} />
+        {/* 채널로 접으면 「인스타그램 12」는 보이지만 그게 l.instagram.com인지 ig.me인지는 사라진다.
+            묶는 규칙이 맞는지 의심될 때 열어 보는 자리 */}
+        {report.refs.length > 0 && (
+          <details className="adm-err vz-table">
+            <summary>도메인 그대로 보기</summary>
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={4}>아직 기록이 없다.</td>
+                  <th>도메인</th>
+                  <th>채널</th>
+                  <th className="num">방문</th>
+                  <th className="num">조회</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {report.refs.map((x) => (
+                  <tr key={x.host ?? "direct"}>
+                    <td>{x.host ?? "(없음)"}</td>
+                    <td>{channelOf(x.host).label}</td>
+                    <td className="num">{x.visitors}</td>
+                    <td className="num">{x.views}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        )}
+      </section>
+
+      <section className="adm-sec">
+        <h2>
+          SNS 유입
+          <small>
+            {snsTotal.toLocaleString("ko-KR")}명 | 전체 유입의{" "}
+            {refTotal > 0 ? Math.round((snsTotal / refTotal) * 100) : 0}%
+          </small>
+        </h2>
+        {/* 분모가 SNS 합계다. 「올린 글 가운데 어디가 먹혔나」를 보는 자리라 검색·직접은 빼고 센다 */}
+        <RankBars
+          rows={sns.map(toRow)}
+          total={snsTotal}
+          empty="SNS에서 들어온 기록이 아직 없다. 아래 표식을 붙인 주소로 올리면 여기 쌓인다."
+        />
+        <p className="adm-note">
+          <strong>카카오톡과 인스타그램의 인앱 브라우저는 들어온 곳을 안 알려 준다.</strong> 그대로 두면
+          SNS에서 온 사람이 전부 「직접 유입」으로 뭉친다
+          {direct && direct.visitors > 0 && <> — 지금 {direct.visitors.toLocaleString("ko-KR")}명이 그 칸에 있다</>}.
+          글을 올릴 때 주소 뒤에 <code>?utm_source=</code>를 붙이면 그 값으로 갈라 볼 수 있다. 붙일 수 있는 값은
+          아래뿐이고, 모르는 값은 기록하지 않는다. 주소에 물음표가 이미 있으면 <code>&amp;</code>로 잇는다.
+        </p>
+        <div className="adm-chips adm-utm">
+          {UTM_HINTS.map((k) => (
+            <span key={k}>
+              ?utm_source={k}
+              <i>{channelOf(UTM_HOST[k]).label}</i>
+            </span>
+          ))}
         </div>
       </section>
 

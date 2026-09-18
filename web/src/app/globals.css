@@ -1583,6 +1583,41 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .vz-table { margin-top: 8px; }
 .vz-table summary { color: var(--mut); }
 .vz-table table { margin-top: 6px; border: 1px solid var(--line); border-radius: var(--r-btn); overflow: hidden; }
+/* 표 칸 안의 막대 — 「방문」 숫자 옆에 같은 값을 폭으로 한 번 더 말한다.
+   숫자를 지우고 막대만 두지 않는다. 막대는 비율을 말할 뿐 값을 대신하지 못한다 */
+.adm-bar { display: inline-grid; grid-template-columns: minmax(48px, 1fr) auto; align-items: center; gap: 8px;
+  min-width: 108px; width: 100%; }
+.adm-bar-track { height: 6px; border-radius: 999px; background: var(--sub); overflow: hidden; }
+.adm-bar-track i { display: block; height: 100%; border-radius: 999px; background: var(--acc); }
+.adm-bar b { font-weight: 800; }
+
+/* 가로 막대 순위 — 유입 채널. 이름이 길어 세로 막대로는 라벨이 겹친다(rank-bars.tsx 주석) */
+.rz { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rz-row { display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; align-items: baseline;
+  padding: 9px 12px 10px; border: 1px solid var(--line); border-radius: var(--r-btn); background: var(--bg); }
+.rz-name { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 13.5px; }
+.rz-name b { font-weight: 800; }
+.rz-name i { flex: 1 1 auto; min-width: 0; font-style: normal; font-size: 11px; color: var(--dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rz-val { font-size: 14px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; }
+.rz-val small { margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--dim); letter-spacing: 0; }
+.rz-track { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--sub); overflow: hidden; }
+.rz-track i { display: block; height: 100%; border-radius: 999px; background: var(--acc); }
+/* 채널의 종류를 색으로도 갈라 둔다 — SNS만 눈으로 훑을 수 있게 */
+.rz-row.k-search .rz-track i { background: var(--ok); }
+.rz-row.k-direct .rz-track i { background: var(--line2); }
+.rz-row.k-etc .rz-track i { background: var(--mut); }
+.rz-kind { flex: none; font-style: normal; padding: 1px 6px; border-radius: 6px; font-size: 10px; font-weight: 800;
+  background: var(--acc-soft); color: var(--acc); }
+.rz-kind.k-search { background: #e8f5ec; color: var(--ok); }
+.rz-kind.k-direct, .rz-kind.k-etc { background: var(--sub); color: var(--dim); }
+
+/* utm 표식 안내 — 칩처럼 생겼지만 누를 것이 아니라 베껴 쓸 글자다 */
+.adm-utm span { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 11px;
+  border: 1px dashed var(--line2); border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--ink); }
+.adm-utm i { font-style: normal; font-size: 11px; font-weight: 700; color: var(--dim); }
+.adm-note code { padding: 1px 5px; border-radius: 5px; background: var(--sub); font-size: 11px; }
+
 /* 인기 경로의 주소는 길다. 줄바꿈 대신 줄여서 표가 흔들리지 않게 */
 .adm-path { color: var(--mut); text-decoration: underline; text-underline-offset: 2px;
   word-break: break-all; }

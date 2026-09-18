@@ -74,7 +74,19 @@ export function VisitTracker() {
       }
     }
 
-    const payload = JSON.stringify({ visitorId: id, path: pathname, referrerHost, entry });
+    // 링크에 직접 붙인 표식. **카카오톡과 인스타그램 인앱 브라우저는 referrer를 안 보내서**
+    // 이것이 없으면 SNS에서 온 사람이 전부 「직접 유입」으로 뭉친다.
+    // 서버는 아는 값만 도메인으로 바꿔 적고 나머지는 버린다(lib/analytics.ts UTM_HOST).
+    let utm: string | null = null;
+    if (entry) {
+      try {
+        utm = new URLSearchParams(location.search).get("utm_source");
+      } catch {
+        utm = null;
+      }
+    }
+
+    const payload = JSON.stringify({ visitorId: id, path: pathname, referrerHost, entry, utm });
     try {
       // sendBeacon은 페이지를 떠나도 끝까지 간다. 막혀 있으면 keepalive fetch로 물러선다
       const sent = navigator.sendBeacon?.(ROUTES.apiTrack, new Blob([payload], { type: "application/json" }));
