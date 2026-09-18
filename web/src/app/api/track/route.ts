@@ -3,7 +3,7 @@
 // **web이 DB에 쓰는 유일한 라우트다**(CLAUDE.md 예외, 사용자 결정 2026-09-16).
 // 답은 언제나 204다 — 봇이든 못 쓸 값이든 「안 받았다」를 알려줄 이유가 없고,
 // 집계가 실패해도 이용자 화면에는 아무 일도 일어나면 안 된다.
-import { analyticsOn, cleanView, isBotUA, recordView, sweepOld, type ViewPayload } from "@/lib/analytics";
+import { analyticsOn, cleanView, isBotUA, recordView, sweepOld } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 export const preferredRegion = "iad1";
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   }
   if (!body || typeof body !== "object") return NO_CONTENT;
 
-  const view = cleanView(body as ViewPayload);
+  const view = cleanView(body as Record<string, unknown>);
   if (!view) return NO_CONTENT;
 
   try {

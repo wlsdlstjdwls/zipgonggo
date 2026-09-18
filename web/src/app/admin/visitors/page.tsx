@@ -7,9 +7,9 @@
 import Link from "next/link";
 import { isAdmin } from "@/lib/admin-auth";
 import {
-  analyticsOn, ANALYTICS_START, DEFAULT_RANGE, pathKind, RANGES, rangeOf, visitorReport, ONLINE_MIN,
+  analyticsOn, ANALYTICS_START, channelOf, DEFAULT_RANGE, foldChannels, pathKind, RANGES, rangeOf,
+  visitorReport, ONLINE_MIN,
 } from "@/lib/analytics";
-import { foldChannels, UTM_HINTS, UTM_HOST, channelOf } from "@/lib/analytics";
 import { ROUTES } from "@/lib/routes";
 import { VisitChart } from "./visit-chart";
 import { BarCell, RankBars, type BarRow } from "./rank-bars";
@@ -193,26 +193,13 @@ export default async function AdminVisitors({ searchParams }: { searchParams: Pr
           </small>
         </h2>
         {/* 분모가 SNS 합계다. 「올린 글 가운데 어디가 먹혔나」를 보는 자리라 검색·직접은 빼고 센다 */}
-        <RankBars
-          rows={sns.map(toRow)}
-          total={snsTotal}
-          empty="SNS에서 들어온 기록이 아직 없다. 아래 표식을 붙인 주소로 올리면 여기 쌓인다."
-        />
+        <RankBars rows={sns.map(toRow)} total={snsTotal} empty="SNS에서 들어온 기록이 아직 없다." />
         <p className="adm-note">
-          <strong>카카오톡과 인스타그램의 인앱 브라우저는 들어온 곳을 안 알려 준다.</strong> 그대로 두면
-          SNS에서 온 사람이 전부 「직접 유입」으로 뭉친다
-          {direct && direct.visitors > 0 && <> — 지금 {direct.visitors.toLocaleString("ko-KR")}명이 그 칸에 있다</>}.
-          글을 올릴 때 주소 뒤에 <code>?utm_source=</code>를 붙이면 그 값으로 갈라 볼 수 있다. 붙일 수 있는 값은
-          아래뿐이고, 모르는 값은 기록하지 않는다. 주소에 물음표가 이미 있으면 <code>&amp;</code>로 잇는다.
+          <strong>카카오톡과 인스타그램의 인앱 브라우저는 들어온 곳을 안 알려 준다.</strong> 거기서 온 사람은
+          위 막대가 아니라 「직접 유입」에 들어간다
+          {direct && direct.visitors > 0 && <> — 지금 그 칸에 {direct.visitors.toLocaleString("ko-KR")}명이 있다</>}.
+          그래서 이 절의 숫자는 <strong>SNS 유입의 하한</strong>이다. 실제로는 이보다 많다.
         </p>
-        <div className="adm-chips adm-utm">
-          {UTM_HINTS.map((k) => (
-            <span key={k}>
-              ?utm_source={k}
-              <i>{channelOf(UTM_HOST[k]).label}</i>
-            </span>
-          ))}
-        </div>
       </section>
 
       <section className="adm-sec">

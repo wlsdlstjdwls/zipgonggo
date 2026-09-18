@@ -1612,12 +1612,6 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .rz-kind.k-search { background: #e8f5ec; color: var(--ok); }
 .rz-kind.k-direct, .rz-kind.k-etc { background: var(--sub); color: var(--dim); }
 
-/* utm 표식 안내 — 칩처럼 생겼지만 누를 것이 아니라 베껴 쓸 글자다 */
-.adm-utm span { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 11px;
-  border: 1px dashed var(--line2); border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--ink); }
-.adm-utm i { font-style: normal; font-size: 11px; font-weight: 700; color: var(--dim); }
-.adm-note code { padding: 1px 5px; border-radius: 5px; background: var(--sub); font-size: 11px; }
-
 /* 인기 경로의 주소는 길다. 줄바꿈 대신 줄여서 표가 흔들리지 않게 */
 .adm-path { color: var(--mut); text-decoration: underline; text-underline-offset: 2px;
   word-break: break-all; }

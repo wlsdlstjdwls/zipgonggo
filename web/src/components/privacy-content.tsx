@@ -48,10 +48,7 @@ export function PrivacyContent() {
         <ul>
           <li>2항의 무작위 방문자 식별자</li>
           <li>본 지면의 경로 (예: /area/서울특별시). 검색어 등 물음표 뒤의 값은 떼고 저장합니다</li>
-          <li>
-            들어온 곳의 도메인 (예: search.naver.com). 주소 전체가 아니라 도메인만 남깁니다.
-            운영자가 SNS에 올린 링크에 출처 표식(utm_source)이 붙어 있으면 그 서비스의 도메인을 적습니다
-          </li>
+          <li>들어온 곳의 도메인 (예: search.naver.com). 주소 전체가 아니라 도메인만 남깁니다</li>
           <li>조회한 시각</li>
         </ul>
         <p>

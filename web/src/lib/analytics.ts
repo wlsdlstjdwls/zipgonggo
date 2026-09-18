@@ -52,48 +52,9 @@ export function isBotUA(ua: string | null | undefined): boolean {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type ViewInput = { visitorId: string; path: string; referrerHost?: string | null; entry?: boolean };
-/** 브라우저가 보내는 날것. utm은 여기서만 쓰이고 저장되는 값은 언제나 도메인 하나다 */
-export type ViewPayload = Partial<ViewInput> & { utm?: string | null };
-
-/**
- * utm_source 값 → 그 서비스의 정규 도메인.
- *
- * **왜 필요한가** — 카카오톡과 인스타그램의 인앱 브라우저는 referrer를 아예 안 보낸다.
- * 그대로 두면 SNS에서 온 사람이 전부 「직접 유입」으로 뭉쳐 어느 글이 먹혔는지 알 길이 없다.
- * 그래서 직접 뿌리는 링크에 `?utm_source=instagram`을 달고, 그 값을 **도메인으로 바꿔**
- * 기존 referrer_host 칸에 적는다.
- *
- * **표에 없는 값은 버린다.** 저장되는 것이 늘 「들어온 곳의 도메인」이어야 개인정보처리방침
- * 3항(넷뿐이다)이 거짓말이 되지 않는다 — 새 항목을 적으려면 시행 7일 전 공지가 먼저다.
- */
-export const UTM_HOST: Record<string, string> = {
-  instagram: "instagram.com", ig: "instagram.com", insta: "instagram.com",
-  threads: "threads.net",
-  kakao: "kakao.com", kakaotalk: "kakao.com", katalk: "kakao.com", openchat: "kakao.com",
-  naver: "naver.com", blog: "blog.naver.com", naverblog: "blog.naver.com", naver_blog: "blog.naver.com",
-  cafe: "cafe.naver.com", navercafe: "cafe.naver.com", naver_cafe: "cafe.naver.com",
-  post: "post.naver.com", band: "band.us",
-  x: "x.com", twitter: "x.com",
-  facebook: "facebook.com", fb: "facebook.com",
-  youtube: "youtube.com", yt: "youtube.com", shorts: "youtube.com",
-  tiktok: "tiktok.com", discord: "discord.com", telegram: "t.me",
-  brunch: "brunch.co.kr", tistory: "tistory.com", velog: "velog.io",
-  reddit: "reddit.com", linkedin: "linkedin.com",
-  dcinside: "dcinside.com", fmkorea: "fmkorea.com", clien: "clien.net",
-  ruliweb: "ruliweb.com", ppomppu: "ppomppu.co.kr", theqoo: "theqoo.net",
-};
-
-/** 콘솔에 안내할 대표 표식. 글을 올릴 때 링크 뒤에 붙일 값이다 */
-export const UTM_HINTS = ["instagram", "threads", "kakao", "blog", "cafe", "band", "x", "youtube"] as const;
-
-/** utm_source를 도메인으로. 모르는 값이면 null(적지 않는다) */
-export function hostFromUtm(utm: string | null | undefined): string | null {
-  const key = (utm ?? "").toString().trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 30);
-  return key ? (UTM_HOST[key] ?? null) : null;
-}
 
 /** 들어온 값을 믿지 않고 깎는다. 못 쓸 값이면 null — 라우트는 조용히 204를 돌려준다 */
-export function cleanView(v: ViewPayload): ViewInput | null {
+export function cleanView(v: Partial<ViewInput>): ViewInput | null {
   const visitorId = String(v.visitorId ?? "");
   if (!UUID_RE.test(visitorId)) return null;
 
@@ -108,9 +69,6 @@ export function cleanView(v: ViewPayload): ViewInput | null {
   let referrerHost: string | null = null;
   const raw = (v.referrerHost ?? "").toString().trim().toLowerCase().slice(0, 100);
   if (raw && !/[\s/]/.test(raw)) referrerHost = raw;
-
-  // utm이 이긴다 — 내가 직접 붙인 표식이라 인앱 브라우저가 지워 버린 referrer보다 정확하다
-  referrerHost = hostFromUtm(v.utm) ?? referrerHost;
 
   return { visitorId, path, referrerHost, entry: Boolean(v.entry) };
 }
