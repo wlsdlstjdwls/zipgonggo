@@ -66,6 +66,23 @@ export function SkeletonDetail() {
   );
 }
 
+/** 검색 결과 골격(/search). 전에는 loading.tsx가 없어 이동 즉시 화면이 그대로 멈춰 있었다 —
+ *  "버튼 누르는 게 느리다"의 절반은 이거였다(사용자 지적 2026-09-18). 뼈대가 있으면 Link가 그걸 미리 받아 둔다. */
+export function SkeletonSearch() {
+  return (
+    <article className="srch" aria-busy="true" aria-label="검색 중">
+      <div className="crumb"><Box w={64} h={30} r={9} /></div>
+      <div className="list-top"><Box w={240} h={20} /></div>
+      <div className="srch-sec">
+        <Box w={92} h={16} style={{ margin: "0 var(--pad) 14px" }} />
+        <div className="sk-cards">
+          {[0, 1, 2, 3, 4, 5].map((i) => <Box key={i} h={150} r={16} />)}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 /** 약관·방침 골격: 좁은 본문 한 단. 이동 즉시 뼈대를 깔아 "아무것도 안 나온다"를 막는다(사용자 지적 2026-09-09) */
 export function SkeletonLegal() {
   return (

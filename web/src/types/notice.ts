@@ -323,10 +323,14 @@ export type SearchComplexHit = {
   closed: boolean;
 };
 
+/** 검색에 걸린 공고. 목록 행에 쓰는 값 그대로에 마감 여부만 붙는다 —
+ *  화면이 진행 중과 마감을 두 덩이로 갈라 싣는다(마감분은 「마감된 공고 보기」 안에). */
+export type SearchNoticeHit = NoticeListItem & { closed: boolean };
+
 export type SearchResult = {
   /** 사용자가 친 말 그대로. 지면 제목과 입력칸 되채우기에 쓴다 */
   q: string;
   shortcuts: SearchShortcut[];
-  notices: NoticeListItem[];
+  notices: SearchNoticeHit[];
   complexes: SearchComplexHit[];
 };

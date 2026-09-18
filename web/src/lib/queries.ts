@@ -7,7 +7,7 @@ import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_ELIGIBILITY, CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { isClosed, todayKST } from "./format";
-import type { ComplexFacts, ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorResultRow, SearchComplexHit, Sector, YouthHouse } from "@/types/notice";
+import type { ComplexFacts, ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorResultRow, SearchComplexHit, SearchNoticeHit, Sector, YouthHouse } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
@@ -23,6 +23,13 @@ const LIST_COLS = `
   id, slug, ${titleCol()}, agency, housing_type::text AS housing_type, sector::text AS sector, house_type, sido, sigungu, complex_name,
   supply_count, min_deposit, min_rent, posted_at, apply_start_at, apply_end_at, announce_at,
   status::text AS status, source_status, amends_source_key, source_url, address, source_rank`;
+
+/** LIST_COLS가 내놓은 **결과 이름** 그대로. CTE 밖에서 다시 고를 때 쓴다 —
+ *  LIST_COLS를 두 번 쓰면 `regexp_replace(title …)`가 이미 벗겨진 title에 또 걸려 식이 깨진다. */
+const LIST_OUT = `
+  id, slug, title, agency, housing_type, sector, house_type, sido, sigungu, complex_name,
+  supply_count, min_deposit, min_rent, posted_at, apply_start_at, apply_end_at, announce_at,
+  status, source_status, amends_source_key, source_url, address, source_rank`;
 
 function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
   const where: string[] = [CANONICAL_ONLY];
@@ -512,6 +519,39 @@ export const listLandingNotices = unstable_cache(
   CACHE_OPTS,
 );
 
+/** 검색의 「바로 가기」가 쓰는 원천 — 시도 분포 + 시군구×유형 + 유형 허브.
+ *
+ *  **세 조회를 한 왕복으로 합친다.** /api/search는 레이아웃을 타지 않아 react cache() 중복 제거가 없다 —
+ *  키를 한 자 칠 때마다 커넥션 세 개가 따로 열렸다. 셋 다 같은 주기로 갱신되는 정적에 가까운 집계라
+ *  한 문장 안에 json_agg로 말아 담는 게 맞다. */
+export const listShortcutSource = cache(unstable_cache(
+  async (): Promise<{ sido: FilterOption[]; pairs: AreaTypePair[]; hubs: TypeHub[] }> => {
+    const rows = await query<{ sido: FilterOption[]; pairs: AreaTypePair[]; hubs: TypeHub[] }>(
+      `SELECT
+         (SELECT coalesce(json_agg(t), '[]'::json) FROM (
+            SELECT sido AS value, count(*)::int AS count FROM notice
+             WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED} GROUP BY 1 ORDER BY 2 DESC, 1) t) AS sido,
+         (SELECT coalesce(json_agg(t), '[]'::json) FROM (
+            WITH pair AS (
+              SELECT a.sido, a.sigungu, n.housing_type::text AS housing_type, count(DISTINCT n.id)::int AS count
+                FROM notice_area a JOIN notice n ON n.id = a.notice_id
+               WHERE n.canonical_id IS NULL AND a.sigungu IS NOT NULL
+               GROUP BY 1, 2, 3),
+            dup AS (SELECT sigungu FROM notice_area WHERE sigungu IS NOT NULL GROUP BY 1 HAVING count(DISTINCT sido) > 1)
+            SELECT p.*, (p.sigungu IN (SELECT sigungu FROM dup)) AS ambiguous
+              FROM pair p ORDER BY p.count DESC, p.sido, p.sigungu) t) AS pairs,
+         (SELECT coalesce(json_agg(t), '[]'::json) FROM (
+            SELECT housing_type::text AS housing_type, count(*)::int AS total,
+                   count(*) FILTER (WHERE ${NOT_CLOSED})::int AS open,
+                   count(DISTINCT sido)::int AS sidos
+              FROM notice WHERE ${CANONICAL_ONLY} GROUP BY 1 ORDER BY 2 DESC) t) AS hubs`,
+    );
+    return rows[0] ?? { sido: [], pairs: [], hubs: [] };
+  },
+  ["search-shortcut-source-v1"],
+  CACHE_OPTS,
+));
+
 /* ── 검색 (0033·0034) ──────────────────────────────────────
    자유 입력 한 칸. 필터로는 못 닿던 길 — 「고덕리엔파크」나 「강동구」처럼 **이름을 아는 사람**이 들어오는 문이다.
 
@@ -522,14 +562,26 @@ export const listLandingNotices = unstable_cache(
    unstable_cache로 감싸지 않는다. 찾는 말이 사람마다 달라 캐시 키가 매번 새로 생긴다(listNoticesByIds와 같은 이유) —
    같은 말을 또 치는 건 CDN이 /api/search 응답 한 장으로 받는 게 맞는 층이다. */
 
-/** 이 말이 들어간 공고. 제목으로 시작하는 것 → 진행 중 → 최신 순. */
-export async function searchNotices(term: string, limit: number): Promise<NoticeListItem[]> {
-  return query<NoticeListItem>(
-    `SELECT ${LIST_COLS} FROM notice
-      WHERE ${CANONICAL_ONLY}
-        AND notice_search_key(title, complex_name, address, agency, sido, sigungu) LIKE '%' || $1 || '%'
-      ORDER BY (search_norm(title) LIKE $1 || '%') DESC, (${CLOSED}), posted_at DESC, id DESC
-      LIMIT $2`,
+/** 이 말이 들어간 공고. 제목으로 시작하는 것 → 최신 순.
+ *
+ *  **진행 중과 마감을 각각 limit까지 준다.** 전에는 한 덩이로 정렬해 앞에서 잘라서,
+ *  진행 중이 limit을 채우면 마감분은 한 건도 못 왔다 — 화면에서 「마감 공고 보기」를 열 방법이 없었다.
+ *  row_number를 closed로 갈라 매기면 왕복 한 번으로 두 몫을 같이 받는다(쿼리를 둘로 쪼개지 않는 이유:
+ *  Neon은 병렬 쿼리가 늘수록 새 커넥션을 열 확률이 올라간다). */
+export async function searchNotices(term: string, limit: number): Promise<SearchNoticeHit[]> {
+  return query<SearchNoticeHit>(
+    `WITH hit AS (
+       SELECT ${LIST_COLS}, ${CLOSED} AS closed, (search_norm(title) LIKE $1 || '%') AS head
+         FROM notice
+        WHERE ${CANONICAL_ONLY}
+          AND notice_search_key(title, complex_name, address, agency, sido, sigungu) LIKE '%' || $1 || '%'
+     ),
+     ranked AS (
+       SELECT hit.*, row_number() OVER (PARTITION BY closed ORDER BY head DESC, posted_at DESC, id DESC) AS rn
+         FROM hit
+     )
+     SELECT ${LIST_OUT}, closed FROM ranked WHERE rn <= $2
+      ORDER BY closed, head DESC, posted_at DESC, id DESC`,
     [term, limit],
   );
 }
@@ -547,11 +599,17 @@ export async function searchComplexes(term: string, limit: number): Promise<Sear
         WHERE n.canonical_id IS NULL
           AND complex_search_key(c.name, c.road_address, c.sido, c.sigungu) LIKE '%' || $1 || '%'
         ORDER BY search_norm(c.name), search_norm(c.road_address), (${CLOSED}), n.posted_at DESC, c.id
+     ),
+     ranked AS (
+       SELECT hit.*, (search_norm(name) LIKE $1 || '%') AS head,
+              row_number() OVER (PARTITION BY closed
+                                 ORDER BY (search_norm(name) LIKE $1 || '%') DESC, posted_at DESC, name) AS rn
+         FROM hit
      )
      SELECT id, name, complex_code, sido, sigungu, road_address, notice_slug, title AS notice_title, posted_at, closed
-       FROM hit
-      ORDER BY (search_norm(name) LIKE $1 || '%') DESC, closed, posted_at DESC, name
-      LIMIT $2`,
+       FROM ranked
+      WHERE rn <= $2
+      ORDER BY closed, head DESC, posted_at DESC, name`,
     [term, limit],
   );
 }

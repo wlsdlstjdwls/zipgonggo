@@ -4,18 +4,22 @@
 // 얇은 페이지를 발행하지 않는다는 규칙(CLAUDE.md 4)에 정면으로 걸린다. follow는 남긴다: 크롤러가
 // 여기 실린 공고·단지 링크를 따라가는 건 오히려 이롭다.
 //
-// 헤더 드롭다운과 같은 조회를 쓰되 갈래마다 더 많이 싣는다. /api/search를 거치지 않고 직접 읽는다 —
-// 서버에서 제 DB를 부르는 자리에 제 HTTP 라우트를 한 번 더 타는 건 왕복만 늘린다.
+// 골격은 약관 지면(좁은 한 단)이 아니라 **목록 지면과 같은 전폭**이다(사용자 지적 2026-09-18:
+// "화면 넓은데 왜 2열로만"). legal-in은 max-width 720px이라 288px 카드가 두 장밖에 못 들어갔다.
+//
+// 진행 중과 마감을 갈라 싣는다. 마감분은 「마감된 공고 보기」를 펴야 나온다 —
+// <details>로 두는 건 자바스크립트 없이 즉시 열리기 때문이다(왕복이 없다).
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NoticeRow } from "@/components/notice-row";
 import { SITE_NAME } from "@/lib/constants";
 import { count } from "@/lib/format";
-import { listAreaTypePairs, listFilterOptions, listTypeHubs, searchComplexes, searchNotices } from "@/lib/queries";
+import { listShortcutSource, searchComplexes, searchNotices } from "@/lib/queries";
 import { matchShortcuts, SEARCH_MIN_LEN, SEARCH_PAGE_LIMIT, searchTerm } from "@/lib/search";
 import { noticeComplexPath, ROUTES } from "@/lib/routes";
 import { regionShort } from "@/lib/sido";
 import { firstParam } from "@/lib/notice-filters";
+import type { SearchComplexHit, SearchNoticeHit } from "@/types/notice";
 
 // DB(us-east-1)와 리전을 맞춘다 — layout.tsx와 같은 값 유지
 export const preferredRegion = "iad1";
@@ -31,103 +35,141 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   };
 }
 
+function Crumb() {
+  return (
+    <div className="crumb">
+      <Link href={ROUTES.home} className="back">← 목록</Link>
+    </div>
+  );
+}
+
 export default async function SearchPage({ searchParams }: Props) {
   const raw = firstParam((await searchParams).q) ?? "";
+  const q = raw.trim();
   const term = searchTerm(raw);
 
   if (!term) {
     return (
-      <article className="stage legal">
-        <div className="legal-in">
-          <h1>검색</h1>
-          <p className="legal-eff">{SITE_NAME}</p>
-          <div className="legal-body">
-            <p>
-              {raw.trim()
-                ? `찾을 말이 너무 짧다. ${SEARCH_MIN_LEN}글자 이상 쳐 보세요.`
-                : "단지 이름, 공고 제목, 지역 이름으로 찾습니다. 헤더 위쪽 칸에 쳐 보세요."}
-            </p>
-            <p><Link href={ROUTES.home}>← 전체 공고 목록</Link></p>
-          </div>
-        </div>
+      <article className="stage srch">
+        <Crumb />
+        <div className="list-top"><h1>검색</h1></div>
+        <p className="srch-note">
+          {q
+            ? `찾을 말이 너무 짧습니다. ${SEARCH_MIN_LEN}글자 이상 쳐 보세요.`
+            : "단지 이름, 공고 제목, 지역 이름으로 찾습니다. 헤더 위쪽 칸에 쳐 보세요."}
+        </p>
       </article>
     );
   }
 
-  const [notices, complexes, options, pairs, hubs] = await Promise.all([
+  const [hits, complexHits, src] = await Promise.all([
     searchNotices(term, SEARCH_PAGE_LIMIT),
     searchComplexes(term, SEARCH_PAGE_LIMIT),
-    listFilterOptions(undefined),
-    listAreaTypePairs(),
-    listTypeHubs(),
+    listShortcutSource(),
   ]);
-  const shortcuts = matchShortcuts(raw, { sido: options.sido, pairs, hubs }, 12);
-  const found = shortcuts.length + notices.length + complexes.length;
+  const shortcuts = matchShortcuts(raw, src, 12);
+
+  const open = hits.filter((n) => !n.closed);
+  const closed = hits.filter((n) => n.closed);
+  const cxOpen = complexHits.filter((c) => !c.closed);
+  const cxClosed = complexHits.filter((c) => c.closed);
+  const found = shortcuts.length + hits.length + complexHits.length;
 
   return (
-    <article className="stage legal">
-      <div className="crumb">
-        <Link href={ROUTES.home} className="back">← 목록</Link>
+    <article className="stage srch">
+      <Crumb />
+      <div className="list-top">
+        <h1>「{q}」 검색 결과</h1>
+        {found > 0 && <span>공고 {count(hits.length)} | 단지 {count(complexHits.length, "곳")}</span>}
       </div>
-      <div className="legal-in">
-        <h1>「{raw.trim()}」 검색 결과</h1>
-        <p className="legal-eff">
-          {found > 0 ? `공고 ${count(notices.length)} | 단지 ${count(complexes.length, "곳")}` : "걸리는 것이 없다"} | {SITE_NAME}
+
+      {found === 0 && (
+        <p className="srch-note">
+          「{q}」에 걸리는 공고나 단지가 없습니다. 띄어쓰기를 빼고 이름 일부만 쳐 보거나,{" "}
+          <Link href={ROUTES.home}>전체 목록</Link>에서 지역과 유형으로 좁혀 보세요.
         </p>
-        <div className="legal-body">
-          {found === 0 && (
-            <p>
-              「{raw.trim()}」에 걸리는 공고나 단지가 없다. 띄어쓰기를 빼고 이름 일부만 쳐 보거나,{" "}
-              <Link href={ROUTES.home}>전체 목록</Link>에서 지역과 유형으로 좁혀 보세요.
-            </p>
-          )}
+      )}
 
-          {shortcuts.length > 0 && (
-            <section className="legal-sec">
-              <h2>바로 가기</h2>
-              <ul className="ss-list">
-                {shortcuts.map((s) => (
-                  <li key={s.key}>
-                    <Link href={s.href}>
-                      <b>{s.label}</b>
-                      <span>{s.sub}</span>
-                      <em>{count(s.count)}</em>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+      {shortcuts.length > 0 && (
+        <section className="srch-sec">
+          <h2>바로 가기</h2>
+          <ul className="ss-list">
+            {shortcuts.map((s) => (
+              <li key={s.key}>
+                <Link href={s.href}>
+                  <b>{s.label}</b>
+                  <span>{s.sub}</span>
+                  <em>{count(s.count)}</em>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
-          {notices.length > 0 && (
-            <section className="legal-sec">
-              <h2>공고 {count(notices.length)}</h2>
-              <ul className="rows v-card">
-                {notices.map((n) => <NoticeRow key={n.id} n={n} />)}
-              </ul>
-              {notices.length === SEARCH_PAGE_LIMIT && <p>많이 걸려 {SEARCH_PAGE_LIMIT}건까지만 싣는다. 말을 더 붙여 좁혀 보세요.</p>}
-            </section>
+      {hits.length > 0 && (
+        <section className="srch-sec">
+          <h2>공고 {count(open.length)}</h2>
+          {open.length > 0 ? (
+            <ul className="rows v-card">
+              {open.map((n) => <NoticeRow key={n.id} n={n} />)}
+            </ul>
+          ) : (
+            <p className="srch-note">지금 접수 중인 공고는 없습니다. 아래에서 마감된 공고를 볼 수 있습니다.</p>
           )}
+          {open.length === SEARCH_PAGE_LIMIT && (
+            <p className="srch-note">많이 걸려 {SEARCH_PAGE_LIMIT}건까지만 싣습니다. 말을 더 붙여 좁혀 보세요.</p>
+          )}
+          {closed.length > 0 && <ClosedNotices rows={closed} />}
+        </section>
+      )}
 
-          {complexes.length > 0 && (
-            <section className="legal-sec">
-              <h2>단지 {count(complexes.length, "곳")}</h2>
-              <ul className="ss-list">
-                {complexes.map((c) => (
-                  <li key={c.id}>
-                    <Link href={noticeComplexPath(c.notice_slug, c)}>
-                      <b>{c.name}</b>
-                      <span>{c.road_address || regionShort(c)}</span>
-                      <em>{c.closed ? "마감 공고" : "진행 중"}</em>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-              <p>단지 지면은 그 단지를 공급한 공고에 매달려 있다 — 가장 최근 공고 하나로 보낸다.</p>
-            </section>
+      {complexHits.length > 0 && (
+        <section className="srch-sec">
+          <h2>단지 {count(cxOpen.length, "곳")}</h2>
+          {cxOpen.length > 0 ? (
+            <ComplexList rows={cxOpen} />
+          ) : (
+            <p className="srch-note">접수 중인 공고에 걸린 단지는 없습니다.</p>
           )}
-        </div>
-      </div>
+          {cxClosed.length > 0 && (
+            <details className="more">
+              <summary>마감 공고의 단지 {count(cxClosed.length, "곳")} 보기</summary>
+              <ComplexList rows={cxClosed} />
+            </details>
+          )}
+          <p className="srch-note">단지 지면은 그 단지를 공급한 공고에 매달려 있습니다 — 가장 최근 공고 하나로 보냅니다.</p>
+        </section>
+      )}
     </article>
+  );
+}
+
+/** 마감분은 접어 둔다. 지우지 않는 건 규칙이고(CLAUDE.md 5), 기본으로 펴 두지 않는 건
+ *  지금 신청할 수 있는 공고를 찾으러 온 사람이 대부분이라서다. */
+function ClosedNotices({ rows }: { rows: SearchNoticeHit[] }) {
+  return (
+    <details className="more">
+      <summary>마감된 공고 {count(rows.length)} 보기</summary>
+      <ul className="rows v-card">
+        {rows.map((n) => <NoticeRow key={n.id} n={n} />)}
+      </ul>
+    </details>
+  );
+}
+
+function ComplexList({ rows }: { rows: SearchComplexHit[] }) {
+  return (
+    <ul className="ss-list">
+      {rows.map((c) => (
+        <li key={c.id}>
+          <Link href={noticeComplexPath(c.notice_slug, c)}>
+            <b>{c.name}</b>
+            <span>{c.road_address || regionShort(c)}</span>
+            <em>{c.closed ? "마감 공고" : "진행 중"}</em>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -16,7 +16,13 @@ import { regionShort } from "@/lib/sido";
 import type { SearchResult } from "@/types/notice";
 
 /** 타이핑이 멎고 이만큼 지나야 쏜다. 한 글자마다 쏘면 왕복이 타이핑을 따라오지 못한다 */
-const DEBOUNCE_MS = 180;
+const DEBOUNCE_MS = 140;
+
+/** 이번 방문에 한 번 받아 본 말은 다시 묻지 않는다. 지우고 다시 치는(백스페이스) 길이 제일 흔한데
+ *  그때마다 왕복을 다시 도는 게 "느리다"의 큰 몫이었다(사용자 지적 2026-09-18).
+ *  캐시는 모듈 수준 — 헤더는 한 장뿐이라 다시 마운트돼도 살아 있다. 방문이 끝나면 같이 사라진다. */
+const MEMO = new Map<string, SearchResult>();
+const MEMO_MAX = 60;
 
 const EMPTY: SearchResult = { q: "", shortcuts: [], notices: [], complexes: [] };
 
@@ -46,10 +52,19 @@ export function SiteSearch() {
   const ready = term.length >= SEARCH_MIN_LEN;
   const rows = flatten(res);
 
-  // 타이핑 → 조회. 앞선 요청은 버린다(AbortController) — 느린 응답이 나중에 도착해 새 결과를 덮는 걸 막는다
+  // 타이핑 → 조회. 앞선 요청은 버린다(AbortController) — 느린 응답이 나중에 도착해 새 결과를 덮는 걸 막는다.
+  //
+  // **기다리는 동안 앞 결과를 지우지 않는다.** 전에는 한 자 칠 때마다 패널이 비었다가 다시 찼다 —
+  // 왕복 시간은 그대로인데 눈에는 매번 처음부터 다시 찾는 것처럼 보였다.
   useEffect(() => {
     if (!ready) {
       setRes(EMPTY);
+      setBusy(false);
+      return;
+    }
+    const memo = MEMO.get(term);
+    if (memo) {
+      setRes(memo);
       setBusy(false);
       return;
     }
@@ -59,7 +74,10 @@ export function SiteSearch() {
       try {
         const r = await fetch(`${ROUTES.apiSearch}?q=${encodeURIComponent(term)}`, { signal: ac.signal });
         if (!r.ok) throw new Error(String(r.status));
-        setRes((await r.json()) as SearchResult);
+        const data = (await r.json()) as SearchResult;
+        if (MEMO.size >= MEMO_MAX) MEMO.clear();
+        MEMO.set(term, data);
+        setRes(data);
       } catch (e) {
         if ((e as Error).name !== "AbortError") setRes(EMPTY);
       } finally {
@@ -85,6 +103,13 @@ export function SiteSearch() {
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
+  function clear() {
+    setQ("");
+    setRes(EMPTY);
+    setActive(-1);
+    input.current?.focus();
+  }
+
   function go(href: string) {
     setOpen(false);
     input.current?.blur();
@@ -93,7 +118,9 @@ export function SiteSearch() {
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Escape") {
-      setOpen(false);
+      // 한 번 누르면 패널만 닫고, 이미 닫혀 있으면 친 말까지 비운다 — 오른쪽 ×와 같은 일
+      if (open) setOpen(false);
+      else if (q) clear();
       return;
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -140,6 +167,15 @@ export function SiteSearch() {
         autoComplete="off"
         enterKeyHint="search"
       />
+      {q && (
+        // 네이티브 지우기 버튼은 CSS로 떼 놨다(칸 높이를 흔든다) — 대신 우리 걸 단다.
+        // mousedown을 막는 건 칸이 포커스를 잃으면서 패널이 먼저 닫히는 걸 막기 위해서다
+        <button type="button" className="ss-clear" aria-label="검색어 지우기" onMouseDown={(e) => e.preventDefault()} onClick={clear}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      )}
       {showPanel && (
         <div className="ss-panel" id={listId} role="listbox" aria-label="검색 결과">
           {res.shortcuts.length > 0 && (
@@ -161,6 +197,7 @@ export function SiteSearch() {
                   onPick={go}
                   title={n.title}
                   meta={`${n.agency} | ${regionShort(n)} | ${n.housing_type}`}
+                  tail={n.closed ? "마감" : undefined}
                 />
               ))}
             </section>
