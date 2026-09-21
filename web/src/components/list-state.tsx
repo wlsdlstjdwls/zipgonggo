@@ -12,7 +12,7 @@ import { readScope, writeScope } from "@/lib/scope";
 import { feedParams } from "@/lib/notice-filters";
 import { ROUTES } from "@/lib/routes";
 import { VIEW_STORAGE_KEY } from "@/lib/constants";
-import { isNoticeView, isSector, type Facets, type NoticeClosing, type NoticeFilters, type NoticeSort, type NoticeView } from "@/types/notice";
+import { isSector, type Facets, type NoticeClosing, type NoticeFilters, type NoticeSort, type NoticeView } from "@/types/notice";
 
 export type ListFilters = NoticeFilters;
 
@@ -102,12 +102,8 @@ export function ListStateProvider({ children, initialFacets }: { children: React
     } else {
       setF({ ...saved, sido: pathSido ?? saved.sido });
     }
-    try {
-      const v = window.localStorage.getItem(VIEW_STORAGE_KEY);
-      if (isNoticeView(v)) setViewState(v);
-    } catch {
-      // 프라이빗 모드 등 저장 실패는 화면 동작에 영향 없음
-    }
+    // 보기(카드/목록/간략) 저장값은 되살리지 않는다 — 전환 스위치를 감춘 동안(2026-09-21)
+    // 전에 「간략」을 골라 뒀던 사람은 되돌릴 단추가 없어 그 보기에 갇힌다. 스위치를 되살리면 여기서 다시 읽는다
     setReady(true);
     // 마운트 1회 — pathSido는 그때 값으로 충분하다. 저장된 시도로 옮기는 라우팅은 하지 않는다(주소창을 건드리지 않는다)
     // eslint-disable-next-line react-hooks/exhaustive-deps

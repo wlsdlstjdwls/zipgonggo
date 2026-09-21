@@ -301,8 +301,9 @@ small { font-size: 13.5px; }
 .rail-reset { border: 0; background: none; font-family: inherit; cursor: pointer; align-self: flex-start; display: inline-flex; align-items: center;
   height: 34px; padding: 0 12px; border-radius: var(--r-chip); font-weight: 700; font-size: 13.5px; color: var(--acc); white-space: nowrap; }
 .rail-reset:hover { background: var(--acc-soft); }
-/* 보기·정렬은 조회 조건이 아니다 — 아래 조건 묶음과 선으로 가른다 */
-.rail-g.rail-view + .rail-g + .rail-g { padding-top: 16px; border-top: 1px solid var(--line); }
+/* 정렬은 조회 조건이 아니다 — 아래 조건 묶음과 선으로 가른다(보기 전환은 2026-09-21에 감췄다) */
+.rail-in > .rail-g:first-child + .rail-g,
+.sheet-b > .rail-g:first-child + .rail-g { padding-top: 16px; border-top: 1px solid var(--line); }
 
 /* 좁은 화면 전용 필터 줄 + 바텀시트. 넓은 화면에서는 레일이 대신하므로 감춘다 */
 .fsheet-bar { display: none; }
@@ -396,9 +397,18 @@ small { font-size: 13.5px; }
 .chip-f.dis { cursor: default; opacity: 0.55; }
 /* 「제한 없음」처럼 조건을 거는 게 아니라 거두는 칩 — 켜져 있어도 잉크를 뒤집지 않는다 */
 .chip-f.none.on { background: var(--sub); border-color: var(--line2); color: var(--ink); }
-/* 예산 칩은 금액만 적혀 폭이 짧다 — 레일에서 한 줄에 둘씩 들어가게 붙인다 */
-.rail-budget .rail-chips { gap: 5px; }
-.rail-budget .chip-f { height: 34px; padding: 0 11px; }
+/* 예산 상한 — 눈금 칩 대신 만원 단위 직접 입력(사용자 요청 2026-09-21).
+   눈금은 내 예산이 칸 사이에 있으면 못 고른다. 칩·셀렉트와 같은 골격에 단위만 오른쪽에 박는다 */
+.bin { display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 13px; border: 1px solid var(--line2); border-radius: var(--r-chip); background: var(--bg);
+  transition: border-color 220ms var(--ease), background 220ms var(--ease); }
+.bin:hover { border-color: var(--line-strong); background: var(--sub); }
+.bin:focus-within { border-color: var(--ink); background: var(--bg); }
+.bin.on { border-color: var(--line-strong); }
+.bin-i { flex: 1 1 auto; width: 100%; min-width: 0; border: 0; padding: 0; background: none; font: inherit; font-weight: 800; font-size: 13.5px; color: var(--ink); text-align: right; }
+.bin-i::placeholder { font-weight: 700; color: var(--dim); }
+.bin-i:focus { outline: none; }
+.bin-u { flex: none; font-weight: 700; font-size: 12.5px; color: var(--dim); }
+.bin-h { margin: 0; font-weight: 700; font-size: 12px; color: var(--dim); }
 .chip-f.dis:hover { transform: none; }
 
 /* 셀렉트·검색창 — 칩(.chip-f)과 같은 골격에 화살표만 얹는다. 폼 컨트롤이 칩 옆에서 겉돌지 않게. */
@@ -416,6 +426,12 @@ small { font-size: 13.5px; }
 /* 값이 걸린 셀렉트는 활성 칩과 같은 잉크 반전 — 어떤 필터가 켜졌는지 한눈에 */
 .sel.on { background-color: var(--ink); border-color: var(--ink); color: #fff; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1.5 1.5l4 4 4-4' fill='none' stroke='%23ffffff' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 .sel.on:hover { background-color: var(--ink); }
+/* 늘 값이 하나 걸려 있는 셀렉트(정렬)는 잉크를 뒤집지 않는다 — 켜짐이 아니라 기본 상태라
+   검정 칩이 하나 더 떠 「필터가 걸렸다」로 읽힌다(사용자 지적 2026-09-21) */
+.selw.plain > .sel.on { background-color: var(--bg); border-color: var(--line2); color: var(--mut);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1.5 1.5l4 4 4-4' fill='none' stroke='%235f6672' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.selw.plain > .sel.on:hover { background-color: var(--sub); border-color: var(--line-strong); }
+.selw.plain > .sel.on > small { color: var(--dim); }
 /* 셀렉트 목록 — OS 드롭다운 대신 사이트 톤으로. 버튼 바로 아래 붙고 스크롤을 따라 움직인다(components/select.tsx).
    body로 포털해 position:fixed로 띄운다 — 자리(left·top·min-width·max-height)는 select.tsx가 재서 인라인으로 준다.
    좁은 화면 필터 시트(.sheet-b)가 스크롤 컨테이너라 안에 두면 잘렸다(사용자 지적 2026-09-15).
