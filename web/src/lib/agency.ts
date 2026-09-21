@@ -5,6 +5,8 @@ import type { NoticeListItem } from "@/types/notice";
 export type AgencyLabels = {
   /** 원문 버튼 */
   original: string;
+  /** 좁은 화면 하단 고정 바의 원문 버튼 — 값 두 개와 한 줄에 서므로 짧아야 한다 */
+  originalShort: string;
   /** 원문 링크 목록 항목 */
   originalListItem: string;
   /** 포털 버튼 */
@@ -17,6 +19,7 @@ export type AgencyLabels = {
 
 const SH: AgencyLabels = {
   original: "SH 원문 공고와 첨부 보기 ↗",
+  originalShort: "원문과 첨부 ↗",
   originalListItem: "SH 공고 원문 (첨부파일 포함)",
   portal: "서울주거포털 ↗",
   portalListItem: "서울주거포털 게시글",
@@ -26,6 +29,7 @@ const SH: AgencyLabels = {
 // 서울시 청년안심주택 게시판(민간임대). source_url은 게시글, portal_url은 임대사업자의 청약 신청 페이지
 const SEOUL_YOUTH: AgencyLabels = {
   original: "서울시 청년안심주택 공고와 첨부 보기 ↗",
+  originalShort: "원문과 첨부 ↗",
   originalListItem: "서울시 청년안심주택 게시글 (공고문 첨부 포함)",
   portal: "사업자 청약 신청 페이지 ↗",
   portalListItem: "임대사업자 청약 신청 페이지",
@@ -34,6 +38,7 @@ const SEOUL_YOUTH: AgencyLabels = {
 
 const DEFAULT: AgencyLabels = {
   original: "기관 원문 공고 보기 ↗",
+  originalShort: "원문 공고 ↗",
   originalListItem: "기관 원문 공고",
   portal: "마이홈포털 ↗",
   portalListItem: "마이홈포털 상세",

@@ -26,10 +26,11 @@ export function periodLabel(n: Pick<NoticeListItem, "apply_start_at" | "apply_en
   return NO_DATE;
 }
 
-/** 날짜 한 칸 — 라벨은 작게, 값은 진하게(사용자 요청 2026-09-09) */
-function Dt({ k, v }: { k: string; v: string }) {
+/** 날짜 한 칸 — 라벨은 작게, 값은 진하게(사용자 요청 2026-09-09).
+    hi는 접수 기간 한 칸에만 붙는다 — 셋이 같은 무게면 결정값이 안 보인다(2026-09-21) */
+function Dt({ k, v, hi }: { k: string; v: string; hi?: boolean }) {
   return (
-    <span className="rd">
+    <span className={hi ? "rd hi" : "rd"}>
       <i>{k}</i>
       <b>{v}</b>
     </span>
@@ -39,7 +40,9 @@ function Dt({ k, v }: { k: string; v: string }) {
 export function NoticeRow({ n, stagger, muted }: Props) {
   const d = ddayChip(n);
   const qty = n.supply_count != null ? num(n.supply_count, "호") : null;
-  const meta = [n.agency, regionShort(n), n.housing_type, qty].filter(Boolean).join(" | ");
+  // 지역을 메타 나열에서 떼어 앞에 세운다 — 훑을 때 제일 먼저 찾는 값인데 기관 뒤에 묻혀 있었다(2026-09-21)
+  const loc = regionShort(n);
+  const meta = [n.housing_type, n.agency, qty].filter(Boolean).join(" | ");
   // 공공임대냐 민간임대냐가 안 보인다는 지적(2026-09-16). 메타 줄에 글자로만 섞어 두면
   // 기관·지역·유형 사이에 묻히고, 폭이 좁으면 말줄임에 제일 먼저 잘려 나간다 —
   // 그래서 줄 맨 앞에 색 있는 칩으로 떼어 둔다(잘리지 않는 자리)
@@ -63,13 +66,14 @@ export function NoticeRow({ n, stagger, muted }: Props) {
           {/* 접수 상태는 왼쪽 D-day 칩이 이미 말한다 — 메타 줄에 「접수 중」을 겹쳐 쓰지 않는다(사용자 지적 2026-09-09) */}
           <span className="row-metaline">
             <b className={`sect ${mingan ? "priv" : "pub"}`}>{n.sector}</b>
+            {loc && <b className="row-loc">{loc}</b>}
             <Trunc className="row-meta" text={`${meta}${n.amends_source_key ? " | 정정" : ""}`} />
           </span>
           <Trunc className="row-title" text={n.title} />
           <span className="row-dates">
-            <Dt k="공고" v={dateK(n.posted_at)} />
-            <Dt k="접수" v={periodLabel(n)} />
+            <Dt k="접수" v={periodLabel(n)} hi />
             {n.announce_at && <Dt k="발표" v={dateMD(n.announce_at)} />}
+            <Dt k="공고" v={dateK(n.posted_at)} />
           </span>
         </span>
         <span className="row-act">

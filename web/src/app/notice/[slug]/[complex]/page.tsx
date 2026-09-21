@@ -455,6 +455,14 @@ export default async function ComplexPage({ params }: Params) {
               <ShareButton title={c.name} text={n.title} />
             </>
           }
+          /* 좁은 화면 하단 바에 세울 단 하나의 문 — 이 단지가 속한 공고로 돌아가는 길이다 */
+          primary={<Link className="btn acc" href={noticePath(n.slug)}>공고 보기</Link>}
+          /* 하단 바에만 올리는 값 — 제원 표에 다시 적지 않는다(위 요약 스트립이 이미 센다).
+             폰에서는 바가 화면에 고정이라 스크롤을 어디까지 내렸든 금액이 따라온다 */
+          brief={[
+            { label: "보증금", value: c.min_deposit != null ? wonKo(c.min_deposit) : null },
+            { label: "월임대료", value: c.min_rent != null ? wonKo(c.min_rent) : null },
+          ]}
           /* 공급 구분은 태그 줄이, 입주 시작은 요약 스트립이 이미 센다 — 여기서 또 쓰지 않는다 */
           rows={[
             { label: "공급기관", value: n.agency },

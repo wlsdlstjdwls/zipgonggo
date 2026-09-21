@@ -460,6 +460,8 @@ export default async function NoticePage({ params }: Params) {
           ddayLabel={dl.unit}
           ddayNum={dl.num}
           ddayNote={n.apply_end_at ? `${dateK(n.apply_end_at, true)}${n.apply_end_tm ? ` ${n.apply_end_tm}` : ""} 마감` : NO_DATE}
+          /* 좁은 화면 하단 바에 세울 단 하나의 문. 이 패널은 폰에서 지면 2/3 아래로 내려간다(2026-09-21) */
+          primary={<ExternalLink className="btn acc" href={n.source_url}>{L.originalShort}</ExternalLink>}
           cta={
             <>
               <ExternalLink className="btn acc lg" href={n.source_url}>{L.original}</ExternalLink>
@@ -471,8 +473,8 @@ export default async function NoticePage({ params }: Params) {
             </>
           }
           rows={[
-            { label: m ? m.label : "금액", value: moneyRow ?? "원문 확인" },
-            ...(m?.sub ? [{ label: "보증금", value: `${m.sub.replace("보증금 ", "")}부터` }] : []),
+            { label: m ? m.label : "금액", value: moneyRow ?? "원문 확인", lead: true },
+            ...(m?.sub ? [{ label: "보증금", value: `${m.sub.replace("보증금 ", "")}부터`, lead: true }] : []),
             /* 공급기관·공급유형은 제목 위 태그가 이미 말한다 — 카드에서 뺐다(사용자 지적 2026-09-09) */
             { label: "지역", value: region },
             { label: "공급호수", value: n.supply_count != null ? num(n.supply_count, "호") : null },
