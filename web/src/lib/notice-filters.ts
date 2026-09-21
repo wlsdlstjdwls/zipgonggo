@@ -25,6 +25,7 @@ export function parseNoticeFilters(get: (key: string) => string | string[] | nul
   const sector = firstParam(get("sector"));
   return {
     sector: isSector(sector) ? sector : undefined,
+    agency: firstParam(get("agency")),
     sido: firstParam(get("sido")),
     // 시도 없이 온 시군구는 버린다 — 「강서구」는 서울과 부산에 둘 다 있어 홀로는 뜻이 안 선다
     sigungu: firstParam(get("sido")) ? firstParam(get("sigungu")) : undefined,
@@ -41,6 +42,7 @@ export function parseNoticeFilters(get: (key: string) => string | string[] | nul
 export function noticeFiltersToParams(f: NoticeFilters): URLSearchParams {
   const u = new URLSearchParams();
   if (f.sector) u.set("sector", f.sector);
+  if (f.agency) u.set("agency", f.agency);
   if (f.sido) u.set("sido", f.sido);
   if (f.sido && f.sigungu) u.set("sigungu", f.sigungu);
   if (f.type) u.set("type", f.type);
@@ -53,7 +55,7 @@ export function noticeFiltersToParams(f: NoticeFilters): URLSearchParams {
 }
 
 export function hasFilter(f: NoticeFilters): boolean {
-  return Boolean(f.sector || f.sido || f.sigungu || f.type || f.closing || f.closed || f.maxDeposit || f.maxRent || (f.sort && f.sort !== DEFAULT_SORT));
+  return Boolean(f.sector || f.agency || f.sido || f.sigungu || f.type || f.closing || f.closed || f.maxDeposit || f.maxRent || (f.sort && f.sort !== DEFAULT_SORT));
 }
 
 /** /api/notices 용 쿼리. */

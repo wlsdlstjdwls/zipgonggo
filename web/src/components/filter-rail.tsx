@@ -99,9 +99,9 @@ function RailBody() {
   // (사용자 요청 2026-09-21). 찾는 사람이 가장 많은 지역이 수량 순서 탓에 일곱 번째에 묻혀 있었다
   const seoulAt = sidoOptions.findIndex((o) => o.value === "서울특별시");
   if (seoulAt > 0) sidoOptions.unshift(...sidoOptions.splice(seoulAt, 1));
-  // 시군구는 시도를 고른 뒤에만 센다(listFacetsRaw). 지금 고른 값은 수가 0이어도 남긴다 — 사라지면 화면과 상태가 어긋난다
-  const sigunguOptions = [...facets.sigungu];
-  if (f.sigungu && !sigunguOptions.some((o) => o.value === f.sigungu)) sigunguOptions.unshift({ value: f.sigungu, count: 0 });
+  // 기관(SH·LH·서울시·지방 개발공사). 지금 고른 값은 수가 0이어도 남긴다 — 사라지면 셀렉트가 「전체」로 보여 화면과 상태가 어긋난다
+  const agencyOptions = [...facets.agency];
+  if (f.agency && !agencyOptions.some((o) => o.value === f.agency)) agencyOptions.unshift({ value: f.agency, count: 0 });
   const typeOptions = [...facets.type];
   if (f.type && !typeOptions.some((o) => o.value === f.type)) typeOptions.unshift({ value: f.type, count: 0 });
 
@@ -141,6 +141,20 @@ function RailBody() {
         />
       </div>
 
+      {/* 공급주체(공공/민간) 다음의 한 층 — 어느 기관 공고냐(사용자 요청 2026-09-21).
+          SH·LH·서울시가 위에 서고 지방 개발공사(1~9건)는 아래로 내려간다(count DESC 그대로).
+          칩이 아니라 셀렉트인 건 기관이 열둘이라 펼치면 방금 걷어낸 시군구 칩 꼴이 나기 때문이다 */}
+      <div className="rail-g">
+        <h3>공급기관</h3>
+        <Select
+          value={f.agency ?? ""}
+          options={agencyOptions.map((o) => ({ value: o.value, label: o.value, count: o.count }))}
+          onChange={(v) => set({ agency: v || undefined })}
+          placeholder="전체 기관"
+          ariaLabel="공급기관"
+        />
+      </div>
+
       <div className="rail-g">
         <h3>지역</h3>
         <Select
@@ -150,26 +164,8 @@ function RailBody() {
           placeholder="전국"
           ariaLabel="시도"
         />
-        {/* 시도를 고른 뒤에만 나온다 — 전국에서 「강서구」를 고르면 서울과 부산이 섞인다.
-            시도만으로는 서울 한 곳에 공고가 수백 건이라 목록이 안 좁혀졌다(2026-09-21).
-            셀렉트로 접어 두면 열기 전엔 뭐가 있는지 모른다(사용자 지적 2026-09-21) — 칩으로 펼친다.
-            고른 칩을 다시 누르면 시군구가 풀린다. 「전체 시군구」 줄이 따로 필요 없는 이유다.
-            공고가 있는 시군구만 나온다 — 0건 칸을 채워 봐야 누르면 빈 목록이다 */}
-        {sido && sigunguOptions.length > 0 && (
-          <div className="rail-sub" role="group" aria-label="시군구">
-            {sigunguOptions.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                className={`chip-f sm${f.sigungu === o.value ? " on" : ""}`}
-                aria-pressed={f.sigungu === o.value}
-                onClick={() => set({ sigungu: f.sigungu === o.value ? undefined : o.value })}
-              >
-                {o.value} <small>{o.count}</small>
-              </button>
-            ))}
-          </div>
-        )}
+        {/* 시군구 칩은 뺐다(사용자 요청 2026-09-21) — 「강서구 1」처럼 한 건짜리 칸이 스물다섯 줄로 늘어서
+            필터가 아니라 잡동사니가 됐다. 시군구 조건 자체는 /area/{시군구}/{유형} 발행 지면이 맡는다 */}
       </div>
 
       <div className="rail-g">
@@ -212,9 +208,10 @@ export function FilterRail() {
   const close = useCallback(() => setOpen(false), []);
 
   // 시트 버튼에 붙는 배지 — 지금 몇 개가 걸려 있나. 정렬은 조건이 아니라 세지 않는다
-  const active = [f.sector, f.sido, f.sigungu, f.type, f.closing, f.closed, f.maxDeposit, f.maxRent].filter(Boolean).length;
+  const active = [f.sector, f.agency, f.sido, f.type, f.closing, f.closed, f.maxDeposit, f.maxRent].filter(Boolean).length;
   const summary = [
-    f.sigungu ? `${f.sido} ${f.sigungu}` : (f.sido ?? "전국"),
+    f.sido ?? "전국",
+    f.agency ?? null,
     f.type ?? "전체 유형",
     f.maxDeposit ? `보증금 ${wonStep(f.maxDeposit)} 이하` : null,
     f.maxRent ? `월세 ${wonStep(f.maxRent)} 이하` : null,

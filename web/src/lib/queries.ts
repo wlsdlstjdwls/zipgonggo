@@ -37,6 +37,10 @@ function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
     params.push(f.sector);
     where.push(`sector = $${params.length}::rental_sector`);
   }
+  if (f.agency) {
+    params.push(f.agency);
+    where.push(`agency = $${params.length}`);
+  }
   if (f.sido) {
     params.push(f.sido);
     where.push(`sido = $${params.length}`);
@@ -250,7 +254,7 @@ export const listFilterOptions = cache(unstable_cache(
 // "지역이 바뀌면 그 지역의 수량이 나와야 한다"). 자기 자신은 빼고 센다 — 검색 패싯의 표준 규칙이다.
 // 서울을 고른 상태에서 유형 셀렉트는 "서울 안에서 각 유형이 몇 건"을 보여 주고,
 // 시도 셀렉트는 유형·마감 조건만 걸린 채 "각 시도가 몇 건"을 보여 준다(자기 필터를 빼야 다른 지역으로 갈아탈 수 있다).
-type FacetAxis = "sector" | "sido" | "sigungu" | "type" | "closing";
+type FacetAxis = "sector" | "agency" | "sido" | "type" | "closing";
 
 async function listFacetsRaw(f: NoticeFilters): Promise<Facets> {
   const params: unknown[] = [];
@@ -259,17 +263,12 @@ async function listFacetsRaw(f: NoticeFilters): Promise<Facets> {
     if (extra) parts.push(extra);
     return whereSql(parts);
   };
-  // 시군구는 시도를 고른 뒤에만 뜻이 있다 — 전국에서 「강서구」를 세면 서울과 부산이 한 줄로 합쳐진다.
-  // 시도가 없으면 이 축은 아예 묻지 않는다(왕복에 실리는 GROUP BY 하나를 아낀다)
-  const sigunguSql = f.sido
-    ? `UNION ALL
-     SELECT 'sigungu', sigungu, count(*)::int FROM notice ${w("sigungu", "sigungu IS NOT NULL")} GROUP BY 2`
-    : "";
   const rows = await query<{ kind: string; value: string; count: number }>(
     `SELECT 'sector' AS kind, sector::text AS value, count(*)::int AS count FROM notice ${w("sector")} GROUP BY 2
      UNION ALL
+     SELECT 'agency', agency, count(*)::int FROM notice ${w("agency")} GROUP BY 2
+     UNION ALL
      SELECT 'sido', sido, count(*)::int FROM notice ${w("sido")} GROUP BY 2
-     ${sigunguSql}
      UNION ALL
      SELECT 'type', housing_type::text, count(*)::int FROM notice ${w("type")} GROUP BY 2
      UNION ALL
@@ -283,8 +282,9 @@ async function listFacetsRaw(f: NoticeFilters): Promise<Facets> {
   const stat = (v: string) => rows.find((r) => r.kind === "stat" && r.value === v)?.count ?? 0;
   return {
     sector: pick("sector").sort((a, b) => a.value.localeCompare(b.value, "ko")),
+    // 기관은 공고 많은 순 그대로 둔다 — SH·LH·서울시가 위에 서고 지방 개발공사(1~9건)가 아래로 내려간다
+    agency: pick("agency"),
     sido: pick("sido"),
-    sigungu: pick("sigungu").sort((a, b) => a.value.localeCompare(b.value, "ko")),
     type: pick("type"),
     closing7: stat("closing7"),
     total: stat("total"),
@@ -294,7 +294,7 @@ async function listFacetsRaw(f: NoticeFilters): Promise<Facets> {
 /** 스코프 바·필터 바가 쓰는 수량 묶음. 필터가 바뀌면 /api/facets로 다시 받는다. */
 export const listFacets = unstable_cache(
   (f: NoticeFilters) => listFacetsRaw(f),
-  ["notice-facets-v3"],
+  ["notice-facets-v4"],
   CACHE_OPTS,
 );
 

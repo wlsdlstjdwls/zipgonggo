@@ -303,9 +303,6 @@ small { font-size: 13.5px; }
 .rail-g { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .rail-g > h3 { margin: 0; font-weight: 800; font-size: 11.5px; line-height: 1; letter-spacing: 0.04em; color: var(--dim); }
 .rail-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-/* 시도 아래 시군구 — 펼쳐 두되 레일 전체를 밀어내지 않게 높이를 묶고 안에서 굴린다.
-   레일(.rail-in)이 sticky라 여기서 안 막으면 시군구 많은 도(경기)에서 아래 묶음이 화면 밖으로 밀린다 */
-.rail-sub { display: flex; flex-wrap: wrap; gap: 6px; max-height: 172px; overflow-y: auto; overscroll-behavior: contain; }
 .rail .selw, .rail .sel { width: 100%; }
 .rail-reset { border: 0; background: none; font-family: inherit; cursor: pointer; align-self: flex-start; display: inline-flex; align-items: center;
   height: 34px; padding: 0 12px; border-radius: var(--r-chip); font-weight: 700; font-size: 13.5px; color: var(--acc); white-space: nowrap; }

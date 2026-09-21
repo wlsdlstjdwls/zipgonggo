@@ -220,6 +220,8 @@ export type NoticeFilters = {
   sigungu?: string;
   type?: string;
   sector?: Sector;
+  /** 공급기관 원문(notice.agency): SH · LH · 서울시 · 지방 개발공사. 목록에서 SH만, LH만 보려는 요청(2026-09-21) */
+  agency?: string;
   sort?: NoticeSort;
   closing?: NoticeClosing;
   closed?: boolean;
@@ -246,7 +248,7 @@ export type FilterOption = { value: string; count: number };
 
 /** 스코프 바·필터 바의 수량. 지금 걸린 다른 필터를 반영해 센다(자기 축은 빼고) — 지역을 바꾸면 유형 수량도 따라 바뀐다.
  * total은 부문 칩 「전체」의 수, closing7은 「마감 7일 내」 칩의 수다. */
-export type Facets = { sector: FilterOption[]; sido: FilterOption[]; sigungu: FilterOption[]; type: FilterOption[]; closing7: number; total: number };
+export type Facets = { sector: FilterOption[]; agency: FilterOption[]; sido: FilterOption[]; type: FilterOption[]; closing7: number; total: number };
 
 /** 과거 결과 표 한 줄(notice_result, 0014). 단지 × 공급유형 × 계층 × 구분(우선·일반·n순위·소계). 산술이 맞은(reconciled) 줄만 온다 */
 export type PriorResultRow = {

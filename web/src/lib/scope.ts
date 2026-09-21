@@ -27,9 +27,10 @@ export function readScope(): Scope {
     const p = JSON.parse(raw) as Record<string, unknown>;
     return {
       sector: isSector(p.sector) ? p.sector : undefined,
+      agency: str(p.agency),
       sido: str(p.sido),
-      // 시도 없이 남은 시군구는 버린다 — 옛 저장값이 그럴 수 있다
-      sigungu: str(p.sido) ? str(p.sigungu) : undefined,
+      // 시군구는 목록 필터에서 뺐다(사용자 요청 2026-09-21) — 옛 저장값에 남아 있어도 되살리지 않는다.
+      // 고를 칸이 없는 조건이 저장값으로만 살아 있으면 목록이 왜 좁은지 알 길이 없다
       type: str(p.type),
       closing: p.closing === "7d" ? ("7d" as NoticeClosing) : undefined,
       sort: p.sort === "deadline" || p.sort === "rent" ? (p.sort as NoticeSort) : undefined,

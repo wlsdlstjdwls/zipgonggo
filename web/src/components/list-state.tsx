@@ -48,7 +48,7 @@ function sidoFromPath(pathname: string): string | undefined {
   return m ? decodeURIComponent(m[1]) : undefined;
 }
 
-const QUERY_KEYS = ["sector", "type", "closing", "sort", "closed", "sigungu", "dep", "rent"] as const;
+const QUERY_KEYS = ["sector", "agency", "type", "closing", "sort", "closed", "dep", "rent"] as const;
 
 function sortParam(v: string | null): NoticeSort | undefined {
   return v === "deadline" || v === "rent" ? v : undefined;
@@ -88,12 +88,12 @@ export function ListStateProvider({ children, initialFacets }: { children: React
       const sector = q.get("sector");
       setF({
         sector: isSector(sector) ? sector : undefined,
+        agency: q.get("agency") || undefined,
         type: q.get("type") || undefined,
         closing: q.get("closing") === "7d" ? ("7d" as NoticeClosing) : undefined,
         sort: sortParam(q.get("sort")),
         closed: q.get("closed") === "1" || undefined,
         sido: pathSido ?? saved.sido,
-        sigungu: (pathSido ?? saved.sido) ? q.get("sigungu") || undefined : undefined,
         maxDeposit: moneyParam(q.get("dep")),
         maxRent: moneyParam(q.get("rent")),
       });
@@ -147,8 +147,7 @@ export function ListStateProvider({ children, initialFacets }: { children: React
     if (pathSido) router.replace(ROUTES.home);
   }, [pathSido, router]);
   const setSido = useCallback((next?: string) => {
-    // 시도를 갈면 시군구는 반드시 버린다 — 「서울 강서구」에서 부산으로 옮기면 그 시군구는 부산에 없다
-    setF((cur) => ({ ...cur, sido: next, sigungu: undefined }));
+    setF((cur) => ({ ...cur, sido: next }));
     // 경로가 /area/{시도}인데 다른 시도를 고르면 주소와 화면이 어긋난다 — 홈으로 치환한다(주소창이 오히려 짧아진다)
     if (pathSido && next !== pathSido) router.replace(ROUTES.home);
   }, [pathSido, router]);
