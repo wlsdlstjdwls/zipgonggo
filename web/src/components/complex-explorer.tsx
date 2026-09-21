@@ -18,6 +18,7 @@ import { hasMapKey, type LatLng } from "@/lib/naver-maps-loader";
 import { num, wonExact, wonKo, wonShort } from "@/lib/format";
 import type { NoticeComplex } from "@/types/notice";
 import { ComplexMap, type MapItem } from "./complex-map";
+import { IconPhoto } from "./icons";
 import { Select } from "./select";
 import { Trunc } from "./trunc";
 
@@ -38,10 +39,10 @@ function guLabel(c: NoticeComplex): string {
 
 /** 목록 행에 붙일 그림 배지(사용자 요청 2026-09-21). 사진이 도면을 이긴다 — 배지는 한 칸뿐이고
  *  「사진」이라 적혀 있으면 실물이 나와야 한다. 파일 자리가 꺼져 있으면(배포 전 스토리지 미설정) 아무것도 안 단다 */
-function photoTag(c: NoticeComplex): { label: string; title: string } | null {
+function photoTag(c: NoticeComplex): { label: string; title: string; photo: boolean } | null {
   if (!photoBadgeOn(sourceOf(c))) return null;
-  if (c.has_photo) return { label: "사진", title: "단지 전경과 실내 사진이 있습니다" };
-  if (c.has_plan) return { label: "도면", title: "평면도나 층별 도면이 있습니다" };
+  if (c.has_photo) return { label: "사진", title: "단지 전경과 실내 사진이 있습니다", photo: true };
+  if (c.has_plan) return { label: "도면", title: "평면도나 층별 도면이 있습니다", photo: false };
   return null;
 }
 
@@ -344,7 +345,11 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
                     <span className="cx-name">
                       <Trunc text={c.name} />
                       {c.is_new && <span className="chip new">신규</span>}
-                      {tag && <span className="chip pic" title={tag.title}>{tag.label}</span>}
+                      {tag && (
+                        <span className={`chip pic${tag.photo ? " on" : ""}`} title={tag.title}>
+                          {tag.photo && <IconPhoto width={11} height={11} />}{tag.label}
+                        </span>
+                      )}
                     </span>
                     <Trunc className="cx-addr" text={fullAddress(c)} />
                   </span>

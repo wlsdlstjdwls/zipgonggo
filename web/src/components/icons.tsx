@@ -93,3 +93,14 @@ export function IconShield(p: P) {
     </Svg>
   );
 }
+
+/** 사진 — 카메라. 그림이 붙은 공고와 단지 배지에 쓴다(사용자 요청 2026-09-21: 글자만으로는 안 보인다) */
+export function IconPhoto(p: P) {
+  return (
+    <Svg {...p}>
+      <rect x="2.2" y="4.6" width="11.6" height="8.6" rx="2.2" />
+      <path d="M6 4.6l0.9-1.8h2.2l0.9 1.8" />
+      <circle cx="8" cy="8.9" r="2.4" />
+    </Svg>
+  );
+}

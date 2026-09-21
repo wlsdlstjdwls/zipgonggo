@@ -12,6 +12,7 @@ import { dateK, dateMD, ddayChip, NO_DATE, num } from "@/lib/format";
 import { noticePath } from "@/lib/routes";
 import { regionShort } from "@/lib/sido";
 import type { NoticeListItem } from "@/types/notice";
+import { IconPhoto } from "./icons";
 import { SaveButton } from "./save-button";
 import { Trunc } from "./trunc";
 
@@ -73,7 +74,11 @@ export function NoticeRow({ n, stagger, muted }: Props) {
           <span className="row-metaline">
             <b className={`sect ${mingan ? "priv" : "pub"}`}>{n.sector}</b>
             {loc && <b className="row-loc">{loc}</b>}
-            {photo && <b className="row-photo" title="단지 사진이 있는 공고입니다">사진</b>}
+            {photo && (
+              <b className="row-photo" title="단지 사진이 있는 공고입니다">
+                <IconPhoto width={11} height={11} />사진
+              </b>
+            )}
             <Trunc className="row-meta" text={`${meta}${n.amends_source_key ? " | 정정" : ""}`} />
           </span>
           <Trunc className="row-title" text={n.title} />
