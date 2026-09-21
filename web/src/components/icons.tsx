@@ -73,12 +73,13 @@ export function IconStar(p: P) {
   );
 }
 
-/** 시계 — 마감이 가까운 순서 */
-export function IconClock(p: P) {
+/** 달력 — 접수 마감과 신청 일정 */
+export function IconCalendar(p: P) {
   return (
     <Svg viewBox="0 0 24 24" width="24" height="24" strokeWidth="1.5" {...p}>
-      <circle cx="12" cy="12" r="8.6" />
-      <path d="M12 7.2V12l3.2 2" />
+      <rect x="3.4" y="5.2" width="17.2" height="15.4" rx="2.4" />
+      <path d="M3.4 10h17.2M8.2 3.4v3.6M15.8 3.4v3.6" />
+      <path d="M8 14.2h2.2M8 17.4h2.2M14 14.2h2.2" />
     </Svg>
   );
 }

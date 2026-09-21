@@ -7,29 +7,29 @@
 import Link from "next/link";
 import { useState } from "react";
 import { BrandMark } from "./brand-mark";
-import { IconClock, IconDevices, IconShield, IconStar } from "./icons";
+import { IconCalendar, IconDevices, IconShield, IconStar } from "./icons";
 import { kakaoStartPath, ROUTES } from "@/lib/routes";
 
 // 아이콘은 글자를 거드는 자리다 — 뜻이 아이콘에만 실리면 안 된다(그래서 aria-hidden).
 //
 // **말하는 것은 로그인이 아니라 공고다**(사용자 지적 2026-09-21: 「로그인 얘기만 써 놨다」).
 // 「세션이 어디에 남는가」는 우리 사정이고, 이용자가 얻는 건 공고를 담고 마감을 놓치지 않는 것이다.
-// 이 세 칸만 반말로 쓴다(사용자 결정) — 나머지 지면은 존댓말 그대로다.
+// 문안은 사용자가 직접 준 것을 그대로 쓴다 — 「관심공고」만 띄어 「관심 공고」로 맞췄다(화면 표기 통일, 2026-09-18 결정).
 const BENEFITS = [
   {
     icon: IconStar,
-    title: "눈에 든 공고, 별 하나로 담아 둔다",
-    desc: "목록에서 ★만 누르면 끝. 다음에 다시 뒤져 찾을 일이 없다",
+    title: "관심 있는 공고를 한곳에 모아 보세요",
+    desc: "별표를 눌러 저장하면, 다시 찾을 필요 없이 관심 공고에서 바로 확인할 수 있어요.",
   },
   {
-    icon: IconClock,
-    title: "마감 가까운 순으로 쌓아 준다",
-    desc: "담아 둔 공고를 접수 마감이 임박한 순서로 보여준다. 신청일을 놓치고 지나가는 일을 줄인다",
+    icon: IconCalendar,
+    title: "마감이 가까운 공고부터 확인하세요",
+    desc: "저장한 공고를 접수 마감이 가까운 순서로 보여드려요. 신청 일정을 한눈에 확인하고 미리 준비하세요.",
   },
   {
     icon: IconDevices,
-    title: "폰에서 담고 컴퓨터에서 이어 본다",
-    desc: "출근길에 담아 둔 공고를 집에서 그대로 연다. 브라우저를 정리해도 목록은 남는다",
+    title: "어떤 기기에서든 이어서 보세요",
+    desc: "휴대폰에서 저장한 공고를 컴퓨터에서도 그대로 확인하세요. 같은 계정으로 로그인하면 관심 공고가 그대로 남아 있어요.",
   },
 ] as const;
 
@@ -94,7 +94,7 @@ export function LoginPanel({ next, ready, failed }: { next: string; ready: boole
 
       <p className="login-privacy">
         <IconShield width={15} height={15} aria-hidden="true" />
-        받아 가는 건 별명 하나. 프로필 사진과 이메일은 선택이고, 전화번호와 주소는 안 묻는다. 탈퇴하면 그 자리에서 지운다
+        받아 가는 정보는 별명 하나입니다. 프로필 사진과 이메일은 선택이고, 전화번호와 주소는 묻지 않습니다. 탈퇴하면 그 자리에서 지웁니다.
       </p>
 
       <p className="login-foot">
