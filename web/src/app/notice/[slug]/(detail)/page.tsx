@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminOnly } from "@/components/admin-only";
+import { AreaMap } from "@/components/area-map";
 import { CalcSeed } from "@/components/calc-context";
 import { ComplexExplorer } from "@/components/complex-explorer";
 import { ComplexFactsSection } from "@/components/complex-facts";
@@ -24,6 +25,7 @@ import { HOUSEHOLD_MAX, ruleLines } from "@/lib/eligibility";
 import { noticeGraph } from "@/lib/jsonld";
 import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, isClosed, moneyOf, NO_DATE, num, won, wonKo, wonShort } from "@/lib/format";
 import { MINGAN_INCOME_PCTS, minganRuleCards } from "@/lib/mingan-fit";
+import { recruitedTypeCodes } from "@/lib/notice-supply-type";
 import { moveInLabel } from "@/lib/notice-view";
 import {
   getAmendChain, getComplexFacts, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition,
@@ -79,6 +81,62 @@ function Stamped({ v, pre }: { v: Stamp; pre?: string }) {
   );
 }
 
+type RuleCard = { key: string; title: string; sub: string; right: string | null; lines: { label: string; text: string }[]; note: string | null };
+
+// 신청자격 카드 — 유형마다 빠진 항목이 달라 가로로 훑을 수가 없었다(2026-09-21).
+// 쓰이는 기준을 모두 모아 같은 차례로 세우고, 그 유형이 안 보는 기준은 감추지 않고 「해당 없음」이라 쓴다.
+// 목록에 없는 라벨(민간임대의 「선정」·「신청」)이 뒤로 밀리되 사라지지는 않게 순서만 정해 준다
+const SLOT_ORDER = ["나이", "혼인", "계층", "무주택", "소득", "자산", "자동차", "거주지", "지역"];
+const slotOf = (label: string) => (label === "혼인기간" ? "혼인" : label);
+const slotRank = (s: string) => {
+  const i = SLOT_ORDER.indexOf(s);
+  return i < 0 ? SLOT_ORDER.length : i;
+};
+
+/** 카드 묶음을 칸 맞춤(subgrid)에 올릴 꼴로. align이 false면 줄을 있는 그대로 둔다 */
+function alignCards(cards: RuleCard[], align: boolean) {
+  const slots = align
+    ? [...new Set(cards.flatMap((c) => c.lines.map((l) => slotOf(l.label))))].sort((a, b) => slotRank(a) - slotRank(b))
+    : [];
+  const out = align
+    ? cards.map((c) => ({
+        ...c,
+        lines: slots.map((s) => {
+          const h = c.lines.find((l) => slotOf(l.label) === s);
+          return h ? { label: h.label, text: h.text, off: false } : { label: s, text: "해당 없음", off: true };
+        }),
+      }))
+    : cards.map((c) => ({ ...c, lines: c.lines.map((l) => ({ label: l.label, text: l.text, off: false })) }));
+  const anyNote = align && out.some((c) => c.note);
+  // 칸 맞춤에 쓸 줄 수 — 머리줄 + 기준 줄들 + (메모 줄)
+  return { cards: out, align, anyNote, rows: 1 + slots.length + (anyNote ? 1 : 0) };
+}
+
+function EligCards({ block }: { block: ReturnType<typeof alignCards> }) {
+  return (
+    /* 표(가로 스크롤)는 좁은 화면에서 유형 열이 밀려나 안 보인다는 지적(2026-09-09) — 자가진단
+       카드(elig-card/elig-why)와 같은 모양으로 유형 하나당 카드 하나씩 쌓는다 */
+    <ul className={`elig-list${block.align ? " elig-align" : ""}`} style={block.align ? ({ "--rows": block.rows } as React.CSSProperties) : undefined}>
+      {block.cards.map((c) => (
+        <li key={c.key} className="elig-card">
+          <div className="elig-card-h">
+            <b>{c.title}</b>
+            <span>{c.sub}</span>
+            {c.right && <span className="elig-card-r"><small>{c.right}</small></span>}
+          </div>
+          <ul className="elig-why">
+            {c.lines.map((l) => (
+              <li key={l.label} className={l.off ? "off" : undefined}><span>{l.label}</span><p>{l.text}</p></li>
+            ))}
+          </ul>
+          {/* 메모가 있는 카드가 하나라도 있으면 없는 카드도 자리를 비워 둔다 — 안 그러면 칸 맞춤이 한 줄씩 어긋난다 */}
+          {block.anyNote && (c.note ? <p className="elig-memo">{c.note}</p> : <p className="elig-memo" aria-hidden="true" />)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
   return (
     <li>
@@ -118,13 +176,21 @@ export default async function NoticePage({ params }: Params) {
   // 민간임대(청년안심주택)는 사업자마다 조판이 달라 공고문 자격 묶음을 못 읽는다. 자격은 단지가 달라도 같은 제도 고정 규칙이라
   // 시드 카드(ppmh_*, 일반공급을 「자산·자동차 기준 없음」으로 적는다) 대신 공고문에서 확인한 규칙을 직접 그린다(lib/mingan-fit.ts)
   const isMingan = !noticeElig && n.housing_type === "공공지원민간임대";
-  const eligTypes = noticeElig || isMingan ? [] : eligRules.types.filter((t) => t.housing_type === n.housing_type);
+  const allTypes = noticeElig || isMingan ? [] : eligRules.types.filter((t) => t.housing_type === n.housing_type);
+  // 제목이 대는 유형만 앞에 세운다 — 「청년 매입임대주택」 공고 한 장에 제도 전체 6종이 늘어서서
+  // 정작 이 공고 유형이 묻혔다(사용자 지적 2026-09-21). 못 고르면 예전처럼 전부 그린다.
+  // 고른 뒤에도 나머지를 지우지 않고 접어 둔다 — 제목으로 가른 것이라 틀렸을 때 길이 막히면 안 된다
+  const picked = allTypes.length ? recruitedTypeCodes(n.housing_type, n.title) : [];
+  const hit = allTypes.filter((t) => picked.includes(t.code));
+  const eligTypes = hit.length ? hit : allTypes;
+  const restTypes = hit.length ? allTypes.filter((t) => !picked.includes(t.code)) : [];
   const minganCards = isMingan ? minganRuleCards(eligRules.types) : [];
   // 공급현황 표를 못 읽은 공고(첨부가 안내문이거나 CID 폰트)는 고를 주택형이 없어 「내 조건」을 띄우지 않는다
   const minganFit = isMingan && supply.length > 0;
-  const ruleCards = minganCards.length
-    ? minganCards.map((c) => ({ key: c.title, title: c.title, sub: c.sub, right: null as string | null, lines: c.lines, note: null as string | null }))
-    : eligTypes.map((t) => ({ key: t.code, title: t.category, sub: t.name, right: t.ranking_method, lines: ruleLines(t), note: t.note }));
+  const cardOf = (t: (typeof eligRules.types)[number]): RuleCard => ({ key: t.code, title: t.category, sub: t.name, right: t.ranking_method, lines: ruleLines(t), note: t.note });
+  const ruleCards: RuleCard[] = minganCards.length
+    ? minganCards.map((c) => ({ key: c.title, title: c.title, sub: c.sub, right: null, lines: c.lines, note: null }))
+    : eligTypes.map(cardOf);
   const noticeYear = n.posted_at ? new Date(n.posted_at).getFullYear() : null;
   // 신청자격에 실제로 쓰인 %만 열로 추린다 — 8종 전부 보여주면 모바일에서 표가 너무 넓어진다
   const incomePcts = minganCards.length
@@ -142,6 +208,11 @@ export default async function NoticePage({ params }: Params) {
   const m = moneyOf(n);
   const L = agencyLabels(n);
   const showAreaTable = areas.length > 1 || (areas.length === 1 && areas[0].supply_count != null && !n.address);
+  // 시도가 하나뿐이면 줄마다 되풀이하지 않고 제목에서 한 번만 말한다(사용자 지적 2026-09-21)
+  const oneSido = new Set(areas.map((a) => a.sido)).size === 1;
+  const areaMax = areas.reduce((a, x) => Math.max(a, x.supply_count ?? 0), 0);
+  // 지도에 찍을 시군구. 시군구를 모르는 줄(미지정)은 찍을 자리가 없다
+  const areaPins = areas.filter((a) => a.sigungu).map((a) => ({ sido: a.sido, sigungu: a.sigungu as string, count: a.supply_count }));
   const region = regionLabel(n) || "전국";
   const period = n.apply_start_at || n.apply_end_at ? `${dateMD(n.apply_start_at)}–${dateMD(n.apply_end_at)}` : null;
   // 상한(첨부 공급현황 표)이 하한과 다를 때만 범위 표기. 월임대료 공고는 월임대료 범위, 전세형은 보증금 범위
@@ -211,33 +282,10 @@ export default async function NoticePage({ params }: Params) {
     ...(n.announce_at ? [] : [{ label: "당첨자 발표", value: null }]),
   ];
 
-  // 신청자격 카드 — 유형마다 빠진 항목이 달라 가로로 훑을 수가 없었다(2026-09-21).
-  // 쓰이는 기준을 모두 모아 같은 차례로 세우고, 그 유형이 안 보는 기준은 감추지 않고 「해당 없음」이라 쓴다.
-  // 목록에 없는 라벨(민간임대의 「선정」·「신청」)이 뒤로 밀리되 사라지지는 않게 순서만 정해 준다
-  const SLOT_ORDER = ["나이", "혼인", "계층", "무주택", "소득", "자산", "자동차", "거주지", "지역"];
-  const slotOf = (label: string) => (label === "혼인기간" ? "혼인" : label);
-  const slotRank = (s: string) => {
-    const i = SLOT_ORDER.indexOf(s);
-    return i < 0 ? SLOT_ORDER.length : i;
-  };
   // 민간임대 카드(공통/특별공급/일반공급)는 **서로 대등한 유형이 아니다** — 한 제도를 세 측면으로 쪼갠 것이라
   // 공통 카드의 빈 소득 줄을 「해당 없음」으로 채우면 "소득을 안 본다"는 거짓말이 된다. 칸 맞춤은 유형 카드에만 건다
-  const alignRules = minganCards.length === 0;
-  const slots = alignRules
-    ? [...new Set(ruleCards.flatMap((c) => c.lines.map((l) => slotOf(l.label))))].sort((a, b) => slotRank(a) - slotRank(b))
-    : [];
-  const alignedCards = alignRules
-    ? ruleCards.map((c) => ({
-        ...c,
-        lines: slots.map((s) => {
-          const hit = c.lines.find((l) => slotOf(l.label) === s);
-          return hit ? { label: hit.label, text: hit.text, off: false } : { label: s, text: "해당 없음", off: true };
-        }),
-      }))
-    : ruleCards.map((c) => ({ ...c, lines: c.lines.map((l) => ({ label: l.label, text: l.text, off: false })) }));
-  const anyNote = alignRules && alignedCards.some((c) => c.note);
-  // 칸 맞춤(subgrid)에 쓸 줄 수 — 머리줄 + 기준 줄들 + (메모 줄)
-  const eligRows = 1 + slots.length + (anyNote ? 1 : 0);
+  const mainBlock = alignCards(ruleCards, minganCards.length === 0);
+  const restBlock = alignCards(restTypes.map(cardOf), true);
 
   // 차례 — 머리글 밑에 붙어 따라다닌다(components/detail-nav.tsx). 여기 적힌 id는 아래 섹션의 id와 같아야 한다
   const navItems = [
@@ -406,30 +454,24 @@ export default async function NoticePage({ params }: Params) {
               <p className="ne-sum">
                 {minganCards.length
                   ? <>특별공급과 일반공급으로 나뉩니다. 이 공고가 실제로 모집하는 계층과 세부 조건은 {L.originalDoc} 기준.</>
-                  : <>유형 {eligTypes.length}개. 이 공고가 실제로 모집하는 유형과 세부 조건은 {L.originalDoc} 기준.</>}{" "}
+                  : restTypes.length > 0
+                    ? <>공고 제목이 가리키는 유형은 <b>{eligTypes.map((t) => t.name).join(" | ")}</b>입니다. 세부 조건은 {L.originalDoc} 기준.</>
+                    : <>유형 {eligTypes.length}개. 이 공고가 실제로 모집하는 유형과 세부 조건은 {L.originalDoc} 기준.</>}{" "}
                 {/* 자격진단은 아직 안 열었다 — 운영자에게만 보인다(2026-09-21) */}
                 <AdminOnly><Link href={ROUTES.eligibility}>내 조건으로 진단하기 →</Link></AdminOnly>
               </p>
-              {/* 표(가로 스크롤)는 좁은 화면에서 유형 열이 밀려나 안 보인다는 지적(2026-09-09) — 자가진단
-                  카드(elig-card/elig-why)와 같은 모양으로 유형 하나당 카드 하나씩 쌓는다 */}
-              <ul className={`elig-list${alignRules ? " elig-align" : ""}`} style={alignRules ? ({ "--rows": eligRows } as React.CSSProperties) : undefined}>
-                {alignedCards.map((c) => (
-                  <li key={c.key} className="elig-card">
-                    <div className="elig-card-h">
-                      <b>{c.title}</b>
-                      <span>{c.sub}</span>
-                      {c.right && <span className="elig-card-r"><small>{c.right}</small></span>}
-                    </div>
-                    <ul className="elig-why">
-                      {c.lines.map((l) => (
-                        <li key={l.label} className={l.off ? "off" : undefined}><span>{l.label}</span><p>{l.text}</p></li>
-                      ))}
-                    </ul>
-                    {/* 메모가 있는 카드가 하나라도 있으면 없는 카드도 자리를 비워 둔다 — 안 그러면 칸 맞춤이 한 줄씩 어긋난다 */}
-                    {anyNote && (c.note ? <p className="elig-memo">{c.note}</p> : <p className="elig-memo" aria-hidden="true" />)}
-                  </li>
-                ))}
-              </ul>
+              <EligCards block={mainBlock} />
+
+              {/* 제목으로 가른 것이라 틀릴 수 있다 — 나머지 유형을 지우지 않고 접어 둔다 */}
+              {restBlock.cards.length > 0 && (
+                <details className="ne-fold">
+                  <summary>
+                    <b>{n.housing_type} 제도의 다른 유형 {restBlock.cards.length}가지</b>
+                    <small>이 공고에는 해당하지 않을 수 있습니다</small>
+                  </summary>
+                  <div className="ne-fold-body"><EligCards block={restBlock} /></div>
+                </details>
+              )}
 
               {incomeRows.length > 0 && (
                 <details className="ne-fold">
@@ -469,22 +511,37 @@ export default async function NoticePage({ params }: Params) {
 
           {showAreaTable && areas.length > 0 && (
             <section className="dsec" id="areas">
-              <h2>{n.address ? "시군구별 공급호수" : "공급 지역"}</h2>
-              {!n.address && <p className="note" style={{ margin: "0 0 12px" }}>주택별 주소는 공고문 첨부에만 있습니다.</p>}
-              <div className="tbl">
-                <table>
-                  <thead><tr><th>시도</th><th>시군구</th><th className="num">공급호수</th></tr></thead>
-                  <tbody>
-                    {areas.map((a, i) => (
-                      <tr key={i}>
-                        <td>{a.sido}</td>
-                        <td>{a.sigungu ?? <span style={{ color: "var(--dim)" }}>미지정</span>}</td>
-                        <td className="num">{num(a.supply_count, "호")}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <h2>
+                {n.address ? "시군구별 공급호수" : "공급 지역"}
+                {/* 시도가 하나면 제목이 그 말을 한 번만 한다 — 표 안에서 「서울특별시」가 24줄 되풀이됐다(사용자 지적 2026-09-21) */}
+                {oneSido && <small className="dsec-src">{areas[0].sido} {num(areas.length, "곳")}</small>}
+              </h2>
+              {!n.address && (
+                <p className="note" style={{ margin: "0 0 12px" }}>
+                  주택별 주소는 공고문 첨부에만 있습니다.{areaPins.length > 0 ? " 아래는 시군구 단위로 센 호수입니다." : ""}
+                </p>
+              )}
+              {/* 「주소는 있는데 왜 지도가 없냐」(사용자 지적 2026-09-21) — 단지 좌표가 없는 공고에 우리가 아는
+                  가장 좁은 위치가 시군구다. 단지 탐색기나 「위치」 지도가 이미 있으면 그리지 않는다 */}
+              {areaPins.length > 0 && complexes.length === 0 && !n.address && (
+                <>
+                  <AreaMap items={areaPins} label={`${region} 공급 지역 지도`} />
+                  <p className="note" style={{ margin: "8px 0 14px" }}>핀은 시군구 중심입니다 — 주택이 실제로 있는 자리가 아닙니다.</p>
+                </>
+              )}
+              <ul className="area-grid">
+                {areas.map((a, i) => (
+                  <li key={i}>
+                    {/* 시군구를 모르는 줄은 시도 이름만 — 「강원 미지정」처럼 없는 말을 채우지 않는다 */}
+                    <b>{a.sigungu ? (oneSido ? a.sigungu : `${sidoShort(a.sido)} ${a.sigungu}`) : sidoShort(a.sido)}</b>
+                    <span>{num(a.supply_count, "호")}</span>
+                    {/* 어느 구에 몰렸는지 눈으로 — 가장 많은 곳을 100으로 잡은 비율 띠 */}
+                    {a.supply_count != null && areaMax > 0 && (
+                      <i style={{ "--w": `${Math.round((a.supply_count / areaMax) * 100)}%` } as React.CSSProperties} />
+                    )}
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
 

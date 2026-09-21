@@ -1349,6 +1349,7 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   .rail-view .viewsw button { flex: none; width: 38px; }
   .dsec.lead > h2 { font-size: 17px; }
   .dsec.lead .d-map { height: 300px; }
+  .area-map { height: 320px; }
   .cx-card { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; }
   .cx-card-a { display: grid; grid-template-columns: 1fr 1fr; }
   .cx-card-a .map-btn { width: 100%; }
@@ -1508,6 +1509,20 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .ne-fold-body { padding: 0 14px 14px; }
 .ne-fold-body > .ne-block:first-child { margin-top: 0; }
 .ne-fold .ne-fold { margin: 10px 0 0; }
+
+/* 공급 지역 — 시군구 타일. 세로 표는 「서울특별시」를 24줄 되풀이해 읽기 힘들었다(사용자 지적 2026-09-21).
+   시도는 제목에서 한 번만 말하고, 여기엔 구 이름과 호수만 둔다. 띠 길이가 어디에 몰렸는지 알려 준다 */
+.area-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.area-grid li { position: relative; overflow: hidden; display: flex; align-items: baseline; gap: 8px; padding: 11px 13px 13px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
+.area-grid li b { font-weight: 800; font-size: 14px; letter-spacing: -0.02em; }
+.area-grid li span { margin-left: auto; font-weight: 800; font-size: 13.5px; font-variant-numeric: tabular-nums; color: var(--mut); }
+.area-grid li i { position: absolute; left: 0; bottom: 0; height: 3px; width: var(--w); background: var(--acc); opacity: 0.5; }
+/* 시군구 지도는 단지 지도보다 한 뼘 낮게 — 핀이 구 중심이라 더 봐도 더 보이는 게 없다 */
+.area-map { height: 420px; }
+/* 비례기호 — 지름이 호수의 제곱근에 비례한다. 이름표는 지도가 당겨졌을 때(.near)만 편다 */
+.zg-dot { display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--acc); border: 2px solid #fff; color: #fff; font-weight: 800; letter-spacing: -0.02em; box-shadow: 0 3px 10px rgba(15, 18, 22, 0.28); }
+.zg-dot em { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); display: none; padding: 2px 7px; border-radius: 999px; background: var(--ink); color: #fff; font-style: normal; font-weight: 800; font-size: 11.5px; white-space: nowrap; }
+.area-map.near .zg-dot em { display: block; }
 .ne-reqs li { padding-left: 0; }
 .ne-class { display: grid; gap: 14px; }
 .ne-sub .ne-group { margin-top: 4px; }
