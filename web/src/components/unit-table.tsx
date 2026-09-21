@@ -9,28 +9,25 @@
 // 동도 주소도 하나뿐이면 한 건물이라 호만으로 유일하다.
 // 금액은 계약 때 고를 수 있는 폭 그대로 — 최대(전세전환) / 기준 / 최소(월세전환).
 //
-// **긴 목록을 접는다(사용자 지적 2026-09-21: "데이터가 많으면 너무 아래로 나열이라서").**
+// **자리를 못 박았다(사용자 지적 2026-09-21: "여전히 너무 많은 영역을 차지해").**
 // 실측(2026-09-21): 단지 471곳 중 462곳이 15호 이하인데 엘클루(3동 17층) 172호처럼 백 줄이 넘는 단지가 있다.
-// 그 세 곳 때문에 지면 아래쪽(위치 지도·용어)이 스크롤 저편으로 밀려났다. 손댄 곳 셋:
-//  1. 스무 줄씩 끊어 보여 주고 「더 보기」로 잇는다 — 목록 지면이 쓰는 방식 그대로(notice-explorer).
-//  2. 층 칩을 더했다. 17층 172호에서 사람이 찾는 건 「3층에 뭐가 있나」다(호실이 스물 미만이면 칩이 소음이라 안 세운다).
+// 그 세 곳 때문에 지면 아래쪽(위치 지도·용어)이 스크롤 저편으로 밀려났다. 세 번 고친 끝의 모양 —
+//  1. 조건은 **셀렉트 세 개**(동/주소 · 층 · 구조). 칩으로 늘어놓으니 17층짜리 단지에서 칩 줄만 두 줄을 먹었다.
+//  2. 표는 **높이를 못 박은 상자 안에서 스크롤**한다. 몇 호짜리 단지든 이 섹션이 먹는 세로 자리가 같다.
+//     표 머리와 첫 열은 상자 안에서 고정이라 스크롤해도 어느 동 몇 호의 무슨 값인지 안 잃는다.
 //  3. 표 머리에서 면적·보증금으로 줄 세운다 — 싼 호실·큰 호실을 찾으려고 백 줄을 훑지 않게.
-// 필터·정렬을 건드리면 다시 스무 줄로 접는다. 접은 채로도 「몇 호 중 몇 호를 보고 있는지」와 면적·보증금 범위는 늘 적는다.
+// 「더 보기」로 스무 줄씩 잇던 방식은 뺐다(같은 날) — 상자가 자리를 못 박으니 끊어 줄 이유가 없고,
+// 끊어 두면 Ctrl+F로 호수를 못 찾는다. 줄 수와 상관없이 「몇 호 중 몇 호」와 면적·보증금 범위는 늘 적는다.
 
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { num, wonExact, wonKo } from "@/lib/format";
 import type { NoticeUnit } from "@/types/notice";
 import { Term } from "./glossary";
+import { Select, type SelectOption } from "./select";
 
 type Props = { units: NoticeUnit[] };
 
 const ALL = "";
-
-/** 한 번에 보여 주는 줄 수. 「더 보기」 한 번에 이만큼 더 붙는다 */
-const STEP = 20;
-
-/** 층 칩을 세우는 최소 호실 수. 열 줄짜리 빌라에 층 칩까지 세우면 고를 것보다 칩이 많다 */
-const FLOOR_CHIP_MIN = 20;
 
 /** 표 머리에서 고를 수 있는 정렬. `room`은 서버가 준 순서(동 → 주소 → 층 → 호) 그대로다 */
 type SortKey = "room" | "area" | "deposit";
@@ -73,7 +70,6 @@ export function UnitTable({ units }: Props) {
   const [layout, setLayout] = useState(ALL);
   const [floor, setFloor] = useState(ALL);
   const [sort, setSort] = useState<Sort>({ key: "room", desc: false });
-  const [shown, setShown] = useState(STEP);
 
   // 동이 하나라도 있으면 동으로, 없으면 주소가 갈릴 때만 주소로 가른다
   const byDong = units.some((u) => u.building);
@@ -88,10 +84,7 @@ export function UnitTable({ units }: Props) {
   const layouts = useMemo(() => tally(units, (u) => u.room_layout), [units]);
   // 층은 숫자로 줄 세운다 — 글자로 세면 10층이 2층 앞에 선다
   const floors = useMemo(
-    () =>
-      units.length < FLOOR_CHIP_MIN
-        ? []
-        : tally(units, (u) => (u.floor != null ? String(u.floor) : null)).sort((a, b) => Number(a[0]) - Number(b[0])),
+    () => tally(units, (u) => (u.floor != null ? String(u.floor) : null)).sort((a, b) => Number(a[0]) - Number(b[0])),
     [units],
   );
 
@@ -117,13 +110,7 @@ export function UnitTable({ units }: Props) {
     });
   }, [filtered, sort]);
 
-  // 조건이나 정렬이 바뀌면 다시 접는다 — 펼쳐 둔 채로 거르면 걸러진 줄이 어디까지인지 안 보인다
-  useEffect(() => { setShown(STEP); }, [dong, layout, floor, sort]);
-
-  const page = visible.slice(0, shown);
-  const rest = visible.length - page.length;
-
-  // 지금 보고 있는 조건의 폭. 접어 둔 줄까지 포함해서 잰다 — 「더 보기」를 누르지 않고도 이 조건의 폭을 안다
+  // 지금 거른 조건의 폭. 스크롤해 내려가 보지 않아도 이 조건이 어떤 값들인지 안다
   const areaSpan = span(visible.map((u) => u.area_m2));
   const depositSpan = span(visible.map((u) => u.deposit));
 
@@ -133,19 +120,12 @@ export function UnitTable({ units }: Props) {
   // 호 + 전용면적/구조/승강기/보증금(+월임대료)(+전세전환/월세전환) — colSpan은 실제로 그리는 열 수와 맞춰야 한다
   const colCount = 4 + (hasRent ? 2 : 1) + (hasSwap ? 2 : 0);
 
-  const Chips = ({ label, list, value, set, labelize }: { label: string; list: [string, number][]; value: string; set: (v: string) => void; labelize?: (v: string) => string }) =>
-    list.length < 2 ? null : (
-      <div className="ut-chips" role="group" aria-label={label}>
-        <button type="button" className={`chip-f sm${value === ALL ? " on" : ""}`} aria-pressed={value === ALL} onClick={() => set(ALL)}>
-          {label} 전체 <small>{units.length}</small>
-        </button>
-        {list.map(([v, n]) => (
-          <button key={v} type="button" className={`chip-f sm${value === v ? " on" : ""}`} aria-pressed={value === v} onClick={() => set(value === v ? ALL : v)} title={labelize ? labelize(v) : v}>
-            {labelize ? labelize(v) : v} <small>{n}</small>
-          </button>
-        ))}
-      </div>
-    );
+  /** 조건 하나. 고를 게 하나뿐이면 세우지 않는다 — 누를 것도 없는 셀렉트는 자리만 먹는다 */
+  const Picker = ({ label, list, value, set, labelize }: { label: string; list: [string, number][]; value: string; set: (v: string) => void; labelize?: (v: string) => string }) => {
+    if (list.length < 2) return null;
+    const options: SelectOption[] = list.map(([v, n]) => ({ value: v, label: labelize ? labelize(v) : v, count: n }));
+    return <Select value={value} options={options} onChange={set} placeholder={`${label} 전체`} ariaLabel={label} />;
+  };
 
   /** 정렬을 거는 표 머리. 누르면 오름차순, 한 번 더 누르면 내림차순, 세 번째면 원래 순서(동 → 호)로 돌아온다 */
   const SortTh = ({ k, children }: { k: SortKey; children: ReactNode }) => {
@@ -168,9 +148,12 @@ export function UnitTable({ units }: Props) {
   return (
     <div className="ut">
       <div className="ut-tools">
-        <Chips label={groupLabel} list={dongs} value={dong} set={setDong} labelize={byDong ? undefined : addrShort} />
-        <Chips label="구조" list={layouts} value={layout} set={setLayout} />
-        <Chips label="층" list={floors} value={floor} set={setFloor} labelize={(v) => `${v}층`} />
+        <Picker label={groupLabel} list={dongs} value={dong} set={setDong} labelize={byDong ? undefined : addrShort} />
+        <Picker label="층" list={floors} value={floor} set={setFloor} labelize={(v) => `${v}층`} />
+        <Picker label="구조" list={layouts} value={layout} set={setLayout} />
+        {(dong || floor || layout) && (
+          <button type="button" className="ut-clear" onClick={() => { setDong(ALL); setFloor(ALL); setLayout(ALL); }}>조건 초기화</button>
+        )}
       </div>
       <p className="ut-count">
         <b>{visible.length}</b> / {num(units.length, "호")}
@@ -182,7 +165,7 @@ export function UnitTable({ units }: Props) {
           </em>
         )}
       </p>
-      <div className="tbl wide">
+      <div className="tbl wide ut-box">
         <table className="supply">
           <thead>
             <tr>
@@ -199,7 +182,7 @@ export function UnitTable({ units }: Props) {
             </tr>
           </thead>
           <tbody>
-            {page.map((u) => (
+            {visible.map((u) => (
               <tr key={u.id}>
                 <td className="tc-key">
                   {dongs.length > 0 && (
@@ -234,18 +217,6 @@ export function UnitTable({ units }: Props) {
           </tbody>
         </table>
       </div>
-      {rest > 0 && (
-        <div className="ut-more">
-          <button type="button" className="btn" onClick={() => setShown((v) => v + STEP)}>
-            더 보기 +{Math.min(STEP, rest)}
-          </button>
-          {rest > STEP && (
-            <button type="button" className="ut-all" onClick={() => setShown(visible.length)}>
-              {num(visible.length, "호")} 전부 펼치기
-            </button>
-          )}
-        </div>
-      )}
       {dongs.length === 0 && (
         <p className="note">공고문 별첨에 이 단지의 동 표기가 없습니다. 주소도 하나라 한 건물이며, 호만으로 호실이 갈립니다.</p>
       )}
