@@ -353,9 +353,9 @@ export default async function ComplexPage({ params }: Params) {
               <Pending
                 title={imgSource && imagesEnabled(imgSource)
                   ? "이 단지의 사진과 도면은 아직 준비 중입니다"
-                  /* 매입임대는 기다린다고 생기지 않는다 — 「준비 중」이라 적으면 곧 올라올 것처럼 읽힌다 */
+                  /* 매입임대는 주소로 붙인다 — 못 붙은 집은 기다린다고 생기지 않는다(「준비 중」이 아니다) */
                   : !imgSource && !isMingan && n.housing_type === "매입임대"
-                  ? "이 단지는 사진과 도면이 없습니다"
+                  ? "이 집의 사진은 찾지 못했습니다"
                   : "사진과 도면은 공개 준비 중입니다"}
                 lead={imgSource && !imagesEnabled(imgSource)
                   ? <>{imgSource === "youth" ? "서울시 청년안심주택 포털" : "서울주택도시공사 SH주택정보"}의 평면도와 사진을 지면에 싣기 위한 확인 절차가 끝나면 보여 드립니다. 그때까지는 {L.originalDoc}의 안내를 따라 확인하세요.</>
@@ -368,7 +368,7 @@ export default async function ComplexPage({ params }: Params) {
                   /* 매입임대는 빌라나 다가구주택 한 호실이라 SH주택정보(아파트 793단지)에 단지가 아예 없다.
                      여기에 「준공 전이라 없다」고 적으면 사실과 다르다(2026-09-21) */
                   : n.housing_type === "매입임대"
-                  ? <>SH주택정보는 아파트 단지만 싣습니다. 매입임대는 빌라나 다가구주택 한 호실을 사들여 빌려주는 방식이라 단지 자료가 없습니다. 집의 모습은 {L.originalDoc}과 현장 방문으로 확인하세요.</>
+                  ? <>매입임대는 빌라나 다가구주택 한 호실이라 SH주택정보에서 주소로 찾습니다. 이 주소는 아직 찾지 못했습니다. 집의 모습은 {L.originalDoc}과 현장 방문으로 확인하세요.</>
                   : <>준공 전 신규 공급 단지라 SH주택정보에 단지 자료가 아직 없습니다. 전자팸플릿은 {L.originalDoc}의 안내를 따라 확인하세요.</>}
                 action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
               />

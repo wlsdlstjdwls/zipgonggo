@@ -430,13 +430,14 @@ export async function getYouthHouse(homeCode: string | null): Promise<YouthHouse
 
 /** 단지 1곳의 사진·도면. 공공임대는 SH주택정보(0023), 민간임대는 청년안심주택 포털(0026)에서 온다.
  *  한 단지가 두 출처에 다 있지는 않다 — 코드가 붙은 쪽만 읽고, 둘 다 없으면 빈 배열.
- *  순서: 평면도를 맨 앞에 둔다 — 청약자가 제일 먼저 찾는 그림이다. */
+ *  순서: 평면도를 맨 앞에 둔다 — 청약자가 제일 먼저 찾는 그림이다.
+ *  매입임대(다가구·원룸)에는 평면도가 없고 그 자리에 「층별 도면」이 온다(imgTy 08, 2026-09-21). */
 export async function getComplexImages(biznsCd: string | null, homeCode: string | null = null): Promise<ComplexImage[]> {
   if (biznsCd) {
     return query<ComplexImage>(
       `SELECT 'sh' AS source, bizns_cd AS code, kind, sply_ty, label, source_url, file_name
          FROM sh_house_image WHERE bizns_cd = $1
-        ORDER BY array_position(ARRAY['평면도','전경','배치도','실내'], kind), sply_ty, sort_no, id`,
+        ORDER BY array_position(ARRAY['평면도','층별 도면','전경','배치도','실내'], kind), sply_ty, sort_no, id`,
       [biznsCd],
     );
   }

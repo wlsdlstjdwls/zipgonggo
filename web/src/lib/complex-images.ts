@@ -39,6 +39,8 @@ export function groupByKind(images: ComplexImage[]): [string, ComplexImage[]][] 
 
 // 실내 사진 이름 앞머리의 주택형(`84A 안방` → `안방`). 탭이 종류를 말하고 있으면 이건 겹치는 말이다.
 const LEADING_TYPE_RE = /^\d{2,3}[A-Za-z]?\d?\s+/;
+// 매입임대 전경 사진은 이름이 찍은 날짜다(`20230303`, `20230217광채`). 캡션으로 쓸 말이 아니다
+const SHOT_DATE_RE = /^(19|20)\d{6}/;
 
 /** 그림 밑에 붙일 말.
  *
@@ -49,6 +51,7 @@ export function caption(img: ComplexImage, mixed = false): string {
   const room = img.label ? img.label.replace(LEADING_TYPE_RE, "") : "";
   if (mixed) return [img.sply_ty, room || img.kind].filter(Boolean).join(" ");
   if (img.kind === "평면도") return img.sply_ty ? `${img.sply_ty}형` : img.kind;
+  if (SHOT_DATE_RE.test(room)) return "";
   if (room && room !== img.kind) return room;
   // 전경·배치도는 한 장뿐이고 탭 이름이 곧 설명이다. 같은 말을 두 번 쓰지 않는다
   return img.sply_ty || "";

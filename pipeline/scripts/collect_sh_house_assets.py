@@ -6,6 +6,7 @@
 
     cd pipeline
     python scripts/collect_sh_house_assets.py houses                # 서울 전 단지 목록 → data/sh-house/houses.json
+    python scripts/collect_sh_house_assets.py houses --rent-ty 20,30  # 매입 다가구·원룸까지 (실측 2026-09-21: 3,331단지)
     python scripts/collect_sh_house_assets.py match 309467          # 공고 단지 ↔ biznsCd → data/sh-house/{seq}/match.json
     python scripts/collect_sh_house_assets.py assets 309467         # 단지별 보유 이미지 조사 → …/manifest.json
     python scripts/collect_sh_house_assets.py fetch 309467 --only "천왕이펜하우스 3단지"  # 내려받기 → …/img/
@@ -13,6 +14,11 @@
     python scripts/collect_sh_house_assets.py link-all              # 다른 공고의 같은 단지에도 biznsCd 연결
 
 `match`는 DB의 `notice_complex` 행(공고 수집이 넣은 것)을 대조한다 — 공고문을 다시 읽지 않는다.
+
+**매입임대는 이름으로 못 붙인다.** SH 쪽 이름이 「다가구매입임대(강동구)」로 구마다 하나라서다.
+주소(도로명+건물번호)로만 붙인다 — 강동구 실측 26/26(2026-09-21). 가진 그림도 아파트와 다르다:
+전경 2~3장과 **imgTy 08**이다. 08은 API가 「기타」라 부르지만 이름이 「1층」·「2~3층」·「101동 2~4층」인
+**층별 건축도면**이다. 아파트에는 평면도가 따로 있으니 08을 안 봤고, 매입에는 그게 유일한 도면이다.
 
 **공개 발행 전에 SH 이용 허락을 받는다.** `/houseinfo/robots.txt`가 자기 경로를 막고 있다(sources 머리글 참조).
 산출물은 커밋하지 않는다(CLAUDE.md 커밋 규칙 — `pipeline/data/`).
@@ -25,7 +31,7 @@ import json
 import re
 import sys
 from collections import Counter
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 PIPELINE_ROOT = Path(__file__).resolve().parents[1]
@@ -38,9 +44,15 @@ ISH_CACHE = PIPELINE_ROOT / "data" / "ish"
 # PoC 동안 웹이 읽는 자리. 발행 때 스토리지로 옮긴다(0023 주석 참조)
 PUBLIC_ROOT = PIPELINE_ROOT.parent / "web" / "public" / "sh-house"
 # 지면에 쓸 이미지. 정문·주차장·편의시설은 단지 페이지를 두껍게 하지 못한다.
-DEFAULT_KINDS = ("평면도", "전경", "배치도", "실내")
+DEFAULT_KINDS = ("평면도", "층별 도면", "전경", "배치도", "실내")
 # 조사 단계에서 부를 imgTy. 나머지 코드는 sources.sh_houseinfo.IMG_TYPES 참조
 PROBE_IMG_TYPES = ("01", "03", "07")
+# 매입(다가구·원룸)은 03·07이 비고 08에 층별 도면이 있다. 주택형 목록도 빈 배열이라 평면도 질의를 걸 것이 없다
+MAEIP_IMG_TYPES = ("01", "08")
+# 「기타」로 실려 오는 08을 지면에서 부를 이름. 아파트의 08(진짜 기타)에는 이 이름을 붙이지 않는다
+MAEIP_PLAN_KIND = "층별 도면"
+APARTMENT_TY = "10"
+RENT_TY_NAMES = {"10": "아파트", "20": "매입다가구", "30": "매입원룸"}
 
 PAREN_RE = re.compile(r"\([^)]*\)")
 # 밑줄도 지운다 — SH는 `공덕SK리더스뷰_2단지`, 공고문은 `공덕SK리더스뷰2단지`
@@ -68,17 +80,29 @@ def _addr_key(addr: str) -> str:
     return re.sub(r"\s", "", PAREN_RE.sub("", SIDO_RE.sub("", addr or "")))
 
 
-def cmd_houses(client: HouseInfoClient) -> Path:
-    """서울 25개 구 아파트 단지 전수."""
-    rows: dict[str, dict] = {}
-    for sig in SEOUL_SIG:
-        for h in client.houses(sig):
-            rows[h.bizns_cd] = asdict(h)
-        print(f"  {sig}: 누적 {len(rows)}단지", file=sys.stderr)
+def cmd_houses(client: HouseInfoClient, rent_tys: tuple[str, ...]) -> Path:
+    """서울 25개 구 단지 전수. 받은 유형만 새로 긁고 나머지는 이미 받아 둔 것을 그대로 둔다.
+
+    아파트(10)와 매입(20·30)은 한 파일에 같이 산다 — `rent_ty` 칸으로 갈린다. 이름 인덱스는
+    아파트만 쓴다(`_house_index`): 매입 이름은 구마다 하나라 이름으로는 아무 집도 못 가린다.
+    """
     out = OUT_ROOT / "houses.json"
+    rows: dict[str, dict] = {}
+    if out.exists():
+        rows = json.loads(out.read_text(encoding="utf-8"))
+        for cd, h in rows.items():
+            h.setdefault("rent_ty", APARTMENT_TY)  # 매입을 알기 전에 받아 둔 것은 전부 아파트다
+    for rent_ty in rent_tys:
+        before = len(rows)
+        for sig in SEOUL_SIG:
+            for h in client.houses(sig, rent_ty=rent_ty):
+                rows[h.bizns_cd] = {**asdict(h), "rent_ty": rent_ty}
+            print(f"  {RENT_TY_NAMES.get(rent_ty, rent_ty)} {sig}: 누적 {len(rows)}단지", file=sys.stderr)
+        print(f"== {RENT_TY_NAMES.get(rent_ty, rent_ty)}: {len(rows) - before}단지 늘었다", file=sys.stderr)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"{len(rows)}단지 → {out}", file=sys.stderr)
+    kinds = Counter(h.get("rent_ty", APARTMENT_TY) for h in rows.values())
+    print(f"{len(rows)}단지 ({', '.join(f'{RENT_TY_NAMES.get(k, k)} {n}' for k, n in sorted(kinds.items()))}) → {out}", file=sys.stderr)
     return out
 
 
@@ -103,9 +127,17 @@ def _house_index() -> tuple[dict[str, str], dict[str, str]]:
     by_name: dict[str, str] = {}
     by_addr: dict[str, str] = {}
     for cd, h in houses.items():
-        by_name.setdefault(_name_key(h["name"]), cd)
+        # 매입 단지 이름은 「다가구매입임대(강동구)」 하나뿐이라 이름 인덱스에 넣으면 구 전체가 한 코드로 붙는다
+        if h.get("rent_ty", APARTMENT_TY) == APARTMENT_TY:
+            by_name.setdefault(_name_key(h["name"]), cd)
         by_addr.setdefault(_addr_key(h["address"]), cd)
     return by_name, by_addr
+
+
+def _rent_ty_index() -> dict[str, str]:
+    """biznsCd → rentTy. assets가 어느 imgTy를 물어볼지 이걸로 가른다."""
+    houses = json.loads((OUT_ROOT / "houses.json").read_text(encoding="utf-8"))
+    return {cd: h.get("rent_ty", APARTMENT_TY) for cd, h in houses.items()}
 
 
 def _lookup(by_name: dict[str, str], by_addr: dict[str, str], name: str, addr: str) -> tuple[str | None, str]:
@@ -191,14 +223,21 @@ def cmd_assets(seq: str, client: HouseInfoClient) -> Path:
     """대조된 단지마다 어떤 이미지를 갖고 있는지 조사. 내려받지는 않는다."""
     rows = json.loads((OUT_ROOT / seq / "match.json").read_text(encoding="utf-8"))
     targets = [r for r in rows if r["biznsCd"]]
+    rent_ty = _rent_ty_index()
     manifest = []
     for i, r in enumerate(targets, 1):
         cd = r["biznsCd"]
         images: list[Image] = []
-        for ty in PROBE_IMG_TYPES:
-            images.extend(client.images(cd, ty))
-        for sply in client.supply_types(cd):
-            images.extend(client.plans(cd, sply))
+        if rent_ty.get(cd, APARTMENT_TY) == APARTMENT_TY:
+            for ty in PROBE_IMG_TYPES:
+                images.extend(client.images(cd, ty))
+            for sply in client.supply_types(cd):
+                images.extend(client.plans(cd, sply))
+        else:
+            # 매입은 08(「기타」)이 층별 건축도면이다. 이름을 여기서 갈아 둬야 지면 탭이 「기타」가 안 된다
+            for ty in MAEIP_IMG_TYPES:
+                for im in client.images(cd, ty):
+                    images.append(replace(im, kind=MAEIP_PLAN_KIND) if im.kind == "기타" else im)
         manifest.append({"단지명": r["단지명"], "biznsCd": cd, "이미지": [asdict(im) for im in images]})
         kinds = Counter(im.kind for im in images)
         summary = ", ".join(f"{k} {n}" for k, n in kinds.items()) or "없음"
@@ -226,8 +265,24 @@ def _leaf(row: dict) -> str:
     return UNSAFE_RE.sub("_", name)
 
 
-def _saved_path(seq: str, complex_name: str, row: dict) -> Path:
-    return OUT_ROOT / seq / "img" / UNSAFE_RE.sub("_", complex_name) / _leaf(row)
+def _leaves(images: list[dict]) -> list[str]:
+    """한 단지 안에서 겹치지 않는 저장 이름들. 같은 이름이 두 번 오면 뒤엣것에 번호를 단다 —
+    매입임대 한 단지가 「주차계획도.PNG」를 두 장 갖고 있었다(2026-09-21). 이름이 같으면 한 장이 다른 장을
+    덮어써 지면에 같은 그림이 두 번 뜬다. 차례가 정해져 있으니 fetch와 load가 같은 이름을 얻는다."""
+    seen: Counter = Counter()
+    out = []
+    for row in images:
+        leaf = _leaf(row)
+        seen[leaf] += 1
+        if seen[leaf] > 1:
+            stem, dot, ext = leaf.rpartition(".")
+            leaf = f"{stem}_{seen[leaf]}{dot}{ext}" if dot else f"{leaf}_{seen[leaf]}"
+        out.append(leaf)
+    return out
+
+
+def _saved_path(seq: str, complex_name: str, leaf: str) -> Path:
+    return OUT_ROOT / seq / "img" / UNSAFE_RE.sub("_", complex_name) / leaf
 
 
 def _sply_from_label(label: str | None) -> str:
@@ -251,11 +306,15 @@ def cmd_fetch(seq: str, kinds: tuple[str, ...], client: HouseInfoClient, only: s
     for m in manifest:
         if only and only not in m["단지명"]:
             continue
-        for row in m["이미지"]:
+        for row, leaf in zip(m["이미지"], _leaves(m["이미지"])):
             if row["kind"] not in kinds:
                 continue
-            path = _saved_path(seq, m["단지명"], row)
+            path = _saved_path(seq, m["단지명"], leaf)
             if path.exists():
+                continue
+            # 같은 단지가 여러 공고에 나온다(매입임대 재고가 그렇다). 이미 웹 자리에 있는 그림은 다시 받지 않는다 —
+            # DB 행도 단지에 붙어 있어 이 공고의 load가 건너뛰어도 지면에는 그대로 나온다
+            if (PUBLIC_ROOT / m["biznsCd"] / leaf).exists():
                 continue
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(client.download(Image(**row)))
@@ -282,8 +341,8 @@ def cmd_load(seq: str) -> int:
     copied = 0
     rows: list[tuple] = []
     for m in manifest:
-        for sort_no, row in enumerate(m["이미지"]):
-            src = _saved_path(seq, m["단지명"], row)
+        for sort_no, (row, leaf) in enumerate(zip(m["이미지"], _leaves(m["이미지"]))):
+            src = _saved_path(seq, m["단지명"], leaf)
             if not src.exists():
                 continue  # 아직 안 받은 종류. fetch가 받은 것만 싣는다
             dest = PUBLIC_ROOT / m["biznsCd"] / src.name
@@ -333,7 +392,9 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--delay", type=float, default=1.0, help="요청 간격(초). 기본 1초")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("houses", help="서울 전 단지 목록을 받는다")
+    p_houses = sub.add_parser("houses", help="서울 전 단지 목록을 받는다")
+    p_houses.add_argument("--rent-ty", default=APARTMENT_TY,
+                          help=f"쉼표 구분. {' | '.join(f'{k} {v}' for k, v in RENT_TY_NAMES.items())}. 기본 {APARTMENT_TY}")
     sub.add_parser("match", help="공고 단지에 biznsCd를 붙인다").add_argument("seq")
     sub.add_parser("assets", help="단지별 보유 이미지를 조사한다").add_argument("seq")
     p_fetch = sub.add_parser("fetch", help="이미지를 내려받는다")
@@ -356,7 +417,7 @@ def main() -> None:
 
     client = HouseInfoClient(delay_sec=args.delay)
     if args.cmd == "houses":
-        cmd_houses(client)
+        cmd_houses(client, tuple(t.strip() for t in args.rent_ty.split(",") if t.strip()))
     elif args.cmd == "assets":
         cmd_assets(args.seq, client)
     else:
