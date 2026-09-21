@@ -2,8 +2,10 @@
 //
 // 네 양식(lib/notice-fit.ts 머리말): 장기전세는 면적×순위×출생자녀 가산×맞벌이 매트릭스 + 선정 순서 + 가감점표,
 // 행복주택은 계층 절(요건·순위·배점·선정), 매입임대는 순위 두 줄, 청년 매입임대는 신청유형 + 순위 셋(자격 열) + 가점 배점표.
-// 표가 여러 장이라 **한 번에 다 펴지 않는다** —
-// 제목 밑에 한 줄 요약을 두고, 순위 표만 펼친 채 나머지는 <details>로 접는다(사용자 지적 2026-09-14: "나열식이라 보기 힘들다").
+// 표가 여러 장이라 **한 번에 다 펴지 않는다** — 제목 밑에 한 줄 요약을 두고 나머지는 <details>로 접는다
+// (사용자 지적 2026-09-14: "나열식이라 보기 힘들다").
+// 전에는 순위 표처럼 「먼저 봐야 할 것」을 펴 둔 채 시작했는데, 그 카드들이 지면을 다 먹었다
+// (사용자 지적 2026-09-21: "카드들이 항상 펼쳐져 있다"). **처음엔 전부 접는다** — 요약 한 줄이 골자를 이미 말한다.
 // 값은 파이프라인이 공고문 쪽 XML에서 좌표로 읽은 것이다. 소득표 금액은 검산(verified)을 통과했을 때만 싣는다.
 import type { ReactNode } from "react";
 import { wonKo } from "@/lib/format";
@@ -47,10 +49,10 @@ function spans<T>(rows: T[], key: (r: T) => string | null): number[] {
   return out;
 }
 
-/** 접이식 묶음. 기본은 접힘 — 순위 표처럼 먼저 봐야 할 것만 open */
-function Fold({ title, hint, open, children }: { title: string; hint?: string; open?: boolean; children: ReactNode }) {
+/** 접이식 묶음. 전부 접힌 채로 연다(2026-09-21) — 펴 둘 것을 고르지 않는다 */
+function Fold({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <details className="ne-fold" open={open}>
+    <details className="ne-fold">
       <summary>
         <b>{title}</b>
         {hint && <small>{hint}</small>}
@@ -325,7 +327,7 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
       )}
 
       {kind === "cheongnyeon" && (d.applicant_types?.length ?? 0) > 0 && (
-        <Fold title="신청유형" hint="공고일 기준 본인에 해당하는 유형 하나를 고른다" open>
+        <Fold title="신청유형" hint="공고일 기준 본인에 해당하는 유형 하나를 고른다">
           <div className="tbl ne-tbl">
             <table>
               <thead><tr><th>유형</th><th>요건</th></tr></thead>
@@ -340,13 +342,13 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
       )}
 
       {kind === "cheongnyeon" && d.rank_tables.length > 0 && (
-        <Fold title="신청 순위와 자격" hint="1순위는 소득과 자산 심사 없음, 2순위는 본인과 부모, 3순위는 본인 기준" open>
+        <Fold title="신청 순위와 자격" hint="1순위는 소득과 자산 심사 없음, 2순위는 본인과 부모, 3순위는 본인 기준">
           {d.rank_tables.map((t, i) => <CheongnyeonRankTable key={i} t={t} />)}
         </Fold>
       )}
 
       {kind !== "haengbok" && kind !== "cheongnyeon" && d.rank_tables.length > 0 && (
-        <Fold title={kind === "maeip" ? "신청 순위" : "소득기준과 신청순위"} open
+        <Fold title={kind === "maeip" ? "신청 순위" : "소득기준과 신청순위"}
           hint={kind === "maeip" ? undefined : "면적과 순위마다 다르고, 맞벌이면 완화된 기준"}>
           {d.rank_tables.map((t, i) => <RankTable key={i} t={t} />)}
         </Fold>
@@ -414,7 +416,7 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
       )}
 
       {income && (
-        <Fold title="가구원수별 월평균소득 기준액" open={kind === "maeip" || kind === "cheongnyeon"}
+        <Fold title="가구원수별 월평균소득 기준액"
           hint={`${income.base_year ?? incomeYear}년 소득 통계 기준${noticeYear ? `, ${noticeYear}년 공고에 적용` : ""}`}>
           <p className="ne-lead">
             공고문은 통계청이 발표한 전년도 도시근로자 가구당 월평균소득을 씁니다. 연도가 공고보다 한 해 앞서는 이유입니다.
@@ -453,13 +455,13 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
 
       {d.selection.length > 0 && (
         <Fold title={kind === "maeip" ? "동일순위 경쟁 시" : kind === "cheongnyeon" ? "입주자 선정 순서" : "동일순위 경쟁 시 입주자 선정 기준"}
-          hint={kind === "cheongnyeon" ? "순위가 높은 순, 같은 순위면 가점 합산" : "같은 순위 안에서 경쟁하면 이 순서로 정한다"} open={kind === "maeip" || kind === "cheongnyeon"}>
+          hint={kind === "cheongnyeon" ? "순위가 높은 순, 같은 순위면 가점 합산" : "같은 순위 안에서 경쟁하면 이 순서로 정한다"}>
           {d.selection.map((t, i) => <SelectionTable key={i} t={t} title={d.selection.length > 1} />)}
         </Fold>
       )}
 
       {d.score_tables.length > 0 && (
-        <Fold title={kind === "cheongnyeon" ? "가점 배점표" : "가점과 감점 배점표"} open={kind === "cheongnyeon"}
+        <Fold title={kind === "cheongnyeon" ? "가점 배점표" : "가점과 감점 배점표"}
           hint={kind === "cheongnyeon" ? "동일순위 경쟁 시 합산, 같은 점수면 항목 순서(①~⑦)로" : undefined}>
           {d.score_tables.map((t, i) => <ScoreTable key={i} t={t} />)}
           {d.penalties && (
