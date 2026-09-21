@@ -2,7 +2,7 @@
 
 export type NoticeStatus = "공고중" | "접수중" | "접수마감" | "정정공고중";
 export type Sector = "공공임대" | "민간임대";
-export type NoticeSort = "posted" | "deadline";
+export type NoticeSort = "posted" | "deadline" | "rent";
 /** 마감 임박 필터. "7d" = 오늘부터 7일 안에 접수 마감 */
 export type NoticeClosing = "7d";
 
@@ -214,7 +214,24 @@ export type ComplexImage = {
 };
 
 // closed: 마감 공고 포함 여부. 기본(undefined)은 감춘다 — 백필로 2004년치까지 들어와 목록이 마감으로 덮인다(사용자 요청 2026-09-09)
-export type NoticeFilters = { sido?: string; type?: string; sector?: Sector; sort?: NoticeSort; closing?: NoticeClosing; closed?: boolean };
+export type NoticeFilters = {
+  sido?: string;
+  /** 시군구. sido가 함께 걸려야 뜻이 선다 — 「강서구」는 서울과 부산에 둘 다 있다 */
+  sigungu?: string;
+  type?: string;
+  sector?: Sector;
+  sort?: NoticeSort;
+  closing?: NoticeClosing;
+  closed?: boolean;
+  /** 보증금 상한(원). 이 값 이하인 공고만. 금액을 못 읽은 공고(min_deposit IS NULL)는 빠진다 */
+  maxDeposit?: number;
+  /** 월임대료 상한(원). 전세형(min_rent = 0)은 언제나 통과한다 */
+  maxRent?: number;
+};
+
+/** 예산 칩의 눈금(원). 목록·시트가 같은 값을 쓴다. 0은 「제한 없음」이 아니라 「전세형만」이라 넣지 않는다 */
+export const DEPOSIT_STEPS: readonly number[] = [10_000_000, 30_000_000, 50_000_000, 100_000_000, 200_000_000];
+export const RENT_STEPS: readonly number[] = [100_000, 200_000, 300_000, 500_000, 800_000];
 
 /** 목록 보기 모드. 필터가 아니라 화면 취향이라 조회 조건에 섞지 않는다(사용자 요청 2026-09-09) */
 export type NoticeView = "card" | "list" | "compact";
@@ -229,7 +246,7 @@ export type FilterOption = { value: string; count: number };
 
 /** 스코프 바·필터 바의 수량. 지금 걸린 다른 필터를 반영해 센다(자기 축은 빼고) — 지역을 바꾸면 유형 수량도 따라 바뀐다.
  * total은 부문 칩 「전체」의 수, closing7은 「마감 7일 내」 칩의 수다. */
-export type Facets = { sector: FilterOption[]; sido: FilterOption[]; type: FilterOption[]; closing7: number; total: number };
+export type Facets = { sector: FilterOption[]; sido: FilterOption[]; sigungu: FilterOption[]; type: FilterOption[]; closing7: number; total: number };
 
 /** 과거 결과 표 한 줄(notice_result, 0014). 단지 × 공급유형 × 계층 × 구분(우선·일반·n순위·소계). 산술이 맞은(reconciled) 줄만 온다 */
 export type PriorResultRow = {

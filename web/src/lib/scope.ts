@@ -13,6 +13,11 @@ function str(v: unknown): string | undefined {
   return typeof v === "string" && v ? v : undefined;
 }
 
+/** 저장된 예산. 양의 정수만 — 손으로 고친 localStorage가 쿼리를 깨지 못하게 */
+function money(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? v : undefined;
+}
+
 /** localStorage에서 마지막 목록 상태를 읽는다. 서버(SSR)에선 항상 빈 값. */
 export function readScope(): Scope {
   if (typeof window === "undefined") return {};
@@ -23,10 +28,14 @@ export function readScope(): Scope {
     return {
       sector: isSector(p.sector) ? p.sector : undefined,
       sido: str(p.sido),
+      // 시도 없이 남은 시군구는 버린다 — 옛 저장값이 그럴 수 있다
+      sigungu: str(p.sido) ? str(p.sigungu) : undefined,
       type: str(p.type),
       closing: p.closing === "7d" ? ("7d" as NoticeClosing) : undefined,
-      sort: p.sort === "deadline" ? ("deadline" as NoticeSort) : undefined,
+      sort: p.sort === "deadline" || p.sort === "rent" ? (p.sort as NoticeSort) : undefined,
       closed: p.closed === true || undefined,
+      maxDeposit: money(p.maxDeposit),
+      maxRent: money(p.maxRent),
     };
   } catch {
     return {};

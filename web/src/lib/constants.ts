@@ -68,7 +68,7 @@ export const BOOT_SCOPE_JS = `try{
 var p=location.pathname;
 if(p==="/"||p.indexOf("/area/")===0){
   var s=JSON.parse(localStorage.getItem(${JSON.stringify(SCOPE_STORAGE_KEY)})||"{}");
-  if(s&&(s.sector||s.sido||s.type||s.closing||s.sort||s.closed)){
+  if(s&&(s.sector||s.sido||s.sigungu||s.type||s.closing||s.sort||s.closed||s.maxDeposit||s.maxRent)){
     document.documentElement.setAttribute("data-booting","");
     setTimeout(function(){document.documentElement.removeAttribute("data-booting")},3000);
   }

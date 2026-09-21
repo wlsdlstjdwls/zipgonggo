@@ -1,11 +1,15 @@
 "use client";
 
-// 결과 행. D-day 칩 56×52 · 메타/제목/날짜 줄 · ★저장 · →.
-// 금액 열은 뺐다(사용자 요청 2026-09-09) — 목록에서 읽을 값은 "언제 넣나"이고, 금액은 상세가 정확히 말한다.
-// 대신 공고일·접수기간·발표일을 한 줄 더 써서 진하게 보여 준다.
+// 결과 행. D-day 칩 56×52 · 메타/제목/금액/날짜 줄 · ★저장 · →.
+//
+// **금액을 되살렸다(2026-09-21).** 09-09에 「목록에서 읽을 값은 언제 넣나」라는 이유로 뺐는데,
+// 임대 목록에서 보증금과 월세가 안 보이면 상세를 열기 전엔 내 예산인지조차 못 가른다 —
+// 수십 건을 하나씩 열어 보게 만드는 값이라 목록에 있어야 한다. 전체의 83%에 값이 있고,
+// 없는 공고는 「원문 확인」으로 적는다(없는 금액을 지어내지 않는다).
+// 최솟값이라는 점은 「부터」로 말한다 — 같은 공고 안에서도 주택형마다 다르다.
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { dateK, dateMD, ddayChip, NO_DATE, num } from "@/lib/format";
+import { dateK, dateMD, ddayChip, NO_DATE, num, wonExact, wonKo } from "@/lib/format";
 import { noticePath } from "@/lib/routes";
 import { regionShort } from "@/lib/sido";
 import type { NoticeListItem } from "@/types/notice";
@@ -33,6 +37,29 @@ function Dt({ k, v, hi }: { k: string; v: string; hi?: boolean }) {
     <span className={hi ? "rd hi" : "rd"}>
       <i>{k}</i>
       <b>{v}</b>
+    </span>
+  );
+}
+
+/** 목록의 금액 한 줄. 보증금과 월세를 나란히 — 둘 다 없으면 「원문 확인」 한 마디.
+    정확한 원 단위는 title 속성으로만 둔다(CLAUDE.md 표기 규칙) */
+function Money({ n }: { n: Pick<NoticeListItem, "min_deposit" | "min_rent"> }) {
+  const dep = n.min_deposit;
+  const rent = n.min_rent;
+  if (dep == null && rent == null) return <span className="row-money none">금액 원문 확인</span>;
+  return (
+    <span className="row-money">
+      {dep != null && (
+        <b title={`보증금 ${wonExact(dep)}부터`}>
+          <i>보증금</i> {wonKo(dep)}
+        </b>
+      )}
+      {/* 월세 0원은 전세형이다 — 「0원」이라고 적으면 공짜로 읽힌다 */}
+      {rent != null && (
+        <b title={rent === 0 ? "월임대료 없음(전세형)" : `월임대료 ${wonExact(rent)}부터`}>
+          <i>월세</i> {rent === 0 ? "없음" : wonKo(rent)}
+        </b>
+      )}
     </span>
   );
 }
@@ -70,6 +97,7 @@ export function NoticeRow({ n, stagger, muted }: Props) {
             <Trunc className="row-meta" text={`${meta}${n.amends_source_key ? " | 정정" : ""}`} />
           </span>
           <Trunc className="row-title" text={n.title} />
+          <Money n={n} />
           <span className="row-dates">
             <Dt k="접수" v={periodLabel(n)} hi />
             {n.announce_at && <Dt k="발표" v={dateMD(n.announce_at)} />}

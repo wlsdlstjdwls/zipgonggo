@@ -41,6 +41,23 @@ function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
     params.push(f.sido);
     where.push(`sido = $${params.length}`);
   }
+  // 시군구는 시도 안에서만 뜻이 선다(「강서구」가 서울과 부산에 둘 다 있다) — parseNoticeFilters가 이미 걸러 보내지만
+  // API로 직접 들어오는 길도 있어 여기서 한 번 더 묶는다
+  if (f.sido && f.sigungu) {
+    params.push(f.sigungu);
+    where.push(`sigungu = $${params.length}`);
+  }
+  // 예산. 금액을 못 읽은 공고(83%만 값이 있다)는 상한을 걸면 빠진다 — 「얼마인지 모르는 집」을
+  // 예산 안이라고 말할 수는 없다. 대신 상한을 안 걸면 그대로 다 보인다
+  if (f.maxDeposit) {
+    params.push(f.maxDeposit);
+    where.push(`min_deposit IS NOT NULL AND min_deposit <= $${params.length}`);
+  }
+  // 전세형(min_rent = 0)은 어떤 월세 상한에도 걸린다 — 월세가 0이니 당연히 통과다
+  if (f.maxRent) {
+    params.push(f.maxRent);
+    where.push(`min_rent IS NOT NULL AND min_rent <= $${params.length}`);
+  }
   if (f.type) {
     params.push(f.type);
     where.push(`housing_type::text = $${params.length}`);
@@ -84,6 +101,7 @@ const DEADLINE_KEY = `CASE WHEN apply_end_at >= ${TODAY} AND NOT ${CLOSED} THEN 
 // 커서: posted → "posted_at|id". deadline → "rank|apply_end_at|posted_at|id". 정렬키 전체를 담아야 같은 값이 겹쳐도 빠지지 않는다.
 // 커서는 정렬 키를 그대로 담는다. source_rank는 NULL일 수 있어 빈 칸으로 싣고 아래에서 최댓값으로 되돌린다.
 function encodeCursor(n: NoticeListItem, sort: NoticeSort): string {
+  if (sort === "rent") return `${n.min_rent ?? ""}|${n.min_deposit ?? ""}|${n.id}`;
   if (sort === "posted") return `${n.posted_at}|${n.source_rank ?? ""}|${n.id}`;
   const today = todayKST();
   // DEADLINE_RANK와 같은 식이어야 한다 — 어긋나면 다음 페이지가 통째로 빠지거나 겹친다
@@ -93,6 +111,16 @@ function encodeCursor(n: NoticeListItem, sort: NoticeSort): string {
 
 /** NULLS LAST 정렬을 튜플 비교로 쓰려고 NULL을 맨 뒤 값으로 바꾼다. */
 const RANK_LAST = 2_147_483_647;
+// 금액 NULL을 맨 뒤로 보내는 값. 원 단위라 int를 넘어 bigint로 쓴다 — 실제 보증금은 10억을 안 넘는다
+const MONEY_LAST = 999_999_999_999;
+const RENT_KEY = `COALESCE(min_rent, ${MONEY_LAST})`;
+
+/** 금액 커서 한 칸. 빈 칸(값이 NULL이던 행)은 SQL의 COALESCE와 같은 맨 뒤 값으로 되돌린다.
+ *  rankOrLast와 따로 두는 이유 — 되돌릴 값이 int 최댓값이 아니라 MONEY_LAST다 */
+function moneyOrLast(v: string): number | null {
+  if (v === "") return MONEY_LAST;
+  return /^\d+$/.test(v) ? Number(v) : null;
+}
 function rankOrLast(v: string): number | null {
   if (v === "") return RANK_LAST;
   return /^\d+$/.test(v) ? Number(v) : null;
@@ -101,14 +129,30 @@ function rankOrLast(v: string): number | null {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 async function listNoticesPageRaw(f: NoticeFilters, cursor: string | null, limit: number): Promise<NoticePage> {
-  const sort: NoticeSort = f.sort === "deadline" ? "deadline" : "posted";
+  const sort: NoticeSort = f.sort === "deadline" || f.sort === "rent" ? f.sort : "posted";
   const params: unknown[] = [];
   const where = buildWhere(f, params);
   const countParams = [...params];
   const countWhere = whereSql(where);
 
   let order: string;
-  if (sort === "posted") {
+  if (sort === "rent") {
+    // 월세 낮은 순. 금액을 못 읽은 공고는 맨 뒤로 — 0원(전세형)과 「모름」은 다른 값이다
+    order = `${RENT_KEY} ASC, min_deposit ASC NULLS LAST, id DESC`;
+    if (cursor) {
+      const [rent, dep, id] = cursor.split("|");
+      const r = moneyOrLast(rent ?? "");
+      const d = moneyOrLast(dep ?? "");
+      if (r !== null && d !== null && /^\d+$/.test(id)) {
+        params.push(r, d, Number(id));
+        const [pr, pd, pi] = [params.length - 2, params.length - 1, params.length];
+        // (rent ASC, deposit ASC, id DESC)의 다음 행. id만 내림차순이라 부호를 뒤집어 튜플로 비교한다
+        where.push(
+          `(${RENT_KEY}, COALESCE(min_deposit, ${MONEY_LAST}), -id) > ($${pr}::bigint, $${pd}::bigint, -$${pi}::bigint)`,
+        );
+      }
+    }
+  } else if (sort === "posted") {
     // 같은 공고일 안에서는 기관 원본 목록 순서(source_rank)를 지킨다 — 사용자 요청 2026-09-08
     order = `posted_at DESC, source_rank ASC NULLS LAST, id DESC`;
     if (cursor) {
@@ -163,7 +207,7 @@ async function listNoticesPageRaw(f: NoticeFilters, cursor: string | null, limit
 /** 목록 1페이지. cursor는 이전 페이지의 nextCursor. */
 export const listNoticesPage = unstable_cache(
   (f: NoticeFilters, cursor: string | null = null, limit: number = PAGE_SIZE) => listNoticesPageRaw(f, cursor, limit),
-  ["notice-page-v5"],
+  ["notice-page-v6"],
   CACHE_OPTS,
 );
 
@@ -206,7 +250,7 @@ export const listFilterOptions = cache(unstable_cache(
 // "지역이 바뀌면 그 지역의 수량이 나와야 한다"). 자기 자신은 빼고 센다 — 검색 패싯의 표준 규칙이다.
 // 서울을 고른 상태에서 유형 셀렉트는 "서울 안에서 각 유형이 몇 건"을 보여 주고,
 // 시도 셀렉트는 유형·마감 조건만 걸린 채 "각 시도가 몇 건"을 보여 준다(자기 필터를 빼야 다른 지역으로 갈아탈 수 있다).
-type FacetAxis = "sector" | "sido" | "type" | "closing";
+type FacetAxis = "sector" | "sido" | "sigungu" | "type" | "closing";
 
 async function listFacetsRaw(f: NoticeFilters): Promise<Facets> {
   const params: unknown[] = [];
@@ -215,10 +259,17 @@ async function listFacetsRaw(f: NoticeFilters): Promise<Facets> {
     if (extra) parts.push(extra);
     return whereSql(parts);
   };
+  // 시군구는 시도를 고른 뒤에만 뜻이 있다 — 전국에서 「강서구」를 세면 서울과 부산이 한 줄로 합쳐진다.
+  // 시도가 없으면 이 축은 아예 묻지 않는다(왕복에 실리는 GROUP BY 하나를 아낀다)
+  const sigunguSql = f.sido
+    ? `UNION ALL
+     SELECT 'sigungu', sigungu, count(*)::int FROM notice ${w("sigungu", "sigungu IS NOT NULL")} GROUP BY 2`
+    : "";
   const rows = await query<{ kind: string; value: string; count: number }>(
     `SELECT 'sector' AS kind, sector::text AS value, count(*)::int AS count FROM notice ${w("sector")} GROUP BY 2
      UNION ALL
      SELECT 'sido', sido, count(*)::int FROM notice ${w("sido")} GROUP BY 2
+     ${sigunguSql}
      UNION ALL
      SELECT 'type', housing_type::text, count(*)::int FROM notice ${w("type")} GROUP BY 2
      UNION ALL
@@ -233,6 +284,7 @@ async function listFacetsRaw(f: NoticeFilters): Promise<Facets> {
   return {
     sector: pick("sector").sort((a, b) => a.value.localeCompare(b.value, "ko")),
     sido: pick("sido"),
+    sigungu: pick("sigungu").sort((a, b) => a.value.localeCompare(b.value, "ko")),
     type: pick("type"),
     closing7: stat("closing7"),
     total: stat("total"),
@@ -242,7 +294,7 @@ async function listFacetsRaw(f: NoticeFilters): Promise<Facets> {
 /** 스코프 바·필터 바가 쓰는 수량 묶음. 필터가 바뀌면 /api/facets로 다시 받는다. */
 export const listFacets = unstable_cache(
   (f: NoticeFilters) => listFacetsRaw(f),
-  ["notice-facets-v2"],
+  ["notice-facets-v3"],
   CACHE_OPTS,
 );
 

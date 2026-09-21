@@ -193,3 +193,13 @@ export function deadlineChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_e
   if (toEnd === 0) return { num: "오늘", unit: "마감", tone: "hot", days: 0 };
   return { num: `D-${toEnd}`, unit: "마감까지", tone: toEnd <= DDAY_URGENT_DAYS ? "hot" : toEnd <= DDAY_SOON_DAYS ? "warn" : "acc", days: toEnd };
 }
+
+/** 예산 칩·목록 요약에 쓰는 짧은 금액. 만 단위 아래를 버린다 — 「5,000만」·「1억」·「30만」.
+ *  wonKo는 한 원도 안 버려 칩에 넣으면 「1,558만 5,000원 이하」처럼 길어진다. 눈금 값에만 쓴다 */
+export function wonStep(n: number): string {
+  const eok = Math.floor(n / 100_000_000);
+  const man = Math.floor((n - eok * 100_000_000) / 10_000);
+  if (eok && man) return `${eok}억 ${man.toLocaleString(KO)}만`;
+  if (eok) return `${eok}억`;
+  return `${man.toLocaleString(KO)}만`;
+}
