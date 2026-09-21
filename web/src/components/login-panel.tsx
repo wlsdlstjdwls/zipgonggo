@@ -7,25 +7,29 @@
 import Link from "next/link";
 import { useState } from "react";
 import { BrandMark } from "./brand-mark";
-import { IconDevices, IconKeep, IconShield } from "./icons";
+import { IconClock, IconDevices, IconShield, IconStar } from "./icons";
 import { kakaoStartPath, ROUTES } from "@/lib/routes";
 
 // 아이콘은 글자를 거드는 자리다 — 뜻이 아이콘에만 실리면 안 된다(그래서 aria-hidden).
+//
+// **말하는 것은 로그인이 아니라 공고다**(사용자 지적 2026-09-21: 「로그인 얘기만 써 놨다」).
+// 「세션이 어디에 남는가」는 우리 사정이고, 이용자가 얻는 건 공고를 담고 마감을 놓치지 않는 것이다.
+// 이 세 칸만 반말로 쓴다(사용자 결정) — 나머지 지면은 존댓말 그대로다.
 const BENEFITS = [
   {
+    icon: IconStar,
+    title: "눈에 든 공고, 별 하나로 담아 둔다",
+    desc: "목록에서 ★만 누르면 끝. 다음에 다시 뒤져 찾을 일이 없다",
+  },
+  {
+    icon: IconClock,
+    title: "마감 가까운 순으로 쌓아 준다",
+    desc: "담아 둔 공고를 접수 마감이 임박한 순서로 보여준다. 신청일을 놓치고 지나가는 일을 줄인다",
+  },
+  {
     icon: IconDevices,
-    title: "관심 공고가 기기를 넘어 남습니다",
-    desc: "휴대폰에서 담아 둔 공고를 데스크탑에서 그대로 봅니다",
-  },
-  {
-    icon: IconKeep,
-    title: "브라우저를 지워도 목록이 남습니다",
-    desc: "지금까지는 이 브라우저에만 있어서 사이트 데이터를 지우면 함께 사라졌습니다",
-  },
-  {
-    icon: IconShield,
-    title: "받아 가는 것은 별명 하나가 전부입니다",
-    desc: "프로필 사진과 이메일은 선택이고, 전화번호와 주소는 묻지 않습니다. 탈퇴하면 그 자리에서 지웁니다",
+    title: "폰에서 담고 컴퓨터에서 이어 본다",
+    desc: "출근길에 담아 둔 공고를 집에서 그대로 연다. 브라우저를 정리해도 목록은 남는다",
   },
 ] as const;
 
@@ -39,7 +43,7 @@ export function LoginPanel({ next, ready, failed }: { next: string; ready: boole
         <BrandMark size={30} />
         집공고 로그인
       </h1>
-      <p className="login-sub">카카오 계정으로 3초 만에 시작합니다. 따로 만들 아이디도 비밀번호도 없습니다.</p>
+      <p className="login-sub">카카오로 3초면 시작한다.</p>
 
       <ul className="login-why">
         {BENEFITS.map(({ icon: Icon, title, desc }) => (
@@ -89,6 +93,11 @@ export function LoginPanel({ next, ready, failed }: { next: string; ready: boole
       ) : (
         <p className="login-hint">로그인은 준비 중입니다. 조금 뒤에 다시 들러 주세요.</p>
       )}
+
+      <p className="login-privacy">
+        <IconShield width={15} height={15} aria-hidden="true" />
+        받아 가는 건 별명 하나. 프로필 사진과 이메일은 선택이고, 전화번호와 주소는 안 묻는다. 탈퇴하면 그 자리에서 지운다
+      </p>
 
       <p className="login-foot">
         로그인하지 않아도 공고 열람과 계산기는 그대로 쓸 수 있습니다.{" "}

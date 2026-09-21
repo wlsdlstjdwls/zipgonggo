@@ -1784,7 +1784,10 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .login-hint { margin: 10px 0 0; font-size: 12.5px; font-weight: 700; color: var(--hot); text-align: center; }
 .login-err { margin: 16px 0 0; padding: 11px 13px; border-radius: var(--radius-sm); background: var(--hot-soft);
   color: var(--hot); font-size: 13.5px; font-weight: 700; }
-.login-foot { margin: 22px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--dim); text-align: center; }
+.login-privacy { display: flex; align-items: flex-start; gap: 7px; margin: 16px 0 0; padding: 11px 13px;
+  border-radius: var(--radius-sm); background: var(--sub); font-size: 12px; line-height: 1.65; color: var(--dim); }
+.login-privacy svg { flex: none; margin-top: 2px; }
+.login-foot { margin: 18px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--dim); text-align: center; }
 .login-foot a { color: var(--acc); font-weight: 700; }
 
 /* 내 계정. 로그인 지면과 같은 이유로 좌우 패딩을 제 몫으로 갖는다 */

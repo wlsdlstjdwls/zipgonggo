@@ -64,13 +64,21 @@ export function IconDevices(p: P) {
   );
 }
 
-/** 자물쇠 — 브라우저를 지워도 계정에 남는다 */
-export function IconKeep(p: P) {
+/** 별 — 관심 공고 담기(목록의 ★와 같은 뜻) */
+export function IconStar(p: P) {
   return (
     <Svg viewBox="0 0 24 24" width="24" height="24" strokeWidth="1.5" {...p}>
-      <rect x="4" y="10.2" width="16" height="10.4" rx="2.4" />
-      <path d="M7.8 10.2V7.6a4.2 4.2 0 0 1 8.4 0v2.6" />
-      <path d="M12 14.2v2.4" />
+      <path d="M12 3.4l2.65 5.37 5.93.86-4.29 4.18 1.01 5.9L12 16.92l-5.3 2.79 1.01-5.9L3.42 9.63l5.93-.86z" />
+    </Svg>
+  );
+}
+
+/** 시계 — 마감이 가까운 순서 */
+export function IconClock(p: P) {
+  return (
+    <Svg viewBox="0 0 24 24" width="24" height="24" strokeWidth="1.5" {...p}>
+      <circle cx="12" cy="12" r="8.6" />
+      <path d="M12 7.2V12l3.2 2" />
     </Svg>
   );
 }
