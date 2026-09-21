@@ -469,7 +469,7 @@ LH 이용약관(`lh.or.kr/menu.es?mid=a10802000000`) 제1~12조와 부칙을 훑
 | `BLOB_READ_WRITE_TOKEN` | Vercel 대시보드 Storage → Blob 스토어 | `web/scripts/upload-house-images.mjs`가 사진을 올릴 때만. 웹 런타임은 안 쓴다 |
 | `GOOGLE_SITE_VERIFICATION` | [구글 서치콘솔](https://search.google.com/search-console) → 속성 추가 → HTML 태그의 `content` 값 | 사이트 소유확인 `<meta>`. 이게 통과해야 사이트맵 제출·색인 요청 화면이 열린다. **비밀값이 아니라 현재 값은 `web/src/lib/constants.ts`에 박아 뒀다** — env는 덮어쓰기용 |
 | `INDEXNOW_KEY` | 직접 생성(16바이트 hex). 발급처 없음 — 아무 문자열이나 정하고 `web/public/{키}.txt`로 공개하면 그게 소유 증명이다 | 빙·네이버·얀덱스·Seznam에 변경 URL을 즉시 밀어 넣는다(구글은 참여 안 함). **비밀값 아님** — 공개가 규격이다. 워크플로 env에도 평문으로 있다 |
-| `KAKAO_REST_API_KEY` | [카카오 developers](https://developers.kakao.com) → 내 애플리케이션 → 앱 키 → REST API 키 | 카카오 로그인(web). **콘솔의 Redirect URI에 `{오리진}/api/auth/kakao/callback`을 등록해야 돈다** — 로컬(`http://localhost:3100/...`)과 운영(`https://zipgonggo.com/...`) 둘 다. 동의항목은 닉네임/프로필 사진만 켠다 |
+| `KAKAO_REST_API_KEY` | [카카오 developers](https://developers.kakao.com) → 내 애플리케이션 → 앱 키 → REST API 키 | 카카오 로그인(web). **콘솔의 Redirect URI에 `{오리진}/api/auth/kakao/callback`을 등록해야 돈다** — 로컬(`http://localhost:3100/...`)과 운영(`https://zipgonggo.com/...`) 둘 다. 동의항목은 닉네임(필수) / 프로필 사진(선택) / 카카오계정 이메일(선택) 셋 |
 | `KAKAO_CLIENT_SECRET` | 카카오 developers → 카카오 로그인 → 보안 → Client Secret | 콘솔에서 「사용함」으로 켠 앱은 **필수**. 안 보내면 토큰 발급이 실패한다. 껐으면 비워 둔다 |
 | `AUTH_SECRET` | 직접 생성 — `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` | 로그인 세션 쿠키(`zg_user`) 서명 열쇠. 바꾸면 발급해 둔 세션이 전부 무효가 된다(전원 로그아웃). **`KAKAO_REST_API_KEY`와 이 값 중 하나라도 비면 로그인 기능 자체가 꺼진다** |
 | `NAVER_SITE_VERIFICATION` | [네이버 서치어드바이저](https://searchadvisor.naver.com) → 웹마스터도구 → 사이트 등록 → HTML 태그의 `content` 값 | 같은 용도. 네이버는 이 확인 없이는 수집 요청 자체가 안 된다. 값 자리도 위와 같다 |

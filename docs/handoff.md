@@ -43,8 +43,10 @@
   담은 게 사라지면 이유를 알 길이 없다). 이후 토글은 양쪽에 적고, 서버 쓰기 실패는 화면을 막지 않는다
 - 콘솔 — `/admin/members`(요약 4칸 + 회원 목록 50행 페이징 + 많이 담은 공고), 대시보드에 회원 타일 3칸.
   **조회 전용**이다
-- 문서 — 이용약관 제3조(계정과 탈퇴) 신설·시행일 2026-09-28, 개인정보처리방침 3항(회원 정보) 신설·
-  1·2·7·8항 개정·시행일 2026-09-28, `data-sources.md` 필요한 키 3줄, `.env.example` 둘
+- 문서 — 이용약관 제3조(계정과 탈퇴) 신설, 개인정보처리방침 3항(회원 정보) 신설·1·2·7·8항 개정.
+  **둘 다 시행일 2026-09-21(오늘 오픈, 사용자 결정).** 7일 전 공지를 건너뛴 근거는 「선택 기능 신설이라
+  기존 이용 방식에서 수집 항목이 하나도 안 늘었다」 — 다음 개정부터는 날짜를 미리 잡는다.
+  `data-sources.md` 필요한 키 3줄, `.env.example` 둘
 
 `npx tsc --noEmit` 통과. 로컬 3100에서 `/api/auth/me` → `{"enabled":true,"user":null}`,
 `/api/auth/kakao` → 카카오 authorize로 307(redirect_uri·state 정상), `/`·`/login`·`/my`·`/my/account`·
@@ -54,11 +56,15 @@
 
 1. 카카오 developers → 내 애플리케이션 → **카카오 로그인 활성화 ON**
 2. **Redirect URI 두 줄 등록** — `http://localhost:3100/api/auth/kakao/callback`,
-   `https://zipgonggo.com/api/auth/kakao/callback` (한 글자라도 다르면 KOE006)
-3. 플랫폼 → Web → 사이트 도메인에 `http://localhost:3100`, `https://zipgonggo.com`
-4. 동의항목 — 닉네임/프로필 사진만 「필수 동의」. 이메일은 검수 대상이라 켜지 않았다
+   `https://zipgonggo.com/api/auth/kakao/callback` (한 글자라도 다르면 KOE006).
+   **리다이렉트 URI도 사이트 도메인도 최대 10개**다 — 한 칸만 보이면 저장 후 「추가」로 늘린다
+3. 플랫폼 → Web → 사이트 도메인에 `http://localhost:3100`, `https://zipgonggo.com`.
+   REST API 서버 리다이렉트 방식이라 실제 대조는 Redirect URI가 한다 — 도메인 칸이 모자라면 운영만 넣어도 된다
+4. 동의항목(콘솔에 켜 둔 대로 코드 scope도 맞췄다) — 닉네임 **필수**, 프로필 사진 **선택**,
+   카카오계정(이메일) **선택**. 선택 항목은 안 와도 로그인이 되게 짰다(NULL 허용).
+   이메일은 `is_email_valid`/`is_email_verified`가 false면 아예 안 받는다(닿지 않는 주소를 들고 있어 봐야 짐이다)
 5. Vercel 환경변수 셋 추가 — `KAKAO_REST_API_KEY` `KAKAO_CLIENT_SECRET` `AUTH_SECRET`
-   (로컬 `web/.env.local`에는 넣어 뒀다). **방침 시행일 2026-09-28 전에는 운영에 켜지 않는다**
+   (로컬 `web/.env.local`에는 넣어 뒀다)
 
 ### 다음에 집을 것
 

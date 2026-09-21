@@ -6,8 +6,10 @@ import { ROUTES } from "@/lib/routes";
 export const TERMS_TITLE = "이용약관";
 /** 지금 효력이 있는 판의 시행일. **가입할 때 이 값을 회원 표(terms_version)에 적는다** —
  *  약관을 고쳐 이 날짜가 바뀌면 「어느 판에 동의한 회원인가」가 기록으로 남아 재동의 대상을 가릴 수 있다.
- *  2026-09-09 최초 시행 → 2026-09-28 카카오 로그인 도입판(제3조 신설, 제2조 개정) */
-export const TERMS_EFFECTIVE_DATE = "2026-09-28";
+ *  2026-09-09 최초 시행 → 2026-09-21 카카오 로그인 도입판(제3조 신설, 제2조 개정).
+ *  회원이 아직 없는 상태에서 회원 조항을 새로 세우는 것이라 즉시 시행한다 — 불리해지는 기존 회원이 없다.
+ *  회원이 생긴 뒤의 개정은 제9조대로 7일(불리한 변경은 30일) 전에 공지하고 날짜를 미리 잡는다 */
+export const TERMS_EFFECTIVE_DATE = "2026-09-21";
 export const TERMS_FIRST_DATE = "2026-09-09";
 
 // 이용약관 본문 — /terms 페이지가 쓴다. 문구에 가운뎃점을 쓰지 않는다(CLAUDE.md 표기 규칙).
@@ -43,6 +45,13 @@ export function TermsContent() {
           <li>
             계정은 <strong>카카오 계정으로만</strong> 만듭니다. 별도의 아이디와 비밀번호를 두지 않으며,
             만 14세 미만은 가입할 수 없습니다.
+          </li>
+          <li>
+            카카오 로그인 동의 화면에서 받는 항목은 <strong>[필수] 닉네임</strong>,{" "}
+            <strong>[선택] 프로필 사진</strong>, <strong>[선택] 카카오계정(이메일)</strong> 셋입니다.{" "}
+            <strong>선택 항목에 동의하지 않아도 로그인과 서비스 이용에 제한이 없습니다.</strong> 이메일은
+            문의 회신과 중요한 공지에만 쓰며 광고 메일을 보내지 않습니다. 자세한 내용은{" "}
+            <Link href={ROUTES.privacy}>개인정보처리방침</Link> 3항에 있습니다.
           </li>
           <li>
             로그인 버튼을 누르면 이 약관과 <Link href={ROUTES.privacy}>개인정보처리방침</Link>에

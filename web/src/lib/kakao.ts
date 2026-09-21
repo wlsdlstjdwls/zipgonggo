@@ -10,8 +10,12 @@
 //   https://zipgonggo.com/api/auth/kakao/callback
 //   http://localhost:3100/api/auth/kakao/callback
 //
-// 동의항목은 **닉네임과 프로필 사진만** 켠다. 이메일은 카카오 검수를 통과해야 받을 수 있고,
-// 없어도 이 서비스는 아무 데도 아쉽지 않다(알림 메일을 보내지 않는다).
+// 콘솔에 켜 둔 동의항목은 셋이다(2026-09-21 기준).
+//   profile_nickname  필수 동의 — 화면에 부를 이름
+//   profile_image     선택 동의 — 없으면 이니셜 동그라미로 대신한다
+//   account_email     선택 동의 — 문의 회신과 중요한 공지에만 쓴다
+// **선택 항목은 안 와도 정상이다.** 셋 다 scope에 실어 동의 화면에 띄우되, 빠진 값은 NULL로 둔다 —
+// 없다고 로그인을 막지 않는다(막으면 선택 동의가 사실상 필수가 된다).
 
 const AUTHORIZE = "https://kauth.kakao.com/oauth/authorize";
 const TOKEN = "https://kauth.kakao.com/oauth/token";
@@ -41,7 +45,7 @@ export function kakaoAuthorizeUrl(origin: string, state: string): string | null 
   u.searchParams.set("redirect_uri", `${origin}${KAKAO_CALLBACK_PATH}`);
   u.searchParams.set("response_type", "code");
   u.searchParams.set("state", state);
-  u.searchParams.set("scope", "profile_nickname,profile_image");
+  u.searchParams.set("scope", "profile_nickname,profile_image,account_email");
   return u.toString();
 }
 
@@ -92,6 +96,8 @@ export async function fetchKakaoProfile(accessToken: string): Promise<KakaoProfi
     id?: number | string;
     kakao_account?: {
       email?: string;
+      is_email_valid?: boolean;
+      is_email_verified?: boolean;
       profile?: { nickname?: string; profile_image_url?: string; thumbnail_image_url?: string };
     };
     properties?: { nickname?: string; profile_image?: string; thumbnail_image?: string };
@@ -99,12 +105,16 @@ export async function fetchKakaoProfile(accessToken: string): Promise<KakaoProfi
   if (json.id === undefined || json.id === null) return null;
 
   // 같은 값이 kakao_account.profile 과 properties 두 군데로 온다. 동의항목 구성에 따라 한쪽만 차므로 둘 다 본다
-  const p = json.kakao_account?.profile;
+  // 이메일은 선택 동의라 거부하면 안 온다. 동의했어도 카카오 쪽에서 미인증 상태면 안 줄 수 있어
+  // is_email_valid/is_email_verified가 false인 주소는 아예 안 받는다 — 닿지 않는 주소를 들고 있어 봐야 짐이다
+  const acc = json.kakao_account;
+  const emailOk = acc?.email && acc.is_email_valid !== false && acc.is_email_verified !== false;
+  const p = acc?.profile;
   return {
     kakaoId: String(json.id),
     nickname: p?.nickname ?? json.properties?.nickname ?? null,
     profileImage:
       p?.thumbnail_image_url ?? p?.profile_image_url ?? json.properties?.thumbnail_image ?? json.properties?.profile_image ?? null,
-    email: json.kakao_account?.email ?? null,
+    email: emailOk ? (acc?.email ?? null) : null,
   };
 }
