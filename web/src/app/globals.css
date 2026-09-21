@@ -1732,6 +1732,12 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* 로그인 여부를 아직 모르는 첫 프레임의 자리지킴. 「로그인」이 떴다 이름으로 바뀌는 깜빡임을 막는다 */
 .acct-hold { display: inline-block; width: 64px; height: 1px; }
 
+/* 로그인 문은 헤더에서 유일하게 색을 채운 자리다 — 브랜드 파랑(사용자 요청 2026-09-21).
+   **카카오 노랑을 여기 쓰지 않는다.** 그 색이 헤더에 오면 「카카오가 만든 서비스」로 읽힌다 —
+   노랑은 로그인 지면의 카카오 버튼 하나에만 둔다(거기서는 「어느 계정으로 들어가나」를 말하는 색이라 맞다) */
+.nav-btn.acct-in { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 800; }
+.nav-btn.acct-in:hover { background: var(--primary-hover); border-color: var(--primary-hover); color: #fff; }
+
 .acct { position: relative; flex: none; }
 .acct-btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px 0 6px;
   border: 1px solid var(--line2); border-radius: 999px; background: var(--bg); color: var(--mut);
@@ -1801,3 +1807,16 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .acct-bye-row { display: flex; gap: 8px; }
 .acct-bye-go { margin-top: 12px; padding: 9px 14px; border: 1px solid var(--hot); border-radius: var(--r-chip);
   background: var(--hot); color: #fff; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
+
+/* 푸터 색인 링크 접기 — 링크를 지우면 /area·/type이 고아가 되므로 **감추지 않고 접는다**(2026-09-21).
+   닫힌 details 안의 링크도 HTML에 그대로 있어 크롤러는 전부 읽는다 */
+.foot-more { margin-bottom: 4px; }
+.foot-more > summary { display: inline-flex; align-items: center; gap: 6px; padding: 7px 0; cursor: pointer;
+  font-size: 13px; font-weight: 700; color: var(--mut); list-style: none; }
+.foot-more > summary::-webkit-details-marker { display: none; }
+.foot-more > summary::after { content: ""; width: 7px; height: 7px; border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor; transform: rotate(45deg) translate(-2px, -2px); transition: transform 200ms var(--ease); }
+.foot-more[open] > summary::after { transform: rotate(225deg) translate(-1px, -1px); }
+.foot-more > summary:hover { color: var(--ink); }
+.foot-more[open] > summary { color: var(--ink); }
+.foot-more .foot-area:first-of-type { margin-top: 6px; }

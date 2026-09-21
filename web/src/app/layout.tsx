@@ -116,7 +116,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <footer className="site-footer">
             <div className="bar">
               {/* 지역별 착지 페이지로 가는 유일한 내부 링크. 크롤러가 공고 상세까지 닿는 길이 여기서 갈라진다 —
-                  목록은 무한스크롤이라 홈 HTML에는 첫 24건만 있다(2026-09-15 점검). 지우지 말 것 */}
+                  목록은 무한스크롤이라 홈 HTML에는 첫 24건만 있다(2026-09-15 점검). 지우지 말 것.
+
+                  **접어 두되 <details>로 접는다**(사용자 결정 2026-09-21: 푸터가 너무 길다).
+                  display:none이 아니라 닫힌 details라서 링크는 HTML에 그대로 있고 크롤러는 똑같이 읽는다 —
+                  구글도 닫힌 details 안의 링크를 따라간다. JS도 필요 없다 */}
+              {(areas.length > 0 || types.length > 0) && (
+                <details className="foot-more">
+                  <summary>지역별 모집공고와 유형별 안내 모두 보기</summary>
               {areas.length > 0 && (
                 <nav className="foot-area" aria-label="지역별 모집공고">
                   <b>지역별 모집공고</b>
@@ -144,6 +151,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     ))}
                   </ul>
                 </nav>
+              )}
+                </details>
               )}
               <p>출처: 국토교통부 마이홈포털 공공주택 모집공고 조회 서비스(공공데이터포털), 서울주거포털 SH 공고 목록. 공고 원문은 각 기관 링크에서 확인하세요.</p>
               {/* 개인정보처리방침은 다른 링크보다 굵게 — 개인정보보호법 시행령이 "글자 크기나 색상으로 구분해
