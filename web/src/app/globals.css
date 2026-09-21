@@ -69,6 +69,8 @@
   --maxw: 1400px;
   /* 고정 헤더 높이. sticky 레일·해시 착지점이 전부 이 값을 본다 — 모바일에선 검색칸이 둘째 줄로 내려가 커진다 */
   --hdr: 60px;
+  /* 상세의 차례 줄(.d-nav) 높이 — 헤더 밑에 붙어 따라온다. 오른쪽 패널 sticky와 해시 착지점이 이 값을 더해 쓴다 */
+  --dnav: 59px;
   --pad: 18px;
   --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif;
 }
@@ -937,6 +939,8 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 @media (hover: none) { .pv-nav { display: none; } }
 .aside { border-left: 1px solid var(--line); }
 .aside-in { position: sticky; top: var(--hdr); padding: 22px var(--pad); display: flex; flex-direction: column; gap: 14px; }
+/* 차례가 따라오는 지면에서는 그 밑에서 멈춘다 — 안 그러면 패널 머리가 차례 뒤로 기어든다 */
+.hd-out .aside-in { top: calc(var(--hdr) + var(--dnav)); }
 .dcard { padding: 18px; border-radius: var(--r-panel); }
 .dcard span { display: block; font-weight: 800; font-size: 11.5px; line-height: 1; letter-spacing: 0.04em; margin-bottom: 10px; }
 .dcard b { font-weight: 900; font-size: 40px; line-height: 1; letter-spacing: -0.06em; }
@@ -982,9 +986,13 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
   .dbar-a .btn { padding: 0 13px; font-size: 13px; }
 }
 
-/* 상세 안의 라벨:값 목록(spec-list.tsx) — 카드 안 헤어라인 그리드. gap 1px + 각 칸 배경으로 격자선을 만든다(반응형 컬럼 수와 무관하게 성립). */
-.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; margin: 0; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--line); overflow: hidden; }
-.spec div { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 13px 16px; background: var(--bg); }
+/* 상세 안의 라벨:값 목록(spec-list.tsx) — 카드 안 헤어라인 격자.
+   예전엔 gap 1px + 바탕 색으로 줄을 그었는데, 항목 수가 칸 수에 딱 맞아떨어져야만 성립했다 —
+   5개를 6칸에 놓으면 마지막에 회색 빈 덩어리가 남았다(2026-09-21).
+   줄을 칸의 테두리로 그리고 음수 여백으로 바깥줄을 테두리 밑으로 밀어 감춘다 — 칸이 몇이든 성립한다 */
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0; margin: 0; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); overflow: hidden; }
+.spec div { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 13px 16px; background: var(--bg);
+  border-top: 1px solid var(--line); border-left: 1px solid var(--line); margin: -1px 0 0 -1px; }
 .spec dt { margin: 0; color: var(--dim); font-weight: 800; font-size: 11.5px; line-height: 1; letter-spacing: 0.1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .spec dd { margin: 0; color: var(--ink); font-weight: 700; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
 .spec .wide { grid-column: 1 / -1; }
@@ -1304,6 +1312,24 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   .detail { grid-template-columns: 1fr; }
   .aside { border-left: 0; border-top: 1px solid var(--line); }
   .aside-in { position: static; }
+  .hd-out .aside-in { top: auto; }
+  /* 폰에서 오른쪽 패널은 본문 **밑**으로 내려갔다 — 4,150px 지면의 2,806px 지점(2026-09-21 실측).
+     결정에 필요한 값(마감과 금액, 호수)을 제목 바로 밑으로 끌어올린다. 머리글을 두 칸 밖으로 빼 둔
+     지면(.hd-out)에서만 돈다 — 단지 상세처럼 머리글이 본문 칸 안에 있는 지면은 제목보다 위로 올라가 버린다 */
+  .hd-out { display: flex; flex-direction: column; }
+  .hd-out > .aside { order: -1; border-top: 0; border-bottom: 1px solid var(--line); }
+  .hd-out > .aside .aside-in { padding: 14px var(--pad) 16px; gap: 10px; }
+  /* D-day 카드를 누이면 요약 덩어리가 한 화면에 들어간다 */
+  .hd-out > .aside .dcard { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; padding: 13px 15px; }
+  .hd-out > .aside .dcard span { margin-bottom: 0; }
+  .hd-out > .aside .dcard b { font-size: 28px; }
+  .hd-out > .aside .dcard p { margin: 0 0 0 auto; }
+  .hd-out > .aside .dcard-x { flex-basis: 100%; margin-top: 2px; }
+  /* 제원은 두 칸으로 — 한 칸짜리로 쌓으면 이 덩어리만 400px가 된다 */
+  .hd-out > .aside .specs { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; row-gap: 9px; }
+  .hd-out > .aside .specs > .t, .hd-out > .aside .specs .r.lead { grid-column: 1 / -1; }
+  /* 두 칸의 길이가 다를 때 짧은 쪽 밑줄이 허공에 뜨지 않게 — 칸이 글자를 따라 줄어든다 */
+  .hd-out > .aside .specs .r { align-self: start; }
   .d-title { font-size: 30px; }
   .cx { grid-template-columns: minmax(0, 1fr); }
   .cx-map-wrap { position: static; order: -1; min-width: 0; height: 400px; }
@@ -1412,8 +1438,20 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-why li.y > span { color: var(--ok); }
 .elig-why li.n > span { color: var(--hot); }
 .elig-why li > p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--mut); }
+/* 「해당 없음」은 값이 아니라 「이 유형은 그 기준을 안 본다」는 말이다 — 무게를 미리 뺀다 */
+.elig-why li.off > span, .elig-why li.off > p { color: var(--dim); opacity: 0.75; }
 
 .elig-rank, .elig-memo { margin: 8px 0 0; font-size: 12.5px; line-height: 1.65; color: var(--dim); }
+
+/* 공고 상세의 신청자격 카드 — 유형끼리 가로로 훑을 수 있게 같은 줄에 같은 기준을 놓는다(2026-09-21).
+   카드가 부모 격자의 줄을 그대로 받아 쓰게(subgrid) 하고, 안의 <ul>은 display:contents로 지워
+   기준 한 줄이 공통 격자의 한 줄이 되게 한다. subgrid를 모르는 브라우저는 평범한 카드로 떨어진다.
+   열 하나를 320px로 잡은 건 260px에서는 네 열이 서서 값이 줄마다 여러 번 감겼기 때문이다 */
+.elig-align { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); column-gap: 8px; row-gap: 4px; align-items: start; }
+.elig-align > .elig-card { display: grid; grid-template-rows: subgrid; grid-row: span var(--rows); align-content: start; margin-bottom: 8px; }
+.elig-align .elig-why { display: contents; }
+.elig-align .elig-card-h { margin-bottom: 5px; }
+.elig-align .elig-memo { margin: 6px 0 0; min-height: 1px; }
 .elig-sub small { margin-left: 8px; font-weight: 600; font-size: 12.5px; color: var(--dim); }
 
 /* ── 공고문에서 읽은 신청자격 (notice-eligibility.tsx) ──
@@ -1445,9 +1483,17 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* ── 상세 페이지 정리(2026-09-14: "나열식이라 보기 힘들다") — 차례 줄, 접이식 묶음, 계층 탭, 한 줄 요약 ── */
 /* 해시로 닿는 자리는 고정 헤더(60px) 아래에서 멈춘다 — 제목이 헤더에 먹히던 문제(사용자 지적 2026-09-17) */
 .dsec[id], .section[id] { scroll-margin-top: calc(var(--hdr) + 12px); }
-.d-nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px var(--pad); border-bottom: 1px solid var(--line); background: var(--sub); }
-.d-nav a { display: inline-flex; align-items: center; height: 38px; padding: 0 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-weight: 800; font-size: 13px; color: var(--mut); }
+/* 차례가 헤더 밑에 붙어 따라오는 지면(.hd-out)은 차례 높이만큼 더 내려서 멈췄다 */
+.hd-out .dsec[id], .hd-out .section[id] { scroll-margin-top: calc(var(--hdr) + var(--dnav) + 12px); }
+/* 긴 지면(4,000px)에서 머리글에만 붙어 있으면 섬션을 옮기려고 맨 위까지 되올라가야 했다(2026-09-21).
+   헤더 밑에 붙이고, 줄바꿈 대신 가로 스크롤로 한 줄을 지킨다 — 세 줄로 쌓이면 바 자체가 화면을 먹는다 */
+.d-nav { position: sticky; top: var(--hdr); z-index: 9; padding: 10px 0; border-bottom: 1px solid var(--line); background: var(--sub); }
+.d-nav-in { display: flex; gap: 6px; padding: 0 var(--pad); overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth; }
+.d-nav-in::-webkit-scrollbar { display: none; }
+.d-nav a { flex: none; display: inline-flex; align-items: center; height: 38px; padding: 0 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-weight: 800; font-size: 13px; color: var(--mut); white-space: nowrap; transition: color 160ms var(--ease), border-color 160ms var(--ease), background 160ms var(--ease); }
 .d-nav a:hover { color: var(--ink); border-color: var(--ink); }
+/* 지금 읽고 있는 섬션 — 긴 지면에서 「여기가 어디인가」를 말해 준다 */
+.d-nav a.on { background: var(--ink); border-color: var(--ink); color: #fff; }
 .dsec > h2 .dsec-src { margin-left: auto; font-weight: 600; font-size: 12.5px; letter-spacing: 0; color: var(--dim); }
 .ne-sum { margin: -4px 0 12px; font-weight: 700; font-size: 13.5px; line-height: 1.6; color: var(--mut); }
 .ne-foot { margin: 12px 0 0; }

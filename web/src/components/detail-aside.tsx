@@ -25,7 +25,7 @@ type Props = {
 };
 
 export function DetailAside({ tone, ddayLabel, ddayNum, ddayNote, ddayExtra, cta, primary, brief, rows, footNote }: Props) {
-  // 하단 바에 세울 요약 — lead로 찍은 줄(금액과 보증금)이다. 값이 없는 줄은 「—」라 바에 올릴 게 못 된다
+  // 하단 바에 세울 요약 — lead로 찍은 줄(금액과 보증금)이다. 값이 없는 줄은 바에 올릴 게 못 된다
   const bar = (brief ?? rows.filter((r) => r.lead)).filter((r) => r.value != null).slice(0, 2);
   return (
     <>
@@ -43,7 +43,8 @@ export function DetailAside({ tone, ddayLabel, ddayNum, ddayNote, ddayExtra, cta
             {rows.map((r) => (
               <div className={`r${r.value == null ? " empty" : ""}${r.lead ? " lead" : ""}`} key={r.label}>
                 <span>{r.label}</span>
-                <b>{r.value ?? "—"}</b>
+                {/* 빈칸 대신 「준비 중」— 왜 비었는지 말해 주지 않는 대시는 「없다」로 읽힌다(docs/handoff.md 표기 규칙) */}
+                <b>{r.value ?? "준비 중"}</b>
               </div>
             ))}
           </div>

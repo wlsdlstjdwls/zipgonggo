@@ -24,6 +24,8 @@ type AuthState = {
   loading: boolean;
   /** env에 카카오 키가 없는 배포 — 로그인 문을 아예 그리지 않는다 */
   enabled: boolean;
+  /** 운영자 쿠키(zg_admin)로 들어와 있다. 아직 안 연 메뉴를 이 사람에게만 보인다(components/admin-only.tsx) */
+  admin: boolean;
   refresh: () => Promise<void>;
 };
 
@@ -32,18 +34,21 @@ const AuthCtx = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [enabled, setEnabled] = useState(false);
+  const [admin, setAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/me", { headers: { accept: "application/json" }, cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const d = (await res.json()) as { enabled: boolean; user: AuthUser | null };
+      const d = (await res.json()) as { enabled: boolean; admin?: boolean; user: AuthUser | null };
       setEnabled(d.enabled);
+      setAdmin(d.admin === true);
       setUser(d.user ?? null);
     } catch {
       // 물어보지 못했으면 로그아웃으로 친다. 화면이 하나도 안 그려지는 것보다는 낫다
       setUser(null);
+      setAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -53,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const value = useMemo<AuthState>(() => ({ user, loading, enabled, refresh }), [user, loading, enabled, refresh]);
+  const value = useMemo<AuthState>(() => ({ user, loading, enabled, admin, refresh }), [user, loading, enabled, admin, refresh]);
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
 

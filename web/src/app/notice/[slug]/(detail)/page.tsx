@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminOnly } from "@/components/admin-only";
 import { CalcSeed } from "@/components/calc-context";
 import { ComplexExplorer } from "@/components/complex-explorer";
 import { ComplexFactsSection } from "@/components/complex-facts";
 import { DetailAside } from "@/components/detail-aside";
 import { DetailHeadBar } from "@/components/detail-headbar";
+import { DetailNav } from "@/components/detail-nav";
 import { ExternalLink } from "@/components/external-link";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
@@ -191,13 +193,61 @@ export default async function NoticePage({ params }: Params) {
     ...(n.announce_at ? [{ label: "당첨자 발표", value: at(n.announce_at, null), sub: null, at: n.announce_at }] : []),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
-  // key = 사람이 달력에 적는 두 날짜. 나머지 단계보다 크게 그린다
-  const steps: { label: string; value: Stamp | null; sub?: Stamp | null; on?: boolean; key?: boolean }[] = [
+  // 카드는 사람이 달력에 적는 날짜만. 두 가지를 고쳤다(2026-09-21):
+  //  - 접수가 하루짜리면 같은 날짜를 카드 두 장이 되풀이했다(LH 「09.29 / 09.29」) — 한 장으로 합치고 시각을 밑줄로 단다
+  //  - 날짜를 못 읽은 공고는 「—」 카드 두 장이 자리만 먹었다 — 카드를 걷고 왜 비었는지 한 줄로 말한다
+  const oneDay = Boolean(n.apply_start_at && n.apply_start_at === n.apply_end_at);
+  const applyHours = [n.apply_start_tm, n.apply_end_tm].filter(Boolean).join(" ~ ") || null;
+  const keyCards: { label: string; value: Stamp; foot?: string | null; on?: boolean }[] = oneDay
+    ? [{ label: "접수", value: { date: dateK(n.apply_start_at, true), time: null }, foot: applyHours, on: true }]
+    : [
+        ...(n.apply_start_at ? [{ label: "접수 시작", value: at(n.apply_start_at, n.apply_start_tm) as Stamp }] : []),
+        ...(n.apply_end_at ? [{ label: "접수 마감", value: at(n.apply_end_at, n.apply_end_tm) as Stamp, on: true }] : []),
+      ];
+  // 카드로 올라간 접수 날짜는 목록에서 뺀다 — 한 값은 한 곳
+  const restSteps: { label: string; value: Stamp | null; sub?: Stamp | null }[] = [
     { label: "공고일", value: at(n.posted_at, null) },
-    { label: "접수 시작", value: at(n.apply_start_at, n.apply_start_tm), key: true },
-    { label: "접수 마감", value: at(n.apply_end_at, n.apply_end_tm), on: true, key: true },
     ...tail,
     ...(n.announce_at ? [] : [{ label: "당첨자 발표", value: null }]),
+  ];
+
+  // 신청자격 카드 — 유형마다 빠진 항목이 달라 가로로 훑을 수가 없었다(2026-09-21).
+  // 쓰이는 기준을 모두 모아 같은 차례로 세우고, 그 유형이 안 보는 기준은 감추지 않고 「해당 없음」이라 쓴다.
+  // 목록에 없는 라벨(민간임대의 「선정」·「신청」)이 뒤로 밀리되 사라지지는 않게 순서만 정해 준다
+  const SLOT_ORDER = ["나이", "혼인", "계층", "무주택", "소득", "자산", "자동차", "거주지", "지역"];
+  const slotOf = (label: string) => (label === "혼인기간" ? "혼인" : label);
+  const slotRank = (s: string) => {
+    const i = SLOT_ORDER.indexOf(s);
+    return i < 0 ? SLOT_ORDER.length : i;
+  };
+  // 민간임대 카드(공통/특별공급/일반공급)는 **서로 대등한 유형이 아니다** — 한 제도를 세 측면으로 쪼갠 것이라
+  // 공통 카드의 빈 소득 줄을 「해당 없음」으로 채우면 "소득을 안 본다"는 거짓말이 된다. 칸 맞춤은 유형 카드에만 건다
+  const alignRules = minganCards.length === 0;
+  const slots = alignRules
+    ? [...new Set(ruleCards.flatMap((c) => c.lines.map((l) => slotOf(l.label))))].sort((a, b) => slotRank(a) - slotRank(b))
+    : [];
+  const alignedCards = alignRules
+    ? ruleCards.map((c) => ({
+        ...c,
+        lines: slots.map((s) => {
+          const hit = c.lines.find((l) => slotOf(l.label) === s);
+          return hit ? { label: hit.label, text: hit.text, off: false } : { label: s, text: "해당 없음", off: true };
+        }),
+      }))
+    : ruleCards.map((c) => ({ ...c, lines: c.lines.map((l) => ({ label: l.label, text: l.text, off: false })) }));
+  const anyNote = alignRules && alignedCards.some((c) => c.note);
+  // 칸 맞춤(subgrid)에 쓸 줄 수 — 머리줄 + 기준 줄들 + (메모 줄)
+  const eligRows = 1 + slots.length + (anyNote ? 1 : 0);
+
+  // 차례 — 머리글 밑에 붙어 따라다닌다(components/detail-nav.tsx). 여기 적힌 id는 아래 섹션의 id와 같아야 한다
+  const navItems = [
+    ...(complexes.length > 0 ? [{ id: "complexes", label: `단지 ${num(complexes.length, "곳")}` }] : []),
+    ...(facts ? [{ id: "complex", label: "단지 정보" }] : []),
+    { id: "schedule", label: "일정" },
+    ...(noticeElig || minganFit ? [{ id: "fit", label: "내 조건" }] : []),
+    ...(noticeElig || ruleCards.length > 0 ? [{ id: "eligibility", label: "신청자격" }] : []),
+    ...(showAreaTable && areas.length > 0 ? [{ id: "areas", label: "지역별 호수" }] : []),
+    { id: "info", label: "공고 정보" },
   ];
 
   return (
@@ -213,50 +263,46 @@ export default async function NoticePage({ params }: Params) {
         back={{ href: ROUTES.home, label: "← 목록" }}
         action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
       />
-      <div className="detail">
-        <div className="detail-main">
-          <header className="d-head">
-            <div className="d-tags">
-              {/* 뒤로가기는 이 줄 맨 앞에 — 혼자 한 행을 쓰지 않는다(사용자 요청 2026-09-09) */}
-              <Link href={ROUTES.home} className="d-back">← 목록</Link>
-              {/* D-day는 오른쪽 카드가 크게 센다 — 여기서 또 세지 않는다 */}
-              <span className="tag type"><Term>{n.housing_type}</Term></span>
-              <span className="tag">{n.agency}</span>
-              {/* 지역 태그는 /area/{시도}로 가는 링크다 — 상세에서 같은 지역 다른 공고로 건너가는 유일한 길이고,
-                  크롤러가 상세에서 목록으로 되돌아 나가는 길이기도 하다(2026-09-15 SEO 점검) */}
-              {areaLink && <Link href={areaLink} className="tag link">{sidoShort(n.sido)}</Link>}
-              {n.sector === "민간임대" && <span className="tag">{n.sector}</span>}
-              {n.house_type && <span className="tag">{n.house_type}</span>}
-              {/* 공급/재공급은 태그 줄에서 바로 읽혀야 한다(사용자 요청 2026-09-09) */}
-              {supplyKind && <span className="tag"><TermText>{supplyKind}</TermText></span>}
-              {n.amends_source_key && <span className="tag acc">정정공고</span>}
-            </div>
-            <h1 className="d-title">{n.title}</h1>
-            {/* 같은 공고가 기관 seq 여러 개로 올라온 경우. URL은 살려 두고(하지 말 것 6)
-                최신 글로 보내 준다 — 여기 남은 값은 옛 회차의 것일 수 있다 */}
-            {n.canonical_slug && (
-              <p className="d-canon">
-                이 공고는 <Link href={noticePath(n.canonical_slug)}>최신 공고문</Link>으로 대체됐습니다.
-                아래 내용은 이 회차 기준입니다.
-              </p>
-            )}
-            {/* 헤드라인은 금액이 아니라 접수 상태다. 다만 한 줄로 — 본론은 아래 단지 목록과 지도다(사용자 요청 2026-09-09) */}
-            <p className="d-when">
-              <b className={`when ${ph.tone}`}>{ph.label}</b>
-              {ph.note && <span>{ph.note}</span>}
-            </p>
-          </header>
+      {/* 머리글과 차례는 두 칸(본문|패널) **밖**에 둔다(2026-09-21) — 제목이 오른쪽 패널 폭만큼 눌리지 않고,
+          좁은 화면에서 오른쪽 패널(마감·금액·원문)을 제목 바로 밑으로 끌어올릴 수 있다 */}
+      <header className="d-head">
+        <div className="d-tags">
+          {/* 뒤로가기는 이 줄 맨 앞에 — 혼자 한 행을 쓰지 않는다(사용자 요청 2026-09-09) */}
+          <Link href={ROUTES.home} className="d-back">← 목록</Link>
+          {/* D-day는 오른쪽 카드가 크게 센다 — 여기서 또 세지 않는다 */}
+          <span className="tag type"><Term>{n.housing_type}</Term></span>
+          <span className="tag">{n.agency}</span>
+          {/* 지역 태그는 /area/{시도}로 가는 링크다 — 상세에서 같은 지역 다른 공고로 건너가는 유일한 길이고,
+              크롤러가 상세에서 목록으로 되돌아 나가는 길이기도 하다(2026-09-15 SEO 점검) */}
+          {areaLink && <Link href={areaLink} className="tag link">{sidoShort(n.sido)}</Link>}
+          {n.sector === "민간임대" && <span className="tag">{n.sector}</span>}
+          {n.house_type && <span className="tag">{n.house_type}</span>}
+          {/* 공급/재공급은 태그 줄에서 바로 읽혀야 한다(사용자 요청 2026-09-09) */}
+          {supplyKind && <span className="tag"><TermText>{supplyKind}</TermText></span>}
+          {n.amends_source_key && <span className="tag acc">정정공고</span>}
+        </div>
+        <h1 className="d-title">{n.title}</h1>
+        {/* 같은 공고가 기관 seq 여러 개로 올라온 경우. URL은 살려 두고(하지 말 것 6)
+            최신 글로 보내 준다 — 여기 남은 값은 옛 회차의 것일 수 있다 */}
+        {n.canonical_slug && (
+          <p className="d-canon">
+            이 공고는 <Link href={noticePath(n.canonical_slug)}>최신 공고문</Link>으로 대체됐습니다.
+            아래 내용은 이 회차 기준입니다.
+          </p>
+        )}
+        {/* 헤드라인은 금액이 아니라 접수 상태다. 다만 한 줄로 — 본론은 아래 단지 목록과 지도다(사용자 요청 2026-09-09) */}
+        <p className="d-when">
+          <b className={`when ${ph.tone}`}>{ph.label}</b>
+          {ph.note && <span>{ph.note}</span>}
+        </p>
+      </header>
 
-          {/* 긴 페이지의 차례 — 무엇이 어디 있는지 먼저 보인다(사용자 지적 2026-09-14: "나열식이라 보기 힘들다") */}
-          <nav className="d-nav" aria-label="이 페이지 차례">
-            {complexes.length > 0 && <a href="#complexes">단지 {num(complexes.length, "곳")}</a>}
-            {facts && <a href="#complex">단지 정보</a>}
-            <a href="#schedule">일정</a>
-            {(noticeElig || minganFit) && <a href="#fit">내 조건</a>}
-            {(noticeElig || ruleCards.length > 0) && <a href="#eligibility">신청자격</a>}
-            {showAreaTable && areas.length > 0 && <a href="#areas">지역별 호수</a>}
-            <a href="#info">공고 정보</a>
-          </nav>
+      {/* 긴 페이지의 차례 — 무엇이 어디 있는지 먼저 보인다(사용자 지적 2026-09-14: "나열식이라 보기 힘들다").
+          헤더 밑에 붙어 따라오고 지금 읽는 섹션을 표시한다(2026-09-21) */}
+      <DetailNav items={navItems} />
+
+      <div className="detail hd-out">
+        <div className="detail-main">
 
           {complexes.length > 0 && (
             <section className="dsec lead" id="complexes">
@@ -298,18 +344,23 @@ export default async function NoticePage({ params }: Params) {
             <h2>접수 일정</h2>
             {hasSchedule ? (
               <>
-                {/* 달력에 적는 두 날짜만 카드. 나머지 단계는 한 줄씩 — 카드 여덟 장이 나란히 서면 어느 것이 급한지 안 보였다(2026-09-14) */}
-                <div className="steps">
-                  {steps.filter((s) => s.key).map((s) => (
-                    <div key={s.label} className={`step key${s.on && s.value ? " on" : ""}`}>
-                      <span>{s.label}</span>
-                      <b>{s.value ? <Stamped v={s.value} /> : "—"}</b>
-                      {s.sub && <em><Stamped v={s.sub} pre="~ " /></em>}
-                    </div>
-                  ))}
-                </div>
+                {/* 달력에 적는 날짜만 카드. 나머지 단계는 한 줄씩 — 카드 여덟 장이 나란히 서면 어느 것이 급한지 안 보였다(2026-09-14) */}
+                {keyCards.length > 0 ? (
+                  <div className="steps">
+                    {keyCards.map((s) => (
+                      <div key={s.label} className={`step key${s.on ? " on" : ""}`}>
+                        <span>{s.label}</span>
+                        <b><Stamped v={s.value} /></b>
+                        {s.foot && <em>{s.foot}</em>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* 빈 카드를 세우느니 왜 비었는지 말한다 — 공고문에서 접수 기간을 못 읽은 회차다 */
+                  <p className="note" style={{ margin: "0 0 2px" }}>접수 기간은 {L.originalDoc}에서 확인하세요.</p>
+                )}
                 <ol className="tl">
-                  {steps.filter((s) => !s.key).map((s) => (
+                  {restSteps.map((s) => (
                     <li key={s.label}>
                       <span>{s.label}</span>
                       <b>{s.value ? <Stamped v={s.value} /> : "—"}{s.sub && <em><Stamped v={s.sub} pre=" ~ " /></em>}</b>
@@ -356,12 +407,13 @@ export default async function NoticePage({ params }: Params) {
                 {minganCards.length
                   ? <>특별공급과 일반공급으로 나뉩니다. 이 공고가 실제로 모집하는 계층과 세부 조건은 {L.originalDoc} 기준.</>
                   : <>유형 {eligTypes.length}개. 이 공고가 실제로 모집하는 유형과 세부 조건은 {L.originalDoc} 기준.</>}{" "}
-                <Link href={ROUTES.eligibility}>내 조건으로 진단하기 →</Link>
+                {/* 자격진단은 아직 안 열었다 — 운영자에게만 보인다(2026-09-21) */}
+                <AdminOnly><Link href={ROUTES.eligibility}>내 조건으로 진단하기 →</Link></AdminOnly>
               </p>
               {/* 표(가로 스크롤)는 좁은 화면에서 유형 열이 밀려나 안 보인다는 지적(2026-09-09) — 자가진단
                   카드(elig-card/elig-why)와 같은 모양으로 유형 하나당 카드 하나씩 쌓는다 */}
-              <ul className="elig-list">
-                {ruleCards.map((c) => (
+              <ul className={`elig-list${alignRules ? " elig-align" : ""}`} style={alignRules ? ({ "--rows": eligRows } as React.CSSProperties) : undefined}>
+                {alignedCards.map((c) => (
                   <li key={c.key} className="elig-card">
                     <div className="elig-card-h">
                       <b>{c.title}</b>
@@ -370,10 +422,11 @@ export default async function NoticePage({ params }: Params) {
                     </div>
                     <ul className="elig-why">
                       {c.lines.map((l) => (
-                        <li key={l.label}><span>{l.label}</span><p>{l.text}</p></li>
+                        <li key={l.label} className={l.off ? "off" : undefined}><span>{l.label}</span><p>{l.text}</p></li>
                       ))}
                     </ul>
-                    {c.note && <p className="elig-memo">{c.note}</p>}
+                    {/* 메모가 있는 카드가 하나라도 있으면 없는 카드도 자리를 비워 둔다 — 안 그러면 칸 맞춤이 한 줄씩 어긋난다 */}
+                    {anyNote && (c.note ? <p className="elig-memo">{c.note}</p> : <p className="elig-memo" aria-hidden="true" />)}
                   </li>
                 ))}
               </ul>

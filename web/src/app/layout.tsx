@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AccountMenu } from "@/components/account-menu";
+import { AdminOnly } from "@/components/admin-only";
 import { AuthProvider } from "@/components/auth-context";
 import { CalcButton, CalcProvider } from "@/components/calc-context";
 import { CalcDock } from "@/components/calc-dock";
@@ -88,9 +89,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="bar">
               <div className="left">
                 <HomeLink />
-                {/* 자격진단은 공고 목록과 나란한 한 갈래다 — 헤더에서 바로 닿게 둔다 */}
+                {/* 자격진단은 공고 목록과 나란한 한 갈래지만 아직 안 열었다 —
+                    운영자로 들어왔을 때만 보인다(사용자 결정 2026-09-21). 주소는 살려 둔다 */}
                 <nav className="site-nav" aria-label="주요 메뉴">
-                  <Link href={ROUTES.eligibility}>자격진단</Link>
+                  <AdminOnly><Link href={ROUTES.eligibility}>자격진단</Link></AdminOnly>
                   {/* ★로 담아 둔 공고를 다시 찾아가는 유일한 길. 담기만 되고 볼 자리가 없었다(2026-09-18) */}
                   <SavedLink />
                 </nav>

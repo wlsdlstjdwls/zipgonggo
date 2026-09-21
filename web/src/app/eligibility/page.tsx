@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   alternates: { canonical: ROUTES.eligibility },
   openGraph: { title: TITLE, description: DESCRIPTION, url: ROUTES.eligibility },
+  // 아직 안 열었다(사용자 결정 2026-09-21). 화면으로 가는 메뉴를 운영자에게만 보이면서
+  // 색인만 열려 있으면 검색으로 먼저 닿는다 — 사이트맵과 함께 거둔다.
+  // **지우지는 않는다**(CLAUDE.md 하지 말 것 5) — 열 때 이 두 줄과 sitemap.ts 한 줄을 돌린다
+  robots: { index: false, follow: true },
 };
 
 export default async function EligibilityPage() {
