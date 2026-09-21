@@ -43,8 +43,6 @@ export function LoginPanel({ next, ready, failed }: { next: string; ready: boole
         <BrandMark size={30} />
         집공고 로그인
       </h1>
-      <p className="login-sub">카카오로 3초면 시작한다.</p>
-
       <ul className="login-why">
         {BENEFITS.map(({ icon: Icon, title, desc }) => (
           <li key={title}>
