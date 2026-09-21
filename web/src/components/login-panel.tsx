@@ -6,18 +6,24 @@
 // (smokespot에서 disabled 버튼이 클릭을 삼켜 「로그인이 안 된다」로 보였던 일을 그대로 피한다)
 import Link from "next/link";
 import { useState } from "react";
+import { BrandMark } from "./brand-mark";
+import { IconDevices, IconKeep, IconShield } from "./icons";
 import { kakaoStartPath, ROUTES } from "@/lib/routes";
 
+// 아이콘은 글자를 거드는 자리다 — 뜻이 아이콘에만 실리면 안 된다(그래서 aria-hidden).
 const BENEFITS = [
   {
+    icon: IconDevices,
     title: "관심 공고가 기기를 넘어 남습니다",
     desc: "휴대폰에서 담아 둔 공고를 데스크탑에서 그대로 봅니다",
   },
   {
+    icon: IconKeep,
     title: "브라우저를 지워도 목록이 남습니다",
     desc: "지금까지는 이 브라우저에만 있어서 사이트 데이터를 지우면 함께 사라졌습니다",
   },
   {
+    icon: IconShield,
     title: "받아 가는 것은 별명 하나가 전부입니다",
     desc: "프로필 사진과 이메일은 선택이고, 전화번호와 주소는 묻지 않습니다. 탈퇴하면 그 자리에서 지웁니다",
   },
@@ -29,14 +35,20 @@ export function LoginPanel({ next, ready, failed }: { next: string; ready: boole
 
   return (
     <div className="login">
-      <h1>집공고 로그인</h1>
+      <h1>
+        <BrandMark size={30} />
+        집공고 로그인
+      </h1>
       <p className="login-sub">카카오 계정으로 3초 만에 시작합니다. 따로 만들 아이디도 비밀번호도 없습니다.</p>
 
       <ul className="login-why">
-        {BENEFITS.map((b) => (
-          <li key={b.title}>
-            <b>{b.title}</b>
-            <span>{b.desc}</span>
+        {BENEFITS.map(({ icon: Icon, title, desc }) => (
+          <li key={title}>
+            <span className="login-why-ico" aria-hidden="true"><Icon /></span>
+            <div>
+              <b>{title}</b>
+              <span>{desc}</span>
+            </div>
           </li>
         ))}
       </ul>

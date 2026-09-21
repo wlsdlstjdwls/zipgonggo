@@ -1,7 +1,6 @@
 // 이용약관/개인정보처리방침 같은 정책 문서의 공용 골격.
 // 본문 폭을 좁게 잡고 조항 단위로 끊는다 — 화면에서 읽히라고 만든 문서지 PDF 대용이 아니다.
-import Link from "next/link";
-import { ROUTES } from "@/lib/routes";
+import { BackLink } from "./back-link";
 import { SITE_NAME } from "@/lib/constants";
 
 export function LegalDoc({ title, effectiveDate, children }: {
@@ -12,7 +11,8 @@ export function LegalDoc({ title, effectiveDate, children }: {
   return (
     <article className="stage legal">
       <div className="crumb">
-        <Link href={ROUTES.home} className="back">← 목록</Link>
+        {/* 온 길로 돌아간다. 로그인 화면에서 약관을 열었으면 로그인 화면으로 */}
+        <BackLink />
       </div>
       <div className="legal-in">
         <h1>{title}</h1>

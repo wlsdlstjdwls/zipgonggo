@@ -51,3 +51,36 @@ export function IconCalc(p: P) {
     </Svg>
   );
 }
+
+/** 기기 둘 — 휴대폰에서 담고 데스크탑에서 본다 */
+export function IconDevices(p: P) {
+  return (
+    <Svg viewBox="0 0 24 24" width="24" height="24" strokeWidth="1.5" {...p}>
+      <rect x="1.6" y="4" width="13.4" height="9.6" rx="1.6" />
+      <path d="M5.4 17.2h5.6M8.2 13.6v3.6" />
+      <rect x="16.4" y="8.6" width="6" height="11.4" rx="1.6" />
+      <path d="M18.6 17.6h1.6" />
+    </Svg>
+  );
+}
+
+/** 자물쇠 — 브라우저를 지워도 계정에 남는다 */
+export function IconKeep(p: P) {
+  return (
+    <Svg viewBox="0 0 24 24" width="24" height="24" strokeWidth="1.5" {...p}>
+      <rect x="4" y="10.2" width="16" height="10.4" rx="2.4" />
+      <path d="M7.8 10.2V7.6a4.2 4.2 0 0 1 8.4 0v2.6" />
+      <path d="M12 14.2v2.4" />
+    </Svg>
+  );
+}
+
+/** 방패 — 받아 가는 게 적다 */
+export function IconShield(p: P) {
+  return (
+    <Svg viewBox="0 0 24 24" width="24" height="24" strokeWidth="1.5" {...p}>
+      <path d="M12 2.8 4.6 5.8v6c0 4.4 3.1 8.1 7.4 9.4 4.3-1.3 7.4-5 7.4-9.4v-6z" />
+      <path d="M8.9 12.1l2.2 2.2 4-4.3" />
+    </Svg>
+  );
+}
