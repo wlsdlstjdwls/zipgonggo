@@ -8,8 +8,16 @@
 // 별첨에 동이 없어도 주소가 갈리면 같은 「404호」가 건물마다 따로 있다 — 그때는 주소 칸을 세운다.
 // 동도 주소도 하나뿐이면 한 건물이라 호만으로 유일하다.
 // 금액은 계약 때 고를 수 있는 폭 그대로 — 최대(전세전환) / 기준 / 최소(월세전환).
+//
+// **긴 목록을 접는다(사용자 지적 2026-09-21: "데이터가 많으면 너무 아래로 나열이라서").**
+// 실측(2026-09-21): 단지 471곳 중 462곳이 15호 이하인데 엘클루(3동 17층) 172호처럼 백 줄이 넘는 단지가 있다.
+// 그 세 곳 때문에 지면 아래쪽(위치 지도·용어)이 스크롤 저편으로 밀려났다. 손댄 곳 셋:
+//  1. 스무 줄씩 끊어 보여 주고 「더 보기」로 잇는다 — 목록 지면이 쓰는 방식 그대로(notice-explorer).
+//  2. 층 칩을 더했다. 17층 172호에서 사람이 찾는 건 「3층에 뭐가 있나」다(호실이 스물 미만이면 칩이 소음이라 안 세운다).
+//  3. 표 머리에서 면적·보증금으로 줄 세운다 — 싼 호실·큰 호실을 찾으려고 백 줄을 훑지 않게.
+// 필터·정렬을 건드리면 다시 스무 줄로 접는다. 접은 채로도 「몇 호 중 몇 호를 보고 있는지」와 면적·보증금 범위는 늘 적는다.
 
-import { useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { num, wonExact, wonKo } from "@/lib/format";
 import type { NoticeUnit } from "@/types/notice";
 import { Term } from "./glossary";
@@ -17,6 +25,16 @@ import { Term } from "./glossary";
 type Props = { units: NoticeUnit[] };
 
 const ALL = "";
+
+/** 한 번에 보여 주는 줄 수. 「더 보기」 한 번에 이만큼 더 붙는다 */
+const STEP = 20;
+
+/** 층 칩을 세우는 최소 호실 수. 열 줄짜리 빌라에 층 칩까지 세우면 고를 것보다 칩이 많다 */
+const FLOOR_CHIP_MIN = 20;
+
+/** 표 머리에서 고를 수 있는 정렬. `room`은 서버가 준 순서(동 → 주소 → 층 → 호) 그대로다 */
+type SortKey = "room" | "area" | "deposit";
+type Sort = { key: SortKey; desc: boolean };
 
 function tally(units: NoticeUnit[], pick: (u: NoticeUnit) => string | null): [string, number][] {
   const m = new Map<string, number>();
@@ -44,9 +62,18 @@ function addrShort(a: string): string {
   return i > 0 ? a.slice(i + 1) : a;
 }
 
+/** 값이 있는 것들의 최솟값·최댓값. 하나도 없으면 null */
+function span(vals: (number | null)[]): [number, number] | null {
+  const xs = vals.filter((v): v is number => v != null);
+  return xs.length ? [Math.min(...xs), Math.max(...xs)] : null;
+}
+
 export function UnitTable({ units }: Props) {
   const [dong, setDong] = useState(ALL);
   const [layout, setLayout] = useState(ALL);
+  const [floor, setFloor] = useState(ALL);
+  const [sort, setSort] = useState<Sort>({ key: "room", desc: false });
+  const [shown, setShown] = useState(STEP);
 
   // 동이 하나라도 있으면 동으로, 없으면 주소가 갈릴 때만 주소로 가른다
   const byDong = units.some((u) => u.building);
@@ -59,11 +86,46 @@ export function UnitTable({ units }: Props) {
 
   const dongs = useMemo(() => tally(units, groupOf), [units, groupOf]);
   const layouts = useMemo(() => tally(units, (u) => u.room_layout), [units]);
-
-  const visible = useMemo(
-    () => units.filter((u) => (!dong || groupOf(u) === dong) && (!layout || u.room_layout === layout)),
-    [units, dong, layout, groupOf],
+  // 층은 숫자로 줄 세운다 — 글자로 세면 10층이 2층 앞에 선다
+  const floors = useMemo(
+    () =>
+      units.length < FLOOR_CHIP_MIN
+        ? []
+        : tally(units, (u) => (u.floor != null ? String(u.floor) : null)).sort((a, b) => Number(a[0]) - Number(b[0])),
+    [units],
   );
+
+  const filtered = useMemo(
+    () =>
+      units.filter(
+        (u) =>
+          (!dong || groupOf(u) === dong) &&
+          (!layout || u.room_layout === layout) &&
+          (!floor || String(u.floor) === floor),
+      ),
+    [units, dong, layout, floor, groupOf],
+  );
+
+  // 정렬은 거른 다음에. 값이 없는 호실은 방향과 상관없이 맨 뒤로 보낸다 — 「모름」은 0원도 0㎡도 아니다
+  const visible = useMemo(() => {
+    if (sort.key === "room") return filtered;
+    const pick = sort.key === "area" ? (u: NoticeUnit) => u.area_m2 : (u: NoticeUnit) => u.deposit;
+    return [...filtered].sort((a, b) => {
+      const [x, y] = [pick(a), pick(b)];
+      if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
+      return sort.desc ? y - x : x - y;
+    });
+  }, [filtered, sort]);
+
+  // 조건이나 정렬이 바뀌면 다시 접는다 — 펼쳐 둔 채로 거르면 걸러진 줄이 어디까지인지 안 보인다
+  useEffect(() => { setShown(STEP); }, [dong, layout, floor, sort]);
+
+  const page = visible.slice(0, shown);
+  const rest = visible.length - page.length;
+
+  // 지금 보고 있는 조건의 폭. 접어 둔 줄까지 포함해서 잰다 — 「더 보기」를 누르지 않고도 이 조건의 폭을 안다
+  const areaSpan = span(visible.map((u) => u.area_m2));
+  const depositSpan = span(visible.map((u) => u.deposit));
 
   // 전세전환·월세전환 열은 값이 있을 때만 — 장기전세형 별첨에는 없다
   const hasSwap = units.some((u) => u.deposit_jeonse != null || u.deposit_wolse != null);
@@ -74,24 +136,52 @@ export function UnitTable({ units }: Props) {
   const Chips = ({ label, list, value, set, labelize }: { label: string; list: [string, number][]; value: string; set: (v: string) => void; labelize?: (v: string) => string }) =>
     list.length < 2 ? null : (
       <div className="ut-chips" role="group" aria-label={label}>
-        <button type="button" className={`chip-f${value === ALL ? " on" : ""}`} aria-pressed={value === ALL} onClick={() => set(ALL)}>
-          전체 <small>{units.length}</small>
+        <button type="button" className={`chip-f sm${value === ALL ? " on" : ""}`} aria-pressed={value === ALL} onClick={() => set(ALL)}>
+          {label} 전체 <small>{units.length}</small>
         </button>
         {list.map(([v, n]) => (
-          <button key={v} type="button" className={`chip-f${value === v ? " on" : ""}`} aria-pressed={value === v} onClick={() => set(value === v ? ALL : v)} title={v}>
+          <button key={v} type="button" className={`chip-f sm${value === v ? " on" : ""}`} aria-pressed={value === v} onClick={() => set(value === v ? ALL : v)} title={labelize ? labelize(v) : v}>
             {labelize ? labelize(v) : v} <small>{n}</small>
           </button>
         ))}
       </div>
     );
 
+  /** 정렬을 거는 표 머리. 누르면 오름차순, 한 번 더 누르면 내림차순, 세 번째면 원래 순서(동 → 호)로 돌아온다 */
+  const SortTh = ({ k, children }: { k: SortKey; children: ReactNode }) => {
+    const on = sort.key === k;
+    return (
+      <th className="num">
+        <button
+          type="button"
+          className={`ut-sort${on ? " on" : ""}`}
+          aria-label={`${typeof children === "string" ? children : ""} 기준 정렬`}
+          onClick={() => setSort(on ? (sort.desc ? { key: "room", desc: false } : { key: k, desc: true }) : { key: k, desc: false })}
+        >
+          {children}
+          <i aria-hidden="true">{on ? (sort.desc ? "▾" : "▴") : "⇅"}</i>
+        </button>
+      </th>
+    );
+  };
+
   return (
     <div className="ut">
       <div className="ut-tools">
         <Chips label={groupLabel} list={dongs} value={dong} set={setDong} labelize={byDong ? undefined : addrShort} />
         <Chips label="구조" list={layouts} value={layout} set={setLayout} />
+        <Chips label="층" list={floors} value={floor} set={setFloor} labelize={(v) => `${v}층`} />
       </div>
-      <p className="ut-count"><b>{visible.length}</b> / {num(units.length, "호")}</p>
+      <p className="ut-count">
+        <b>{visible.length}</b> / {num(units.length, "호")}
+        {areaSpan && <em>전용 {areaSpan[0] === areaSpan[1] ? `${areaSpan[0]}㎡` : `${areaSpan[0]}~${areaSpan[1]}㎡`}</em>}
+        {depositSpan && (
+          <em title={depositSpan[0] === depositSpan[1] ? wonExact(depositSpan[0]) : `${wonExact(depositSpan[0])} ~ ${wonExact(depositSpan[1])}`}>
+            {hasRent ? "보증금" : "전세금"}{" "}
+            {depositSpan[0] === depositSpan[1] ? wonKo(depositSpan[0]) : `${wonKo(depositSpan[0])}~${wonKo(depositSpan[1])}`}
+          </em>
+        )}
+      </p>
       <div className="tbl wide">
         <table className="supply">
           <thead>
@@ -99,17 +189,17 @@ export function UnitTable({ units }: Props) {
               {/* 동 열을 따로 두면 좁은 화면에서 스크롤할 때 어느 동인지 잊어버린다(사용자 지적
                   2026-09-09) — 호 열 하나에 합쳐 sticky로 고정한다(globals.css) */}
               <th>{dongs.length > 0 ? `${groupLabel}/호` : "호"}</th>
-              <th className="num">전용면적</th>
+              <SortTh k="area">전용면적</SortTh>
               <th>구조</th>
               <th>승강기</th>
-              <th className="num">{hasRent ? "임대보증금" : "전세금"}</th>
+              <SortTh k="deposit">{hasRent ? "임대보증금" : "전세금"}</SortTh>
               {hasRent && <th className="num">월임대료</th>}
               {hasSwap && <th className="num">최대 보증금</th>}
               {hasSwap && <th className="num">최소 보증금</th>}
             </tr>
           </thead>
           <tbody>
-            {visible.map((u) => (
+            {page.map((u) => (
               <tr key={u.id}>
                 <td className="tc-key">
                   {dongs.length > 0 && (
@@ -144,6 +234,18 @@ export function UnitTable({ units }: Props) {
           </tbody>
         </table>
       </div>
+      {rest > 0 && (
+        <div className="ut-more">
+          <button type="button" className="btn" onClick={() => setShown((v) => v + STEP)}>
+            더 보기 +{Math.min(STEP, rest)}
+          </button>
+          {rest > STEP && (
+            <button type="button" className="ut-all" onClick={() => setShown(visible.length)}>
+              {num(visible.length, "호")} 전부 펼치기
+            </button>
+          )}
+        </div>
+      )}
       {dongs.length === 0 && (
         <p className="note">공고문 별첨에 이 단지의 동 표기가 없습니다. 주소도 하나라 한 건물이며, 호만으로 호실이 갈립니다.</p>
       )}

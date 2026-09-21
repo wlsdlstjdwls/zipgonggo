@@ -496,6 +496,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .chip.amend { background: var(--acc-soft); color: var(--acc); }
 /* 「신규」 칩은 지도 신규 핀과 같은 주황이다 — 목록과 지도가 다른 색으로 같은 말을 하면 안 된다(2026-09-09) */
 .chip.new { background: #fdefe6; color: #b8460a; }
+/* 사진·도면이 있는 단지 표시(사용자 요청 2026-09-21). 「신규」와 나란히 서므로 색을 뺏지 않는 중립 */
+.chip.pic { background: var(--sub); color: var(--mut); }
 
 /* ── 탐색기: 좌 목록 / 우 지도 ───────────────────────────── */
 .ex-list { min-width: 0; }
@@ -602,23 +604,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .row-meta .live.soft { background: var(--sub); color: var(--mut); }
 .row-meta .live.soon { background: var(--soon-soft); color: var(--soon); }
 .row-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-top: 6px; font-weight: 800; font-size: 16px; line-height: 1.45; letter-spacing: -0.03em; color: var(--ink); overflow: hidden; }
-/* 금액 줄 — 임대 목록의 결정값. 제목 바로 밑, 날짜 위. 보증금과 월세를 한 줄에 나란히 세운다.
-   라벨(보증금·월세)은 작게 앞에 붙이고 금액을 진하게 — 라벨이 같은 무게면 둘 중 뭐가 얼만지 훑어지지 않는다 */
-.row-money { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; margin-top: 8px; min-width: 0; }
-.row-money b { display: inline-flex; align-items: baseline; gap: 5px; font-weight: 800; font-size: 15px;
-  letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.row-money i { font-style: normal; font-weight: 700; font-size: 11.5px; letter-spacing: 0.02em; color: var(--dim); }
-/* 금액을 못 읽은 공고(전체의 17%). 없는 값을 지어내지 않고 「원문 확인」이라고 적는다 */
-.row-money.none { font-weight: 700; font-size: 13px; color: var(--dim); }
-/* 간략 보기는 한 줄에 몰아 넣는 자리라 라벨을 접고 금액만 남긴다 */
-.rows.v-compact .row-money { margin-top: 3px; gap: 0 10px; }
-.rows.v-compact .row-money b { font-size: 13px; }
-.rows.v-compact .row-money i { display: none; }
-.rows.v-compact .row-money b + b::before { content: "|"; margin-right: 10px; color: var(--line2); font-weight: 600; }
-.rows.v-card .row-money { margin-top: 9px; }
-/* 카드에 금액 줄이 들어오면서 한 장이 길어졌다(2026-09-21) — 셋 가운데 제일 덜 쓰는 공고일을 접는다.
-   정렬 기준이라 목록·간략 보기에는 그대로 남는다(거기선 한 줄에 다 들어간다) */
-.rows.v-card .rd:last-child { display: none; }
 
 /* 날짜 줄 — 라벨은 연하게, 값은 진하게.
    셋을 같은 무게로 세우면 훑을 때 어느 게 결정값인지 안 보인다(2026-09-21) —
@@ -1180,9 +1165,25 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* ── 동호수별 목록 (components/unit-table.tsx) ───────────── */
 .ut-tools { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .ut-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.ut-count { margin: 0 0 8px; font-weight: 700; font-size: 12.5px; color: var(--dim); }
+.ut-count { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 8px; font-weight: 700; font-size: 12.5px; color: var(--dim); }
 .ut-count b { color: var(--ink); font-weight: 800; }
+/* 지금 거른 조건의 폭(전용면적·보증금). 「더 보기」를 누르지 않고도 이 조건이 어떤 값들인지 안다 */
+.ut-count em { font-style: normal; font-weight: 700; color: var(--mut); }
+.ut-count em::before { content: ""; display: inline-block; width: 1px; height: 10px; margin-right: 10px;
+  vertical-align: -1px; background: var(--line2); }
 .ut-empty { padding: 22px 12px; text-align: center; color: var(--dim); }
+/* 표 머리에서 거는 정렬 — 백 줄짜리 단지에서 싼 호실·큰 호실을 훑지 않고 찾는 길(사용자 지적 2026-09-21) */
+.ut-sort { display: inline-flex; align-items: center; gap: 4px; padding: 0; background: none; border: 0;
+  font: inherit; color: inherit; cursor: pointer; }
+.ut-sort i { font-style: normal; font-size: 10px; color: var(--dim); }
+.ut-sort:hover { color: var(--acc); }
+.ut-sort.on { color: var(--ink); }
+.ut-sort.on i { color: var(--acc); }
+/* 긴 목록은 스무 줄씩 잇는다. 「전부 펼치기」는 표를 통째로 읽거나 Ctrl+F로 찾을 때의 길 */
+.ut-more { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.ut-all { padding: 0; background: none; border: 0; font: inherit; font-weight: 700; font-size: 13px;
+  color: var(--mut); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.ut-all:hover { color: var(--acc); }
 .supply .tc-key small { font-weight: 600; font-size: 11.5px; color: var(--dim); }
 
 /* ── 상세 머리글 → 헤더 리빌 (components/detail-headbar.tsx) ──
@@ -1785,6 +1786,11 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   vertical-align: -1px; background: var(--line2); }
 .sect.pub { background: var(--acc-soft); color: var(--acc); }
 .sect.priv { background: var(--warn-soft); color: var(--warn); }
+/* 「사진」 배지 — 사진이 붙은 공고는 열어 볼 값이 다르다(사용자 요청 2026-09-21).
+   부문 칩과 같은 높이로 두되 색은 중립이다. 이 배지는 실물 사진이 있을 때만 붙는다 —
+   평면도만 있는 단지는 달지 않는다(배지가 「사진」이라 적혀 있으면 사진이 나와야 한다) */
+.row-photo { flex: none; display: inline-flex; align-items: center; height: 19px; padding: 0 7px; border-radius: 6px;
+  background: var(--sub); color: var(--mut); font-weight: 800; font-size: 11.5px; white-space: nowrap; }
 
 /* ─────────────────── 계정 (카카오 로그인, 2026-09-21) ───────────────────
    헤더 계정 자리 · 로그인 지면 · 내 계정. 카카오 노란색은 카카오 버튼에만 쓴다 —

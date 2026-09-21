@@ -86,6 +86,18 @@ export function imagesEnabled(source: ImageSource): boolean {
 /** 두 출처 다 꺼져 있으면 갤러리 자리에 「준비 중」을 그린다 */
 export const anyImagesEnabled = SH_HOUSE_BASE != null || YOUTH_HOUSE_BASE != null;
 
+/** 이 단지의 그림이 어느 출처에서 오나. 둘 다 없으면 null — 배지도 갤러리도 없다 */
+export function sourceOf(c: { sh_bizns_cd: string | null; youth_home_code: string | null }): ImageSource | null {
+  return c.sh_bizns_cd ? "sh" : c.youth_home_code ? "youth" : null;
+}
+
+/** 목록에 「사진」 배지를 달아도 되나(사용자 요청 2026-09-21).
+ *  DB에 사진 행이 있어도 파일 자리가 꺼져 있으면 지면엔 한 장도 안 나온다 — 그때 배지를 달면 배지가 거짓말이 된다.
+ *  공고 목록은 단지 코드를 안 들고 오므로 부문으로 출처를 가른다(공공임대=SH주택정보, 민간임대=청년안심주택). */
+export function photoBadgeOn(source: ImageSource | null): boolean {
+  return source != null && imagesEnabled(source);
+}
+
 export function imageSrc(img: ComplexImage): string {
   const base = BASES[img.source] ?? `/${img.source === "sh" ? "sh-house" : "youth-house"}`;
   return `${base}/${img.code}/${encodeURIComponent(img.file_name)}`;

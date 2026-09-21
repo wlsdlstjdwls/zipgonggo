@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { photoBadgeOn, sourceOf } from "@/lib/complex-images";
 import { noticeComplexPath } from "@/lib/routes";
 import { hasMapKey, type LatLng } from "@/lib/naver-maps-loader";
 import { num, wonExact, wonKo, wonShort } from "@/lib/format";
@@ -33,6 +34,15 @@ function fullAddress(c: NoticeComplex): string {
 
 function guLabel(c: NoticeComplex): string {
   return c.sido === "서울특별시" ? c.sigungu : `${c.sido} ${c.sigungu}`;
+}
+
+/** 목록 행에 붙일 그림 배지(사용자 요청 2026-09-21). 사진이 도면을 이긴다 — 배지는 한 칸뿐이고
+ *  「사진」이라 적혀 있으면 실물이 나와야 한다. 파일 자리가 꺼져 있으면(배포 전 스토리지 미설정) 아무것도 안 단다 */
+function photoTag(c: NoticeComplex): { label: string; title: string } | null {
+  if (!photoBadgeOn(sourceOf(c))) return null;
+  if (c.has_photo) return { label: "사진", title: "단지 전경과 실내 사진이 있습니다" };
+  if (c.has_plan) return { label: "도면", title: "평면도나 층별 도면이 있습니다" };
+  return null;
 }
 
 // 면적 구간 — 20㎡ 폭(사용자 요청 2026-09-09: 10㎡ 단위는 너무 잘아 선택지만 늘어난다).
@@ -326,11 +336,16 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
           {visible.map((c) => {
             const on = c.id === selected;
             const noPin = phase === "ready" && (c.lat == null || c.lng == null);
+            const tag = photoTag(c);
             return (
               <li key={c.id} data-id={c.id} className={`${on ? "on" : ""}${focus === c.id ? " is-focus" : ""}`.trim() || undefined}>
                 <button type="button" onClick={() => onPick(c.id)} aria-pressed={on} onMouseEnter={() => setFocus(c.id)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(c.id)} onBlur={() => setFocus(null)}>
                   <span className="cx-row-main">
-                    <span className="cx-name"><Trunc text={c.name} />{c.is_new && <span className="chip new">신규</span>}</span>
+                    <span className="cx-name">
+                      <Trunc text={c.name} />
+                      {c.is_new && <span className="chip new">신규</span>}
+                      {tag && <span className="chip pic" title={tag.title}>{tag.label}</span>}
+                    </span>
                     <Trunc className="cx-addr" text={fullAddress(c)} />
                   </span>
                   <span className="cx-row-side">

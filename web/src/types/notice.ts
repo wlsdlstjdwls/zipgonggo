@@ -42,6 +42,10 @@ export type NoticeListItem = {
   address: string | null;
   /** 기관 원본 목록에서의 순번(1이 맨 위). 같은 공고일 안 정렬·커서에 쓴다 */
   source_rank: number | null;
+  /** 이 공고의 단지 중 한 곳이라도 실물 사진(전경·실내·투시도)을 가지고 있나(0023·0026).
+   * 목록에서 「사진」 배지를 다는 근거다 — 사진이 있는 장은 열어 볼 값이 다르다(사용자 요청 2026-09-21).
+   * 도면(평면도·층별 도면·배치도)만 있는 단지는 false — 배지가 사진을 약속하면 사진이어야 한다 */
+  has_photo?: boolean;
 };
 
 /** notice.schedule_steps 한 칸. end가 null이면 하루짜리 단계.
@@ -165,6 +169,10 @@ export type NoticeComplex = {
   min_rent: number | null;
   area_min: number | null;
   area_max: number | null;
+  /** 실물 사진(SH 전경·실내 | 청년안심 전경·투시도·편의시설)이 있나. 목록 배지의 근거 */
+  has_photo?: boolean;
+  /** 도면만 있나(평면도·층별 도면·배치도). 사진이 있으면 그쪽이 이긴다 — 배지는 한 칸뿐이다 */
+  has_plan?: boolean;
 };
 
 /** 청년안심주택 포털 단지 사실(youth_house, 0027). 공고문 첨부에 없는 값만 모은 것 —

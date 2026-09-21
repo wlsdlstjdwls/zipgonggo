@@ -19,17 +19,40 @@ const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 const titleCol = (alias = "") =>
   `regexp_replace(${alias}title, '^\\s*\\[민간임대\\]\\s*', '') AS title`;
 
+/* ── 「사진 있음」 배지의 근거 (0023·0026) ────────────────────────────────────
+   사진과 도면을 한 덩이로 세지 않는다. 배지가 「사진」이라고 적혀 있으면 열었을 때 사진이 나와야 한다 —
+   평면도만 있는 단지에 사진 배지를 달면 배지가 거짓말이 된다(단지 1,930곳 중 도면만 있는 곳 115곳, 2026-09-21).
+   종류 이름은 출처마다 다르다: SH는 전경·실내, 청년안심주택은 전경·투시도·편의시설이 실물이다. */
+const PHOTO_KINDS_SH = `('전경', '실내')`;
+const PHOTO_KINDS_YOUTH = `('전경', '투시도', '편의시설')`;
+
+/** 단지 한 곳(별칭 c)에 실물 사진이 있나 */
+const COMPLEX_HAS_PHOTO = `(
+  EXISTS (SELECT 1 FROM sh_house_image i WHERE i.bizns_cd = c.sh_bizns_cd AND i.kind IN ${PHOTO_KINDS_SH})
+  OR EXISTS (SELECT 1 FROM youth_house_image i WHERE i.home_code = c.youth_home_code AND i.kind IN ${PHOTO_KINDS_YOUTH}))`;
+
+/** 도면(평면도·층별 도면·배치도)이 있나. 사진이 있으면 화면은 사진 쪽을 쓴다 */
+const COMPLEX_HAS_PLAN = `(
+  EXISTS (SELECT 1 FROM sh_house_image i WHERE i.bizns_cd = c.sh_bizns_cd AND i.kind NOT IN ${PHOTO_KINDS_SH})
+  OR EXISTS (SELECT 1 FROM youth_house_image i WHERE i.home_code = c.youth_home_code AND i.kind NOT IN ${PHOTO_KINDS_YOUTH}))`;
+
+/* 공고 한 건(notice)에 딸린 단지 중 한 곳이라도 사진이 있나. 목록 한 장은 20행이고 이 식은 LIMIT 뒤에
+   남은 행에만 돈다 — 색인(idx_notice_complex_notice, idx_sh_house_image_lookup)을 그대로 탄다 */
+const NOTICE_HAS_PHOTO = `(EXISTS (
+  SELECT 1 FROM notice_complex c WHERE c.notice_id = notice.id AND ${COMPLEX_HAS_PHOTO}))`;
+
 const LIST_COLS = `
   id, slug, ${titleCol()}, agency, housing_type::text AS housing_type, sector::text AS sector, house_type, sido, sigungu, complex_name,
   supply_count, min_deposit, min_rent, posted_at, apply_start_at, apply_end_at, announce_at,
-  status::text AS status, source_status, amends_source_key, source_url, address, source_rank`;
+  status::text AS status, source_status, amends_source_key, source_url, address, source_rank,
+  ${NOTICE_HAS_PHOTO} AS has_photo`;
 
 /** LIST_COLS가 내놓은 **결과 이름** 그대로. CTE 밖에서 다시 고를 때 쓴다 —
  *  LIST_COLS를 두 번 쓰면 `regexp_replace(title …)`가 이미 벗겨진 title에 또 걸려 식이 깨진다. */
 const LIST_OUT = `
   id, slug, title, agency, housing_type, sector, house_type, sido, sigungu, complex_name,
   supply_count, min_deposit, min_rent, posted_at, apply_start_at, apply_end_at, announce_at,
-  status, source_status, amends_source_key, source_url, address, source_rank`;
+  status, source_status, amends_source_key, source_url, address, source_rank, has_photo`;
 
 function buildWhere(f: NoticeFilters, params: unknown[]): string[] {
   const where: string[] = [CANONICAL_ONLY];
@@ -211,7 +234,7 @@ async function listNoticesPageRaw(f: NoticeFilters, cursor: string | null, limit
 /** 목록 1페이지. cursor는 이전 페이지의 nextCursor. */
 export const listNoticesPage = unstable_cache(
   (f: NoticeFilters, cursor: string | null = null, limit: number = PAGE_SIZE) => listNoticesPageRaw(f, cursor, limit),
-  ["notice-page-v6"],
+  ["notice-page-v7"],
   CACHE_OPTS,
 );
 
@@ -335,6 +358,7 @@ export const getNoticeComplexes = cache(async (noticeId: number): Promise<Notice
     `SELECT c.id, c.name, c.sido, c.sigungu, c.road_address, c.is_new, c.complex_code, c.source_page,
             c.heating, c.unit_count, c.min_deposit, c.min_rent, c.area_min, c.area_max,
             c.sh_bizns_cd, c.youth_home_code,
+            ${COMPLEX_HAS_PHOTO} AS has_photo, ${COMPLEX_HAS_PLAN} AS has_plan,
             ST_Y(c.geom::geometry) AS lat, ST_X(c.geom::geometry) AS lng,
             COALESCE(t.classes, ARRAY[]::text[]) AS tenant_classes
      FROM notice_complex c
