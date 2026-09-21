@@ -109,9 +109,12 @@ export function apiNoticesPath(params: string, cursor: string): string {
   return `${ROUTES.apiNotices}?${u.toString()}`;
 }
 
-/** /login?next=… 로그인 안내 지면. 돌아올 자리를 들려 보낸다(없으면 홈) */
+/** /login?next=… 로그인 안내 지면. 돌아올 자리를 들려 보낸다.
+ *  **자기 자신은 안 싣는다** — 로그인 지면에서 버튼을 또 누르면 next=/login이 붙고,
+ *  로그인한 채 /login에 닿으면 다시 next로 보내 제자리를 맴돈다(lib/auth.ts safeNextPath도 한 번 더 막는다) */
 export function loginPath(next?: string): string {
-  return next && next !== ROUTES.home ? `${ROUTES.login}?next=${encodeURIComponent(next)}` : ROUTES.login;
+  const keep = next && next !== ROUTES.home && !next.startsWith(ROUTES.login);
+  return keep ? `${ROUTES.login}?next=${encodeURIComponent(next)}` : ROUTES.login;
 }
 
 /** 카카오로 바로 보내는 자리. 로그인 지면의 버튼이 이 주소를 연다(POST 아닌 GET — 카카오로 페이지가 통째로 넘어간다) */

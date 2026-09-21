@@ -81,9 +81,18 @@ export async function currentUser(): Promise<SessionUser | null> {
   return rows[0] ?? null;
 }
 
-/** 로그인 뒤 돌아갈 자리. 같은 오리진의 앱 경로만 허용한다 —
- *  "//evil.com"·"@evil.com"·"\evil.com"은 origin 뒤에 붙이면 다른 호스트가 돼 오픈 리다이렉트가 된다 */
+/**
+ * 로그인 뒤 돌아갈 자리. 같은 오리진의 **사람이 보는 앱 경로**만 허용한다.
+ *
+ * 둘을 막는다.
+ * 1) 오픈 리다이렉트 — "//evil.com"·"@evil.com"·"\evil.com"은 origin 뒤에 붙이면 다른 호스트가 된다
+ * 2) **제자리 뺑뺑이** — next가 `/login`이나 `/api/…`이면 로그인 직후 다시 그리로 가고,
+ *    `/login`은 이미 로그인한 사람을 또 next로 보내 무한 리다이렉트가 된다.
+ *    로그인 지면에서 로그인 버튼을 한 번 더 누르면 실제로 `next=%2Flogin`이 실린다(2026-09-21 사용자 제보)
+ */
 export function safeNextPath(raw: string | null | undefined, fallback: string): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//") || /[@\\]/.test(raw)) return fallback;
+  const path = raw.split(/[?#]/)[0];
+  if (path === "/login" || path.startsWith("/login/") || path.startsWith("/api/")) return fallback;
   return raw;
 }
