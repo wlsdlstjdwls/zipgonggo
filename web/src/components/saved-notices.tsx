@@ -15,6 +15,8 @@ import { PAGE_SIZE, ROW_STAGGER_MS, SAVED_MAX_IDS } from "@/lib/constants";
 import { count } from "@/lib/format";
 import { ROUTES } from "@/lib/routes";
 import type { NoticeListItem } from "@/types/notice";
+import { loginPath } from "@/lib/routes";
+import { useAuth } from "./auth-context";
 import { useListState } from "./list-state";
 import { NoticeRow } from "./notice-row";
 import { useSave } from "./save-context";
@@ -22,6 +24,7 @@ import { SkeletonRows } from "./skeleton";
 
 export function SavedNotices() {
   const { saved, ready, isSaved } = useSave();
+  const { user, enabled: loginEnabled } = useAuth();
   // 보기 모드(카드/목록/간략)는 목록 화면에서 고른 취향을 그대로 따른다
   const { view } = useListState();
   const [shown, setShown] = useState<number[]>([]);
@@ -70,6 +73,24 @@ export function SavedNotices() {
     </div>
   );
 
+  // 어디에 남는 목록인지는 로그인 여부에 따라 달라진다. 그 사실을 감추지 않는다 —
+  // 「이 브라우저에만 남는다」를 모르고 데이터를 지웠다가 잃는 일이 실제로 생긴다
+  const note = user ? (
+    <p className="saved-note">
+      이 목록은 계정에 저장됩니다. 다른 기기에서 로그인해도 그대로 보입니다.
+    </p>
+  ) : (
+    <p className="saved-note">
+      이 목록은 이 브라우저에만 남습니다. 사이트 데이터를 지우거나 다른 기기에서 열면 비어 있습니다.
+      {loginEnabled && (
+        <>
+          {" "}
+          <Link href={loginPath(ROUTES.my)}>카카오로 로그인</Link>하면 계정에 옮겨 둡니다.
+        </>
+      )}
+    </p>
+  );
+
   // 아직 localStorage도 못 읽었거나 첫 조회가 안 끝난 상태
   if (!ready || (items === null && !error)) {
     return (
@@ -110,9 +131,7 @@ export function SavedNotices() {
   return (
     <div className="ex-list">
       {head}
-      <p className="saved-note">
-        이 목록은 이 브라우저에만 남습니다. 사이트 데이터를 지우거나 다른 기기에서 열면 비어 있습니다.
-      </p>
+      {note}
       <ul className={`rows v-${view}`}>
         {items.map((n, i) => (
           <NoticeRow key={n.id} n={n} stagger={(i % PAGE_SIZE) * ROW_STAGGER_MS} muted={!isSaved(n.id)} />

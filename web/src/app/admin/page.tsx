@@ -4,6 +4,7 @@ import Link from "next/link";
 import { isAdmin } from "@/lib/admin-auth";
 import { ago, dashboardData, elapsed, parseIngestMessage, stampKST, type JobHealth } from "@/lib/admin";
 import { JOBS, workflowRunsUrl } from "@/lib/jobs";
+import { memberStats } from "@/lib/users";
 import { ROUTES } from "@/lib/routes";
 import { RunButton } from "./run-button";
 
@@ -55,7 +56,10 @@ export default async function AdminDashboard() {
   if (!(await isAdmin())) return null;
 
   // 질의 하나로 전부 받는다 — 나눠 던지면 왕복이 늘고, 동시에 던지면 커넥션을 새로 여느라 더 걸린다
-  const { health, stats, queue, sources, recent, visits } = await dashboardData();
+  const [{ health, stats, queue, sources, recent, visits }, members] = await Promise.all([
+    dashboardData(),
+    memberStats(),
+  ]);
 
   const broken = health.filter((h) => h.ok === false || h.late);
 
@@ -95,6 +99,18 @@ export default async function AdminDashboard() {
           <Stat label="동시접속" value={visits.online} note="최근 5분" />
           <Stat label="오늘 방문" value={visits.todayVisitors} note={`${visits.todayViews.toLocaleString("ko-KR")}뷰`} />
           <Stat label="누적 방문" value={visits.totalVisitors} note={`${visits.totalViews.toLocaleString("ko-KR")}뷰`} />
+        </div>
+      </section>
+
+      <section className="adm-sec">
+        <h2>
+          회원
+          <Link href={ROUTES.adminMembers}>목록 보기</Link>
+        </h2>
+        <div className="adm-stats">
+          <Stat label="전체 회원" value={members.total} note={`7일 신규 ${members.new7d}명`} />
+          <Stat label="30일 내 접속" value={members.active30d} note="살아 있는 회원" />
+          <Stat label="관심 공고를 담은 회원" value={members.with_saved} note={`담긴 공고 ${members.saved_total.toLocaleString("ko-KR")}건`} />
         </div>
       </section>
 

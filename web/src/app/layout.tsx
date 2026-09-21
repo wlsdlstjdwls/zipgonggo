@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { AccountMenu } from "@/components/account-menu";
+import { AuthProvider } from "@/components/auth-context";
 import { CalcButton, CalcProvider } from "@/components/calc-context";
 import { CalcDock } from "@/components/calc-dock";
 import { HomeLink } from "@/components/home-link";
@@ -74,6 +76,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script dangerouslySetInnerHTML={{ __html: BOOT_SCOPE_JS }} />
       </head>
       <body>
+        {/* 로그인 상태는 브라우저가 /api/auth/me로 따로 묻는다 — **여기서 쿠키를 읽으면
+            전 지면이 동적으로 떨어져 ISR이 죽는다**(components/auth-context.tsx 머리글).
+            SaveProvider가 이 값을 구독해 로그인 순간 관심 공고를 서버와 합친다 */}
+        <AuthProvider>
         <SaveProvider>
           {/* 계산기는 화면 오른쪽 아래 떠 있던 버튼에서 헤더 메뉴로 올렸다(사용자 요청 2026-09-09).
               패널은 body로 포털되지만 여는 버튼과 씨앗값이 서로 다른 트리라 Provider가 감싼다 */}
@@ -92,6 +98,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {/* 검색칸 — 필터로는 못 닿던 길(이름을 아는 사람). 좁은 화면에서는 이게 헤더의 주인공이라 가운데를 차지한다 */}
               <SiteSearch />
               <CalcButton />
+              <AccountMenu />
             </div>
           </header>
           {/* 목록 상태(부문·유형·마감·정렬)는 URL이 아니라 이 Provider가 들고 있다 — 스코프 바·필터 바·목록이 함께 구독한다.
@@ -155,6 +162,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </Suspense>
           </CalcProvider>
         </SaveProvider>
+        </AuthProvider>
       </body>
     </html>
   );

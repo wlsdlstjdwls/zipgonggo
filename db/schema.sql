@@ -758,3 +758,33 @@ COMMENT ON TABLE indexnow_url IS
   '공고 상세가 아닌 발행 URL(단지/유형/지역/정책문서)의 IndexNow 제출 이력. 있으면 이미 알린 것이다';
 COMMENT ON COLUMN indexnow_url.submitted_at IS
   '처음 제출한 시각. 갱신하지 않는다 — 이 표는 재발행 신호가 아니라 「알렸다」는 사실만 든다';
+
+-- 0035 — 회원(카카오 로그인). web이 직접 쓰는 두 번째·세 번째 표(CLAUDE.md 예외, 2026-09-21)
+CREATE TABLE user_account (
+  id              bigserial   PRIMARY KEY,
+  kakao_id        text        NOT NULL UNIQUE,
+  nickname        text,
+  profile_image   text,
+  email           text,
+  terms_version   text        NOT NULL,
+  terms_agreed_at timestamptz NOT NULL DEFAULT now(),
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  last_login_at   timestamptz NOT NULL DEFAULT now(),
+  login_count     integer     NOT NULL DEFAULT 1
+);
+COMMENT ON TABLE  user_account IS
+  '카카오 로그인 회원. web이 직접 쓰는 두 번째 표(page_view에 이어). 파이프라인은 건드리지 않는다';
+COMMENT ON COLUMN user_account.kakao_id IS
+  '카카오 회원번호(id). 앱 단위로 다른 값이라 이것만으로는 카카오 계정을 특정할 수 없다';
+CREATE INDEX user_account_created_idx ON user_account (created_at DESC);
+CREATE INDEX user_account_login_idx   ON user_account (last_login_at DESC);
+
+CREATE TABLE user_saved_notice (
+  user_id    bigint      NOT NULL REFERENCES user_account (id) ON DELETE CASCADE,
+  notice_id  bigint      NOT NULL REFERENCES notice (id)       ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, notice_id)
+);
+COMMENT ON TABLE user_saved_notice IS
+  '로그인 회원의 관심 공고(★). 탈퇴하면 CASCADE로 같이 지워진다';
+CREATE INDEX user_saved_notice_notice_idx ON user_saved_notice (notice_id);

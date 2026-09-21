@@ -7,6 +7,67 @@
 
 ---
 
+## 지금 상태 (2026-09-21, 67차 세션)
+
+**카카오 로그인을 붙였다**(사용자 요청). 참고한 건 `C:\Users\cware\project\smokespot` —
+거기는 Supabase Auth가 다 해 주지만 집공고는 Neon 직결이라 **OAuth를 직접 구현했다**.
+흐름과 화면 구성(약관 동의 뒤에만 눌리는 카카오 버튼, 로그인 유도 화면, 콘솔 회원 목록)만 옮겨 왔다.
+
+### 규칙이 바뀐 자리 — CLAUDE.md를 먼저 고쳤다
+
+「web이 DB에 쓰는 자리는 딱 하나(page_view)」가 **셋**이 됐다. 회원 표 둘을 예외로 열었고
+(`user_account` | `user_saved_notice`), 쓰기는 전부 `web/src/lib/users.ts`에 모았다.
+운영자 콘솔은 그대로 **읽기 전용**이고, `ADMIN_EMAIL`+`ADMIN_PASSWORD_HASH`와 회원 표는 서로 무관하다 —
+카카오로 콘솔에 들어올 수 없고 회원 표에 관리자 플래그를 두지 않는다.
+
+### 설계에서 못 물러선 두 가지
+
+- **루트 레이아웃에서 쿠키를 읽지 않는다.** 읽는 순간 전 지면이 동적 렌더로 떨어져 ISR이 죽는다
+  (공고 3만 지면이 매 요청 렌더). 그래서 세션은 브라우저가 `/api/auth/me`로 따로 묻고,
+  헤더 계정 자리는 답이 오기 전까지 **비워 둔다**(「로그인」이 떴다 이름으로 바뀌는 깜빡임 방지)
+- **액세스 토큰을 저장하지 않는다.** 로그인 순간 프로필 한 번 읽고 버린다. 세션은 `AUTH_SECRET`으로
+  서명한 쿠키 한 장(`zg_user`, 30일)뿐이고 안에 든 건 회원 id와 만료시각이다.
+  대가로 **탈퇴할 때 카카오 「연결 끊기」를 대신 못 해 준다** — 화면에서 카카오 계정 설정으로 안내한다
+
+### 만든 것
+
+- DB `0035_user_account.sql` — `user_account`(카카오 회원번호/별명/프로필 사진/동의 약관 시행일/접속 기록),
+  `user_saved_notice`(관심 공고). **적용 완료**(Neon). 탈퇴는 hard delete, 관심 공고는 CASCADE
+- `lib/auth.ts`(서명 쿠키·`currentUser`·오픈 리다이렉트 차단) | `lib/kakao.ts`(authorize/token/profile) |
+  `lib/users.ts`(업서트·탈퇴·관심 공고·콘솔 집계)
+- 라우트 — `/api/auth/kakao`(state 물표 심고 카카오로) | `/api/auth/kakao/callback` |
+  `/api/auth/me` | `/api/saved`(GET, POST add/remove/merge)
+- 화면 — `/login`(혜택 3줄 + 약관 동의 뒤에만 눌리는 버튼) | `/my/account`(프로필·관심 공고 수·로그아웃·탈퇴 2단 확인) |
+  헤더 계정 메뉴 | `/my`의 안내 문구가 로그인 여부에 따라 갈린다
+- 관심 공고 동기화 — 로그인 순간 브라우저 목록과 서버 목록을 **합친다**(빼지 않는다: 다른 기기에서
+  담은 게 사라지면 이유를 알 길이 없다). 이후 토글은 양쪽에 적고, 서버 쓰기 실패는 화면을 막지 않는다
+- 콘솔 — `/admin/members`(요약 4칸 + 회원 목록 50행 페이징 + 많이 담은 공고), 대시보드에 회원 타일 3칸.
+  **조회 전용**이다
+- 문서 — 이용약관 제3조(계정과 탈퇴) 신설·시행일 2026-09-28, 개인정보처리방침 3항(회원 정보) 신설·
+  1·2·7·8항 개정·시행일 2026-09-28, `data-sources.md` 필요한 키 3줄, `.env.example` 둘
+
+`npx tsc --noEmit` 통과. 로컬 3100에서 `/api/auth/me` → `{"enabled":true,"user":null}`,
+`/api/auth/kakao` → 카카오 authorize로 307(redirect_uri·state 정상), `/`·`/login`·`/my`·`/my/account`·
+`/admin/members` 전부 200. **로그인 왕복 자체는 미검증** — 카카오 콘솔 Redirect URI 등록이 먼저다.
+
+### 사람이 해야 하는 것 (이게 안 되면 로그인은 안 돈다)
+
+1. 카카오 developers → 내 애플리케이션 → **카카오 로그인 활성화 ON**
+2. **Redirect URI 두 줄 등록** — `http://localhost:3100/api/auth/kakao/callback`,
+   `https://zipgonggo.com/api/auth/kakao/callback` (한 글자라도 다르면 KOE006)
+3. 플랫폼 → Web → 사이트 도메인에 `http://localhost:3100`, `https://zipgonggo.com`
+4. 동의항목 — 닉네임/프로필 사진만 「필수 동의」. 이메일은 검수 대상이라 켜지 않았다
+5. Vercel 환경변수 셋 추가 — `KAKAO_REST_API_KEY` `KAKAO_CLIENT_SECRET` `AUTH_SECRET`
+   (로컬 `web/.env.local`에는 넣어 뒀다). **방침 시행일 2026-09-28 전에는 운영에 켜지 않는다**
+
+### 다음에 집을 것
+
+- 카카오 콘솔 등록 뒤 **실제 로그인 왕복 1회** — 회원 1행 생김 / 관심 공고 합쳐짐 / 탈퇴로 지워짐까지
+- 로그인 회원에게만 줄 것을 하나 더 만든다. 지금은 「관심 공고가 기기를 넘어 남는다」 하나뿐이라
+  로그인할 이유가 약하다 — 마감 알림(메일 주소를 받아야 한다)이나 자격진단 결과 저장이 후보
+
+---
+
 ## 지금 상태 (2026-09-21, 66차 세션)
 
 **65차가 CSS만 만졌다 — 사용자 정정: 「데이터를 보여주는 방법, 필터링 방법 이런 거지 ui css만 고치자 그게 아니야」.**

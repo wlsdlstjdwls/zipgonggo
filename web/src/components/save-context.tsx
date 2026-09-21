@@ -1,11 +1,18 @@
 "use client";
 
-// ★ 관심 공고 목록 + 토스트. 서버 저장 없음 — localStorage에만 둔다(사용자 식별이 생기면 옮긴다).
+// ★ 관심 공고 목록 + 토스트.
+//
+// **로그아웃 상태에서는 예전 그대로 localStorage에만 둔다.** 로그인하면 거기에 서버 사본이 하나 더 붙는다:
+// 들어오는 순간 브라우저 목록과 서버 목록을 **합치고**(빼지 않는다 — 다른 기기에서 담은 게 사라지면
+// 이용자로서는 이유를 알 길이 없다), 그 뒤의 토글은 localStorage와 서버에 같이 적는다.
+// 서버 쓰기가 실패해도 화면은 그대로 간다 — 별표가 안 켜지는 것보다 사본이 하루 늦는 편이 낫다.
 // 화면 문구는 「관심 공고」로 통일한다(사용자 결정 2026-09-18). 코드의 save/saved는 그대로 둔다 — 키 이름까지 바꾸면 이미 저장된 목록이 날아간다.
 // 마운트 후에 읽어야 SSR HTML(전부 ☆)과 첫 렌더가 일치한다(hydration mismatch 방지).
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SAVED_STORAGE_KEY, TOAST_MS } from "@/lib/constants";
+import { ROUTES } from "@/lib/routes";
+import { useAuth } from "./auth-context";
 
 type Ctx = {
   saved: ReadonlySet<number>;
@@ -21,6 +28,14 @@ type Ctx = {
 
 const SaveCtx = createContext<Ctx | null>(null);
 
+function write(ids: Set<number>): void {
+  try {
+    window.localStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {
+    // 프라이빗 모드 등 — 메모리에만 둔다
+  }
+}
+
 function read(): Set<number> {
   try {
     const raw = window.localStorage.getItem(SAVED_STORAGE_KEY);
@@ -32,6 +47,7 @@ function read(): Set<number> {
 }
 
 export function SaveProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [saved, setSaved] = useState<Set<number>>(() => new Set());
   const [ready, setReady] = useState(false);
   const [popped, setPopped] = useState<number | null>(null);
@@ -48,6 +64,35 @@ export function SaveProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  // 로그인한 사람의 목록을 서버와 한 번 맞춘다. **로그인 직후 한 번만** —
+  // 사람이 바뀌었을 때(다른 계정으로 다시 로그인)도 한 번 더 돈다
+  const syncedFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!ready || !user || syncedFor.current === user.id) return;
+    syncedFor.current = user.id;
+    const local = [...saved];
+    let cancelled = false;
+    fetch(ROUTES.apiSaved, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ op: "merge", ids: local }),
+    })
+      .then((res) => (res.ok ? (res.json() as Promise<{ ids: number[] }>) : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        const merged = new Set([...local, ...d.ids]);
+        write(merged);
+        setSaved(merged);
+      })
+      .catch(() => {
+        // 서버가 안 받아도 브라우저 목록은 멀쩡하다. 다음 로그인 때 다시 시도한다
+        syncedFor.current = null;
+      });
+    return () => { cancelled = true; };
+    // saved를 의존성에 넣지 않는다 — 별표를 누를 때마다 합치기를 다시 돌 이유가 없다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, user]);
+
   const toast = useCallback((text: string) => {
     setToastText(text);
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -59,14 +104,23 @@ export function SaveProvider({ children }: { children: ReactNode }) {
       const next = new Set(prev);
       const on = !next.has(id);
       if (on) next.add(id); else next.delete(id);
-      try { window.localStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify([...next])); } catch { /* 프라이빗 모드 등 — 메모리에만 */ }
+      write(next);
+      // 로그인했으면 서버 사본에도 적는다. 답을 기다리지 않는다 — 별표는 이미 켜졌다
+      if (user) {
+        void fetch(ROUTES.apiSaved, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ op: on ? "add" : "remove", id }),
+          keepalive: true,
+        }).catch(() => {});
+      }
       toast(on ? "관심 공고에 담았습니다" : "관심 공고에서 뺐습니다");
       return next;
     });
     setPopped(id);
     if (popTimer.current) clearTimeout(popTimer.current);
     popTimer.current = setTimeout(() => setPopped(null), 460);
-  }, [toast]);
+  }, [toast, user]);
 
   const value = useMemo<Ctx>(() => ({ saved, ready, isSaved: (id) => saved.has(id), toggle, popped, toast }), [saved, ready, toggle, popped, toast]);
 

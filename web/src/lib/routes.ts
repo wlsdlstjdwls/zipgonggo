@@ -19,8 +19,18 @@ export const ROUTES = {
   eligibility: "/eligibility",
   // 검색 결과 지면. 색인 대상이 아니다 — 얇은 페이지 방지 규칙(CLAUDE.md 4)에 걸린다. 페이지가 noindex를 단다
   search: "/search",
-  // 저장(★)해 둔 공고를 모아 보는 자리. 브라우저 localStorage만 보는 개인 화면이라 색인 대상이 아니다
+  // 저장(★)해 둔 공고를 모아 보는 자리. 로그아웃 상태면 브라우저 localStorage만 보는 개인 화면이라 색인 대상이 아니다
   my: "/my",
+  // 내 계정 — 프로필, 로그아웃, 회원탈퇴. 로그인한 사람만 들어온다
+  myAccount: "/my/account",
+  // 카카오 로그인 안내 지면. 혜택과 약관 동의를 먼저 보여주고 카카오로 보낸다
+  login: "/login",
+  // 카카오로 보내는 자리(GET). next 쿼리로 돌아올 곳을 들려 보낸다
+  apiAuthKakao: "/api/auth/kakao",
+  // 카카오가 code를 돌려보내는 자리. **카카오 개발자 콘솔 등록값과 같아야 한다**(lib/kakao.ts)
+  apiAuthKakaoCallback: "/api/auth/kakao/callback",
+  // 관심 공고 서버 동기화. 로그인한 사람만 쓴다
+  apiSaved: "/api/saved",
   terms: "/terms",
   privacy: "/privacy",
   rss: "/rss.xml",
@@ -28,6 +38,7 @@ export const ROUTES = {
   admin: "/admin",
   adminIngest: "/admin/ingest",
   adminVisitors: "/admin/visitors",
+  adminMembers: "/admin/members",
 } as const;
 
 /** /notice/{slug}. slug에 한글·콜론이 들어가므로 항상 인코딩한다. */
@@ -96,4 +107,14 @@ export function apiNoticesPath(params: string, cursor: string): string {
   const u = new URLSearchParams(params);
   u.set("cursor", cursor);
   return `${ROUTES.apiNotices}?${u.toString()}`;
+}
+
+/** /login?next=… 로그인 안내 지면. 돌아올 자리를 들려 보낸다(없으면 홈) */
+export function loginPath(next?: string): string {
+  return next && next !== ROUTES.home ? `${ROUTES.login}?next=${encodeURIComponent(next)}` : ROUTES.login;
+}
+
+/** 카카오로 바로 보내는 자리. 로그인 지면의 버튼이 이 주소를 연다(POST 아닌 GET — 카카오로 페이지가 통째로 넘어간다) */
+export function kakaoStartPath(next?: string): string {
+  return next ? `${ROUTES.apiAuthKakao}?next=${encodeURIComponent(next)}` : ROUTES.apiAuthKakao;
 }

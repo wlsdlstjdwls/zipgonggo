@@ -1,6 +1,6 @@
 "use client";
 
-// 콘솔 탭. 지금은 셋뿐이라 평평하게 깐다 — 늘어나면 「검수/운영」처럼 묶는다.
+// 콘솔 탭. 지금은 넷뿐이라 평평하게 깐다 — 늘어나면 「검수/운영」처럼 묶는다.
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
@@ -12,6 +12,7 @@ const TABS = [
   { href: ROUTES.admin, label: "대시보드" },
   { href: ROUTES.adminIngest, label: "수집 이력" },
   { href: ROUTES.adminVisitors, label: "방문" },
+  { href: ROUTES.adminMembers, label: "회원" },
 ] as const;
 
 export function AdminNav({ fails30d }: { fails30d: number }) {

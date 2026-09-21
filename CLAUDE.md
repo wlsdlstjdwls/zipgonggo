@@ -23,6 +23,7 @@
 | 지도 | 네이버 Web Dynamic Map | 무료 이용량 한도 초과가 실측될 때 |
 | DB | Neon Postgres + PostGIS | — |
 | 파이프라인 | Python | HWP 파싱 수단이 Node에 생겼을 때 |
+| 로그인 | 카카오 OAuth를 직접(Auth 서비스 없이) + 서명 쿠키 | 제공자를 늘려야 할 때. 그때도 세션 표는 마지막에 |
 
 ## 하지 말 것
 
@@ -65,14 +66,29 @@ GitHub 러너 IP의 TCP 연결을 간헐로 안 받아 세웠다(2026-09-16). we
 Fluid Compute라 함수별 리전 지정이 안 먹기 때문이다 — 자세한 건 [`egress/README.md`](egress/README.md).
 **허용 호스트를 늘릴 땐 `egress/api/index.js`와 `pipeline/.../sources/egress.py` 둘 다 고친다.**
 
-**web이 DB에 쓰는 자리는 딱 하나 — `/api/track`의 `page_view` 표다**(사용자 결정 2026-09-16).
-방문은 브라우저에서만 생기는 사실이라 파이프라인이 알 길이 없어서 둔 예외다. 그 표 말고는 web이 쓰지 않는다.
+**web이 DB에 쓰는 자리는 셋뿐이다.** 다른 표는 전부 pipeline이 넣고 web은 읽기만 한다.
 
-`web/src/app/admin`은 운영자 콘솔(`/admin`)이다. **여기도 DB를 읽기만 한다** — 숫자를 보여줄 뿐,
+| 쓰는 곳 | 표 | 왜 예외인가 |
+|---|---|---|
+| `/api/track` | `page_view` | 방문은 브라우저에서만 생긴다(사용자 결정 2026-09-16) |
+| 카카오 로그인 콜백 / 내 계정 | `user_account` | 로그인도 탈퇴도 브라우저에서만 생긴다(사용자 결정 2026-09-21) |
+| `/api/saved` | `user_saved_notice` | 관심 공고(★) 담기도 마찬가지 |
+
+회원 표에 대는 쓰기는 **전부 `web/src/lib/users.ts`에 모은다** — 라우트나 화면에서 INSERT를 흩뿌리지 않는다.
+파이프라인은 이 두 표를 쳐다보지 않는다.
+
+**로그인은 카카오 하나다**(2026-09-21). 이메일 가입도 비밀번호도 두지 않는다.
+액세스 토큰은 **저장하지 않는다** — 로그인 순간 프로필 한 번 읽고 버리고, 세션은 `AUTH_SECRET`으로
+서명한 쿠키 한 장(`zg_user`)뿐이다. `KAKAO_REST_API_KEY`나 `AUTH_SECRET`이 비면 로그인 기능 자체가 꺼진다.
+**로그인 없이도 모든 지면이 그대로 돌아야 한다** — 루트 레이아웃에서 쿠키를 읽지 않는다(읽으면 전 지면이
+동적으로 떨어져 ISR이 죽는다). 세션은 브라우저가 `/api/auth/me`로 따로 묻는다.
+
+`web/src/app/admin`은 운영자 콘솔(`/admin`)이다. **여기는 DB를 읽기만 한다** — 숫자를 보여줄 뿐,
 고치는 일은 pipeline 스테이지를 돌려서 한다. 콘솔이 하는 유일한 바깥 행동은 GitHub 워크플로 dispatch.
-출입은 `ADMIN_EMAIL` + `ADMIN_PASSWORD_HASH` 둘(회원 시스템 없음, DB에 계정 표를 두지 않는다).
-비밀번호는 scrypt 해시로만 둔다 — `node web/scripts/admin-password.mjs '비밀번호'`로 만든다.
-둘 중 하나라도 비면 콘솔 전체가 404다.
+회원 화면(`/admin/members`)도 조회 전용이다 — 회원을 지우거나 막지 않는다(탈퇴는 본인이 `/my/account`에서).
+출입은 `ADMIN_EMAIL` + `ADMIN_PASSWORD_HASH` 둘이다 — **운영자 계정은 회원 표와 무관하다**(카카오 로그인으로
+콘솔에 들어올 수 없고, 회원 표에 관리자 플래그를 두지 않는다). 비밀번호는 scrypt 해시로만 둔다 —
+`node web/scripts/admin-password.mjs '비밀번호'`로 만든다. 둘 중 하나라도 비면 콘솔 전체가 404다.
 
 ## URL 규칙
 

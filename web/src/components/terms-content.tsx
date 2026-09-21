@@ -4,7 +4,11 @@ import { CONTACT_EMAIL, SITE_NAME } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
 
 export const TERMS_TITLE = "이용약관";
-export const TERMS_EFFECTIVE_DATE = "2026-09-09";
+/** 지금 효력이 있는 판의 시행일. **가입할 때 이 값을 회원 표(terms_version)에 적는다** —
+ *  약관을 고쳐 이 날짜가 바뀌면 「어느 판에 동의한 회원인가」가 기록으로 남아 재동의 대상을 가릴 수 있다.
+ *  2026-09-09 최초 시행 → 2026-09-28 카카오 로그인 도입판(제3조 신설, 제2조 개정) */
+export const TERMS_EFFECTIVE_DATE = "2026-09-28";
+export const TERMS_FIRST_DATE = "2026-09-09";
 
 // 이용약관 본문 — /terms 페이지가 쓴다. 문구에 가운뎃점을 쓰지 않는다(CLAUDE.md 표기 규칙).
 export function TermsContent() {
@@ -23,19 +27,40 @@ export function TermsContent() {
           <li>LH, SH, 지방공사 등이 공개한 입주자모집공고를 모아 목록과 지도로 제공</li>
           <li>공고 첨부 문서에서 읽은 사실 데이터(단지명, 주소, 보증금, 임대료, 면적, 호수, 접수 일정) 재구성</li>
           <li>보증금과 월임대료 상호전환 계산기, 대출이자 계산기 등 계산 도구</li>
-          <li>관심 공고 담기(브라우저에만 남습니다)</li>
+          <li>관심 공고 담기 — 로그인하지 않으면 브라우저에만, 로그인하면 계정에도 남습니다</li>
         </ul>
         <p>
           서비스는 무료이며, 운영자는 서비스의 전부 또는 일부를 변경하거나 중단할 수 있습니다.
         </p>
       </LegalSection>
 
-      <LegalSection title="제3조 (계정)">
-        <p>
-          서비스는 회원가입과 로그인을 두지 않습니다. 관심 공고와 화면 설정은 이용자 브라우저에만
-          남으며, 운영자는 이를 수집하거나 열람하지 않습니다. 자세한 내용은{" "}
-          <Link href={ROUTES.privacy}>개인정보처리방침</Link>을 확인하세요.
-        </p>
+      <LegalSection title="제3조 (계정과 탈퇴)">
+        <ul>
+          <li>
+            <strong>로그인 없이도 모든 지면을 이용할 수 있습니다.</strong> 로그인은 관심 공고를 기기와
+            상관없이 이어 보기 위한 선택 사항입니다.
+          </li>
+          <li>
+            계정은 <strong>카카오 계정으로만</strong> 만듭니다. 별도의 아이디와 비밀번호를 두지 않으며,
+            만 14세 미만은 가입할 수 없습니다.
+          </li>
+          <li>
+            로그인 버튼을 누르면 이 약관과 <Link href={ROUTES.privacy}>개인정보처리방침</Link>에
+            동의한 것으로 봅니다. 동의한 약관의 시행일을 가입 기록으로 남깁니다.
+          </li>
+          <li>
+            계정은 본인만 사용합니다. 카카오 계정을 남에게 빌려주어 생긴 일에 운영자는 책임지지 않습니다.
+          </li>
+          <li>
+            <strong>탈퇴는 내 계정 화면에서 언제든 할 수 있고, 즉시 처리됩니다.</strong> 회원 정보와
+            서버에 보관된 관심 공고를 그 자리에서 지우며 되돌릴 수 없습니다. 카카오 쪽 연결 해제는
+            카카오 계정 설정에서 따로 하셔야 합니다.
+          </li>
+          <li>
+            제6조의 금지행위가 반복되면 운영자는 계정 이용을 제한하거나 해지할 수 있습니다. 이 경우
+            사전에 알리되, 서비스 운영에 급박한 위험이 있으면 조치 뒤에 알립니다.
+          </li>
+        </ul>
       </LegalSection>
 
       <LegalSection title="제4조 (정보의 성격과 면책)">
@@ -113,6 +138,10 @@ export function TermsContent() {
 
       <LegalSection title="부칙">
         <p>이 약관은 {TERMS_EFFECTIVE_DATE}부터 시행합니다.</p>
+        <p>
+          {TERMS_FIRST_DATE} 최초 시행. 카카오 로그인 도입에 따라 제3조(계정과 탈퇴)를 새로 쓰고
+          제2조를 고친 판이 {TERMS_EFFECTIVE_DATE}부터 적용됩니다.
+        </p>
       </LegalSection>
     </>
   );

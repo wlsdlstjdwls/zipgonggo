@@ -1723,3 +1723,80 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   vertical-align: -1px; background: var(--line2); }
 .sect.pub { background: var(--acc-soft); color: var(--acc); }
 .sect.priv { background: var(--warn-soft); color: var(--warn); }
+
+/* ─────────────────── 계정 (카카오 로그인, 2026-09-21) ───────────────────
+   헤더 계정 자리 · 로그인 지면 · 내 계정. 카카오 노란색은 카카오 버튼에만 쓴다 —
+   그 색이 서비스 안 다른 데 번지면 「카카오가 만든 서비스」로 읽힌다. */
+
+/* 로그인 여부를 아직 모르는 첫 프레임의 자리지킴. 「로그인」이 떴다 이름으로 바뀌는 깜빡임을 막는다 */
+.acct-hold { display: inline-block; width: 64px; height: 1px; }
+
+.acct { position: relative; flex: none; }
+.acct-btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px 0 6px;
+  border: 1px solid var(--line2); border-radius: 999px; background: var(--bg); color: var(--mut);
+  font-family: inherit; font-weight: 800; font-size: 13.5px; cursor: pointer; transition: border-color 200ms var(--ease), color 200ms var(--ease); }
+.acct-btn:hover { color: var(--ink); border-color: var(--ink); }
+.acct-btn img { width: 26px; height: 26px; border-radius: 999px; object-fit: cover; background: var(--sub); }
+.acct-btn i { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  border-radius: 999px; background: var(--acc-soft); color: var(--acc); font-style: normal; font-weight: 900; font-size: 13px; }
+.acct-btn span { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.acct-menu { position: absolute; top: calc(100% + 7px); right: 0; z-index: 40; min-width: 148px; padding: 5px;
+  border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); box-shadow: var(--shadow-overlay); }
+.acct-menu a, .acct-menu button { display: block; width: 100%; padding: 9px 11px; border: 0; border-radius: var(--radius-sm);
+  background: none; color: var(--mut); font-family: inherit; font-weight: 700; font-size: 13.5px; text-align: left; cursor: pointer; }
+.acct-menu a:hover, .acct-menu button:hover { background: var(--sub); color: var(--ink); }
+.acct-menu form { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
+
+@media (max-width: 560px) { .acct-btn span { display: none; } .acct-btn { padding: 0 4px; } }
+
+/* 로그인 지면 */
+.login { max-width: 420px; margin: 0 auto; padding: 34px 0 60px; }
+.login h1 { font-size: 24px; font-weight: 900; letter-spacing: -0.04em; }
+.login-sub { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: var(--mut); }
+.login-why { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 8px; }
+.login-why li { display: grid; gap: 2px; padding: 13px 15px; border: 1px solid var(--line); border-radius: var(--r-card); }
+.login-why b { font-size: 14px; font-weight: 800; }
+.login-why span { font-size: 12.5px; line-height: 1.6; color: var(--dim); }
+.login-agree { display: flex; align-items: flex-start; gap: 8px; margin: 20px 2px 10px; font-size: 13.5px; line-height: 1.6; color: var(--mut); }
+.login-agree input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--acc); flex: none; }
+.login-agree a { color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.login-kakao { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 48px;
+  border: 0; border-radius: var(--r-btn); background: #fee500; color: #191600; font-family: inherit;
+  font-weight: 800; font-size: 15px; cursor: pointer; transition: filter 200ms var(--ease); }
+.login-kakao:hover { filter: brightness(0.96); }
+.login-kakao.off { background: var(--sub); color: var(--dim); }
+.login-hint { margin: 10px 0 0; font-size: 12.5px; font-weight: 700; color: var(--hot); text-align: center; }
+.login-err { margin: 16px 0 0; padding: 11px 13px; border-radius: var(--radius-sm); background: var(--hot-soft);
+  color: var(--hot); font-size: 13.5px; font-weight: 700; }
+.login-foot { margin: 22px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--dim); text-align: center; }
+.login-foot a { color: var(--acc); font-weight: 700; }
+
+/* 내 계정 */
+.acct-page { max-width: 560px; margin: 0 auto; padding: 26px 0 60px; }
+.acct-page h1 { font-size: 22px; font-weight: 900; letter-spacing: -0.04em; }
+.acct-card { display: flex; align-items: center; gap: 14px; margin-top: 16px; padding: 16px;
+  border: 1px solid var(--line); border-radius: var(--r-card); }
+.acct-card img { width: 52px; height: 52px; border-radius: 999px; object-fit: cover; background: var(--sub); flex: none; }
+.acct-card i { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; flex: none;
+  border-radius: 999px; background: var(--acc-soft); color: var(--acc); font-style: normal; font-weight: 900; font-size: 20px; }
+.acct-card div { display: grid; gap: 3px; min-width: 0; }
+.acct-card b { font-size: 16px; font-weight: 900; }
+.acct-card span { font-size: 12.5px; color: var(--dim); }
+.acct-facts { margin: 18px 0 0; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
+.acct-facts > div { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 13px 15px; background: var(--bg); }
+.acct-facts dt { flex: none; min-width: 132px; font-size: 13px; font-weight: 800; color: var(--mut); }
+.acct-facts dd { margin: 0; font-size: 13px; line-height: 1.6; color: var(--dim); }
+.acct-facts dd a { color: var(--acc); font-weight: 700; }
+.acct-out { margin-top: 18px; }
+.acct-bye { margin-top: 34px; padding: 16px; border: 1px dashed var(--line2); border-radius: var(--r-card); }
+.acct-bye h2 { font-size: 14px; font-weight: 900; }
+.acct-bye p { margin: 7px 0 0; font-size: 13px; line-height: 1.7; color: var(--dim); }
+.acct-bye-warn { color: var(--hot) !important; font-weight: 700; }
+.acct-bye-note { color: var(--dim); }
+.acct-bye-open, .acct-bye-row button { margin-top: 12px; padding: 9px 14px; border: 1px solid var(--line2);
+  border-radius: var(--r-chip); background: var(--bg); color: var(--mut); font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
+.acct-bye-open:hover { color: var(--hot); border-color: var(--hot); }
+.acct-bye-row { display: flex; gap: 8px; }
+.acct-bye-go { margin-top: 12px; padding: 9px 14px; border: 1px solid var(--hot); border-radius: var(--r-chip);
+  background: var(--hot); color: #fff; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
