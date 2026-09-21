@@ -125,6 +125,7 @@ small { font-size: 13.5px; }
 .site-header { background: var(--bg); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; }
 .site-header .bar { max-width: var(--maxw); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; height: var(--hdr); padding: 0 var(--pad); }
 .site-header .left { display: flex; align-items: center; gap: 24px; min-width: 0; }
+.site-header .right { display: flex; align-items: center; gap: 8px; flex: none; }
 .logo { display: inline-flex; align-items: center; gap: 9px; font-weight: 900; font-size: 20px; line-height: 1; letter-spacing: -0.05em; color: var(--ink); }
 .logo svg { display: block; flex: none; }
 .logo b { font-weight: inherit; }

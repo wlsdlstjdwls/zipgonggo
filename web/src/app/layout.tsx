@@ -97,8 +97,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
               {/* 검색칸 — 필터로는 못 닿던 길(이름을 아는 사람). 좁은 화면에서는 이게 헤더의 주인공이라 가운데를 차지한다 */}
               <SiteSearch />
-              <CalcButton />
-              <AccountMenu />
+              {/* 오른쪽 끝의 도구 둘은 한 덩이로 묶는다 — 각자 두면 space-between이 둘을 갈라놔
+                  「로그인」이 화면 구석에 혼자 떨어진다(사용자 지적 2026-09-21) */}
+              <div className="right">
+                <CalcButton />
+                <AccountMenu />
+              </div>
             </div>
           </header>
           {/* 목록 상태(부문·유형·마감·정렬)는 URL이 아니라 이 Provider가 들고 있다 — 스코프 바·필터 바·목록이 함께 구독한다.
