@@ -64,6 +64,9 @@ function BudgetInput({ label, value, onCommit }: {
     <div className="rail-g rail-budget">
       <h3>{label} 상한</h3>
       <div className={`bin${value ? " on" : ""}`}>
+        {/* 칸 하나에 숫자만 있으면 그 숫자가 하한인지 상한인지가 안 읽힌다(사용자 지적 2026-09-21).
+            「0 ~」를 앞에 박아 범위의 오른쪽 끝이라는 걸 눈으로 알린다 */}
+        <span className="bin-p" aria-hidden="true">0 ~</span>
         <input
           className="bin-i"
           type="text"
@@ -92,6 +95,10 @@ function RailBody() {
   // 사라지면 셀렉트가 「전국」으로 보여 화면과 상태가 어긋난다
   const sidoOptions = facets.sido.filter((o) => o.count >= AREA_MIN_COUNT || o.value === sido);
   if (sido && !sidoOptions.some((o) => o.value === sido)) sidoOptions.unshift({ value: sido, count: 0 });
+  // 나머지는 공고 많은 순(listFacetsRaw의 count DESC)이지만 서울은 늘 「전국」 바로 아래에 둔다
+  // (사용자 요청 2026-09-21). 찾는 사람이 가장 많은 지역이 수량 순서 탓에 일곱 번째에 묻혀 있었다
+  const seoulAt = sidoOptions.findIndex((o) => o.value === "서울특별시");
+  if (seoulAt > 0) sidoOptions.unshift(...sidoOptions.splice(seoulAt, 1));
   // 시군구는 시도를 고른 뒤에만 센다(listFacetsRaw). 지금 고른 값은 수가 0이어도 남긴다 — 사라지면 화면과 상태가 어긋난다
   const sigunguOptions = [...facets.sigungu];
   if (f.sigungu && !sigunguOptions.some((o) => o.value === f.sigungu)) sigunguOptions.unshift({ value: f.sigungu, count: 0 });
@@ -144,15 +151,24 @@ function RailBody() {
           ariaLabel="시도"
         />
         {/* 시도를 고른 뒤에만 나온다 — 전국에서 「강서구」를 고르면 서울과 부산이 섞인다.
-            시도만으로는 서울 한 곳에 공고가 수백 건이라 목록이 안 좁혀졌다(2026-09-21) */}
+            시도만으로는 서울 한 곳에 공고가 수백 건이라 목록이 안 좁혀졌다(2026-09-21).
+            셀렉트로 접어 두면 열기 전엔 뭐가 있는지 모른다(사용자 지적 2026-09-21) — 칩으로 펼친다.
+            고른 칩을 다시 누르면 시군구가 풀린다. 「전체 시군구」 줄이 따로 필요 없는 이유다.
+            공고가 있는 시군구만 나온다 — 0건 칸을 채워 봐야 누르면 빈 목록이다 */}
         {sido && sigunguOptions.length > 0 && (
-          <Select
-            value={f.sigungu ?? ""}
-            options={sigunguOptions.map((o) => ({ value: o.value, label: o.value, count: o.count }))}
-            onChange={(v) => set({ sigungu: v || undefined })}
-            placeholder="전체 시군구"
-            ariaLabel="시군구"
-          />
+          <div className="rail-sub" role="group" aria-label="시군구">
+            {sigunguOptions.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                className={`chip-f sm${f.sigungu === o.value ? " on" : ""}`}
+                aria-pressed={f.sigungu === o.value}
+                onClick={() => set({ sigungu: f.sigungu === o.value ? undefined : o.value })}
+              >
+                {o.value} <small>{o.count}</small>
+              </button>
+            ))}
+          </div>
         )}
       </div>
 

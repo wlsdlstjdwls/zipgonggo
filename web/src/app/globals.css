@@ -297,6 +297,9 @@ small { font-size: 13.5px; }
 .rail-g { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .rail-g > h3 { margin: 0; font-weight: 800; font-size: 11.5px; line-height: 1; letter-spacing: 0.04em; color: var(--dim); }
 .rail-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 시도 아래 시군구 — 펼쳐 두되 레일 전체를 밀어내지 않게 높이를 묶고 안에서 굴린다.
+   레일(.rail-in)이 sticky라 여기서 안 막으면 시군구 많은 도(경기)에서 아래 묶음이 화면 밖으로 밀린다 */
+.rail-sub { display: flex; flex-wrap: wrap; gap: 6px; max-height: 172px; overflow-y: auto; overscroll-behavior: contain; }
 .rail .selw, .rail .sel { width: 100%; }
 .rail-reset { border: 0; background: none; font-family: inherit; cursor: pointer; align-self: flex-start; display: inline-flex; align-items: center;
   height: 34px; padding: 0 12px; border-radius: var(--r-chip); font-weight: 700; font-size: 13.5px; color: var(--acc); white-space: nowrap; }
@@ -395,6 +398,9 @@ small { font-size: 13.5px; }
 .chip-f.on { background: var(--ink); border-color: var(--ink); color: #fff; }
 .chip-f.on small { color: rgba(255, 255, 255, 0.78); } /* 반투명 텍스트는 활성(검정 바탕)에서만 — 흰 칩에선 대비가 깨진다 */
 .chip-f.dis { cursor: default; opacity: 0.55; }
+/* 한 단 아래 칩(시군구) — 시도보다 작게 둬서 상하 관계가 눈에 보인다 */
+.chip-f.sm { height: 32px; padding: 0 11px; gap: 5px; font-size: 12.5px; }
+.chip-f.sm small { font-size: 11.5px; }
 /* 「제한 없음」처럼 조건을 거는 게 아니라 거두는 칩 — 켜져 있어도 잉크를 뒤집지 않는다 */
 .chip-f.none.on { background: var(--sub); border-color: var(--line2); color: var(--ink); }
 /* 예산 상한 — 눈금 칩 대신 만원 단위 직접 입력(사용자 요청 2026-09-21).
@@ -407,6 +413,8 @@ small { font-size: 13.5px; }
 .bin-i { flex: 1 1 auto; width: 100%; min-width: 0; border: 0; padding: 0; background: none; font: inherit; font-weight: 800; font-size: 13.5px; color: var(--ink); text-align: right; }
 .bin-i::placeholder { font-weight: 700; color: var(--dim); }
 .bin-i:focus { outline: none; }
+/* 범위의 왼쪽 끝 — 값이 아니라 안내라 흐리게 두고 입력한 숫자와 굵기를 가른다 */
+.bin-p { flex: none; font-weight: 700; font-size: 12.5px; color: var(--dim); }
 .bin-u { flex: none; font-weight: 700; font-size: 12.5px; color: var(--dim); }
 .bin-h { margin: 0; font-weight: 700; font-size: 12px; color: var(--dim); }
 .chip-f.dis:hover { transform: none; }
