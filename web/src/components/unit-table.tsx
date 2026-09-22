@@ -22,7 +22,6 @@
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { hoText, num, wonExact, wonKo } from "@/lib/format";
 import type { NoticeUnit } from "@/types/notice";
-import { Term } from "./glossary";
 import { Select, type SelectOption } from "./select";
 
 type Props = { units: NoticeUnit[] };
@@ -93,26 +92,42 @@ export function UnitTable({ units }: Props) {
     [units, dong, layout, floor, groupOf],
   );
 
-  // 정렬은 거른 다음에. 값이 없는 호실은 방향과 상관없이 맨 뒤로 보낸다 — 「모름」은 0원도 0㎡도 아니다
+  const hasRent = units.some((u) => u.rent != null);
+
+  // 열은 **호실마다 값이 갈릴 때만** 세운다(사용자 결정 2026-09-22:
+  // "호실별 정보가 좀 중복정보가 많은데 중복 정보는 상단에 표기하고 서로 다른 것만 표기하면 어떤가").
+  // 단지 전체가 같은 값이면 그건 이 단지의 성질이지 호실의 차이가 아니라 위 제원 줄이 말한다 —
+  // 같은 「개방형원룸」을 172줄 반복하는 건 표가 아니라 벽지다.
+  // 전세전환·월세전환 두 열은 통째로 뺐다(같은 날) — 「보증금과 임대료」 슬라이더가 그 폭을 다룬다.
+  const many = (pick: (u: NoticeUnit) => string | number | null): boolean =>
+    new Set(units.map(pick).filter((v) => v != null)).size > 1;
+  const col = {
+    area: many((u) => u.area_m2),
+    layout: many((u) => u.room_layout),
+    elevator: many((u) => u.elevator),
+    deposit: many((u) => u.deposit),
+    rent: hasRent && many((u) => u.rent),
+  };
+  // colSpan은 실제로 그리는 열 수와 맞춰야 한다 — 호 열 하나에 켜진 열을 더한다
+  const colCount = 1 + Object.values(col).filter(Boolean).length;
+
+  // 정렬은 거른 다음에. 값이 없는 호실은 방향과 상관없이 맨 뒤로 보낸다 — 「모름」은 0원도 0㎡도 아니다.
+  // 열이 꺼지면 그 열로 걸어 둔 정렬도 같이 풀린다 — 누를 머리가 없는 정렬은 되돌릴 길이 없다
   const visible = useMemo(() => {
     if (sort.key === "room") return filtered;
+    if ((sort.key === "area" && !col.area) || (sort.key === "deposit" && !col.deposit)) return filtered;
     const pick = sort.key === "area" ? (u: NoticeUnit) => u.area_m2 : (u: NoticeUnit) => u.deposit;
     return [...filtered].sort((a, b) => {
       const [x, y] = [pick(a), pick(b)];
       if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
       return sort.desc ? y - x : x - y;
     });
-  }, [filtered, sort]);
+  }, [filtered, sort, col.area, col.deposit]);
 
   // 지금 거른 조건의 폭. 스크롤해 내려가 보지 않아도 이 조건이 어떤 값들인지 안다
   const areaSpan = span(visible.map((u) => u.area_m2));
   const depositSpan = span(visible.map((u) => u.deposit));
 
-  // 전세전환·월세전환 열은 값이 있을 때만 — 장기전세형 별첨에는 없다
-  const hasSwap = units.some((u) => u.deposit_jeonse != null || u.deposit_wolse != null);
-  const hasRent = units.some((u) => u.rent != null);
-  // 호 + 전용면적/구조/승강기/보증금(+월임대료)(+전세전환/월세전환) — colSpan은 실제로 그리는 열 수와 맞춰야 한다
-  const colCount = 4 + (hasRent ? 2 : 1) + (hasSwap ? 2 : 0);
 
   /** 조건 하나. 고를 게 하나뿐이면 세우지 않는다 — 누를 것도 없는 셀렉트는 자리만 먹는다 */
   const Picker = ({ label, list, value, set, labelize }: { label: string; list: [string, number][]; value: string; set: (v: string) => void; labelize?: (v: string) => string }) => {
@@ -166,13 +181,11 @@ export function UnitTable({ units }: Props) {
               {/* 동 열을 따로 두면 좁은 화면에서 스크롤할 때 어느 동인지 잊어버린다(사용자 지적
                   2026-09-09) — 호 열 하나에 합쳐 sticky로 고정한다(globals.css) */}
               <th>{dongs.length > 0 ? `${groupLabel}/호` : "호"}</th>
-              <SortTh k="area">전용면적</SortTh>
-              <th>구조</th>
-              <th>승강기</th>
-              <SortTh k="deposit">{hasRent ? "임대보증금" : "전세금"}</SortTh>
-              {hasRent && <th className="num">월임대료</th>}
-              {hasSwap && <th className="num">최대 보증금</th>}
-              {hasSwap && <th className="num">최소 보증금</th>}
+              {col.area && <SortTh k="area">전용면적</SortTh>}
+              {col.layout && <th>구조</th>}
+              {col.elevator && <th>승강기</th>}
+              {col.deposit && <SortTh k="deposit">{hasRent ? "임대보증금" : "전세금"}</SortTh>}
+              {col.rent && <th className="num">월임대료</th>}
             </tr>
           </thead>
           <tbody>
@@ -186,23 +199,11 @@ export function UnitTable({ units }: Props) {
                   )}
                   {hoText(u.room)}{u.floor != null && <small> {u.floor}층</small>}
                 </td>
-                <td className="num">{u.area_m2 != null ? `${u.area_m2}㎡` : "—"}</td>
-                <td>{u.room_layout ?? "—"}</td>
-                <td>{u.elevator ?? "—"}</td>
-                <td className="num strong"><Money v={u.deposit} /></td>
-                {hasRent && <td className="num"><Money v={u.rent} /></td>}
-                {hasSwap && (
-                  <td className="num stack">
-                    <b><Money v={u.deposit_jeonse} /></b>
-                    {u.rent_jeonse != null && <small>월 {wonKo(u.rent_jeonse)}</small>}
-                  </td>
-                )}
-                {hasSwap && (
-                  <td className="num stack">
-                    <b><Money v={u.deposit_wolse} /></b>
-                    {u.rent_wolse != null && <small>월 {wonKo(u.rent_wolse)}</small>}
-                  </td>
-                )}
+                {col.area && <td className="num">{u.area_m2 != null ? `${u.area_m2}㎡` : "—"}</td>}
+                {col.layout && <td>{u.room_layout ?? "—"}</td>}
+                {col.elevator && <td>{u.elevator ?? "—"}</td>}
+                {col.deposit && <td className="num strong"><Money v={u.deposit} /></td>}
+                {col.rent && <td className="num"><Money v={u.rent} /></td>}
               </tr>
             ))}
             {visible.length === 0 && (
@@ -211,16 +212,10 @@ export function UnitTable({ units }: Props) {
           </tbody>
         </table>
       </div>
-      {dongs.length === 0 && (
-        <p className="note">공고문 별첨에 이 단지의 동 표기가 없습니다. 주소도 하나라 한 건물이며, 호만으로 호실이 갈립니다.</p>
-      )}
+      {/* 「동 표기가 없습니다」 줄은 뺐다(사용자 요청 2026-09-22) — 한 건물이라는 건 호만 적힌 표가 이미 말한다.
+          같은 호수가 건물마다 따로 있는 단지만은 남긴다: 그건 안 적으면 엉뚱한 집을 본다 */}
       {dongs.length > 0 && !byDong && (
         <p className="note">이 단지는 별첨에 동 표기가 없어 주소로 나눴습니다. 같은 호수가 건물마다 따로 있으니 주소를 함께 보세요.</p>
-      )}
-      {hasSwap && (
-        <p className="note">
-          최대 보증금은 <Term>전세전환</Term>, 최소 보증금은 <Term>월세전환</Term>을 끝까지 적용했을 때의 값입니다. 그 사이 금액도 고를 수 있습니다.
-        </p>
       )}
     </div>
   );

@@ -1229,7 +1229,10 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
    "단순 나열인데 영역을 너무 많이 차지한다"(사용자 지적) — 위아래 헤어라인 사이 한 줄로 눌렀다.
    칸 사이 세로 줄은 두지 않는다: 접히는 줄의 첫 토막에 줄이 남아 군더더기로 보인다. */
 .facts { display: flex; flex-wrap: wrap; align-items: baseline; gap: 7px 20px; list-style: none;
-  margin: 18px var(--pad) 0; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  margin: 0; padding: 0; }
+/* 제목이 이미 구획을 나누므로 이 섹션은 위아래를 바짝 붙인다 — 한 줄짜리 내용에 24px 여백은 과하다 */
+.dsec-facts { padding-top: 18px; padding-bottom: 18px; }
+.dsec-facts > h2 { margin-bottom: 11px; }
 .facts li { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .facts li > span { font-weight: 800; font-size: 11px; line-height: 1; letter-spacing: 0.1em; color: var(--dim); white-space: nowrap; }
 .facts li > b { font-weight: 800; font-size: 13.5px; letter-spacing: -0.02em; color: var(--ink);

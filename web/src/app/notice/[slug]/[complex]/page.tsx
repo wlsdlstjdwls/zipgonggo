@@ -36,14 +36,14 @@ import { JsonLd } from "@/components/json-ld";
 import { agencyLabels } from "@/lib/agency";
 import { complexGraph } from "@/lib/jsonld";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
-import { applyPhase, count, dateK, deadlineChip, NO_DATE, num, wonKo } from "@/lib/format";
+import { applyPhase, count, dateK, deadlineChip, hoText, NO_DATE, num, wonKo } from "@/lib/format";
 import { areaText, classLabel, commonArea, complexPriceRows, convertGroups, m2, moveInLabel, typeLabel, unitPriceRows } from "@/lib/notice-view";
 import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition, getYouthHouse, isComplexIndexable } from "@/lib/queries";
 import { ComplexGallery } from "@/components/complex-gallery";
 import { imagesEnabled, shownImages } from "@/lib/complex-images";
 import { complexSegment, noticeComplexPath, noticePath, ROUTES } from "@/lib/routes";
 import { regionShort, sidoShort } from "@/lib/sido";
-import type { ImageSource, Notice, NoticeComplex } from "@/types/notice";
+import type { ImageSource, Notice, NoticeComplex, NoticeUnit } from "@/types/notice";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
 export const revalidate = 3600;
@@ -204,6 +204,21 @@ export default async function ComplexPage({ params }: Params) {
   };
   const depositSub = varies([...units.map((u) => u.deposit), ...supply.map((s) => s.deposit)]) ? "최소" : null;
   const rentSub = varies([...units.map((u) => u.rent), ...supply.map((s) => s.rent)]) ? "최소" : null;
+
+  // 호실 표는 **호실마다 갈리는 값이 있을 때만** 세운다(사용자 결정 2026-09-22) —
+  // 열이 「호」 하나만 남으면 그건 표가 아니라 한 줄짜리 사실이라 위 제원 줄로 올린다.
+  // 어느 열이 살아남는지는 UnitTable이 같은 기준으로 다시 판단한다
+  const unitVaries = (pick: (u: NoticeUnit) => string | number | null) =>
+    new Set(units.map(pick).filter((v) => v != null)).size > 1;
+  const unitTableWorth = units.length > 0 && ([
+    (u: NoticeUnit) => u.area_m2, (u: NoticeUnit) => u.room_layout, (u: NoticeUnit) => u.elevator,
+    (u: NoticeUnit) => u.deposit, (u: NoticeUnit) => u.rent,
+  ]).some(unitVaries);
+  // 표를 안 세우는 단지의 호실 번호. 여덟 호까지 적고 그 뒤는 「외 n호」 — 위 「공급」이 전체 수를 이미 말한다
+  const roomList = !unitTableWorth && units.length > 0
+    ? units.slice(0, 8).map((u) => `${hoText(u.room)}${u.floor != null ? ` ${u.floor}층` : ""}`).join(" | ")
+      + (units.length > 8 ? ` 외 ${units.length - 8}호` : "")
+    : null;
   const hasFacts = supply.length > 0 || units.length > 0;
 
   // 요약 스트립·태그 줄·공급현황 표와 겹치지 않는 값만 남긴다. 전부 비면 표 자체를 그리지 않는다
@@ -215,8 +230,10 @@ export default async function ComplexPage({ params }: Params) {
     // 공용·계약면적은 주택형마다 다르다 — 여러 줄이면 공급현황 표의 면적 칸이 줄마다 적는다
     ["공용면적", one ? m2(commonArea(one)) : null],
     ["계약면적", one?.area_total != null ? m2(one.area_total) : null],
-    ["구조", layouts.length ? layouts.join(" | ") : null],
-    ["승강기", elevators.length ? elevators.join(" | ") : null],
+    // 값이 하나뿐일 때만 — 호실마다 갈리는 값은 아래 호실 표가 어느 호가 무엇인지 말한다.
+    // 여기에 「개방형원룸 | 투룸」이라고 적고 표에도 같은 열을 세우면 같은 말을 두 번 한다(사용자 결정 2026-09-22)
+    ["구조", layouts.length === 1 ? layouts[0] : null],
+    ["승강기", elevators.length === 1 ? elevators[0] : null],
     ["난방", c.heating],
     ["계약금", !payInPriceTable ? downPayment : null],
     ["잔금", !payInPriceTable ? balance : null],
@@ -297,12 +314,16 @@ export default async function ComplexPage({ params }: Params) {
           </header>
 
           {/* 제원 한 줄 — 값 하나가 한 토막이다. 격자 칸으로 늘어놓으면 단순 나열에 지면을 너무 많이 쓴다
-              (사용자 지적 2026-09-22). 보증금과 월임대료는 밑의 「보증금과 임대료」가 맡는다 */}
+              (사용자 지적 2026-09-22). 보증금과 월임대료는 밑의 「보증금과 임대료」가 맡는다.
+              제목은 다른 섹션과 같은 h2다(사용자 요청 2026-09-22: "이렇게 한 거 너무 좋은데 타이틀은 있어야지") */}
+          <section className="dsec dsec-facts">
+          <h2>기본 정보</h2>
           <ul className="facts">
             <Fact label="전용" term="전용면적" value={area} />
             <Fact label="공급" term="공급 호수" value={unitCount != null ? num(unitCount, "호") : null} sub={unitSub} />
             {/* 값이 없어도 「준비 중」이라고 쓴다 — 칸을 비워 두면 왜 없는지 알 수 없다(사용자 결정 2026-09-09) */}
             <Fact label="입주" term="입주 시작" value={moveIn ?? "준비 중"} sub={moveIn ? "공고문 예정일" : null} />
+            <Fact label="호실" value={roomList} />
             {/* 한 줄짜리 공급의 우선/일반 배분. 위 「공급」은 합만 말한다 */}
             {one && oneSplit && (
               <Fact
@@ -313,6 +334,7 @@ export default async function ComplexPage({ params }: Params) {
             )}
             {specs.map(([label, value, term]) => <Fact key={label} label={label} value={value} term={term} />)}
           </ul>
+          </section>
 
           {/* 제원은 위 요약 스트립으로 올라갔다(2026-09-22) — 여기 남는 건 여러 줄짜리 공급현황 표와
               포털이 주는 단지 정보뿐이라, 둘 다 없으면 섹션 자체를 그리지 않는다 */}
@@ -428,8 +450,9 @@ export default async function ComplexPage({ params }: Params) {
             )}
           </section>
 
-          {/* 별첨 주택목록이 있는 공고만 — 동호수별로 갈라 본다(사용자 요청 2026-09-09) */}
-          {units.length > 0 && (
+          {/* 별첨 주택목록이 있는 공고만 — 동호수별로 갈라 본다(사용자 요청 2026-09-09).
+              호실마다 갈리는 값이 없으면 표를 세우지 않는다 — 호실 번호는 위 제원 줄이 적는다 */}
+          {unitTableWorth && (
             <section className="dsec">
               <h2>{unitLabel} | {num(units.length, "호")}</h2>
               <UnitTable units={units} />
