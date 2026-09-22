@@ -11,7 +11,7 @@
 // 금액 조건은 구간이 아니라 상한이다 — 사람이 실제로 거는 조건은 「내 예산 이하」다.
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { photoBadgeOn, sourceOf } from "@/lib/complex-images";
 import { noticeComplexPath } from "@/lib/routes";
 import { hasMapKey, type LatLng } from "@/lib/naver-maps-loader";
@@ -187,8 +187,14 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
   const hi = numOrNull(areaHi);
   const custom = lo != null || hi != null;
 
+  // 친 글자는 곧바로 칸에 뜨지만 **목록과 지도는 한 박자 늦게** 따라온다(2026-09-22).
+  // 한 글자마다 138줄을 거르고 마커 138개를 지웠다 새로 찍으면 지우기(x) 한 번이 눈에 보이게 밀린다.
+  // useDeferredValue는 급한 일(입력 반영)을 먼저 그리고 무거운 일을 뒤로 미룬다 — 디바운스와 달리
+  // 한가하면 즉시 돌아 체감 지연이 없다
+  const dq = useDeferredValue(q);
+
   const visible = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = dq.trim().toLowerCase();
     const b = AREA_BANDS.find((x) => x.value === band);
     const depCap = CAP_OF.get(dep);
     const rentCap = CAP_OF.get(rent);
@@ -202,7 +208,7 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
       (!onlyNew || c.is_new) &&
       (!needle || `${c.name} ${c.road_address}`.toLowerCase().includes(needle)),
     );
-  }, [items, gu, cls, band, custom, lo, hi, dep, rent, onlyNew, q]);
+  }, [items, gu, cls, band, custom, lo, hi, dep, rent, onlyNew, dq]);
 
   const clearAll = useCallback(() => {
     setGu(""); setCls(""); setBand(""); setAreaLo(""); setAreaHi(""); setDep(""); setRent(""); setOnlyNew(false); setQ(""); setSelected(null);

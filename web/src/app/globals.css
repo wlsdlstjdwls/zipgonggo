@@ -895,8 +895,11 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 .gal-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .gal-tab { padding: 7px 12px; border: 1px solid var(--line2); border-radius: 999px; background: #fff; cursor: pointer; font: inherit; font-weight: 800; font-size: 13.5px; line-height: 1.2; letter-spacing: -0.02em; color: var(--dim); }
 .gal-tab:hover { border-color: var(--line-strong); color: var(--ink); }
-.gal-tab.on { border-color: var(--ink); background: var(--ink); color: #fff; }
-.gal-tab.on .gal-n { color: rgba(255, 255, 255, 0.72); }
+/* 「사진과 도면」 탭 — 필터가 아니라 **늘 하나가 걸려 있는 탭**이라 잉크를 뒤집지 않는다.
+   검은 칩은 「걸렀다」는 신호고, 그건 홈 필터(.chip-f.on)와 셀렉트(.sel.on)에만 남긴다.
+   상호전환 탭(.cs-tabs)이 09-22에 먼저 간 길과 같다(사용자 결정) */
+.gal-tab.on { border-color: var(--acc); background: var(--acc-pastel); color: var(--acc); }
+.gal-tab.on .gal-n { color: var(--acc); opacity: 0.72; }
 /* 이 공고에 없는 주택형 — 나머지 탭과 한 줄에 있되 같은 무게로 읽히면 안 된다 */
 .gal-tab.alt { margin-left: auto; border-style: dashed; }
 
@@ -1193,13 +1196,12 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* 돋보기는 칸 위에 얹힌다 — z-index를 안 박으면 뒤따르는 input 바탕에 가려 보였다 안 보였다 한다
    (사용자 지적 2026-09-22: "돋보기가 사라졌다 생겼다") */
 .cx-search .ss-ico { left: 12px; z-index: 1; }
-/* 흰 칸에 회색 테두리 하나로는 칠 수 있는 자리인 줄 모른다. 회색 바탕은 오히려 「꺼진 칸」으로 읽혀
-   파스텔 파랑으로 바꿨다(사용자 지적 2026-09-22). 포커스에서 흰 바탕 + 파란 테두리로 뒤집는다.
-   `.fld:hover`의 translateY도 여기서만 끈다 — 글 치는 칸이 손을 대면 들썩이면 안 된다 */
-.cx-search .cx-q { width: 100%; padding-left: 34px; background: var(--acc-pastel); border-color: transparent;
-  transition: background 200ms var(--ease), border-color 200ms var(--ease); }
-.cx-search .cx-q::placeholder { color: var(--acc); opacity: 0.72; }
-.cx-search .cx-q:hover { transform: none; background: var(--acc-pastel); border-color: transparent; }
+/* 바탕은 흰색, 테두리는 약하게(사용자 결정 2026-09-22 — 회색도 파스텔도 아니었다).
+   「칠 수 있는 칸」이라고 말하는 건 파란 돋보기 하나로 충분하다. 포커스에서만 테두리가 파래진다.
+   `.fld:hover`의 translateY는 여기서만 끈다 — 글 치는 칸이 손 대면 들썩이면 안 된다 */
+.cx-search .cx-q { width: 100%; padding-left: 34px; background: var(--bg); border-color: var(--line);
+  transition: border-color 200ms var(--ease); }
+.cx-search .cx-q:hover { transform: none; background: var(--bg); border-color: var(--line2); }
 .cx-search .cx-q:focus { outline: none; transform: none; background: var(--bg); border-color: var(--acc); }
 .cx-search .ss-ico { color: var(--acc); }
 .cx-search:focus-within .ss-ico { color: var(--acc); }
@@ -1310,7 +1312,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .facts-row > .facts { flex: 1 1 auto; }
 /* 제원 줄 끝에 있던 버튼이 「기본 정보」 제목 줄 오른쪽 끝으로 올라갔다(사용자 요청 2026-09-22:
    "버튼은 잘 안 보이는데 기본정보 타이틀 옆에 위치하게 해줘"). 제목(.dsec > h2)이 이미 flex라 자리만 준다 */
-.dsec > h2 > .facts-more { margin-left: auto; width: auto; font-size: 12px; padding: 6px 11px; letter-spacing: -0.02em; }
+/* 오른쪽 끝으로 밀지 않는다(사용자 정정 2026-09-22: "오른쪽에 붙이지 말고 타이틀 옆에") —
+   h2의 gap(9px)만 두고 제목에 바로 잇는다 */
+.dsec > h2 > .facts-more { margin-left: 0; width: auto; font-size: 12px; padding: 6px 11px; letter-spacing: -0.02em; }
 /* 좁은 화면에서는 제목 옆에 낄 자리가 없다 — flex-basis 100%로 스스로 아랫줄을 만든다.
    제목 글자를 밀어 「기본 / 정보」로 쪼개는 것보다 한 줄 내주는 게 낫다(실측 330px) */
 @media (max-width: 560px) {
@@ -1584,7 +1588,7 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-src { margin: 0; font-weight: 700; font-size: 13.5px; color: var(--mut); }
 .elig-seg { display: flex; gap: 6px; }
 .elig-seg button { flex: 1; height: 38px; border: 1px solid var(--line2); border-radius: var(--r-btn); background: var(--bg); font-weight: 800; font-size: 14px; color: var(--mut); cursor: pointer; transition: all var(--duration-fast) var(--ease); }
-.elig-seg button.on { border-color: var(--ink); background: var(--ink); color: #fff; }
+.elig-seg button.on { border-color: var(--acc); background: var(--acc-pastel); color: var(--acc); }
 
 .elig-checks { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .elig-chk { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14px; cursor: pointer; }
@@ -1743,7 +1747,8 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .fit-form .elig-grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 .fit-form .elig-in, .fit-form .elig-seg button, .fit-form .sel { background: var(--bg); }
 /* 위 줄이 같은 특이도의 .elig-seg button.on을 덮으면 켜진 칸이 흰 바탕에 흰 글자가 된다(탐색기 chip-f와 같은 함정, 2026-09-14) */
-.fit-form .elig-seg button.on, .fit-form .sel.on { background: var(--ink); }
+.fit-form .elig-seg button.on { background: var(--acc-pastel); }
+.fit-form .sel.on { background: var(--ink); }
 .elig-seg.wrap { flex-wrap: wrap; }
 .elig-seg.wrap button { flex: 1 1 100px; }
 .fit-verdict { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }

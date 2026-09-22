@@ -57,6 +57,10 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
   // 마지막으로 pan해 준 선택. 선택이 그대로인데 호버·좌표 갱신으로 효과가 다시 돌 때는 지도를 건드리지 않는다 —
   // 사용자가 끌어서 핀을 화면 밖으로 보낸 뒤 핀에 마우스만 스쳐도 도로 당겨 왔다(사용자 지적 2026-09-14: "제멋대로 계속 움직여")
   const panned = useRef<number | null>(null);
+  // 마지막으로 만들어진 fit(). ResizeObserver가 자기 효과에서 늘 최신 것을 부르게 한다
+  const fitRef = useRef<(() => void) | null>(null);
+  // 지난 번에 확대해 둔 핀. 호버가 바뀔 때 **그 둘만** 손보면 된다 — 138개를 전부 훑지 않는다
+  const focused = useRef<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [mapReady, setMapReady] = useState(false);
 
@@ -141,14 +145,21 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
       if (map.getZoom() > NAVER_MAP_DEFAULT_ZOOM) map.setZoom(NAVER_MAP_DEFAULT_ZOOM);
     };
     if (changed > 0 && markers.current.size > 0) fit();
-    // 컨테이너 크기가 바뀌면(900px 분기, 모바일 주소창 접힘) 지도에 알리고, 아직 단지를 고르지 않았으면 다시 fit
-    const ro = el.current ? new ResizeObserver(() => {
-      maps.Event.trigger(map, "resize");
-      if (cb.current.selectedId === null) fit();
-    }) : null;
-    if (ro && el.current) ro.observe(el.current);
-    return () => ro?.disconnect();
+    fitRef.current = fit;
   }, [items, coords, split, mapReady]);
+
+  // 2-1) 컨테이너 크기가 바뀌면(900px 분기, 모바일 주소창 접힘) 지도에 알리고, 아직 단지를 고르지 않았으면 다시 fit.
+  // 위 효과 안에 있을 땐 목록이 걸러질 때마다 관찰자를 새로 만들었다 끊었다 했다 — 한 글자마다 그 비용이 붙는다
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !el.current) return;
+    const ro = new ResizeObserver(() => {
+      window.naver.maps.Event.trigger(map, "resize");
+      if (cb.current.selectedId === null) fitRef.current?.();
+    });
+    ro.observe(el.current);
+    return () => ro.disconnect();
+  }, [mapReady]);
 
   // 3) 선택 → 그 핀만 이름 라벨로, 나머지는 브랜드 핀. 호버 → 핀 살짝 확대.
   //    선택이 새로 잡혔고 그 핀이 화면 밖일 때만 panTo — 그 뒤로는 사용자가 어디로 끌든 따라가지 않는다
@@ -159,22 +170,38 @@ export function ComplexMap({ items, coords, focusId, selectedId, onFocus, onSele
     const byId = new Map(items.map((it) => [it.id, it]));
     const newlySelected = selectedId !== panned.current;
     panned.current = selectedId;
+
+    // 호버 표시는 **바뀐 두 핀만** 손댄다. 전에는 매번 138개를 돌며 getElement().querySelector를 했고,
+    // 그 효과가 글자 한 자마다 다시 돌았다(사용자 지적 2026-09-22: "지우는 것도 목록도 느리다")
+    const mark = (id: number | null, on: boolean) => {
+      if (id === null) return;
+      const m = markers.current.get(id);
+      const wrap: HTMLElement | null = m?.marker.getElement?.()?.querySelector(".zg-mk") ?? null;
+      wrap?.classList.toggle("is-focus", on);
+      if (m) m.marker.setZIndex(id === selectedId ? 950 : on ? 900 : 100);
+    };
+    if (focused.current !== focusId) {
+      mark(focused.current, false);
+      mark(focusId, true);
+      focused.current = focusId;
+    }
+
+    // 아이콘 교체와 panTo도 바뀐 핀에만. selected 표시는 마커마다 들고 있으므로 옛 선택을 따로 찾지 않아도 된다
     for (const [id, m] of markers.current) {
       const sel = id === selectedId;
-      if (sel !== m.selected) {
-        const it = byId.get(id);
-        m.marker.setIcon(sel && it
-          ? { content: bubbleMarkerHtml(it.title, it.sub), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) }
-          : { content: markerHtml(pinFill(it, split)), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) });
-        m.selected = sel;
-      }
+      if (sel === m.selected) continue;
+      const it = byId.get(id);
+      m.marker.setIcon(sel && it
+        ? { content: bubbleMarkerHtml(it.title, it.sub), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) }
+        : { content: markerHtml(pinFill(it, split)), anchor: new maps.Point(MARKER_W / 2, MARKER_H - 1) });
+      m.selected = sel;
       m.marker.setZIndex(sel ? 950 : id === focusId ? 900 : 100);
-      const wrap: HTMLElement | null = m.marker.getElement?.()?.querySelector(".zg-mk") ?? null;
-      wrap?.classList.toggle("is-focus", id === focusId);
-      if (sel && newlySelected && !map.getBounds().hasLatLng(m.pos)) {
-        const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-        if (reduce) map.setCenter(m.pos); else map.panTo(m.pos, PAN);
-      }
+    }
+
+    const cur = selectedId === null ? null : markers.current.get(selectedId);
+    if (cur && newlySelected && !map.getBounds().hasLatLng(cur.pos)) {
+      const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      if (reduce) map.setCenter(cur.pos); else map.panTo(cur.pos, PAN);
     }
   }, [items, focusId, selectedId, coords, split, mapReady]);
 
