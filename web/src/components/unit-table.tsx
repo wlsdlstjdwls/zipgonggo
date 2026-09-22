@@ -20,7 +20,7 @@
 // 끊어 두면 Ctrl+F로 호수를 못 찾는다. 줄 수와 상관없이 「몇 호 중 몇 호」와 면적·보증금 범위는 늘 적는다.
 
 import { type ReactNode, useCallback, useMemo, useState } from "react";
-import { num, wonExact, wonKo } from "@/lib/format";
+import { hoText, num, wonExact, wonKo } from "@/lib/format";
 import type { NoticeUnit } from "@/types/notice";
 import { Term } from "./glossary";
 import { Select, type SelectOption } from "./select";
@@ -40,12 +40,6 @@ function tally(units: NoticeUnit[], pick: (u: NoticeUnit) => string | null): [st
     if (v) m.set(v, (m.get(v) ?? 0) + 1);
   }
   return [...m.entries()];
-}
-
-/** 별첨의 호는 "0302"처럼 층+호를 붙인 네 자리다 — 사람이 읽는 "302호"로 편다 */
-function hoText(room: string): string {
-  const t = room.replace(/^0+/, "");
-  return /^\d+$/.test(t) ? `${t}호` : room;
 }
 
 function Money({ v }: { v: number | null }) {

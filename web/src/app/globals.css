@@ -1032,26 +1032,88 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* 첫 열 안에 상위 구분을 작은 배지로 얹을 때 쓴다(동/호, 공급대상/공급유형처럼 두 값을 한 칸에 묶을 때) */
 .tc-tag { display: inline-block; margin-right: 4px; padding: 1px 5px; border-radius: 5px; background: var(--sub); font-size: 11.5px; font-weight: 700; color: var(--mut); }
 
-/* 보증금과 임대료 — 공급대상 × 공급유형마다 전세전환 / 기본 / 월세전환 세 줄(components/convert-table.tsx) */
-.ctable { display: grid; gap: 12px; }
-.ct-g { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
-.ct-h { display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 11px 15px; background: var(--sub); border-bottom: 1px solid var(--line); }
-.ct-h b { font-weight: 800; font-size: 14px; letter-spacing: -0.02em; color: var(--ink); }
-.ct-h span { font-weight: 700; font-size: 12.5px; color: var(--mut); }
-.ct-h em { margin-left: auto; font-style: normal; font-weight: 800; font-size: 12.5px; color: var(--dim); }
-.ct-r { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; align-items: baseline; border-bottom: 1px solid var(--line); }
-.ct-r:last-child { border-bottom: 0; }
-.ct-r > span { padding: 12px 15px; min-width: 0; }
-.ct-head > span { padding-top: 9px; padding-bottom: 9px; font-weight: 800; font-size: 11.5px; letter-spacing: 0.04em; color: var(--dim); }
-.ct-head > span { text-align: center; }
-.ct-r .k { display: flex; align-items: baseline; gap: 6px; font-weight: 700; font-size: 14px; color: var(--mut); }
-.ct-r .k small { font-weight: 600; font-size: 11.5px; color: var(--dim); white-space: nowrap; }
-.ct-r .d, .ct-r .r { text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ct-r .d { font-weight: 800; font-size: 15px; color: var(--ink); }
-.ct-r .r { font-weight: 700; font-size: 14px; color: var(--mut); }
-/* 기본(공고 기준값)이 읽는 사람의 기준선이다 — 전환 두 줄보다 진하게 */
-.ct-r.k-base { background: var(--acc-soft); }
-.ct-r.k-base .k, .ct-r.k-base .d, .ct-r.k-base .r { color: var(--acc); font-weight: 800; }
+/* 보증금과 임대료 — 상호전환 슬라이더(components/convert-slider.tsx).
+   최대/기본/최소 세 줄짜리 표를 걷어내고 손잡이 하나로 바꿨다(사용자 결정 2026-09-22).
+   세로로 먹는 자리를 못 박는 게 이 블록의 목적이다 — 탭 줄을 빼면 110px 안쪽이다. */
+.cslide { display: grid; gap: 0; }
+.cs-pick { margin-bottom: 16px; }
+
+/* 칸이 둘 이상일 때의 탭. TAB_MAX를 넘으면 컴포넌트가 셀렉트(.cs-pick)로 바꾼다 */
+.cs-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 3px; margin-bottom: 16px; scrollbar-width: none; }
+.cs-tabs::-webkit-scrollbar { display: none; }
+.cs-tabs button {
+  flex: 0 0 auto; font: inherit; font-size: 12.5px; font-weight: 800; letter-spacing: -0.02em;
+  border: 1px solid var(--line2); background: var(--bg); color: var(--mut);
+  border-radius: var(--r-chip); padding: 9px 13px; cursor: pointer;
+  transition: transform 240ms var(--sp), background 200ms var(--ease);
+}
+.cs-tabs button em { font-style: normal; font-weight: 700; font-size: 11.5px; color: var(--dim); margin-left: 5px; }
+.cs-tabs button:hover { transform: translateY(-1.5px); }
+.cs-tabs button:active { transform: scale(0.975); }
+.cs-tabs button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.cs-tabs button[aria-pressed="true"] em { color: var(--bg); opacity: 0.72; }
+
+/* 고른 값 — 보증금 왼쪽, 월임대료 오른쪽. 트랙 양 끝 글자와 세로로 줄이 맞는다 */
+.cs-now { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.cs-now .col { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cs-now .col.r { align-items: flex-end; text-align: right; }
+.cs-now .cap { font-size: 10.5px; font-weight: 800; letter-spacing: 0.14em; color: var(--dim); }
+.cs-now .v { font-size: 28px; font-weight: 900; letter-spacing: -0.055em; line-height: 1.05; white-space: nowrap; color: var(--ink); }
+
+.cs-track { position: relative; margin-top: 16px; padding-inline: 2px; }
+.cs-ticks { position: relative; height: 9px; margin-bottom: -2px; }
+.cs-ticks i { position: absolute; top: 0; width: 1px; height: 5px; background: var(--line2); transform: translateX(-0.5px); }
+.cs-ticks i.mid { height: 9px; background: var(--acc); }
+
+/* 바탕 레일(::before) 위에 채움(.cs-fill), 그 위에 손잡이만 보이는 투명 트랙 range를 얹는다 —
+   네이티브 range 하나로는 「기준에서 얼마나 밀었나」를 색으로 못 그린다 */
+.cs-rail { position: relative; }
+.cs-rail::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 8px; margin-top: -4px;
+  border-radius: var(--radius-pill); background: var(--sub); border: 1px solid var(--line);
+}
+.cs-fill {
+  position: absolute; top: 50%; height: 8px; margin-top: -4px; border-radius: var(--radius-pill);
+  pointer-events: none; background: var(--acc);
+  transition: left 160ms var(--ease), width 160ms var(--ease), opacity 160ms var(--ease);
+}
+.cs-rail input[type="range"] {
+  position: relative; appearance: none; -webkit-appearance: none;
+  width: 100%; margin: 0; background: transparent; height: 34px; cursor: grab;
+}
+.cs-rail input[type="range"]:active { cursor: grabbing; }
+.cs-rail input[type="range"]::-webkit-slider-runnable-track { height: 8px; border-radius: var(--radius-pill); background: transparent; }
+.cs-rail input[type="range"]::-moz-range-track { height: 8px; border-radius: var(--radius-pill); background: transparent; }
+.cs-rail input[type="range"]::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none; width: 26px; height: 26px; margin-top: -9px;
+  border-radius: var(--radius-pill); background: var(--acc); border: 3px solid var(--bg);
+  box-shadow: var(--shadow-float); transition: transform 240ms var(--sp);
+}
+.cs-rail input[type="range"]::-moz-range-thumb {
+  width: 26px; height: 26px; border-radius: var(--radius-pill); background: var(--acc);
+  border: 3px solid var(--bg); box-shadow: var(--shadow-float);
+}
+.cs-rail input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.08); }
+.cs-rail input[type="range"]:focus-visible { outline: none; }
+.cs-rail input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--acc-soft), var(--shadow-float); }
+
+/* 트랙 양 끝 — 누르면 그 끝으로 간다. 글자일 뿐이라 자리를 안 먹는다 */
+.cs-ends { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-top: 2px; }
+.cs-end {
+  display: flex; flex-direction: column; gap: 1px; text-align: left;
+  font: inherit; border: 0; background: none; padding: 0; cursor: pointer; color: var(--mut);
+  transition: color 200ms var(--ease);
+}
+.cs-end.hi { text-align: right; align-items: flex-end; }
+.cs-end .k { font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; color: var(--dim); }
+.cs-end .n { font-size: 12.5px; font-weight: 800; letter-spacing: -0.02em; border-bottom: 1px solid transparent; }
+.cs-end:hover { color: var(--acc); }
+.cs-end:hover .n { border-bottom-color: currentColor; }
+.cs-end[aria-pressed="true"] { color: var(--acc); }
+
+@media (max-width: 420px) {
+  .cs-now .v { font-size: 23px; }
+}
 
 /* ── 공급 단지 탐색기(components/complex-explorer.tsx) — 좌 목록 / 우 지도 ── */
 /* 왼쪽 목록과 오른쪽 지도는 같은 높이다(--cx-h) — 지도만 짧으면 목록 옆에 빈 띠가 남는다(사용자 지적 2026-09-09) */

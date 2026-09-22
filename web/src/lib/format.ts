@@ -152,6 +152,12 @@ export function count(n: number, unit = "건"): string {
   return `${n.toLocaleString(KO)}${unit}`;
 }
 
+/** 별첨의 호는 "0302"처럼 층+호를 붙인 네 자리다 — 사람이 읽는 "302호"로 편다 */
+export function hoText(room: string): string {
+  const t = room.replace(/^0+/, "");
+  return /^\d+$/.test(t) ? `${t}호` : room;
+}
+
 /**
  * 접수 상태 — 상세 헤드라인과 목록 행이 같은 문장을 쓴다(사용자 요청 2026-09-09: 접수 시작을 위에서 강조).
  * label은 크게 쓰는 한 마디, note는 그 밑 날짜 줄, live는 목록 행에 붙는 짧은 표식(없으면 null).

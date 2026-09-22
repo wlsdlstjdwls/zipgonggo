@@ -23,7 +23,7 @@ import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
 import { NoticeFit } from "@/components/notice-fit";
 import { NoticeFitMingan } from "@/components/notice-fit-mingan";
-import { ConvertTable } from "@/components/convert-table";
+import { ConvertSlider } from "@/components/convert-slider";
 import { Pending } from "@/components/pending";
 import { PriceTable } from "@/components/price-table";
 import { ShareButton } from "@/components/share-button";
@@ -36,7 +36,7 @@ import { agencyLabels } from "@/lib/agency";
 import { complexGraph } from "@/lib/jsonld";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
 import { applyPhase, count, dateK, deadlineChip, NO_DATE, num, wonKo } from "@/lib/format";
-import { areaText, classLabel, commonArea, complexPriceGroups, complexPriceRows, CONVERT_HINT, m2, moveInLabel, typeLabel, unitPriceRows } from "@/lib/notice-view";
+import { areaText, classLabel, commonArea, complexPriceRows, convertGroups, m2, moveInLabel, typeLabel, unitPriceRows } from "@/lib/notice-view";
 import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition, getYouthHouse, isComplexIndexable } from "@/lib/queries";
 import { ComplexGallery } from "@/components/complex-gallery";
 import { imagesEnabled, shownImages } from "@/lib/complex-images";
@@ -137,7 +137,9 @@ export default async function ComplexPage({ params }: Params) {
   const priceBreak = supply.length > 0 ? complexPriceRows(supply, c) : (unitPriceRows(units).length ? unitPriceRows(units) : complexPriceRows(supply, c));
   // 월임대료가 있는 줄은 공급대상별로 최대/기본/최소 세 줄을 만든다(사용자 요청 2026-09-09)
   // 민간임대는 공고가 비율별 금액을 직접 준다 — SH 규칙(연 이율)로 계산한 전세/월세전환 표를 내면 공고와 다른 숫자가 된다
-  const priceGroups = hasOptions ? [] : complexPriceGroups(supply);
+  // 슬라이더에 걸 칸들. 별첨 호실 목록이 있으면 공고문이 적어 둔 전환 금액을 그대로 쓰고,
+  // 없으면 공급현황 기준값에 calc.ts 규칙을 걸어 만든다 — 자세한 건 lib/notice-view.ts의 convertGroups
+  const slideGroups = hasOptions ? [] : convertGroups(supply, units);
   // 오른쪽 카드는 언제나 "마감"을 센다 — 접수 시작 D-day를 섞으면 「접수 시작까지 / 오늘 / 09.11 마감」처럼 어긋난다
   const dl = deadlineChip(n);
   const ph = applyPhase(n);
@@ -173,7 +175,7 @@ export default async function ComplexPage({ params }: Params) {
   const one = supply.length === 1 ? supply[0] : null;
   const oneSplit = one != null && (one.units_priority != null || one.units_general != null);
   // 장기전세처럼 월임대료가 없는 공고는 아래 금액 표(PriceTable)가 계약금·잔금 줄을 따로 그린다 — 그때는 여기서 뺀다
-  const payInPriceTable = priceGroups.length === 0 && priceBreak.some((r) => r.group === "pay");
+  const payInPriceTable = slideGroups.length === 0 && priceBreak.some((r) => r.group === "pay");
   // 별첨에 동 표기가 있는 단지만 「동호수별」이다 — 다세대·빌라는 호만 실린다(사용자 지적 2026-09-09)
   const unitLabel = units.some((u) => u.building) ? "동호수별 정보" : "호실별 정보";
   const hasFacts = supply.length > 0 || units.length > 0;
@@ -232,7 +234,7 @@ export default async function ComplexPage({ params }: Params) {
     // 전용면적·입주 시작은 요약 스트립 라벨이라 값이 없어도 늘 링크가 걸린다
     "전용면적",
     "입주 시작",
-    ...(priceGroups.length || units.some((u) => u.deposit_jeonse != null) ? ["전세전환", "월세전환"] : []),
+    ...(slideGroups.length || units.some((u) => u.deposit_jeonse != null) ? ["전세전환", "월세전환"] : []),
   ];
 
   return (
@@ -378,13 +380,14 @@ export default async function ComplexPage({ params }: Params) {
           {/* 보증금과 임대료는 공급현황 아래 — 어떤 유형이 있는지 먼저 보고 그 금액을 읽는 순서다(사용자 요청 2026-09-09) */}
           <section className="dsec">
             <h2>{showRent ? "보증금과 임대료" : "전세금"}</h2>
-            {priceGroups.length > 0 ? (
+            {slideGroups.length > 0 ? (
               <>
-                <ConvertTable groups={priceGroups} />
+                <ConvertSlider groups={slideGroups} />
+                {/* 설명은 이 한 줄뿐이다(사용자 결정 2026-09-22) — 배지와 문단을 다 걷어냈다.
+                    다만 전환 한도와 이율이 공고마다 다르다는 사실은 남긴다: 그게 빠지면
+                    우리가 계산한 금액을 공고문 금액으로 읽게 된다 */}
                 <p className="note">
-                  기본은 공고 기준값입니다. 계약 때 월임대료의 {CONVERT_HINT.share}%까지 보증금으로 올리거나(<Term>전세전환</Term>, 연 {CONVERT_HINT.up}%),
-                  보증금의 {CONVERT_HINT.share}%까지 월임대료로 내릴 수 있습니다(<Term>월세전환</Term>, 연 {CONVERT_HINT.down}%).
-                  전환 한도와 이율은 공고마다 다르므로 {L.originalDoc}에서 확인하세요.
+                  <Term>전세전환</Term>과 <Term>월세전환</Term>의 한도와 이율은 공고마다 다릅니다. 계약 조건은 {L.originalDoc}에서 확인하세요.
                 </p>
               </>
             ) : priceBreak.length > 0 ? (

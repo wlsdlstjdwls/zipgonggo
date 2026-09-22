@@ -1,6 +1,6 @@
 // 상세 화면(공고·단지) 전용 표시 계산. 두 page.tsx가 공유한다 — 레이아웃 JSX와 분리해 여기 한 곳만 본다.
-import { convertRange, CONVERT_LIMIT_SHARE, CONVERT_RATE_DOWN, CONVERT_RATE_UP } from "./calc";
-import { wonKo } from "./format";
+import { convertRange } from "./calc";
+import { hoText, wonKo } from "./format";
 import type { Notice, NoticeComplex, NoticeSupply, NoticeUnit } from "@/types/notice";
 
 /** 공급유형 표기 — "39㎡", 주거약자용이면 "39㎡ 주거약자용" */
@@ -163,59 +163,72 @@ export function unitPriceRows(units: NoticeUnit[]): PriceRow[] {
   return rows;
 }
 
-// 단지 상세 「보증금과 임대료」 — 공급대상 × 공급유형마다 최대 / 기본 / 최소 세 줄.
-// 사용자 요청 2026-09-09: "신혼부부 전세전환·기본·월세전환 / 청년 전세전환·기본·월세전환처럼 유형별로,
-// 최소 최대 몇 퍼센트까지 가능한지" — 계약 때 실제로 고를 수 있는 폭을 표에서 바로 읽게 한다.
-// 큰 라벨은 「최대」·「최소」로 바꿨다(사용자 요청 2026-09-09): 보증금이 얼마까지 오르내리는지가 먼저 읽혀야 한다.
-// 원래 용어(전세전환·월세전환)는 보조 글자로 남겨 뜻이 사라지지 않게 하고, 페이지 밑 용어 설명이 받는다.
-// 계산은 lib/calc.ts(SH 별표1 역산 6.0% / 2.5%, 한도 50%)를 쓴다. 하드코딩 금액은 없다.
-export type PriceScenarioKind = "max" | "base" | "min";
-export type PriceScenario = {
-  kind: PriceScenarioKind;
+// ── 상호전환 슬라이더 (사용자 결정 2026-09-22) ─────────────────────────────────
+// 최대/기본/최소 세 줄짜리 표(ConvertTable)를 걷어내고, 그 폭을 손잡이 하나로 끌게 바꿨다.
+// "보기가 힘들다 — 바 같은 걸로 왼쪽 오른쪽 움직이면 최대 보증금(최소 임대료), 왼쪽일수록 최소 보증금(최대 임대료)".
+//
+// 값의 출처가 둘이고, 그 둘을 섞지 않는 것이 이 함수의 전부다:
+//   1) 별첨 호실 목록(unit)은 전환 금액을 **공고문이 직접 적어 놨다**(deposit_jeonse·deposit_wolse).
+//      이때는 규칙으로 계산하지 않는다 — 계산하면 공고문과 다른 숫자가 나온다.
+//      실측(해가온 0203호): 공고문 세 점에서 역산한 이율이 연 6.7%라 calc.ts 기본값 6.0%와 다르다.
+//   2) 공급현황 표(notice_supply)에는 기준 금액뿐이라 calc.ts 규칙(6.0% / 2.5%, 한도 50%)으로 양 끝을 만든다.
+
+/** 상호전환 슬라이더 한 칸. 양 끝은 「보증금 최대」(전세전환)와 「보증금 최소」(월세전환)다 */
+export type ConvertGroup = {
+  id: string;
+  /** 탭·셀렉트에 걸리는 이름. 칸이 하나뿐이면 안 보인다 */
   label: string;
-  deposit: string;
-  rent: string;
-  exact: [number | null, number | null];
-  /** 기준 보증금 대비 비율(%). 기본 줄은 null */
-  pct: number | null;
-  /** 공고문 용어(전세전환·월세전환). 기본 줄은 null — 용어 설명 앵커의 키이기도 하다 */
-  term: string | null;
-};
-export type PriceGroup = { id: string; label: string; note: string; units: number | null; rows: PriceScenario[] };
-
-/** 전환 한도 안내 문구에 쓰는 값 — 화면이 상수를 다시 적지 않게 여기서 한 번만 만든다 */
-export const CONVERT_HINT = {
-  share: Math.round(CONVERT_LIMIT_SHARE * 100),
-  up: CONVERT_RATE_UP,
-  down: CONVERT_RATE_DOWN,
+  /** 이름 옆 보조 글자(면적·호수) */
+  note: string;
+  /** [보증금, 월임대료] 원 단위 */
+  base: [number, number];
+  /** 보증금 최대 쪽 끝 */
+  max: [number, number];
+  /** 보증금 최소 쪽 끝 */
+  min: [number, number];
 };
 
-/** 전환 표를 그릴 수 있는 줄만 — 보증금과 월임대료가 둘 다 있어야 성립한다(장기전세는 월임대료가 없다) */
-export function complexPriceGroups(supply: NoticeSupply[]): PriceGroup[] {
+/** 별첨 호실 목록에서 — 금액이 같은 호실은 한 칸으로 묶는다(층만 다른 같은 값이 흔하다) */
+function unitConvertGroups(units: NoticeUnit[]): ConvertGroup[] {
+  const m = new Map<string, { u: NoticeUnit; n: number }>();
+  for (const u of units) {
+    if (u.deposit == null || u.rent == null) continue;
+    if (u.deposit_jeonse == null || u.rent_jeonse == null) continue;
+    if (u.deposit_wolse == null || u.rent_wolse == null) continue;
+    const key = `${u.deposit}|${u.rent}|${u.deposit_jeonse}|${u.rent_jeonse}|${u.deposit_wolse}|${u.rent_wolse}`;
+    const hit = m.get(key);
+    if (hit) hit.n += 1;
+    else m.set(key, { u, n: 1 });
+  }
+  return [...m.values()].map(({ u, n }) => ({
+    id: `u${u.id}`,
+    label: n > 1 ? `${hoText(u.room)} 외 ${n - 1}호` : hoText(u.room),
+    note: u.area_m2 != null ? `${u.area_m2}㎡` : "",
+    base: [u.deposit as number, u.rent as number],
+    max: [u.deposit_jeonse as number, u.rent_jeonse as number],
+    min: [u.deposit_wolse as number, u.rent_wolse as number],
+  }));
+}
+
+/**
+ * 슬라이더에 걸 칸들. 별첨 호실 목록이 있으면 그쪽이 먼저다 — 공고문이 적어 둔 실제 금액이라서.
+ * 둘 다 없거나 월임대료가 없으면(장기전세) 빈 배열이고, 화면은 기존 금액 표로 떨어진다.
+ */
+export function convertGroups(supply: NoticeSupply[], units: NoticeUnit[]): ConvertGroup[] {
+  const fromUnits = unitConvertGroups(units);
+  if (fromUnits.length) return fromUnits;
   return supply
     .filter((s) => s.deposit != null && s.deposit > 0 && s.rent != null && s.rent > 0)
     .map((s) => {
-      const base = s.deposit as number;
-      const r = convertRange(base, s.rent as number);
-      const scenario = (kind: PriceScenarioKind, label: string, term: string | null, c: { deposit: number; rent: number }): PriceScenario => ({
-        kind,
-        label,
-        term,
-        deposit: wonKo(c.deposit),
-        rent: wonKo(c.rent),
-        exact: [c.deposit, c.rent],
-        pct: kind === "base" ? null : Math.round((c.deposit / base) * 100),
-      });
+      const r = convertRange(s.deposit as number, s.rent as number);
       return {
         id: String(s.id),
         label: classLabel(s),
         note: typeLabel(s),
-        units: s.units_total,
-        rows: [
-          scenario("max", "최대", "전세전환", r.max),
-          scenario("base", "기본", null, r.base),
-          scenario("min", "최소", "월세전환", r.min),
-        ],
+        base: [r.base.deposit, r.base.rent] as [number, number],
+        max: [r.max.deposit, r.max.rent] as [number, number],
+        min: [r.min.deposit, r.min.rent] as [number, number],
       };
     });
 }
+
