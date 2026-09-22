@@ -203,13 +203,15 @@ export function fitJanggi(d: NoticeEligibilityData, p: FitProfile, seed: IncomeS
     const pct = janggiPct(hit, p);
     const lim = incomeLimit?.won;
     if (pct != null) {
-      reasons.unshift({ label: "소득", ok: true, text: `${p.area ?? ""} ${hit.rank != null ? `${hit.rank}순위` : ""} 기준 ${pct}% 이하${lim != null ? ` (월 ${won(lim)})` : ""}, 입력 월 ${won(p.incomeWon)}${bonus ? ` | 출생자녀 가산 +${bonus}%p` : ""}${p.dual && hit.dual_income_pct != null ? " | 맞벌이 완화" : ""}` });
+      // 면적을 안 고른 자리(자격진단)에서는 앞머리가 통째로 빈다 — 빈 조각을 걸러 낸다
+      const head = [p.area, hit.rank != null ? `${hit.rank}순위` : ""].filter(Boolean).join(" ");
+      reasons.unshift({ label: "소득", ok: true, text: `${head}${head ? " " : ""}기준 ${pct}% 이하${lim != null ? ` (월 ${won(lim)})` : ""}, 입력 월 ${won(p.incomeWon)}${bonus ? ` | 출생자녀 가산 +${bonus}%p` : ""}${p.dual && hit.dual_income_pct != null ? " | 맞벌이 완화" : ""}` });
     }
     const need = depositsRequired(hit.requirement);
     if (need != null) reasons.push({ label: "청약", ok: true, text: `약정납입회차 ${need}회 이상, 입력 ${p.deposits}회` });
     if (hit.requirement && need == null) reasons.push({ label: "기준", ok: null, text: hit.requirement });
   } else {
-    reasons.unshift({ label: "소득", ok: false, text: firstIncomeFail ?? "이 면적의 어느 순위에도 맞지 않습니다" });
+    reasons.unshift({ label: "소득", ok: false, text: firstIncomeFail ?? (p.area ? "이 면적의 어느 순위에도 맞지 않습니다" : "어느 순위에도 맞지 않습니다") });
   }
   const ok = hit != null && assetOk !== false;
   return {
