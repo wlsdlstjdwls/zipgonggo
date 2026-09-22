@@ -479,6 +479,9 @@ LH 이용약관(`lh.or.kr/menu.es?mid=a10802000000`) 제1~12조와 부칙을 훑
 | `KAKAO_CLIENT_SECRET` | 카카오 developers → 카카오 로그인 → 보안 → Client Secret | 콘솔에서 「사용함」으로 켠 앱은 **필수**. 안 보내면 토큰 발급이 실패한다. 껐으면 비워 둔다 |
 | `AUTH_SECRET` | 직접 생성 — `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` | 로그인 세션 쿠키(`zg_user`) 서명 열쇠. 바꾸면 발급해 둔 세션이 전부 무효가 된다(전원 로그아웃). **`KAKAO_REST_API_KEY`와 이 값 중 하나라도 비면 로그인 기능 자체가 꺼진다** |
 | `NAVER_SITE_VERIFICATION` | [네이버 서치어드바이저](https://searchadvisor.naver.com) → 웹마스터도구 → 사이트 등록 → HTML 태그의 `content` 값 | 같은 용도. 네이버는 이 확인 없이는 수집 요청 자체가 안 된다. 값 자리도 위와 같다 |
+| `ADMIN_EMAIL` | 직접 정한다 | 운영자 콘솔(`/admin`) 로그인 아이디. **회원 표와 무관하다** |
+| `ADMIN_PASSWORD_HASH` | `node web/scripts/admin-password.mjs '비밀번호'`가 찍어 주는 줄 | 콘솔 비밀번호의 scrypt 해시. **평문은 어디에도 두지 않는다.** `ADMIN_EMAIL`과 둘 중 하나라도 비면 콘솔 전체가 404다. 구분자가 `$`면 안 된다(Next env 로더가 변수 참조로 읽어 값을 통째로 날린다) |
+| `ADMIN_KAKAO_ID` | `node web/scripts/whoami.mjs` (카카오로 한 번 로그인한 뒤) | **아직 안 연 메뉴(자격진단)를 운영자 본인에게 보일지만 가린다.** 이 값으로는 콘솔에 못 들어간다 — `/admin`은 언제나 `zg_admin` 쿠키만 본다. 비워 두면 콘솔에 로그인했을 때만 그 메뉴가 뜬다 |
 
 ## 미해결
 

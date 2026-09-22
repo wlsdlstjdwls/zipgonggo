@@ -31,6 +31,23 @@ export function adminCreds(): AdminCreds | null {
   return email && hash ? { email, hash } : null;
 }
 
+/**
+ * 운영자 본인의 카카오 회원번호. **오직 「아직 안 연 메뉴를 보일까」를 가리는 데만 쓴다**
+ * (components/admin-only.tsx). 사용자 요청 2026-09-22: 평소 카카오로 로그인해 있는데
+ * 메뉴 하나 보자고 콘솔에 따로 로그인하는 게 번거롭다.
+ *
+ * **이 값으로는 콘솔에 못 들어온다.** /admin의 출입은 위 `isAdmin()`(zg_admin 쿠키) 하나뿐이고
+ * 레이아웃과 각 page, 서버 액션이 전부 그걸 본다 — 여기를 아무리 맞춰도 그 문은 안 열린다.
+ * CLAUDE.md의 「카카오 로그인으로 콘솔에 들어올 수 없다」가 그대로 지켜진다.
+ *
+ * 회원 표에 관리자 플래그를 두지 않으려고 env로 뺐다. 이메일이 아니라 회원번호로 맞추는 이유는
+ * 카카오 이메일이 [선택] 동의 항목이라 **동의하지 않으면 아예 없기 때문**이다.
+ */
+export function adminKakaoId(): string | null {
+  const v = process.env.ADMIN_KAKAO_ID?.trim();
+  return v ? v : null;
+}
+
 /** 저장 꼴: `scrypt:N:r:p:salt:key` (salt·key는 base64).
  *  **구분자가 `$`면 안 된다** — Next의 env 로더(@next/env)가 `.env` 값에서 `$16384`를 변수 참조로 읽어
  *  통째로 빈 문자열로 만든다(2026-09-16 실측: 맞는 비밀번호가 계속 틀렸다고 나왔다).

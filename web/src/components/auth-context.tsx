@@ -24,7 +24,9 @@ type AuthState = {
   loading: boolean;
   /** env에 카카오 키가 없는 배포 — 로그인 문을 아예 그리지 않는다 */
   enabled: boolean;
-  /** 운영자 쿠키(zg_admin)로 들어와 있다. 아직 안 연 메뉴를 이 사람에게만 보인다(components/admin-only.tsx) */
+  /** 운영자 본인이다 — 콘솔 쿠키(zg_admin)로 들어왔거나, 운영자의 카카오 계정(ADMIN_KAKAO_ID)으로 로그인했다.
+   *  아직 안 연 메뉴를 이 사람에게만 보인다(components/admin-only.tsx).
+   *  **콘솔 출입 자격이 아니다** — /admin은 언제나 zg_admin 쿠키만 본다 */
   admin: boolean;
   refresh: () => Promise<void>;
 };

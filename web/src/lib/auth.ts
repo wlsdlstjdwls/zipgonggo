@@ -22,6 +22,8 @@ export const USER_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
 export type SessionUser = {
   id: number;
+  /** 카카오 회원번호. 운영자 본인인지 가리는 데만 쓴다(lib/admin-auth.ts adminKakaoId) */
+  kakao_id: string;
   nickname: string | null;
   profile_image: string | null;
   email: string | null;
@@ -75,7 +77,7 @@ export async function currentUser(): Promise<SessionUser | null> {
   const id = await currentUserId();
   if (id === null) return null;
   const rows = await query<SessionUser>(
-    `SELECT id, nickname, profile_image, email, created_at FROM user_account WHERE id = $1`,
+    `SELECT id, kakao_id, nickname, profile_image, email, created_at FROM user_account WHERE id = $1`,
     [id],
   );
   return rows[0] ?? null;
