@@ -2092,6 +2092,19 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .acct-facts dd { margin: 0; font-size: 13px; line-height: 1.6; color: var(--dim); }
 .acct-facts dd a { color: var(--acc); font-weight: 700; }
 .acct-out { margin-top: 18px; }
+/* 자격진단 조건 저장 상자(/my/account). 탈퇴 상자와 같은 골격이되 위험한 일이 아니라 실선으로 둔다 */
+.acct-sync { margin-top: 26px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-card); }
+.acct-sync h2 { font-size: 14px; font-weight: 900; }
+.acct-sync p { margin: 7px 0 0; font-size: 13px; line-height: 1.7; color: var(--dim); }
+.acct-sync-note { color: var(--mut) !important; }
+.acct-sync-on, .acct-sync-off { margin-top: 12px; padding: 9px 14px; border-radius: var(--r-chip);
+  font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
+.acct-sync-on { border: 1px solid var(--acc); background: var(--acc); color: #fff; }
+.acct-sync-off { border: 1px solid var(--line2); background: var(--bg); color: var(--mut); }
+.acct-sync-off:hover { color: var(--ink); border-color: var(--ink); }
+.acct-sync-on:disabled, .acct-sync-off:disabled { opacity: 0.55; cursor: default; }
+.acct-sync-list { margin-top: 14px; }
+
 .acct-bye { margin-top: 34px; padding: 16px; border: 1px dashed var(--line2); border-radius: var(--r-card); }
 .acct-bye h2 { font-size: 14px; font-weight: 900; }
 .acct-bye p { margin: 7px 0 0; font-size: 13px; line-height: 1.7; color: var(--dim); }

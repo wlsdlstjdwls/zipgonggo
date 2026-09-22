@@ -3,8 +3,11 @@
 // 공고별 「내 조건에 맞는 단지」 — 이 공고의 자격 묶음(공고문에서 읽은 것)에 내 조건을 대 보고, 맞는 단지를 추린다.
 // ayounghome의 「내 조건으로 노려볼 만한 단지 찾기」(계층·자치구·배점·거주기간 입력 → 과거 커트라인으로 정렬)에서 착안(사용자 제안 2026-09-14).
 // 과거 경쟁률·커트라인은 아직 결과 표가 1건뿐이라 못 쓴다 — 지금은 자격 판정(순위·배점)과 단지 조건(자치구·면적·금액)으로 고른다.
-// 값은 전부 브라우저 안에만 있다(자가진단과 같은 약속). 양식마다 묻는 게 다르다(lib/notice-fit.ts 머리말).
-// 입력값·펼침 상태는 localStorage(FIT_STORAGE_KEY)에 둔다 — 단지 상세로 갔다 돌아오면 초기화되던 것(사용자 지적 2026-09-14).
+// 내 조건 값은 **화면 셋이 같이 쓰는 한 벌**이다(ProfileProvider, lib/profile.ts) — 자가진단에 넣은 소득을
+// 여기서 또 넣지 않는다(사용자 요청 2026-09-22). 그 한 벌은 브라우저에 있고, 로그인한 뒤 계정 저장을 켠
+// 사람만 서버에도 사본을 둔다. 양식마다 묻는 게 다르다(lib/notice-fit.ts 머리말).
+// **이 공고에서만 뜻이 있는 값**(공급 구분·면적·계층·신청유형·1순위 자격)과 펼침 상태만 여기 남는다
+// (FIT_STORAGE_KEY) — 단지 상세로 갔다 돌아오면 초기화되던 것(사용자 지적 2026-09-14).
 // 마운트 뒤에 읽는다(서버 HTML은 접힌 기본 상태라 하이드레이션이 어긋나지 않게). 단지 상세(currentId)에서는 같은 판정을 돌리고
 // 이 단지가 드는지 한 줄로 먼저 말한 뒤 목록 맨 위에 「이 단지」로 띄운다. 단지 상세는 언제나 접힌 채 시작하고 거기서 편 상태는
 // 저장하지 않는다(공고 상세의 펼침만 기억, 사용자 요청 2026-09-14). 접기 버튼은 위에 하나.
@@ -19,9 +22,11 @@ import {
   areaBand, classKey, complexFacts, fitCheongnyeon, fitHaengbok, fitJanggi, fitMaeip, isSeoul, janggiAreas, MAN, priorForComplex, priorLabel, priorNameKey, seoulGus,
   type ComplexPick, type FitProfile, type FitVerdict,
 } from "@/lib/notice-fit";
+import { fromFit, reconcileRegion, toFit } from "@/lib/profile";
 import { noticeComplexPath, noticePath } from "@/lib/routes";
 import type { EligKind, IncomeStandard, NoticeEligibilityData, RegionTier } from "@/types/eligibility";
 import type { NoticeComplex, NoticeSupply, PriorCompetition, PriorResultRow } from "@/types/notice";
+import { useProfile } from "./profile-context";
 import { Select } from "./select";
 
 type Props = {
@@ -37,6 +42,9 @@ type Props = {
   prior?: PriorCompetition | null;
 };
 
+/** 이 공고에서만 뜻이 있는 값 — 다음 공고에 들고 가 봐야 없는 항목이라 공통 프로필에 넣지 않는다.
+ *  키 이름(p)은 그대로 둔다: 예전 판이 써 둔 저장분을 ProfileProvider가 한 번 읽어 옮긴다 */
+type Selection = Pick<FitProfile, "group" | "area" | "cls" | "applicantType" | "priorityClass">;
 type Stored = { p: Partial<FitProfile>; open: boolean };
 
 function readStored(): Stored | null {
@@ -69,6 +77,7 @@ const LIST_STEP = 12;
 
 export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, currentId, prior }: Props) {
   const kind: EligKind = data.kind ?? "janggi";
+  const { profile, ready: profileReady, patch } = useProfile();
   const [open, setOpen] = useState(false);
   const [p, setP] = useState<FitProfile>(() => ({
     ...DEFAULT,
@@ -79,13 +88,19 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
   }));
   const [shown, setShown] = useState(LIST_STEP);
   const onComplexPage = currentId != null;
-  const set = <K extends keyof FitProfile>(k: K, v: FitProfile[K]) => setP((prev) => ({ ...prev, [k]: v }));
+  // 공통 칸을 고치면 프로필에도 올린다(다른 화면이 같은 값을 쓴다). 이 공고 전용 값은 위 저장소에만 남는다.
+  // setP의 갱신 함수 안에서 patch를 부르지 않는다 — 렌더 중에 남의 컴포넌트를 고치는 짓이 된다
+  const set = <K extends keyof FitProfile>(k: K, v: FitProfile[K]) => {
+    const next = { ...p, [k]: v };
+    setP(next);
+    patch(fromFit(next, tiers));
+  };
   const firstClasses = useMemo(
     () => (kind === "cheongnyeon" ? (data.rank_tables[0]?.rows ?? []).filter((r) => r.rank === 1 && r.label).map((r) => r.label!) : []),
     [kind, data],
   );
 
-  // 저장된 조건 되살리기 — 읽기 전엔 쓰지 않는다(기본값으로 덮어쓰지 않게). 공고마다 다른 항목은 이 공고에 있는 값일 때만 받는다
+  // 이 공고 전용 값 되살리기 — 이 공고에 실제로 있는 값일 때만 받는다(없는 구분이 남으면 진단이 빈손이 된다)
   const loaded = useRef(false);
   // 저장소에 있던 펼침 값. 단지 상세에서는 화면의 open 대신 이 값을 그대로 다시 써서 공고 상세의 기억을 건드리지 않는다
   const storedOpen = useRef(false);
@@ -95,12 +110,6 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
       storedOpen.current = s.open;
       setP((prev) => {
         const next: FitProfile = { ...prev };
-        for (const k of Object.keys(DEFAULT) as (keyof FitProfile)[]) {
-          const v = s.p[k];
-          if (v === undefined || v === null || typeof v !== typeof DEFAULT[k]) continue;
-          if (typeof v === "number" && !Number.isFinite(v)) continue;
-          (next as Record<keyof FitProfile, unknown>)[k] = v;
-        }
         const group = typeof s.p.group === "string" && data.rank_tables.some((t) => t.group === s.p.group) ? s.p.group : prev.group;
         const t = data.rank_tables.find((x) => x.group === group);
         const areasOfT = t ? janggiAreas(t) : [];
@@ -116,11 +125,28 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
     // 마운트 때 한 번만 — data·firstClasses·currentId는 서버가 준 값이라 안 바뀐다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 공통 조건(소득·자산·가구원 등)은 프로필에서 온다. 서버 사본이 뒤늦게 도착해도 같은 길로 들어온다 —
+  // 내려받은 값을 화면에 얹는 자리가 여기 하나뿐이라 두 경로가 어긋날 여지가 없다
+  useEffect(() => {
+    if (!profileReady) return;
+    setP((prev) => ({ ...prev, ...toFit(profile) }));
+  }, [profileReady, profile]);
+  // 옛 저장분에서 온 거주지는 자가진단 어휘가 비어 있다. 시군구 목록을 든 이 화면이 한 번 채운다
+  useEffect(() => {
+    if (!profileReady) return;
+    const fix = reconcileRegion(profile, tiers);
+    if (fix) patch(fix);
+    // 마운트 뒤 한 번이면 된다 — 채우고 나면 reconcileRegion이 null을 준다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileReady]);
+
   useEffect(() => {
     // 첫 커밋의 쓰기는 건너뛴다 — 위 읽기 effect와 같은 커밋에 돌아 기본값으로 저장소를 덮어썼다(setState는 다음 렌더에야 반영)
     if (!loaded.current) { loaded.current = true; return; }
-    writeStored({ p, open: onComplexPage ? storedOpen.current : open });
-  }, [p, open, onComplexPage]);
+    const sel: Selection = { group: p.group, area: p.area, cls: p.cls, applicantType: p.applicantType, priorityClass: p.priorityClass };
+    writeStored({ p: sel, open: onComplexPage ? storedOpen.current : open });
+  }, [p.group, p.area, p.cls, p.applicantType, p.priorityClass, open, onComplexPage]);
 
   const gus = useMemo(() => seoulGus(tiers), [tiers]);
   const guOptions = useMemo(() => [
@@ -395,7 +421,7 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
               {prior
                 ? " 경쟁률은 지난 회차의 접수 결과이며 이번 공고의 경쟁률과 당첨선은 이 공고의 결과가 나와야 알 수 있습니다."
                 : " 경쟁률과 당첨선은 이 공고의 결과가 나와야 알 수 있습니다."}
-              {" "}입력한 값은 이 브라우저를 벗어나지 않습니다.
+              {" "}넣은 값은 자격진단 화면과 같은 한 벌이며, 내 계정에서 저장을 켜지 않는 한 서버로 보내지 않습니다.
             </p>
           </div>
         </div>

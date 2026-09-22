@@ -14,7 +14,7 @@ export function WithdrawBox({ savedCount }: { savedCount: number }) {
       <h2>회원 탈퇴</h2>
       {!asking ? (
         <>
-          <p>계정과 서버에 보관 중인 관심 공고를 지웁니다. 되돌릴 수 없습니다.</p>
+          <p>계정과 서버에 보관 중인 관심 공고, 저장해 둔 자격진단 조건을 지웁니다. 되돌릴 수 없습니다.</p>
           <button type="button" className="acct-bye-open" onClick={() => setAsking(true)}>
             탈퇴하기
           </button>
@@ -23,8 +23,8 @@ export function WithdrawBox({ savedCount }: { savedCount: number }) {
         <>
           <p className="acct-bye-warn">
             정말 탈퇴하시겠습니까? 회원 정보와 서버에 있는 관심 공고{" "}
-            {savedCount > 0 ? count(savedCount) : "목록"}이 바로 지워집니다.
-            이 브라우저에 남아 있는 목록은 그대로 두니, 로그인 없이 계속 쓸 수 있습니다.
+            {savedCount > 0 ? count(savedCount) : "목록"}, 저장해 둔 자격진단 조건이 바로 지워집니다.
+            이 브라우저에 남아 있는 목록과 조건은 그대로 두니, 로그인 없이 계속 쓸 수 있습니다.
           </p>
           <p className="acct-bye-note">
             카카오와의 연결 끊기는 카카오 계정 관리 &gt; 연결된 서비스에서 따로 해제할 수 있습니다.

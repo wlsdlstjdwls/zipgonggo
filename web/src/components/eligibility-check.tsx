@@ -2,13 +2,18 @@
 
 // 자격진단 — 내 조건을 넣으면 33개 공급유형 중 어디에 넣을 수 있는지 가른다.
 // 규칙은 서버가 DB(supply_type·income_standard·region_tier)에서 읽어 넘긴다. 여기서 계산만 한다(lib/eligibility).
-// 값은 전부 브라우저 안에만 있다 — 어디로도 보내지 않는다(개인정보처리방침과 같은 약속).
+// 넣은 값은 **화면 셋이 같이 쓰는 한 벌**로 남는다(ProfileProvider, lib/profile.ts). 전에는 이 화면만
+// 아무것도 저장하지 않아 들어올 때마다 기본값으로 되돌아갔고, 같은 소득을 공고 지면에서 또 넣어야 했다
+// (사용자 지적 2026-09-22). 그 한 벌은 브라우저에 있고, 로그인한 뒤 계정 저장을 켠 사람만 서버에도 사본을 둔다.
+// 장애 여부처럼 건강과 이어지는 계층은 켜도 서버로 가지 않는다(개인정보처리방침 3항).
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { classOptions, diagnoseAll, HOUSEHOLD_MAX, type Marital, type Profile, type Verdict } from "@/lib/eligibility";
 import { fitJanggi, janggiAreas, type FitProfile, type FitVerdict } from "@/lib/notice-fit";
+import { fromElig, reconcileRegion, toElig } from "@/lib/profile";
 import { noticePath } from "@/lib/routes";
 import type { EligibilityRules, JanggiRule } from "@/types/eligibility";
+import { useProfile } from "./profile-context";
 import { Select } from "./select";
 
 const MAN = 10_000;
@@ -41,8 +46,15 @@ function janggiLabel(o: JanggiRule): string {
 type JanggiExtra = { group: string | null; area: string | null; dual: boolean; newborns: number; olderMinor: boolean; deposits: number };
 
 export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
+  const { profile, ready: profileReady, patch } = useProfile();
+  // 서버 HTML은 언제나 기본값이다 — 저장된 값은 마운트 뒤에 얹는다(하이드레이션이 어긋날 자리를 만들지 않는다)
   const [p, setP] = useState<Profile>(DEFAULT);
-  const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setP((prev) => ({ ...prev, [k]: v }));
+  // setP의 갱신 함수 안에서 patch를 부르지 않는다 — 렌더 중에 남의 컴포넌트를 고치는 짓이 된다
+  const set = <K extends keyof Profile>(k: K, v: Profile[K]) => {
+    const next = { ...p, [k]: v };
+    setP(next);
+    patch(fromElig(next, rules.tiers));
+  };
   const jgList = rules.janggi ?? [];
   // 기준 회차 — 기본은 맨 앞(최신). 회차를 바꾸면 그 공고문의 표로 다시 푼다
   const [jgSlug, setJgSlug] = useState<string>(() => jgList[0]?.slug ?? "");
@@ -52,7 +64,15 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
     area: jg?.data.rank_tables[0] ? janggiAreas(jg.data.rank_tables[0])[0] ?? null : null,
     dual: false, newborns: 0, olderMinor: false, deposits: 24,
   }));
-  const setJ = <K extends keyof JanggiExtra>(k: K, v: JanggiExtra[K]) => setJx((prev) => ({ ...prev, [k]: v }));
+  // 맞벌이·자녀·청약 회차는 공고 지면의 「내 조건」도 묻는 값이라 프로필로 올린다.
+  // 공급 구분과 면적은 그 회차 표에서만 뜻이 있어 여기 화면 상태로만 둔다
+  const setJ = <K extends keyof JanggiExtra>(k: K, v: JanggiExtra[K]) => {
+    const next = { ...jx, [k]: v };
+    setJx(next);
+    if (k === "dual" || k === "newborns" || k === "olderMinor" || k === "deposits") {
+      patch({ dual: next.dual, newborns: next.newborns, olderMinor: next.olderMinor, deposits: next.deposits });
+    }
+  };
   // 회차를 갈아타면 공급 구분과 면적은 그 회차 표의 첫 값으로 되돌린다 — 없는 구분이 남으면 진단이 빈손이 된다
   const pickJanggi = (slug: string) => {
     const next = jgList.find((o) => o.slug === slug);
@@ -90,6 +110,22 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
 
   const toggleClass = (c: string) =>
     set("classes", p.classes.includes(c) ? p.classes.filter((x) => x !== c) : [...p.classes, c]);
+
+  // 저장된 한 벌을 화면에 얹는다. 서버 사본이 뒤늦게 도착해도 같은 길로 들어온다 —
+  // 얹는 자리가 하나뿐이라 두 경로가 어긋날 여지가 없다
+  useEffect(() => {
+    if (!profileReady) return;
+    setP(toElig(profile));
+    setJx((prev) => ({ ...prev, dual: profile.dual, newborns: profile.newborns, olderMinor: profile.olderMinor, deposits: profile.deposits }));
+  }, [profileReady, profile]);
+  // 옛 저장분에서 온 거주지는 한쪽 어휘만 차 있다. 시군구 목록을 든 이 화면이 한 번 채운다
+  const fixed = useRef(false);
+  useEffect(() => {
+    if (!profileReady || fixed.current) return;
+    fixed.current = true;
+    const fix = reconcileRegion(profile, rules.tiers);
+    if (fix) patch(fix);
+  }, [profileReady, profile, rules.tiers, patch]);
 
   return (
     <div className="elig">
@@ -214,7 +250,8 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
 
         <p className="elig-note">
           도시근로자 월평균소득은 {rules.incomeYear}년 고시액 기준이다. 이 진단은 안내일 뿐 심사 결과가 아니다 —
-          실제 자격은 각 공고문과 기관 심사가 정한다. 입력한 값은 이 브라우저를 벗어나지 않는다.
+          실제 자격은 각 공고문과 기관 심사가 정한다. 입력한 값은 이 브라우저에 남아 공고 지면의 「내 조건」에도
+          그대로 쓰이며, 내 계정에서 저장을 켜지 않는 한 서버로 보내지 않는다.
         </p>
       </div>
     </div>

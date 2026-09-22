@@ -67,6 +67,8 @@ export default async function AdminMembers({ searchParams }: { searchParams: Pro
           <Stat label="7일 신규" value={stats.new7d} />
           <Stat label="30일 내 접속" value={stats.active30d} note="살아 있는 회원" />
           <Stat label="관심 공고를 담은 회원" value={stats.with_saved} note={`담긴 공고 ${stats.saved_total.toLocaleString("ko-KR")}건`} />
+          {/* 숫자만 낸다 — 무엇을 저장했는지는 콘솔에 그리지 않는다(개인정보처리방침 3항의 약속) */}
+          <Stat label="조건 저장을 켠 회원" value={stats.with_profile} note="내용은 보지 않는다" />
         </div>
       </section>
 

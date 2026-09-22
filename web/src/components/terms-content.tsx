@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LegalSection } from "@/components/legal-doc";
-import { CONTACT_EMAIL, SITE_NAME } from "@/lib/constants";
+import { CONTACT_EMAIL, PROFILE_SYNC_START, SITE_NAME } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
 
 export const TERMS_TITLE = "이용약관";
@@ -8,9 +8,15 @@ export const TERMS_TITLE = "이용약관";
  *  약관을 고쳐 이 날짜가 바뀌면 「어느 판에 동의한 회원인가」가 기록으로 남아 재동의 대상을 가릴 수 있다.
  *  2026-09-09 최초 시행 → 2026-09-21 카카오 로그인 도입판(제3조 신설, 제2조 개정).
  *  회원이 아직 없는 상태에서 회원 조항을 새로 세우는 것이라 즉시 시행한다 — 불리해지는 기존 회원이 없다.
- *  회원이 생긴 뒤의 개정은 제9조대로 7일(불리한 변경은 30일) 전에 공지하고 날짜를 미리 잡는다 */
+ *  회원이 생긴 뒤의 개정은 제9조대로 7일(불리한 변경은 30일) 전에 공지하고 날짜를 미리 잡는다.
+ *  **이 값이 바뀌면 그날 이후 로그인하는 회원의 terms_version이 새 날짜로 찍힌다** —
+ *  그래서 아직 시행되지 않은 판의 날짜를 여기 미리 넣으면 안 된다. 예고는 TERMS_NEXT_DATE로 한다 */
 export const TERMS_EFFECTIVE_DATE = "2026-09-21";
 export const TERMS_FIRST_DATE = "2026-09-09";
+/** 예고한 다음 판의 시행일 — 자격진단 조건을 계정에 저장하는 기능을 여는 날(제2조·제3조 개정).
+ *  개인정보처리방침과 **같은 날이어야 한다**(둘 다 constants의 PROFILE_SYNC_START에서 가져온다).
+ *  그날이 오면 TERMS_EFFECTIVE_DATE를 이 날짜로 올리고 부칙의 예고 문단을 이력으로 고친다 */
+export const TERMS_NEXT_DATE = PROFILE_SYNC_START;
 
 // 이용약관 본문 — /terms 페이지가 쓴다. 문구에 가운뎃점을 쓰지 않는다(CLAUDE.md 표기 규칙).
 export function TermsContent() {
@@ -30,6 +36,11 @@ export function TermsContent() {
           <li>공고 첨부 문서에서 읽은 사실 데이터(단지명, 주소, 보증금, 임대료, 면적, 호수, 접수 일정) 재구성</li>
           <li>보증금과 월임대료 상호전환 계산기, 대출이자 계산기 등 계산 도구</li>
           <li>관심 공고 담기 — 로그인하지 않으면 브라우저에만, 로그인하면 계정에도 남습니다</li>
+          <li>
+            자격진단과 공고별 「내 조건」 — 넣은 조건은 다시 입력하지 않아도 되도록 브라우저에 남습니다.{" "}
+            {PROFILE_SYNC_START}부터는 로그인한 분이 내 계정 화면에서 직접 켠 경우에 한해 계정에도
+            저장됩니다. 기본값은 꺼짐입니다
+          </li>
         </ul>
         <p>
           서비스는 무료이며, 운영자는 서비스의 전부 또는 일부를 변경하거나 중단할 수 있습니다.
@@ -39,8 +50,8 @@ export function TermsContent() {
       <LegalSection title="제3조 (계정과 탈퇴)">
         <ul>
           <li>
-            <strong>로그인 없이도 모든 지면을 이용할 수 있습니다.</strong> 로그인은 관심 공고를 기기와
-            상관없이 이어 보기 위한 선택 사항입니다.
+            <strong>로그인 없이도 모든 지면을 이용할 수 있습니다.</strong> 로그인은 관심 공고와 자격진단
+            조건을 기기와 상관없이 이어 쓰기 위한 선택 사항입니다.
           </li>
           <li>
             계정은 <strong>카카오 계정으로만</strong> 만듭니다. 별도의 아이디와 비밀번호를 두지 않으며,
@@ -62,7 +73,7 @@ export function TermsContent() {
           </li>
           <li>
             <strong>탈퇴는 내 계정 화면에서 언제든 할 수 있고, 즉시 처리됩니다.</strong> 회원 정보와
-            서버에 보관된 관심 공고를 그 자리에서 지우며 되돌릴 수 없습니다. 카카오 쪽 연결 해제는
+            서버에 보관된 관심 공고, 저장해 둔 자격진단 조건을 그 자리에서 지우며 되돌릴 수 없습니다. 카카오 쪽 연결 해제는
             카카오 계정 설정에서 따로 하셔야 합니다.
           </li>
           <li>
@@ -150,6 +161,11 @@ export function TermsContent() {
         <p>
           {TERMS_FIRST_DATE} 최초 시행. 카카오 로그인 도입에 따라 제3조(계정과 탈퇴)를 새로 쓰고
           제2조를 고친 판이 {TERMS_EFFECTIVE_DATE}부터 적용됩니다.
+        </p>
+        <p>
+          <strong>예고</strong> — 자격진단 조건을 계정에 저장하는 선택 기능을 열면서 제2조와 제3조를 고친
+          판이 <strong>{TERMS_NEXT_DATE}</strong>부터 시행됩니다. 제9조대로 7일 전에 알립니다. 그날까지는
+          조건이 이용자 브라우저를 벗어나지 않으며, 그날 이후에도 직접 켜지 않으면 저장되지 않습니다.
         </p>
       </LegalSection>
     </>

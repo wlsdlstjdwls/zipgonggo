@@ -30,7 +30,8 @@ export default async function EligibilityPage() {
         <h1>자격진단</h1>
         <p>
           공공임대는 유형마다 나이와 혼인, 소득, 자산, 자동차 기준이 다릅니다. 내 조건을 한 번 넣으면
-          {" "}{rules.types.length}개 공급유형을 한꺼번에 견줘 볼 수 있습니다. 입력한 값은 어디로도 보내지 않습니다.
+          {" "}{rules.types.length}개 공급유형을 한꺼번에 견줘 볼 수 있습니다. 넣은 값은 이 브라우저에 남아
+          공고 지면의 「내 조건」에도 그대로 쓰이며, 내 계정에서 저장을 켜지 않는 한 서버로 보내지 않습니다.
         </p>
       </header>
       <EligibilityCheck rules={rules} />

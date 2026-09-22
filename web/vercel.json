@@ -6,7 +6,17 @@
     }
   },
   "crons": [
-    { "path": "/api/cron/collect", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/patrol", "schedule": "*/10 * * * *" }
+    {
+      "path": "/api/cron/collect",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/patrol",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/purge-profiles",
+      "schedule": "40 19 * * *"
+    }
   ]
 }

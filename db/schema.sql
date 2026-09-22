@@ -788,3 +788,19 @@ CREATE TABLE user_saved_notice (
 COMMENT ON TABLE user_saved_notice IS
   '로그인 회원의 관심 공고(★). 탈퇴하면 CASCADE로 같이 지워진다';
 CREATE INDEX user_saved_notice_notice_idx ON user_saved_notice (notice_id);
+
+-- 0037 — 회원이 저장해 둔 「내 조건」. web이 직접 쓰는 네 번째 표(CLAUDE.md 예외, 2026-09-22)
+-- 행이 있으면 계정 저장이 켜진 것이다. 끄기는 DELETE 한 줄 — 깃발 열을 따로 두지 않는다.
+-- 장애 여부처럼 건강과 이어지는 값은 이 표에 들어오지 않는다(개인정보처리방침 3항).
+CREATE TABLE user_profile (
+  user_id         bigint      PRIMARY KEY REFERENCES user_account (id) ON DELETE CASCADE,
+  data            jsonb       NOT NULL,
+  privacy_version text        NOT NULL,
+  consented_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT user_profile_small CHECK (pg_column_size(data) < 4096)
+);
+COMMENT ON TABLE  user_profile IS
+  '회원이 저장해 둔 자격진단 조건. 행이 있으면 계정 저장이 켜진 것이다. 탈퇴하면 CASCADE로 같이 지워진다';
+COMMENT ON COLUMN user_profile.data IS
+  'lib/profile.ts의 UserProfile에서 민감 칸(장애 여부 등)을 뺀 사본. 모르는 키는 sanitizeProfile이 떨군다';

@@ -5,16 +5,19 @@
 // 고를 것은 단지가 아니라 주택형이고, 자격은 공고문에서 읽은 묶음이 아니라 제도 고정 규칙이다(lib/mingan-fit.ts 머리말).
 // 특별공급과 일반공급을 따로 매겨 나란히 보인다 — 특별공급에서 떨어져도 일반공급은 열려 있다는 게
 // 이 제도에서 제일 자주 오해받는 자리이고, 물량도 일반공급이 8할이다.
-// 값은 전부 브라우저 안에만 있다(자가진단과 같은 약속). 입력값은 localStorage에 두고 마운트 뒤에 읽는다.
-import { useEffect, useMemo, useRef, useState } from "react";
-import { FIT_MINGAN_STORAGE_KEY } from "@/lib/constants";
+// 내 조건 값은 **화면 셋이 같이 쓰는 한 벌**이다(ProfileProvider, lib/profile.ts) — 자가진단에 넣은 소득을
+// 여기서 또 넣지 않는다(사용자 요청 2026-09-22). 이 화면에만 있는 값은 없어서 제 저장소를 따로 두지 않는다.
+// 옛 키(FIT_MINGAN_STORAGE_KEY)에 남아 있던 값은 ProfileProvider가 한 번 읽어 옮긴다.
+import { useEffect, useMemo, useState } from "react";
 import { num, wonShort } from "@/lib/format";
 import {
   fitMingan, MINGAN_CLASSES, minganPicks,
-  type MinganClass, type MinganPick, type MinganProfile, type MinganTrack,
+  type MinganPick, type MinganProfile, type MinganTrack,
 } from "@/lib/mingan-fit";
+import { fromMingan, toMingan } from "@/lib/profile";
 import type { IncomeStandard, RegionTier, SupplyType } from "@/types/eligibility";
 import type { NoticeSupply } from "@/types/notice";
+import { useProfile } from "./profile-context";
 import { Select } from "./select";
 
 type Props = {
@@ -35,44 +38,22 @@ const DEFAULT: MinganProfile = {
   cls: "청년", age: 30, household: 1, incomeWon: 300 * MAN, assetMan: 15_000, carMan: 0, homeless: true, gu: "",
 };
 
-function readStored(): Partial<MinganProfile> | null {
-  try {
-    const raw = window.localStorage.getItem(FIT_MINGAN_STORAGE_KEY);
-    if (!raw) return null;
-    const v = JSON.parse(raw) as unknown;
-    return v && typeof v === "object" ? (v as Partial<MinganProfile>) : null;
-  } catch {
-    return null;
-  }
-}
-
 export function NoticeFitMingan({ supply, types, income, tiers, complexGu, incomeYear, noticeYear }: Props) {
+  const { profile, ready: profileReady, patch } = useProfile();
   const [open, setOpen] = useState(false);
+  // 서버 HTML은 언제나 기본값이다 — 저장된 값은 마운트 뒤에 얹는다(하이드레이션이 어긋날 자리를 만들지 않는다)
   const [p, setP] = useState<MinganProfile>(DEFAULT);
-  const loaded = useRef(false);
-  const set = <K extends keyof MinganProfile>(k: K, v: MinganProfile[K]) => setP((prev) => ({ ...prev, [k]: v }));
+  // setP의 갱신 함수 안에서 patch를 부르지 않는다 — 렌더 중에 남의 컴포넌트를 고치는 짓이 된다
+  const set = <K extends keyof MinganProfile>(k: K, v: MinganProfile[K]) => {
+    const next = { ...p, [k]: v };
+    setP(next);
+    patch(fromMingan(next, tiers, profile));
+  };
 
   useEffect(() => {
-    const s = readStored();
-    if (!s) return;
-    setP((prev) => {
-      const next: MinganProfile = { ...prev };
-      for (const k of Object.keys(DEFAULT) as (keyof MinganProfile)[]) {
-        const v = s[k];
-        if (v === undefined || v === null || typeof v !== typeof DEFAULT[k]) continue;
-        if (typeof v === "number" && !Number.isFinite(v)) continue;
-        (next as Record<keyof MinganProfile, unknown>)[k] = v;
-      }
-      if (!MINGAN_CLASSES.includes(next.cls)) next.cls = DEFAULT.cls;
-      if (next.cls === "신혼부부" && next.household < 2) next.household = 2;
-      return next;
-    });
-  }, []);
-  useEffect(() => {
-    // 첫 커밋의 쓰기는 건너뛴다 — 위 읽기 effect와 같은 커밋에 돌아 기본값으로 저장소를 덮어썼다
-    if (!loaded.current) { loaded.current = true; return; }
-    try { window.localStorage.setItem(FIT_MINGAN_STORAGE_KEY, JSON.stringify(p)); } catch { /* 프라이빗 모드 등 */ }
-  }, [p]);
+    if (!profileReady) return;
+    setP(toMingan(profile));
+  }, [profileReady, profile]);
 
   const guOptions = useMemo(
     () => [...tiers.filter((t) => t.tier === "서울" && t.kind === "sigungu").map((t) => ({ value: t.name, label: t.name })), { value: "기타", label: "서울 외 지역" }],
@@ -100,7 +81,11 @@ export function NoticeFitMingan({ supply, types, income, tiers, complexGu, incom
                   {MINGAN_CLASSES.map((c) => (
                     // 신혼부부로 바꿀 때 가구원 수가 1이면 2로 올린다 — 1인 기준 소득 한도를 대면 부부 소득이 무조건 넘는다
                     <button key={c} type="button" className={p.cls === c ? "on" : ""}
-                      onClick={() => setP((prev) => ({ ...prev, cls: c, household: c === "신혼부부" && prev.household < 2 ? 2 : prev.household }))}>{c}</button>
+                      onClick={() => {
+                        const next: MinganProfile = { ...p, cls: c, household: c === "신혼부부" && p.household < 2 ? 2 : p.household };
+                        setP(next);
+                        patch(fromMingan(next, tiers, profile));
+                      }}>{c}</button>
                   ))}
                 </div>
               </div>
@@ -160,7 +145,8 @@ export function NoticeFitMingan({ supply, types, income, tiers, complexGu, incom
               {oldStandard
                 ? ` 소득 기준액은 ${incomeYear}년 통계이고 이 공고는 ${noticeYear}년 공고라, 당시 기준과 다릅니다. 자산과 자동차가액 한도도 지금 기준입니다.`
                 : ` 소득 기준액은 ${incomeYear}년 통계 기준입니다.`}
-              {" "}자세한 요건과 제출서류는 공고문 원본을 보세요. 입력한 값은 이 브라우저를 벗어나지 않습니다.
+              {" "}자세한 요건과 제출서류는 공고문 원본을 보세요. 넣은 값은 자격진단 화면과 같은 한 벌이며,
+              내 계정에서 저장을 켜지 않는 한 서버로 보내지 않습니다.
             </p>
           </div>
         </div>

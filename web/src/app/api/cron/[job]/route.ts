@@ -18,7 +18,9 @@
 //
 // 판단 로직 자체는 관리자 콘솔의 「지금 돌리기」와 같은 함수를 쓴다 — 두 벌로 갈라지면 한쪽만 고쳐진다.
 import { NextResponse } from "next/server";
+import { PROFILE_RETAIN_MONTHS } from "@/lib/constants";
 import { dispatchJob } from "@/lib/jobs";
+import { purgeStaleProfiles } from "@/lib/users";
 
 // 워크플로를 부를지 말지가 매 요청 달라진다. 캐시되면 안 된다
 export const dynamic = "force-dynamic";
@@ -39,6 +41,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ job: string }> 
   const byVercel = !!vercelSecret && bearer === `Bearer ${vercelSecret}`;
   if (!byVercel && given !== secret) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // 잡 하나는 워크플로가 아니라 여기서 바로 끝낸다 — 질의 한 줄이면 되는 일에 러너를 띄울 이유가 없고,
+  // 회원 표는 파이프라인이 쳐다보지 않는다(CLAUDE.md 디렉터리 경계)
+  if (name === "purge-profiles") {
+    const removed = await purgeStaleProfiles(PROFILE_RETAIN_MONTHS);
+    return NextResponse.json({ job: name, removed, months: PROFILE_RETAIN_MONTHS });
   }
 
   const { status, body } = await dispatchJob(name);

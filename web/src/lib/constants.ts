@@ -15,6 +15,20 @@ export const SAVED_STORAGE_KEY = "zipgonggo.saved.v1";
 export const FIT_STORAGE_KEY = "zipgonggo.fit.v1";
 // 민간임대(청년안심주택) 공고의 「내 조건」 입력값. 묻는 항목이 공공 공고와 달라 키를 따로 둔다
 export const FIT_MINGAN_STORAGE_KEY = "zipgonggo.fit-mingan.v1";
+// 「내 조건」 한 벌(lib/profile.ts)의 localStorage 키. 세 화면이 이 한 자리를 같이 쓴다 —
+// 옛 키(FIT_*)는 지우지 않고 첫 실행 때 한 번 읽어 옮기기만 한다(되돌릴 여지를 남긴다)
+export const PROFILE_STORAGE_KEY = "zipgonggo.profile.v1";
+// 계정 저장(서버 사본)을 여는 날. **개인정보처리방침 개정 시행일과 같은 날이어야 한다** —
+// 수집 항목이 느는 개정이라 7일 전에 공지하고 그날부터 켠다(방침 11항의 약속).
+// 이 날 전에는 저장 스위치를 아예 그리지 않는다. 스위치가 없으면 서버로 가는 값도 없다.
+export const PROFILE_SYNC_START = "2026-09-29";
+// 조건을 서버에 적기 전에 기다리는 시간(ms). 숫자 칸은 키 하나에 한 번씩 바뀐다 —
+// 관심 공고(★)처럼 즉시 쏘면 커넥션이 폭주한다(Neon 병렬 쿼리 지연과 같은 뿌리)
+export const PROFILE_SAVE_DEBOUNCE_MS = 1200;
+// 저장해 둔 조건을 얼마나 두고 파기하나(개월). 개인정보처리방침 3항에 적은 숫자와 **같아야 한다**.
+// 세는 기준은 마지막으로 고친 시각이다 — 조건을 계속 쓰는 사람의 값이 조용히 사라지면 안 된다
+export const PROFILE_RETAIN_MONTHS = 24;
+
 export const TOAST_MS = 2100;
 // 관심 공고(/my)가 한 번에 불러오는 공고 수 상한. localStorage가 아무리 불어나도 질의는 여기서 끊는다 —
 // 브라우저가 보내는 id 배열을 그대로 믿고 IN 절에 꽂으면 URL 길이와 질의 시간이 남의 손에 달린다

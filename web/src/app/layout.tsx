@@ -6,6 +6,7 @@ import { AuthProvider } from "@/components/auth-context";
 import { CalcButton, CalcProvider } from "@/components/calc-context";
 import { CalcDock } from "@/components/calc-dock";
 import { HomeLink } from "@/components/home-link";
+import { ProfileProvider } from "@/components/profile-context";
 import { SaveProvider } from "@/components/save-context";
 import { SavedLink } from "@/components/saved-link";
 import { SiteSearch } from "@/components/site-search";
@@ -82,6 +83,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             SaveProvider가 이 값을 구독해 로그인 순간 관심 공고를 서버와 합친다 */}
         <AuthProvider>
         <SaveProvider>
+        {/* 「내 조건」 한 벌. 세 진단 화면이 같은 값을 쓰고, 계정 저장을 켠 회원은 서버 사본과도 맞춘다.
+            SaveProvider 안에 둔다 — 불러온 사실을 알리는 토스트를 같이 쓴다 */}
+        <ProfileProvider>
           {/* 계산기는 화면 오른쪽 아래 떠 있던 버튼에서 헤더 메뉴로 올렸다(사용자 요청 2026-09-09).
               패널은 body로 포털되지만 여는 버튼과 씨앗값이 서로 다른 트리라 Provider가 감싼다 */}
           <CalcProvider>
@@ -176,6 +180,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <VisitTracker />
           </Suspense>
           </CalcProvider>
+        </ProfileProvider>
         </SaveProvider>
         </AuthProvider>
       </body>
