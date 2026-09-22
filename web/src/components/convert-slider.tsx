@@ -91,7 +91,10 @@ export function ConvertSlider({ groups }: { groups: ConvertGroup[] }) {
     <div className="cslide">
       {groups.length > 1 && (groups.length > TAB_MAX ? (
         <div className="cs-pick">
+          {/* plain — 늘 값이 하나 걸려 있는 셀렉트라 잉크를 뒤집지 않는다. 검은 칩은 「필터가 걸렸다」는
+              신호인데 여기는 거르는 게 아니라 고르는 자리다(사용자 지적 2026-09-21에 이어 09-22) */}
           <Select
+            className="plain"
             value={g.id}
             options={options}
             onChange={choose}
