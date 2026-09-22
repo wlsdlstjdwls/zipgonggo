@@ -4,6 +4,9 @@
 // 첫 페이지는 서버가 필터 없이 HTML로 넣어 주고(SEO·ISR 캐시 한 장), 필터가 걸리면 여기서 /api/notices로 갈아끼운다.
 // 라우팅을 하지 않으므로 URL이 지저분해지지 않고 화면도 깜빡이지 않는다(사용자 요청 2026-09-09).
 // 무한 스크롤(IntersectionObserver sentinel, rootMargin) + 「더 보기」 버튼 폴백. 로딩 중 재호출 차단·에러 시 재시도.
+//
+// 저장된 필터가 있는 재방문은 **부트 스크립트가 하이드레이션 전에 이미 1페이지를 쏴 뒀다**(constants.ts BOOT_SCOPE_JS,
+// 2026-09-22). 여기서는 그 약속을 집어 쓴다 — 없거나 키가 다르면 예전처럼 새로 묻는다.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FEED_ROOT_MARGIN, PAGE_SIZE, ROW_STAGGER_MS } from "@/lib/constants";
@@ -15,6 +18,16 @@ import { EmptyState } from "./empty-state";
 import { useListState } from "./list-state";
 import { NoticeRow } from "./notice-row";
 import { SkeletonRows } from "./skeleton";
+
+/** 부트 스크립트가 window에 물려 둔 선조회. k는 이 응답이 어떤 조건의 것인지(feedParams와 같은 문자열) */
+type BootWindow = Window & { __zgFeed?: { k: string; p: Promise<NoticePage | null> } };
+
+function fetchPage(key: string): Promise<NoticePage> {
+  return fetch(`${ROUTES.apiNotices}?${key}`, { headers: { accept: "application/json" } }).then((res) => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json() as Promise<NoticePage>;
+  });
+}
 
 type Props = {
   /** 서버가 준 첫 페이지 — 필터 없이 스코프(시도)만 걸린 상태 */
@@ -62,8 +75,13 @@ export function NoticeExplorer({ initial, title }: Props) {
       unveil();
       return;
     }
-    fetch(`${ROUTES.apiNotices}?${key}`, { headers: { accept: "application/json" } })
-      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json() as Promise<NoticePage>; })
+    // 미리 쏴 둔 응답은 조건이 **정확히 같을 때만** 쓴다. 한 글자라도 다르면 버리고 새로 묻는다 —
+    // 조건이 다른 목록을 싣느니 왕복 한 번이 낫다. 한 번 집으면 치워서 다음 필터 변경이 헌 응답을 집지 않게 한다
+    const w = window as BootWindow;
+    const pre = w.__zgFeed?.k === key ? w.__zgFeed.p : null;
+    w.__zgFeed = undefined;
+
+    (pre ? pre.then((p) => p ?? fetchPage(key)) : fetchPage(key))
       .then((p) => { if (cancelled) return; setPage(p); setItems(p.items); setCursor(p.nextCursor); })
       .catch(() => { if (!cancelled) setError("목록을 불러오지 못했습니다."); })
       .finally(() => { if (!cancelled) setSwapping(false); unveil(); });

@@ -61,16 +61,44 @@ export const SH_SIDO = "서울특별시";
 // "/"의 캐시 한 장을 크롤러·공유 링크 수신자를 포함해 모두가 공유한다(6차 설계).
 export const SCOPE_STORAGE_KEY = "zipgonggo.scope.v1";
 
-/** 하이드레이션 전에 <html>에 data-booting을 거는 한 줄짜리 스크립트(layout.tsx의 <head>).
- *  저장된 필터가 있는 재방문에서 서버가 그린 무필터 목록이 잠깐 보였다 갈리는 걸 막는다(사용자 지적 2026-09-09).
- *  표식은 NoticeExplorer가 첫 조회를 마치면 뗀다. 여기 3초 안전장치가 있어 조회가 실패해도 화면이 잠기지 않는다. */
+/** 하이드레이션 전에 <html>에 data-booting을 걸고, 저장된 필터의 1페이지를 **미리 쏘는** 스크립트(layout.tsx의 <head>).
+ *
+ *  가림막: 저장된 필터가 있는 재방문에서 서버가 그린 무필터 목록이 잠깐 보였다 갈리는 걸 막는다(사용자 지적 2026-09-09).
+ *  표식은 NoticeExplorer가 첫 조회를 마치면 뗀다. 여기 3초 안전장치가 있어 조회가 실패해도 화면이 잠기지 않는다.
+ *
+ *  선조회(2026-09-22): 전에는 NoticeExplorer가 **하이드레이션이 끝난 뒤에야** /api/notices를 쐈다.
+ *  3100 실측으로 발사가 2.68초, 응답이 4.24초 — 저장 필터가 있는 사람은 그동안 가림막만 봤다.
+ *  여기서 미리 쏘면 발사가 50ms 안쪽으로 당겨지고, 하이드레이션이 끝날 무렵엔 응답이 이미 와 있다.
+ *
+ *  **한 번만 돈다.** 이 <script>는 layout의 React 트리 안에 있어 하이드레이션 때 다시 실행된다(3100 실측:
+ *  같은 조회가 두 번 나갔다). __zgBoot 표식으로 두 번째 실행을 통째로 건너뛴다.
+ *
+ *  **쿼리 조립은 notice-filters.ts의 noticeFiltersToParams와 같은 순서·같은 규칙이어야 한다**(scope.ts가 읽는
+ *  값의 범위도 같다 — 시군구는 되살리지 않는다). 어긋나면 키가 안 맞아 explorer가 그냥 새로 묻는다 —
+ *  느려질 뿐 틀린 목록이 실리지는 않는다. 그게 이 설계의 안전판이다. */
 export const BOOT_SCOPE_JS = `try{
-var p=location.pathname;
-if(p==="/"||p.indexOf("/area/")===0){
-  var s=JSON.parse(localStorage.getItem(${JSON.stringify(SCOPE_STORAGE_KEY)})||"{}");
-  if(s&&(s.sector||s.agency||s.sido||s.type||s.closing||s.sort||s.closed||s.maxDeposit||s.maxRent)){
+if(window.__zgBoot)throw 0;window.__zgBoot=1;
+var p=location.pathname,ps=null;
+if(p.indexOf("/area/")===0){var t=p.slice(6);if(t&&t.indexOf("/")<0)ps=decodeURIComponent(t);}
+if(p==="/"||ps){
+  var s=JSON.parse(localStorage.getItem(${JSON.stringify(SCOPE_STORAGE_KEY)})||"{}")||{};
+  if(s.sector||s.agency||s.sido||s.type||s.closing||s.sort||s.closed||s.maxDeposit||s.maxRent){
     document.documentElement.setAttribute("data-booting","");
     setTimeout(function(){document.documentElement.removeAttribute("data-booting")},3000);
+    var u=new URLSearchParams();
+    if(s.sector)u.set("sector",s.sector);
+    if(s.agency)u.set("agency",s.agency);
+    var sd=ps||s.sido;if(sd)u.set("sido",sd);
+    if(s.type)u.set("type",s.type);
+    if(s.sort==="deadline"||s.sort==="rent")u.set("sort",s.sort);
+    if(s.closing==="7d")u.set("closing","7d");
+    if(s.closed===true)u.set("closed","1");
+    if(s.maxDeposit>0)u.set("dep",String(s.maxDeposit));
+    if(s.maxRent>0)u.set("rent",String(s.maxRent));
+    var k=u.toString(),sk="";
+    if(ps){var v=new URLSearchParams();v.set("sido",ps);sk=v.toString();}
+    if(k&&k!==sk)window.__zgFeed={k:k,p:fetch("/api/notices?"+k,{headers:{accept:"application/json"}})
+      .then(function(r){return r.ok?r.json():null}).catch(function(){return null})};
   }
 }}catch(e){}`;
 // 목록 보기 모드(카드/목록/간략). 조회 조건과 섞이지 않게 키를 따로 둔다
