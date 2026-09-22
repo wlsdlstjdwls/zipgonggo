@@ -8,15 +8,16 @@
 //    잘못 눌렀을 때 되돌릴 길이 있어야 한다. 다음에 이 화면을 열면 그때 빠진다.
 // 2) **ready 전에는 빈 상태를 그리지 않는다.** 담아 둔 게 있는 사람에게 「담아 둔 공고가 없습니다」가
 //    한 번 번쩍였다가 목록이 들어오면 그게 더 나쁜 거짓말이다.
+// 3) **상태 국면으로 덩이를 나눈다**(사용자 요청 2026-09-22). 담아 둔 목록은 「지금 뭘 해야 하나」를 묻는
+//    화면이라 오늘 마감과 이미 끝난 공고가 한 줄에 섞이면 안 된다. 가르는 규칙은 D-day 칩과 같다
+//    (format.ts의 noticePhase) — 칩과 덩이가 다른 말을 하면 둘 중 하나가 거짓말이 된다.
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PAGE_SIZE, ROW_STAGGER_MS, SAVED_MAX_IDS } from "@/lib/constants";
-import { count } from "@/lib/format";
+import { count, noticePhase, PHASE_LABEL, PHASE_ORDER, type NoticePhase } from "@/lib/format";
 import { ROUTES } from "@/lib/routes";
 import type { NoticeListItem } from "@/types/notice";
-import { loginPath } from "@/lib/routes";
-import { useAuth } from "./auth-context";
 import { useListState } from "./list-state";
 import { NoticeRow } from "./notice-row";
 import { useSave } from "./save-context";
@@ -24,7 +25,6 @@ import { SkeletonRows } from "./skeleton";
 
 export function SavedNotices() {
   const { saved, ready, isSaved } = useSave();
-  const { user, enabled: loginEnabled } = useAuth();
   // 보기 모드(카드/목록/간략)는 목록 화면에서 고른 취향을 그대로 따른다
   const { view } = useListState();
   const [shown, setShown] = useState<number[]>([]);
@@ -63,33 +63,10 @@ export function SavedNotices() {
 
   const reload = useCallback(() => setRetry((n) => n + 1), []);
 
-  // 머리 건수는 화면에 깔린 행 수가 아니라 **지금 담겨 있는 수**다 — 뺀 행은 자리에만 남아 있다.
-  // 헤더 배지와 같은 수를 말해야 한다(둘이 어긋나면 어느 쪽이 거짓말인지 알 길이 없다)
-  const savedCount = items ? items.filter((n) => isSaved(n.id)).length : 0;
-  const head = (
-    <div className="list-top">
-      <h1>관심 공고</h1>
-      {savedCount > 0 && <span>{count(savedCount)}</span>}
-    </div>
-  );
-
-  // 어디에 남는 목록인지는 로그인 여부에 따라 달라진다. 그 사실을 감추지 않는다 —
-  // 「이 브라우저에만 남는다」를 모르고 데이터를 지웠다가 잃는 일이 실제로 생긴다
-  const note = user ? (
-    <p className="saved-note">
-      이 목록은 계정에 저장됩니다. 다른 기기에서 로그인해도 그대로 보입니다.
-    </p>
-  ) : (
-    <p className="saved-note">
-      이 목록은 이 브라우저에만 남습니다. 사이트 데이터를 지우거나 다른 기기에서 열면 비어 있습니다.
-      {loginEnabled && (
-        <>
-          {" "}
-          <Link href={loginPath(ROUTES.my)}>카카오로 로그인</Link>하면 계정에 옮겨 둡니다.
-        </>
-      )}
-    </p>
-  );
+  // 화면 제목은 지우고(사용자 요청 2026-09-22) 이름은 스크린리더에만 남긴다 —
+  // 지면에 h1이 아예 없으면 이 장이 무슨 장인지 읽어 줄 것이 사라진다.
+  // 보관 위치를 밝히던 한 줄(「이 브라우저에만 남습니다」)도 뺐다(사용자 요청 2026-09-22).
+  const head = <h1 className="sr-only">관심 공고</h1>;
 
   // 아직 localStorage도 못 읽었거나 첫 조회가 안 끝난 상태
   if (!ready || (items === null && !error)) {
@@ -128,15 +105,35 @@ export function SavedNotices() {
     );
   }
 
+  // 국면별로 가른다. 조회가 이미 마감 임박순으로 정렬해 오므로 덩이 안 순서는 그대로 둔다.
+  // 빈 덩이는 제목도 내지 않는다 — 「오늘 마감 0건」은 알려 줄 것이 없는 줄이다
+  const groups = new Map<NoticePhase, NoticeListItem[]>();
+  for (const n of items) {
+    const phase = noticePhase(n);
+    const bucket = groups.get(phase);
+    if (bucket) bucket.push(n);
+    else groups.set(phase, [n]);
+  }
+
   return (
     <div className="ex-list">
       {head}
-      {note}
-      <ul className={`rows v-${view}`}>
-        {items.map((n, i) => (
-          <NoticeRow key={n.id} n={n} stagger={(i % PAGE_SIZE) * ROW_STAGGER_MS} muted={!isSaved(n.id)} />
-        ))}
-      </ul>
+      {PHASE_ORDER.filter((phase) => groups.has(phase)).map((phase) => {
+        const rows = groups.get(phase) as NoticeListItem[];
+        return (
+          <section key={phase} className={`saved-group ph-${phase}`}>
+            <h2>
+              {PHASE_LABEL[phase]}
+              <em>{count(rows.length)}</em>
+            </h2>
+            <ul className={`rows v-${view}`}>
+              {rows.map((n, i) => (
+                <NoticeRow key={n.id} n={n} stagger={(i % PAGE_SIZE) * ROW_STAGGER_MS} muted={!isSaved(n.id)} />
+              ))}
+            </ul>
+          </section>
+        );
+      })}
       {error && (
         <p className="feed-error">
           목록을 새로 고치지 못했습니다. <button type="button" className="btn" onClick={reload}>다시 시도</button>

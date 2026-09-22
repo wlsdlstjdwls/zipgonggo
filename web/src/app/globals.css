@@ -699,8 +699,18 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .list-top > span { flex: none; font-weight: 800; font-size: 13.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
 
 /* ── 빈 상태 · 404 ───────────────────────────────────────── */
-/* 저장 목록(/my) — 보관 위치를 밝히는 한 줄과, 방금 저장을 푼 행 */
-.saved-note { margin: 0; padding: 0 var(--pad) 12px; font-size: 12.5px; font-weight: 600; line-height: 1.6; color: var(--dim); }
+/* 저장 목록(/my) — 상태 국면별 덩이와, 방금 저장을 푼 행.
+   제목은 .crumb·.list-top·.rows와 같은 var(--pad) 선에 세운다(2026-09-22).
+   앞의 점은 D-day 칩과 같은 톤을 써서 「오늘 마감」 덩이가 색으로도 먼저 읽히게 한다 */
+.saved-group + .saved-group { padding-top: 18px; }
+.saved-group > h2 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; padding: 16px var(--pad) 0;
+  font-weight: 900; font-size: 15px; line-height: 1.25; letter-spacing: -0.04em; color: var(--ink); }
+.saved-group > h2::before { content: ""; align-self: center; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--line2); }
+.saved-group > h2 em { font-style: normal; font-weight: 800; font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.saved-group.ph-today > h2::before { background: var(--hot); }
+.saved-group.ph-open > h2::before { background: var(--acc); }
+.saved-group.ph-upcoming > h2::before { background: var(--warn); }
+.saved-group.ph-closed > h2 { color: var(--mut); }
 .rows li.muted { opacity: 0.42; transition: opacity 200ms var(--ease); }
 .rows li.muted:hover, .rows li.muted:focus-within { opacity: 1; }
 .state-wrap { padding: 24px var(--pad) 32px; }

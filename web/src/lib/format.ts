@@ -77,6 +77,31 @@ export function isClosed(n: Pick<NoticeListItem, "apply_end_at" | "announce_at" 
   return (toEnd !== null && toEnd < 0) || announced(n);
 }
 
+/** 공고가 지금 어느 국면에 있나. ddayChip과 **같은 규칙**으로 가른다 —
+ *  칩이 「오늘 마감」이라 말하는 행이 「접수 중」 덩이에 들어가면 둘 중 하나가 거짓말이 된다.
+ *  관심 공고(/my)가 이 값으로 목록을 덩이로 나눈다(사용자 요청 2026-09-22). */
+export type NoticePhase = "today" | "open" | "upcoming" | "closed";
+
+export const PHASE_ORDER: readonly NoticePhase[] = ["today", "open", "upcoming", "closed"];
+export const PHASE_LABEL: Record<NoticePhase, string> = {
+  today: "오늘 마감",
+  open: "접수 중",
+  upcoming: "접수 예정",
+  closed: "마감",
+};
+
+export function noticePhase(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "announce_at" | "status">): NoticePhase {
+  if (isClosed(n)) return "closed";
+  const toEnd = daysUntil(n.apply_end_at);
+  const toStart = daysUntil(n.apply_start_at);
+  // 아직 안 열린 접수가 먼저다 — 마감일이 있어도 넣을 수 없는 날은 「접수 중」이 아니다
+  if (toStart !== null && toStart > 0) return "upcoming";
+  if (toEnd === 0) return "today";
+  if (toEnd !== null) return "open";
+  // 접수 마감일을 못 읽은 공고. 기관이 말하는 상태만 남는다
+  return n.status === "접수중" ? "open" : "upcoming";
+}
+
 export function ddayChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_at" | "announce_at" | "status">): DdayChip {
   const toEnd = daysUntil(n.apply_end_at);
   const toStart = daysUntil(n.apply_start_at);
