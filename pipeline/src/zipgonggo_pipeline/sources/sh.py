@@ -6,6 +6,10 @@
   기본 화면은 splyCd=02(국민공공임대)만 보여 8건이다. 전체는 splyCd= 빈값으로 호출해야 한다(81건, 10/페이지, 9페이지).
 - 정적 HTML. <table> 한 개, thead 8열: 번호 · 청약유형 · 공고명 · 공고게시일 · 발표일 · 모집상태 · 담당부서 · 링크
 - 공고명 셀의 포털 상세 링크(/site/main/sh/publicLease/view?seq=N)는 **주석 처리**돼 있어 주석에서 추출. 링크 셀에 i-sh.co.kr 원문(view.do?seq=NNNNNN)
+- **포털 상세의 seq는 공고 식별자가 아니라 목록에서의 자리 번호다**(실측 2026-09-22). 공고가 하나 올라올 때마다
+  모든 seq가 한 칸씩 밀린다 — 2026-09-08에 seq=11이던 「금천구 1인가구 청년 맞춤형주택」 자리에 2주 뒤에는
+  「2026년 국민임대주택 공고」가 앉아 있었다. **이 URL을 저장하면 며칠 뒤엔 남의 공고를 가리킨다.**
+  그래서 portal_url에는 상세가 아니라 **제목으로 검색한 목록 URL**(sv=제목)을 넣는다 — 자리가 밀려도 안 틀린다.
 - 포털 상세는 공고 본문 텍스트만 있고 첨부 없음("sh공사 바로가기를 통해 첨부파일을 확인"). 접수기간은 본문 자유서술이라 구조화 안 됨.
 - robots.txt: User-agent: * / Allow: /
 """
@@ -20,6 +24,7 @@ from typing import Any
 
 import httpx
 from selectolax.parser import HTMLParser
+from urllib.parse import urlencode
 
 from .http import ThrottledHttp
 
@@ -38,6 +43,12 @@ SPLY_CODES = {
 }
 
 
+def portal_search_url(title: str) -> str:
+    """제목으로 검색한 포털 목록 URL. 상세 seq(자리 번호) 대신 저장하는 값이다 — 위 주석 참조.
+    splyCd를 빈 값으로 **반드시** 실어야 한다. 빠지면 화면 기본값(02 국민공공임대)만 걸려 다른 유형이 안 나온다."""
+    return f"{BASE_URL}{LIST_PATH}?" + urlencode({"cp": 1, "splyCd": "", "recrnotiState": "", "sv": title})
+
+
 @dataclass
 class SHRow:
     no: str
@@ -47,7 +58,7 @@ class SHRow:
     announce: str        # YYYY-MM-DD 또는 ''
     state: str           # 모집중 · 모집마감
     dept: str
-    portal_url: str      # housing.seoul.go.kr 상세
+    portal_url: str      # housing.seoul.go.kr 제목 검색 목록(상세 seq는 자리 번호라 안 쓴다)
     portal_seq: str
     source_url: str      # i-sh.co.kr 원문 (없으면 portal_url)
     ish_seq: str         # i-sh view.do?seq=  (없으면 '')
@@ -83,12 +94,15 @@ def parse_list(html: str) -> list[SHRow]:
             m = re.search(r'href="(/site/main/sh/publicLease/view\?[^"]+)"', tr.html or "")
             portal = m.group(1) if m else ""
         ish = next((h for h in links if "i-sh.co.kr" in h), "")
-        portal_url = (BASE_URL + portal.replace("&amp;", "&")) if portal.startswith("/") else portal
+        title = _text(tds[2])
+        # 상세 seq는 자리 번호라 저장하지 않는다(위 주석). 대신 제목 검색 목록을 링크로 둔다 —
+        # 공고가 살아 있으면 그 한 건만 나오고, 내려갔으면 빈 목록이 나온다. 남의 공고를 가리키는 일은 없다
+        portal_url = portal_search_url(title)
         rows.append(
             SHRow(
                 no=_text(tds[0]),
                 type_name=_text(tds[1]),
-                title=_text(tds[2]),
+                title=title,
                 posted=_text(tds[3]),
                 announce=_text(tds[4]),
                 state=_text(tds[5]),

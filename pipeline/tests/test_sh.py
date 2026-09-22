@@ -2,6 +2,7 @@
 
 from datetime import date
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 
@@ -27,7 +28,12 @@ def test_parse_list_reads_10_rows_with_links():
     assert first.posted == "2026-08-31" and first.announce == "2027-03-05"
     assert first.state == "모집중"
     assert first.ish_seq == "309467" and first.source_url.startswith("https://www.i-sh.co.kr/")
-    assert first.portal_seq == "1" and first.portal_url.startswith("https://housing.seoul.go.kr/site/main/sh/publicLease/view?seq=1")
+    # 상세 seq는 자리 번호라 링크로 쓰지 않는다 — portal_url은 제목으로 검색한 목록이다(2026-09-22)
+    assert first.portal_seq == "1"
+    assert first.portal_url.startswith("https://housing.seoul.go.kr/site/main/sh/publicLease/02/list?")
+    assert "publicLease/view" not in first.portal_url
+    assert "splyCd=&" in first.portal_url  # 빠지면 국민공공임대만 걸린다
+    assert quote(first.title, safe="") in first.portal_url.replace("+", "%20")
 
 
 def test_last_page_from_pagination():

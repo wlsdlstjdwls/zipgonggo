@@ -4,6 +4,12 @@
 
 마이홈 API에 SH가 없어(data-sources.md) 이 경로가 서울 공공임대의 유일한 소스다.
 목록에는 접수기간이 없다. status는 모집상태(모집중·모집마감)와 제목의 [수정]/[정정]으로 도출한다.
+
+**목록에서 사라진 공고도 닫는다**(2026-09-22). 포털은 접수가 끝난 공고를 「모집마감」으로 바꾸지 않고
+그냥 목록에서 내려 버리는 일이 있다 — 그러면 마지막으로 본 「모집중」이 DB에 영원히 남는다.
+「금천구 1인가구 청년 맞춤형주택」이 그랬다: 실제 접수는 2026-09-17에 끝났는데(등기우편 마감,
+발표 12-11) DB는 2026-09-22까지 접수중이었고 SH 원문 링크(seq=308799)마저 죽어 있었다.
+그래서 이번 수집에서 못 본 공고는 sweep_missing이 접수마감으로 내린다 — 조건은 그 함수 주석에.
 """
 
 from __future__ import annotations
@@ -117,6 +123,46 @@ def map_sh(row: SHRow, today: date, source_rank: int | None = None) -> dict[str,
     }
 
 
+# 목록에서 사라진 공고를 닫아도 되는 최소 수집량. 이보다 적게 걷혔으면 사이트가 바뀌었거나 부분 수집이라
+# 판단 근거가 없다 — 그럴 땐 아무것도 닫지 않는다. 전체 목록은 80건 안팎이다(2026-09-22 실측 81건)
+SWEEP_MIN_ROWS = 20
+
+
+def sweep_missing(cur, *, seen_keys: set[str], oldest_posted: date, today: date) -> int:
+    """이번 수집에서 못 본 공고를 접수마감으로 내린다. 되돌릴 수 없는 판단이라 조건을 좁게 건다.
+
+    - `source='sh_scrape'`만. 게시판 백필(ish_board)·마이홈은 이 목록이 다루는 범위가 아니다
+    - 목록이 덮는 기간 안(**가장 오래된 행의 게시일 이후**)만. 그 앞은 포털이 이미 안 들고 있다
+    - 아직 안 닫힌 것만. 닫힌 걸 또 닫으면 이력이 지저분해진다
+
+    **URL은 그대로 둔다**(CLAUDE.md 하지 말 것 5) — 상태만 바꾸고 상세는 계속 열린다.
+    바꾼 사실은 notice_event에 남긴다. 나중에 「왜 닫혔지」를 물을 근거가 이것뿐이다."""
+    cur.execute(
+        """
+        WITH gone AS (
+          SELECT id, status FROM notice
+           WHERE source = %(source)s
+             AND posted_at >= %(oldest)s
+             AND status <> '접수마감'
+             AND NOT (source_key = ANY(%(seen)s::text[]))
+        ), upd AS (
+          UPDATE notice n SET status = '접수마감',
+                              source_status = '목록에서 내려감',
+                              updated_at = now()
+            FROM gone WHERE n.id = gone.id
+          RETURNING n.id, gone.status AS before_status
+        )
+        INSERT INTO notice_event (notice_id, event_type, before_val, after_val)
+        SELECT id, 'status_changed',
+               jsonb_build_object('status', before_status),
+               jsonb_build_object('status', '접수마감', 'reason', 'source_list_gone', 'checked_on', %(today)s::text)
+          FROM upd
+        """,
+        {"source": SOURCE, "oldest": oldest_posted, "seen": sorted(seen_keys), "today": today.isoformat()},
+    )
+    return cur.rowcount or 0
+
+
 def run(*, dry_run: bool, max_pages: int | None) -> Stats:
     cfg = settings()
     client = SHClient(delay_sec=cfg.scrape_delay_sec)
@@ -128,6 +174,11 @@ def run(*, dry_run: bool, max_pages: int | None) -> Stats:
     stats.fetched_rows = len(rows)
     stats.groups = len(rows)
     log.info("SH 목록 %d행 · 요청 %d회", len(rows), client.call_count)
+
+    # 목록에 있었다는 사실만으로 「살아 있다」고 본다 — 아래에서 건너뛴 행(정정글·공고 아님)도 포함해야
+    # 멀쩡히 붙어 있는 공고를 사라졌다고 오해하지 않는다
+    seen_keys = {f"ish:{r.ish_seq}" if r.ish_seq else f"portal:{r.portal_seq}" for r in rows}
+    oldest_posted = min((parse_ymd(r.posted) for r in rows if parse_ymd(r.posted)), default=None)
 
     conn = None if dry_run else connect()
     try:
@@ -161,8 +212,14 @@ def run(*, dry_run: bool, max_pages: int | None) -> Stats:
             if cur is None:
                 continue
             upsert_guarded(cur, stats, row.no, mapped, [{"sido": SIDO, "sigungu": None, "supply_count": None}])
+        closed = 0
+        if cur and max_pages is None and len(rows) >= SWEEP_MIN_ROWS and oldest_posted:
+            closed = sweep_missing(cur, seen_keys=seen_keys, oldest_posted=oldest_posted, today=today)
+            if closed:
+                log.info("목록에서 사라진 공고 %d건을 접수마감으로 내렸다(게시일 %s 이후)", closed, oldest_posted)
         if conn and cur:
-            finish_ingest(cur, stage=STAGE, source=SOURCE, stats=stats, started=started, calls=client.call_count)
+            finish_ingest(cur, stage=STAGE, source=SOURCE, stats=stats, started=started,
+                          calls=client.call_count, closed_missing=closed)
             conn.commit()
     finally:
         if conn:
