@@ -9,6 +9,7 @@ import { HomeLink } from "@/components/home-link";
 import { ProfileProvider } from "@/components/profile-context";
 import { SaveProvider } from "@/components/save-context";
 import { SavedLink } from "@/components/saved-link";
+import { SiteMenu } from "@/components/site-menu";
 import { SiteSearch } from "@/components/site-search";
 import { VisitTracker } from "@/components/visit-tracker";
 import { ListStateProvider } from "@/components/list-state";
@@ -108,6 +109,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div className="right">
                 <CalcButton />
                 <AccountMenu />
+                {/* 폰에서는 위 둘과 왼쪽 메뉴를 이 한 칸으로 접는다(globals.css 640px 분기) */}
+                <SiteMenu />
               </div>
             </div>
           </header>

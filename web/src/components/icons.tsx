@@ -104,3 +104,12 @@ export function IconPhoto(p: P) {
     </Svg>
   );
 }
+
+/** 메뉴 — 폰 헤더에서 접힌 메뉴를 여는 자리. 석 줄이면 뜻이 선다 */
+export function IconMenu(p: P) {
+  return (
+    <Svg {...p}>
+      <path d="M2.6 4.4h10.8M2.6 8h10.8M2.6 11.6h10.8" />
+    </Svg>
+  );
+}
