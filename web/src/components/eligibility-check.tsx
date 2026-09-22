@@ -14,6 +14,7 @@ import { dateMD, daysUntil } from "@/lib/format";
 import { fromElig, reconcileRegion, toElig } from "@/lib/profile";
 import type { OpenSoonNotice, TypeHub } from "@/lib/queries";
 import { noticePath, typePath } from "@/lib/routes";
+import { SIDOS, sidoShort } from "@/lib/sido";
 import type { EligibilityRules, JanggiRule } from "@/types/eligibility";
 import { useProfile } from "./profile-context";
 import { Select } from "./select";
@@ -108,12 +109,25 @@ export function EligibilityCheck({ rules, open = [], hubs = [] }: {
   const classes = useMemo(() => classOptions(rules.types), [rules.types]);
   const regions = useMemo(() => rules.tiers.filter((t) => t.tier === "서울").map((t) => t.name), [rules.tiers]);
   const nearby = useMemo(() => rules.tiers.filter((t) => t.tier === "연접").map((t) => t.name), [rules.tiers]);
-  // 서울 구 → 연접지역(표시로 구분) → 그 외 지역 순. Select는 그룹 없는 단일 목록이라 이름에 표를 붙인다
-  const residenceOptions = useMemo(() => [
-    ...regions.map((r) => ({ value: r, label: r })),
-    ...nearby.map((r) => ({ value: r, label: `${r} (연접지역)` })),
-    { value: "그 외 지역", label: "그 외 지역" },
-  ], [regions, nearby]);
+  // 서울 구 → 연접지역(표시로 구분) → 그 밖의 시도 순. Select는 그룹 없는 단일 목록이라 이름에 표를 붙인다.
+  // region_tier에는 서울 25구와 연접 13곳뿐이라 그 밖에 사는 사람은 「그 외 지역」 하나로 뭉뚱그려졌다
+  // (사용자 지적 2026-09-22). 진단에 쓰는 등급은 그래도 「기타」지만, 시도를 알면 오른쪽 공고 목록을
+  // 내 시도부터 세울 수 있다 — LH 공고가 전국에서 올라온다
+  const residenceOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { value: string; label: string }[] = [];
+    // 인천광역시는 연접 줄에도 있다 — 값으로도 표로도 한 번씩만 들어가게 둘 다 본다
+    const push = (value: string, label: string) => {
+      if (seen.has(value) || seen.has(label)) return;
+      seen.add(value); seen.add(label);
+      out.push({ value, label });
+    };
+    for (const r of regions) push(r, r);
+    for (const r of nearby) push(r, `${r} (연접지역)`);
+    // 강원도/강원특별자치도처럼 한 곳을 두 이름으로 든 줄이 있다 — 통칭이 같으면 앞의 것만 남는다
+    for (const sd of SIDOS) if (sd.name !== "서울특별시") push(sd.name, sidoShort(sd.name));
+    return out;
+  }, [regions, nearby]);
 
   const verdicts = useMemo(() => diagnoseAll(p, rules), [p, rules]);
   const pass = verdicts.filter((v) => v.ok);
@@ -130,11 +144,18 @@ export function EligibilityCheck({ rules, open = [], hubs = [] }: {
 
   // 내가 사는 데를 앞에 세운다. 마감 임박 순으로만 세우면 서울 사람에게 대구 공고가 먼저 뜬다.
   // 거주지를 아직 안 골랐으면(기본값) 손대지 않고 마감 순 그대로 둔다
-  const mySido = useMemo(() => (p.residence && tierOf(p.residence, rules.tiers) === "서울" ? "서울특별시" : null), [p.residence, rules.tiers]);
+  const mySido = useMemo(() => {
+    if (!p.residence) return null;
+    if (tierOf(p.residence, rules.tiers) === "서울") return "서울특별시";
+    // 시도를 골랐으면 그대로 쓴다. 시군구(연접)를 골랐으면 어느 시도인지 모르니 이름으로만 맞춘다
+    return SIDOS.some((sd) => sd.name === p.residence) ? p.residence : null;
+  }, [p.residence, rules.tiers]);
   const openMine = useMemo(() => {
     const mine = open.filter((n) => passTypes.has(n.housing_type));
     if (!p.residence) return mine;
-    const near = (n: OpenSoonNotice) => (n.sigungu === p.residence ? 0 : mySido && n.sido === mySido ? 1 : 2);
+    // 시도는 통칭으로 견준다 — 공고가 「강원도」로 올라오고 고른 값이 「강원특별자치도」면 글자로는 안 맞는다
+    const near = (n: OpenSoonNotice) =>
+      n.sigungu === p.residence ? 0 : mySido && n.sido && sidoShort(n.sido) === sidoShort(mySido) ? 1 : 2;
     // 정렬이 안정적이라(ES2019) 같은 등급 안에서는 쿼리가 준 마감 임박 순이 그대로 남는다
     return [...mine].sort((a, b) => near(a) - near(b));
   }, [open, passTypes, p.residence, mySido]);
