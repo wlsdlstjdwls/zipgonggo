@@ -87,31 +87,30 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 /**
- * 요약 스트립 한 칸. 값이 없으면 「준비 중」이라고 쓴다 — 칸을 비워 두면 왜 없는지 알 수 없다.
+ * 제원 한 토막. 라벨은 작게 앞에, 값은 굵게 뒤에 — 한 줄에 여럿이 이어 붙고 좁으면 접힌다.
  *
- * 2026-09-22: 밑에 따로 있던 「공급 정보」 제원 표(SpecList)를 이 스트립에 합쳤다(사용자 요청).
- * 두 영역이 라벨+값이라는 같은 모양인데 칸 크기만 달라 지면을 두 번 먹고 있었다.
- * 금액·면적·호수처럼 먼저 읽을 값은 그대로 크게, 합쳐 온 제원은 `sm`으로 한 단 작게 쓴다.
+ * 내력: 2026-09-09에 큰 칸 다섯 개짜리 요약 스트립으로 났고, 09-22에 「공급 정보」 제원 표를 여기 합쳤다가,
+ * 같은 날 다시 한 줄로 눌렀다 — **"이 정보들이 그냥 단순 나열인데 영역을 너무 많이 차지한다"**(사용자 지적).
+ * 격자 칸은 값 하나마다 세로 66px을 먹는데 여기 있는 건 전부 한 토막짜리 사실이라 그럴 값이 아니다.
+ *
+ * 보증금과 월임대료는 여기서 뺐다 — 바로 밑 「보증금과 임대료」가 같은 숫자를 더 크게, 끌 수 있게 낸다
+ * (사용자 지적 2026-09-22: "이것도 결국 보증금과 임대료와 겹치는 거 아닌가").
  */
-function Kpi({ label, value, sub, term, sm }: {
+function Fact({ label, value, sub, term }: {
   label: string;
   value: ReactNode;
   sub?: string | null;
-  /** 라벨을 줄여 쓴 자리에서 어느 사전 표제어인지 알려 준다(「공가 배분」 → 공가) */
+  /** 라벨을 줄여 쓴 자리에서 어느 사전 표제어인지 알려 준다(「전용」 → 전용면적) */
   term?: string;
-  sm?: boolean;
 }) {
-  const empty = value === null || value === undefined || value === "";
-  // 긴 값(계약금 범위 「965만 6,000원~1,252만 8,000원」처럼)은 두 칸을 쓴다 —
-  // 한 칸에 우겨넣으면 세 줄로 접혀 스트립 전체가 그만큼 키가 큰다(사용자 지적 2026-09-22)
-  const wide = typeof value === "string" && value.length >= 12;
+  if (value === null || value === undefined || value === "") return null;
   return (
-    <div className={`kpi-i${empty ? " off" : ""}${sm ? " sm" : ""}${wide ? " w2" : ""}`}>
+    <li>
       {/* 라벨이 사전에 있는 말이면 스스로 용어 링크가 된다 */}
       <span>{term ? <Term as={label}>{term}</Term> : <TermText>{label}</TermText>}</span>
-      <b>{empty ? "준비 중" : value}</b>
-      {!empty && sub && <em>{sub}</em>}
-    </div>
+      <b>{value}</b>
+      {sub && <em>{sub}</em>}
+    </li>
   );
 }
 
@@ -297,30 +296,23 @@ export default async function ComplexPage({ params }: Params) {
             <p className="d-sub">{full}</p>
           </header>
 
-          {/* 핵심 값 먼저 — 어떤 표를 읽어야 할지 정하기 전에 이 칸들이 답을 준다(사용자 요청 2026-09-09).
-              2026-09-22부터 밑에 따로 있던 「공급 정보」 제원 표도 여기로 합쳤다(사용자 요청) —
-              같은 라벨+값 모양이 두 블록으로 나뉘어 지면을 두 번 먹고 있었다. 앞이 크고 뒤가 작다 */}
-          <div className="kpi">
-            <Kpi
-              label={showRent ? "보증금" : "전세금"}
-              value={c.min_deposit != null ? wonKo(c.min_deposit) : null}
-              sub={depositSub}
-            />
-            <Kpi label="월임대료" value={c.min_rent != null ? wonKo(c.min_rent) : hasFacts && !hasRent ? "없음" : null} sub={c.min_rent != null ? rentSub : "전세형"} />
-            <Kpi label="전용면적" value={area} />
-            <Kpi label="공급 호수" value={unitCount != null ? num(unitCount, "호") : null} sub={unitSub} />
-            <Kpi label="입주 시작" value={moveIn} sub={moveIn ? "공고문 예정일" : null} />
-            {/* 한 줄짜리 공급의 우선/일반 배분. 위 「공급 호수」는 합만 말한다 */}
+          {/* 제원 한 줄 — 값 하나가 한 토막이다. 격자 칸으로 늘어놓으면 단순 나열에 지면을 너무 많이 쓴다
+              (사용자 지적 2026-09-22). 보증금과 월임대료는 밑의 「보증금과 임대료」가 맡는다 */}
+          <ul className="facts">
+            <Fact label="전용" term="전용면적" value={area} />
+            <Fact label="공급" term="공급 호수" value={unitCount != null ? num(unitCount, "호") : null} sub={unitSub} />
+            {/* 값이 없어도 「준비 중」이라고 쓴다 — 칸을 비워 두면 왜 없는지 알 수 없다(사용자 결정 2026-09-09) */}
+            <Fact label="입주" term="입주 시작" value={moveIn ?? "준비 중"} sub={moveIn ? "공고문 예정일" : null} />
+            {/* 한 줄짜리 공급의 우선/일반 배분. 위 「공급」은 합만 말한다 */}
             {one && oneSplit && (
-              <Kpi
-                sm
+              <Fact
                 label="공가 배분"
                 term="공가"
                 value={<><Term as="우선">우선공급</Term> {num(one.units_priority ?? 0, "호")} / <Term as="일반">일반공급</Term> {num(one.units_general ?? 0, "호")}</>}
               />
             )}
-            {specs.map(([label, value, term]) => <Kpi key={label} sm label={label} value={value} term={term} />)}
-          </div>
+            {specs.map(([label, value, term]) => <Fact key={label} label={label} value={value} term={term} />)}
+          </ul>
 
           {/* 제원은 위 요약 스트립으로 올라갔다(2026-09-22) — 여기 남는 건 여러 줄짜리 공급현황 표와
               포털이 주는 단지 정보뿐이라, 둘 다 없으면 섹션 자체를 그리지 않는다 */}
@@ -365,7 +357,43 @@ export default async function ComplexPage({ params }: Params) {
           </section>
           )}
 
-          {/* 사진·도면은 공급현황 바로 뒤 — 어떤 주택형이 나왔는지 본 다음 그 형의 평면도를 본다.
+          {/* 금액이 사진보다 먼저다(2026-09-22). 전에는 요약 스트립이 보증금과 월임대료를 위에서 한 번 말했기에
+              이 섹션이 사진 뒤에 있어도 됐는데, 그 두 칸을 걷어내면서(겹친다는 사용자 지적) 여기가 금액이 나오는
+              유일한 자리가 됐다. 사진 갤러리 밑에 두면 들어오자마자 값을 못 본다 */}
+          <section className="dsec">
+            <h2>{showRent ? "보증금과 임대료" : "전세금"}</h2>
+            {slideGroups.length > 0 ? (
+              <>
+                {/* 한도와 이율은 슬라이더가 자기 칸의 두 끝에서 계산해 직접 적는다 —
+                    공급대상마다 값이 달라 여기서 한 줄로 적을 수 없다 */}
+                <ConvertSlider groups={slideGroups} />
+              </>
+            ) : priceBreak.length > 0 ? (
+              <>
+                <PriceTable rows={priceBreak} depositHead={showRent ? "보증금" : "전세금"} showRent={showRent} />
+                {hasOptions ? (
+                  <>
+                    <p className="note">위 표는 보증금 비율이 가장 낮은 기준값입니다. 비율을 올리면 월임대료가 내려갑니다. 비율별 금액은 아래 표에서 확인하세요.</p>
+                    <h3>보증금 비율별 임대조건</h3>
+                    <DepositOptionsTable supply={supply} hasClass={hasClass} />
+                    <p className="note">계약 때 공고에 적힌 비율 단위로 전환할 수 있고, 계약 뒤에는 바꿀 수 없는 공고가 많습니다. 조건은 {L.originalDoc}에서 확인하세요.</p>
+                  </>
+                ) : hasRent && (
+                  <p className="note">
+                    공고문 기준값입니다. 계약 때 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있습니다. 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
+                  </p>
+                )}
+              </>
+            ) : (
+              <Pending
+                title="이 단지의 금액은 아직 준비 중입니다"
+                lead={<>공고문 첨부의 금액 표를 이 단지에 아직 이어 붙이지 못했습니다. {L.originalDoc}의 표에서 확인하세요.</>}
+                action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
+              />
+            )}
+          </section>
+
+          {/* 사진·도면은 금액 뒤 — 얼마인지 본 다음 어떤 집인지 본다(2026-09-22 자리 바꿈).
               단지 코드가 안 붙은 단지와 기관이 자료를 안 올린 단지는 섹션을 감추지 않고 왜 비었는지 말한다.
               자료를 주는 기관이 공공/민간에 따라 갈리므로(SH주택정보 / 청년안심주택 포털) 문구도 갈린다 —
               민간임대에 「준공 전이라 SH주택정보에 없다」고 적으면 사실과 다르다(사용자 지적 2026-09-15) */}
@@ -395,40 +423,6 @@ export default async function ComplexPage({ params }: Params) {
                   : n.housing_type === "매입임대"
                   ? <>매입임대는 빌라나 다가구주택 한 호실이라 SH주택정보에서 주소로 찾습니다. 이 주소는 아직 찾지 못했습니다. 집의 모습은 {L.originalDoc}과 현장 방문으로 확인하세요.</>
                   : <>준공 전 신규 공급 단지라 SH주택정보에 단지 자료가 아직 없습니다. 전자팸플릿은 {L.originalDoc}의 안내를 따라 확인하세요.</>}
-                action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
-              />
-            )}
-          </section>
-
-          {/* 보증금과 임대료는 공급현황 아래 — 어떤 유형이 있는지 먼저 보고 그 금액을 읽는 순서다(사용자 요청 2026-09-09) */}
-          <section className="dsec">
-            <h2>{showRent ? "보증금과 임대료" : "전세금"}</h2>
-            {slideGroups.length > 0 ? (
-              <>
-                {/* 한도와 이율은 슬라이더가 자기 칸의 두 끝에서 계산해 직접 적는다 —
-                    공급대상마다 값이 달라 여기서 한 줄로 적을 수 없다 */}
-                <ConvertSlider groups={slideGroups} />
-              </>
-            ) : priceBreak.length > 0 ? (
-              <>
-                <PriceTable rows={priceBreak} depositHead={showRent ? "보증금" : "전세금"} showRent={showRent} />
-                {hasOptions ? (
-                  <>
-                    <p className="note">위 표는 보증금 비율이 가장 낮은 기준값입니다. 비율을 올리면 월임대료가 내려갑니다. 비율별 금액은 아래 표에서 확인하세요.</p>
-                    <h3>보증금 비율별 임대조건</h3>
-                    <DepositOptionsTable supply={supply} hasClass={hasClass} />
-                    <p className="note">계약 때 공고에 적힌 비율 단위로 전환할 수 있고, 계약 뒤에는 바꿀 수 없는 공고가 많습니다. 조건은 {L.originalDoc}에서 확인하세요.</p>
-                  </>
-                ) : hasRent && (
-                  <p className="note">
-                    공고문 기준값입니다. 계약 때 정해진 비율 안에서 보증금과 월임대료를 서로 전환할 수 있습니다. 전환 한도와 이율은 {L.originalDoc}에서 확인하세요.
-                  </p>
-                )}
-              </>
-            ) : (
-              <Pending
-                title="이 단지의 금액은 아직 준비 중입니다"
-                lead={<>공고문 첨부의 금액 표를 이 단지에 아직 이어 붙이지 못했습니다. {L.originalDoc}의 표에서 확인하세요.</>}
                 action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
               />
             )}
