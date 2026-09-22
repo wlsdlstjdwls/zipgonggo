@@ -315,7 +315,9 @@ export default async function ComplexPage({ params }: Params) {
               (사용자 지적 2026-09-22). 보증금과 월임대료는 밑의 「보증금과 임대료」가 맡는다.
               제목은 다른 섹션과 같은 h2다(사용자 요청 2026-09-22: "이렇게 한 거 너무 좋은데 타이틀은 있어야지") */}
           <section className="dsec dsec-facts">
-          <h2>기본 정보</h2>
+          {/* 동호수별 목록을 여는 버튼은 제목 줄 오른쪽 끝에 붙인다(사용자 요청 2026-09-22) —
+              제원 줄 끝에 있을 땐 값들 사이에 섞여 버튼인 줄 몰랐다 */}
+          <h2>기본 정보{unitTableWorth && <UnitSheet units={units} label={unitLabel} />}</h2>
           <div className="facts-row">
           <ul className="facts">
             <Fact label="전용" term="전용면적" value={area} />
@@ -333,9 +335,6 @@ export default async function ComplexPage({ params }: Params) {
             )}
             {specs.map(([label, value, term]) => <Fact key={label} label={label} value={value} term={term} />)}
           </ul>
-          {/* 동호수별 목록은 지면에 펼치지 않고 창으로 연다(사용자 결정 2026-09-22) —
-              172호짜리 단지가 지면 아래쪽을 다 밀어내던 자리다 */}
-          {unitTableWorth && <UnitSheet units={units} label={unitLabel} />}
           </div>
           </section>
 

@@ -37,12 +37,13 @@ function guLabel(c: NoticeComplex): string {
   return c.sido === "서울특별시" ? c.sigungu : `${c.sido} ${c.sigungu}`;
 }
 
-/** 목록 행에 붙일 그림 배지(사용자 요청 2026-09-21). 사진이 도면을 이긴다 — 배지는 한 칸뿐이고
- *  「사진」이라 적혀 있으면 실물이 나와야 한다. 파일 자리가 꺼져 있으면(배포 전 스토리지 미설정) 아무것도 안 단다 */
+/** 목록 행에 붙일 그림 표시(사용자 요청 2026-09-21, 칩에서 글자로 2026-09-22).
+ *  사진이 도면을 이긴다 — 자리는 한 칸뿐이고 「사진」이라 적혀 있으면 실물이 나와야 한다.
+ *  파일 자리가 꺼져 있으면(배포 전 스토리지 미설정) 아무것도 안 단다 */
 function photoTag(c: NoticeComplex): { label: string; title: string; photo: boolean } | null {
   if (!photoBadgeOn(sourceOf(c))) return null;
-  if (c.has_photo) return { label: "사진", title: "단지 전경과 실내 사진이 있습니다", photo: true };
-  if (c.has_plan) return { label: "도면", title: "평면도나 층별 도면이 있습니다", photo: false };
+  if (c.has_photo) return { label: "사진 있음", title: "단지 전경과 실내 사진이 있습니다", photo: true };
+  if (c.has_plan) return { label: "도면 있음", title: "평면도나 층별 도면이 있습니다", photo: false };
   return null;
 }
 
@@ -351,11 +352,12 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
                   <span className="cx-row-main">
                     <span className="cx-name">
                       <Trunc text={c.name} />
-                      {/* 호수는 이름 바로 옆(사용자 요청 2026-09-22) — 오른쪽 줄 회색 글자로는 늦게 읽혔다 */}
-                      {hasUnits && c.unit_count != null && <span className="chip units">{num(c.unit_count, "호")}</span>}
+                      {/* 호수와 사진은 이름 옆이되 칩이 아니라 글자다(사용자 지적 2026-09-22) —
+                          알약이 셋씩 붙으면 정작 이름이 안 읽힌다 */}
+                      {hasUnits && c.unit_count != null && <span className="cx-units">{num(c.unit_count, "호")}</span>}
                       {c.is_new && <span className="chip new">신규</span>}
                       {tag && (
-                        <span className={`chip pic${tag.photo ? " on" : ""}`} title={tag.title}>
+                        <span className={`cx-pic${tag.photo ? " on" : ""}`} title={tag.title}>
                           {tag.photo && <IconPhoto width={11} height={11} />}{tag.label}
                         </span>
                       )}
