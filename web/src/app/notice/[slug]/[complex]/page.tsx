@@ -13,6 +13,7 @@
 //   제원 카드   = 그 어디에도 없는 값(공용/계약면적·난방·구조·승강기·계약금/잔금). 공급유형이 한 줄이면 그 줄도 여기로 흡수
 //   공급현황 표 = 공급유형이 두 줄 이상일 때만 — 줄마다 다른 값(호수·금액·면적)을 견주는 자리
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalcSeed } from "@/components/calc-context";
@@ -85,14 +86,31 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-/** 요약 스트립 한 칸. 값이 없으면 「준비 중」이라고 쓴다 — 칸을 비워 두면 왜 없는지 알 수 없다 */
-function Kpi({ label, value, sub }: { label: string; value: string | null; sub?: string | null }) {
+/**
+ * 요약 스트립 한 칸. 값이 없으면 「준비 중」이라고 쓴다 — 칸을 비워 두면 왜 없는지 알 수 없다.
+ *
+ * 2026-09-22: 밑에 따로 있던 「공급 정보」 제원 표(SpecList)를 이 스트립에 합쳤다(사용자 요청).
+ * 두 영역이 라벨+값이라는 같은 모양인데 칸 크기만 달라 지면을 두 번 먹고 있었다.
+ * 금액·면적·호수처럼 먼저 읽을 값은 그대로 크게, 합쳐 온 제원은 `sm`으로 한 단 작게 쓴다.
+ */
+function Kpi({ label, value, sub, term, sm }: {
+  label: string;
+  value: ReactNode;
+  sub?: string | null;
+  /** 라벨을 줄여 쓴 자리에서 어느 사전 표제어인지 알려 준다(「공가 배분」 → 공가) */
+  term?: string;
+  sm?: boolean;
+}) {
+  const empty = value === null || value === undefined || value === "";
+  // 긴 값(계약금 범위 「965만 6,000원~1,252만 8,000원」처럼)은 두 칸을 쓴다 —
+  // 한 칸에 우겨넣으면 세 줄로 접혀 스트립 전체가 그만큼 키가 큰다(사용자 지적 2026-09-22)
+  const wide = typeof value === "string" && value.length >= 12;
   return (
-    <div className={`kpi-i${value ? "" : " off"}`}>
+    <div className={`kpi-i${empty ? " off" : ""}${sm ? " sm" : ""}${wide ? " w2" : ""}`}>
       {/* 라벨이 사전에 있는 말이면 스스로 용어 링크가 된다 */}
-      <span><TermText>{label}</TermText></span>
-      <b>{value ?? "준비 중"}</b>
-      {value && sub && <em>{sub}</em>}
+      <span>{term ? <Term as={label}>{term}</Term> : <TermText>{label}</TermText>}</span>
+      <b>{empty ? "준비 중" : value}</b>
+      {!empty && sub && <em>{sub}</em>}
     </div>
   );
 }
@@ -178,6 +196,15 @@ export default async function ComplexPage({ params }: Params) {
   const payInPriceTable = slideGroups.length === 0 && priceBreak.some((r) => r.group === "pay");
   // 별첨에 동 표기가 있는 단지만 「동호수별」이다 — 다세대·빌라는 호만 실린다(사용자 지적 2026-09-09)
   const unitLabel = units.some((u) => u.building) ? "동호수별 정보" : "호실별 정보";
+
+  // 「최소」 꼬리표는 값이 실제로 갈릴 때만 붙인다 — 한 호실짜리 단지에서 「최소」는 거짓 신호다
+  // (사용자 지적 2026-09-22: 해가온은 호실이 하나인데 보증금 밑에 「최소」가 붙어 있었다)
+  const varies = (vals: (number | null)[]): boolean => {
+    const v = vals.filter((x): x is number => x != null);
+    return v.length > 1 && Math.min(...v) !== Math.max(...v);
+  };
+  const depositSub = varies([...units.map((u) => u.deposit), ...supply.map((s) => s.deposit)]) ? "최소" : null;
+  const rentSub = varies([...units.map((u) => u.rent), ...supply.map((s) => s.rent)]) ? "최소" : null;
   const hasFacts = supply.length > 0 || units.length > 0;
 
   // 요약 스트립·태그 줄·공급현황 표와 겹치지 않는 값만 남긴다. 전부 비면 표 자체를 그리지 않는다
@@ -270,37 +297,36 @@ export default async function ComplexPage({ params }: Params) {
             <p className="d-sub">{full}</p>
           </header>
 
-          {/* 핵심 값 먼저 — 어떤 표를 읽어야 할지 정하기 전에 이 다섯 칸이 답을 준다(사용자 요청 2026-09-09) */}
+          {/* 핵심 값 먼저 — 어떤 표를 읽어야 할지 정하기 전에 이 칸들이 답을 준다(사용자 요청 2026-09-09).
+              2026-09-22부터 밑에 따로 있던 「공급 정보」 제원 표도 여기로 합쳤다(사용자 요청) —
+              같은 라벨+값 모양이 두 블록으로 나뉘어 지면을 두 번 먹고 있었다. 앞이 크고 뒤가 작다 */}
           <div className="kpi">
             <Kpi
               label={showRent ? "보증금" : "전세금"}
               value={c.min_deposit != null ? wonKo(c.min_deposit) : null}
-              sub={c.min_deposit != null ? "최소" : null}
+              sub={depositSub}
             />
-            <Kpi label="월임대료" value={c.min_rent != null ? wonKo(c.min_rent) : hasFacts && !hasRent ? "없음" : null} sub={c.min_rent != null ? "최소" : "전세형"} />
+            <Kpi label="월임대료" value={c.min_rent != null ? wonKo(c.min_rent) : hasFacts && !hasRent ? "없음" : null} sub={c.min_rent != null ? rentSub : "전세형"} />
             <Kpi label="전용면적" value={area} />
             <Kpi label="공급 호수" value={unitCount != null ? num(unitCount, "호") : null} sub={unitSub} />
             <Kpi label="입주 시작" value={moveIn} sub={moveIn ? "공고문 예정일" : null} />
+            {/* 한 줄짜리 공급의 우선/일반 배분. 위 「공급 호수」는 합만 말한다 */}
+            {one && oneSplit && (
+              <Kpi
+                sm
+                label="공가 배분"
+                term="공가"
+                value={<><Term as="우선">우선공급</Term> {num(one.units_priority ?? 0, "호")} / <Term as="일반">일반공급</Term> {num(one.units_general ?? 0, "호")}</>}
+              />
+            )}
+            {specs.map(([label, value, term]) => <Kpi key={label} sm label={label} value={value} term={term} />)}
           </div>
 
-          {/* 제원과 공급현황은 한 섹션이다 — 같은 표를 세로/가로로 두 번 나눠 보여줄 이유가 없다(사용자 요청 2026-09-09) */}
+          {/* 제원은 위 요약 스트립으로 올라갔다(2026-09-22) — 여기 남는 건 여러 줄짜리 공급현황 표와
+              포털이 주는 단지 정보뿐이라, 둘 다 없으면 섹션 자체를 그리지 않는다 */}
+          {(supply.length > 1 || houseSpecs.length > 0 || (supply.length === 0 && units.length === 0)) && (
           <section className="dsec">
             <h2>공급 정보</h2>
-            {/* 단지명·주소·지역은 머리글이, 공급 구분·유형은 태그 줄이, 호수와 배분·금액·전용면적·입주 시작은 위 요약
-                스트립이 이미 말했다 — 여기 남기는 건 그 어디에도 없는 값뿐이다(사용자 지적 2026-09-09·09-14: 겹치는 정보 없애기) */}
-            {(specs.length > 0 || oneSplit) && (
-              <SpecList>
-                {/* 한 줄짜리 공급의 우선/일반 배분. 요약 스트립은 합(공가)만 말한다 */}
-                {one && oneSplit && (
-                  <Spec
-                    label="공가 배분"
-                    term="공가"
-                    value={<><Term as="우선">우선공급</Term> {num(one.units_priority ?? 0, "호")} / <Term as="일반">일반공급</Term> {num(one.units_general ?? 0, "호")}</>}
-                  />
-                )}
-                {specs.map(([label, value, term]) => <Spec key={label} label={label} value={value} term={term} />)}
-              </SpecList>
-            )}
 
             {/* 공급유형이 둘 이상일 때만 표 — 줄마다 다른 호수·금액·면적을 견준다. 한 줄이면 위 카드가 전부다 */}
             {supply.length > 1 && (
@@ -336,11 +362,8 @@ export default async function ComplexPage({ params }: Params) {
                 </p>
               </div>
             )}
-            {!maint && (
-              <p className="note">주차장과 관리비, 주차 요금은 공고문 첨부에 실리지 않아 아직 싣지 못합니다. 계약 전에 관리사무소나 {L.originalDoc}에서 확인하세요.</p>
-            )}
-            {units.length > 0 && <p className="note" style={{ marginTop: 4 }}>호실별 층, 구조, 승강기, 금액은 아래 「{unitLabel}」에 있습니다.</p>}
           </section>
+          )}
 
           {/* 사진·도면은 공급현황 바로 뒤 — 어떤 주택형이 나왔는지 본 다음 그 형의 평면도를 본다.
               단지 코드가 안 붙은 단지와 기관이 자료를 안 올린 단지는 섹션을 감추지 않고 왜 비었는지 말한다.
