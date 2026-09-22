@@ -27,8 +27,10 @@ const DEFAULT: Profile = {
   incomeSelfWon: 300 * MAN,
   incomeHouseholdWon: 300 * MAN,
   assetMan: 15_000,
+  assetSelfMan: 15_000,
   carMan: 0,
   homeless: true,
+  homelessSelf: true,
   classes: ["청년"],
   residence: "",
 };
@@ -55,6 +57,20 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
     setP(next);
     patch(fromElig(next, rules.tiers));
   };
+  // 본인 칸과 세대 칸은 서로를 거스를 수 없다. 한 번에 둘을 고쳐야 해서 set()을 두 번 부르지 않는다 —
+  // 두 번 부르면 앞의 setP가 만든 next를 뒤가 모르고 옛 p 위에 덮는다
+  const setPair = (patchIn: Partial<Profile>) => {
+    const next = { ...p, ...patchIn };
+    setP(next);
+    patch(fromElig(next, rules.tiers));
+  };
+  /** 본인이 집을 가졌으면 세대도 가진 것이다 */
+  const setHomelessSelf = (v: boolean) => setPair(v ? { homelessSelf: true } : { homelessSelf: false, homeless: false });
+  /** 본인 자산은 세대 자산의 일부다 — 본인을 올리면 세대를 같이 밀어 올린다 */
+  const setAssetSelf = (v: number) => setPair({ assetSelfMan: v, ...(v > p.assetMan ? { assetMan: v } : {}) });
+  /** 세대를 본인 아래로 내리면 본인도 따라 내린다 */
+  const setAssetHousehold = (v: number) => setPair({ assetMan: v, ...(v < p.assetSelfMan ? { assetSelfMan: v } : {}) });
+
   const jgList = rules.janggi ?? [];
   // 기준 회차 — 기본은 맨 앞(최신). 회차를 바꾸면 그 공고문의 표로 다시 푼다
   const [jgSlug, setJgSlug] = useState<string>(() => jgList[0]?.slug ?? "");
@@ -149,7 +165,10 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
           <Num label="가구원 수" value={p.household} unit="명" onChange={(v) => set("household", v)} min={1} max={HOUSEHOLD_MAX} />
           <Num label="본인 월소득" value={Math.round(p.incomeSelfWon / MAN)} unit="만 원" onChange={(v) => set("incomeSelfWon", v * MAN)} max={100_000} />
           <Num label="세대 합산 월소득" value={Math.round(p.incomeHouseholdWon / MAN)} unit="만 원" onChange={(v) => set("incomeHouseholdWon", v * MAN)} max={100_000} />
-          <Num label="총자산" value={p.assetMan} unit="만 원" onChange={(v) => set("assetMan", v)} max={1_000_000} />
+          {/* 자산을 두 칸으로 나눈 건 시드가 asset_scope를 「본인」 5개와 「세대」 17개로 갈라 두었기 때문이다.
+              한 칸으로 보면 부모와 사는 청년이 세대 자산 때문에 청년 유형까지 떨어진다(2026-09-22 정정) */}
+          <Num label="본인 총자산" value={p.assetSelfMan} unit="만 원" onChange={(v) => setAssetSelf(v)} max={1_000_000} />
+          <Num label="세대 총자산" value={p.assetMan} unit="만 원" onChange={(v) => setAssetHousehold(v)} max={1_000_000} />
           <Num label="자동차가액" value={p.carMan} unit="만 원" onChange={(v) => set("carMan", v)} max={100_000} />
           <div className="elig-f">
             <span>거주지</span>
@@ -164,10 +183,18 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
         </div>
 
         <div className="elig-checks">
+          {/* 무주택도 시드가 「본인」 8개와 「세대원」 24개로 갈라 두었다. 본인이 유주택이면 세대도 유주택이라
+              세대 칸은 본인이 무주택일 때만 묻는다 — 질문을 하나라도 줄인다 */}
           <label className="elig-chk">
-            <input type="checkbox" checked={p.homeless} onChange={(e) => set("homeless", e.target.checked)} />
-            <span>무주택이다</span>
+            <input type="checkbox" checked={p.homelessSelf} onChange={(e) => setHomelessSelf(e.target.checked)} />
+            <span>본인 명의 주택이 없다</span>
           </label>
+          {p.homelessSelf && (
+            <label className="elig-chk">
+              <input type="checkbox" checked={p.homeless} onChange={(e) => set("homeless", e.target.checked)} />
+              <span>세대원(부모 등) 명의 주택도 없다</span>
+            </label>
+          )}
           <label className="elig-chk">
             <input type="checkbox" checked={p.hasNewborn} onChange={(e) => set("hasNewborn", e.target.checked)} />
             <span>2세 이하 자녀가 있다</span>

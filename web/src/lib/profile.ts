@@ -30,11 +30,16 @@ export type UserProfile = {
   incomeSelfWon: number;
   /** 세대 합산 월소득(원) */
   incomeHouseholdWon: number;
-  /** 총자산(만원) */
+  /** 세대 총자산(만원). 유형 대부분이 이 칸을 본다 */
   assetMan: number;
+  /** 본인 총자산(만원). asset_scope가 「본인」인 청년 계열 5개만 본다 */
+  assetSelfMan: number;
   /** 자동차가액(만원) */
   carMan: number;
+  /** 세대 기준 무주택(세대원 전원) */
   homeless: boolean;
+  /** 본인 명의 무주택. homeless_scope가 「본인」인 청년 계열 8개가 본다 */
+  homelessSelf: boolean;
   /** 자가진단 어휘의 거주지 — 시군구 이름 | "그 외 지역" | "" */
   region: string;
   /** 공고 폼 어휘의 거주지 — 서울 자치구 | "연접" | "경기기타" | "기타" | "" */
@@ -70,8 +75,10 @@ export const DEFAULT_PROFILE: UserProfile = {
   incomeSelfWon: 300 * MAN,
   incomeHouseholdWon: 300 * MAN,
   assetMan: 15_000,
+  assetSelfMan: 15_000,
   carMan: 0,
   homeless: true,
+  homelessSelf: true,
   region: "",
   gu: "",
   residenceYears: 3,
@@ -107,6 +114,7 @@ const NUM_RANGE: Record<string, [number, number]> = {
   incomeSelfWon: [0, 100_000 * MAN],
   incomeHouseholdWon: [0, 100_000 * MAN],
   assetMan: [0, 1_000_000],
+  assetSelfMan: [0, 1_000_000],
   carMan: [0, 100_000],
   residenceYears: [0, 80],
   newborns: [0, 10],
@@ -140,6 +148,12 @@ export function sanitizeProfile(raw: unknown, keepSensitive = true): UserProfile
     ? o.classes.filter((c): c is string => typeof c === "string" && c.length > 0 && c.length <= MAX_TEXT).slice(0, MAX_CLASSES)
     : d.classes;
   const bool = (k: keyof UserProfile) => (typeof o[k] === "boolean" ? (o[k] as boolean) : (d[k] as boolean));
+  // 본인 칸이 없는 저장분(2026-09-22 이전)은 **세대 값을 그대로 복사한다.** 기본값을 넣으면
+  // 「세대에 집이 있다」고 적어 둔 사람이 갑자기 본인 무주택으로 바뀌어 판정이 조용히 달라진다.
+  const homeless = bool("homeless");
+  const assetMan = clampNum("assetMan", o.assetMan, d.assetMan);
+  const homelessSelf = typeof o.homelessSelf === "boolean" ? o.homelessSelf : homeless;
+  const assetSelfMan = typeof o.assetSelfMan === "number" ? clampNum("assetSelfMan", o.assetSelfMan, assetMan) : assetMan;
   return {
     age: clampNum("age", o.age, d.age),
     marital: MARITALS.includes(o.marital as Marital) ? (o.marital as Marital) : d.marital,
@@ -147,9 +161,11 @@ export function sanitizeProfile(raw: unknown, keepSensitive = true): UserProfile
     household: clampNum("household", o.household, d.household),
     incomeSelfWon: clampNum("incomeSelfWon", o.incomeSelfWon, d.incomeSelfWon),
     incomeHouseholdWon: clampNum("incomeHouseholdWon", o.incomeHouseholdWon, d.incomeHouseholdWon),
-    assetMan: clampNum("assetMan", o.assetMan, d.assetMan),
+    assetMan,
+    assetSelfMan,
     carMan: clampNum("carMan", o.carMan, d.carMan),
-    homeless: bool("homeless"),
+    homeless,
+    homelessSelf,
     region: text(o.region, d.region),
     gu: text(o.gu, d.gu),
     residenceYears: clampNum("residenceYears", o.residenceYears, d.residenceYears),
@@ -239,8 +255,10 @@ export function toElig(p: UserProfile): Profile {
     incomeSelfWon: p.incomeSelfWon,
     incomeHouseholdWon: p.incomeHouseholdWon,
     assetMan: p.assetMan,
+    assetSelfMan: p.assetSelfMan,
     carMan: p.carMan,
     homeless: p.homeless,
+    homelessSelf: p.homelessSelf,
     classes: p.classes,
     residence: p.region,
   };
@@ -257,8 +275,10 @@ export function fromElig(v: Profile, tiers: RegionTier[]): Partial<UserProfile> 
     incomeSelfWon: v.incomeSelfWon,
     incomeHouseholdWon: v.incomeHouseholdWon,
     assetMan: v.assetMan,
+    assetSelfMan: v.assetSelfMan,
     carMan: v.carMan,
     homeless: v.homeless,
+    homelessSelf: v.homelessSelf,
     classes: v.classes,
     region: v.residence,
     gu: regionToGu(v.residence, tiers),
@@ -345,7 +365,10 @@ export function fromMingan(v: MinganProfile, tiers: RegionTier[], prev: UserProf
     incomeHouseholdWon: v.incomeWon,
     assetMan: v.assetMan,
     carMan: v.carMan,
+    // 민간 화면의 체크 하나가 「본인 무주택(특별공급은 세대원 전부)」를 겸한다 — 둘 다에 같은 값을 쓴다.
+    // 한쪽만 쓰면 여기서 끄고 자가진단으로 갔을 때 청년 유형만 무주택으로 남는 이상한 상태가 된다
     homeless: v.homeless,
+    homelessSelf: v.homeless,
     gu,
     // 계층 칩은 자가진단 쪽 목록이 더 넓다 — 민간에서 고른 하나를 넣되 나머지는 그대로 둔다
     classes: [...new Set([...prev.classes.filter((c) => !(MINGAN_CLASSES as readonly string[]).includes(c)), v.cls])],

@@ -22,9 +22,15 @@ export type Profile = {
   incomeHouseholdWon: number;
   /** 총자산(만원) */
   assetMan: number;
+  /** 본인 총자산(만원). asset_scope가 「본인」인 5개 유형(대학생·청년 계열)만 이 칸을 본다 */
+  assetSelfMan: number;
   /** 자동차가액(만원). 0이면 미소유 */
   carMan: number;
+  /** 세대 기준 무주택 — homeless_scope가 「세대원」인 24개 유형이 본다 */
   homeless: boolean;
+  /** 본인 명의 무주택 — homeless_scope가 「본인」인 8개 유형(청년 계열)이 본다.
+   *  세대가 무주택이면 본인도 당연히 무주택이라, 엔진은 `homelessSelf || homeless`로 본다 */
+  homelessSelf: boolean;
   /** 해당하는 계층. 유형 사양의 필수계층·나이면제조건과 같은 말을 쓴다 */
   classes: string[];
   /** 거주지 시군구 또는 시도 */
@@ -137,12 +143,19 @@ function checkIncome(t: SupplyType, p: Profile, limit: number | null): Check | n
   };
 }
 
+/** 자산을 누구 것으로 보나. 「본인」은 청년 계열 5개뿐이고 나머지는 세대 기준이다.
+ *  부모와 사는 청년이 세대 자산 때문에 청년 유형까지 떨어지던 자리다(2026-09-22 정정). */
+function assetOf(scope: string, p: Profile): number {
+  return scope === "본인" ? p.assetSelfMan : p.assetMan;
+}
+
 function checkAsset(t: SupplyType, p: Profile): Check | null {
   if (t.asset_limit_man === null) return null;
+  const mine = assetOf(t.asset_scope, p);
   return {
     label: "자산",
-    ok: p.assetMan <= t.asset_limit_man,
-    detail: `${t.asset_scope} 총자산 ${man(t.asset_limit_man)} 이하, 입력 ${man(p.assetMan)}`,
+    ok: mine <= t.asset_limit_man,
+    detail: `${t.asset_scope} 총자산 ${man(t.asset_limit_man)} 이하, 입력 ${man(mine)}`,
   };
 }
 
@@ -158,8 +171,21 @@ function checkCar(t: SupplyType, p: Profile): Check | null {
   };
 }
 
+/**
+ * 무주택을 누구 기준으로 보나. 시드가 「본인」 8개와 「세대원」 24개로 갈라 두었는데
+ * 전에는 이 칸을 안 보고 세대 기준 하나로만 판정했다 — **부모가 집을 가진 청년이
+ * 청년 매입임대·행복주택 대학생까지 전부 미달로 떨어졌다**(2026-09-22 정정).
+ *
+ * 세대가 무주택이면 본인도 무주택이므로 `homelessSelf || homeless`로 본다.
+ * 옛 저장분은 `homelessSelf`가 없어 sanitize가 `homeless` 값을 복사해 넣는다 — 판정이 그대로 유지된다.
+ */
 function checkHomeless(t: SupplyType, p: Profile): Check {
-  return { label: "무주택", ok: p.homeless, detail: `${t.homeless_scope} 기준 무주택이어야 한다` };
+  const self = t.homeless_scope === "본인";
+  const ok = self ? p.homelessSelf || p.homeless : p.homeless;
+  const input = self
+    ? `본인 명의 주택 ${p.homelessSelf || p.homeless ? "없음" : "있음"}`
+    : `세대 안에 주택 ${p.homeless ? "없음" : "있음"}`;
+  return { label: "무주택", ok, detail: `${t.homeless_scope} 기준 무주택이어야 한다. 입력 ${input}` };
 }
 
 function checkRegion(t: SupplyType, p: Profile, tier: string): Check | null {
