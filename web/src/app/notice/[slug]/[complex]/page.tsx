@@ -462,9 +462,6 @@ export default async function ComplexPage({ params }: Params) {
           {minganRules && !noticeElig && supply.length > 0 && (
             <section className="dsec lead" id="fit">
               <h2>내 조건에 맞는 주택형</h2>
-              <p className="note" style={{ margin: "0 0 12px" }}>
-                청년안심주택 민간임대의 소득과 자산, 순위 기준에 내 조건을 대 보고 넣을 수 있는 주택형을 추립니다. 값은 어디로도 보내지 않습니다.
-              </p>
               <NoticeFitMingan
                 supply={supply} types={minganRules.types} income={minganRules.income} tiers={minganRules.tiers}
                 complexGu={c.sigungu ?? null} incomeYear={minganRules.incomeYear}
@@ -476,9 +473,6 @@ export default async function ComplexPage({ params }: Params) {
           {noticeElig && eligRules && (
             <section className="dsec lead" id="fit">
               <h2>내 조건에 맞는 단지</h2>
-              <p className="note" style={{ margin: "0 0 12px" }}>
-                이 공고문의 소득과 자산, 순위 기준에 내 조건을 대 보고 이 단지가 드는지, 같은 공고의 다른 단지는 어디가 맞는지 추립니다. 값은 어디로도 보내지 않습니다.
-              </p>
               <NoticeFit data={noticeElig.data} complexes={siblings} supply={noticeSupply} income={eligRules.income} tiers={eligRules.tiers} noticeSlug={n.slug} currentId={c.id} prior={prior} />
             </section>
           )}

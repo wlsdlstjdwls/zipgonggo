@@ -424,9 +424,6 @@ export default async function NoticePage({ params }: Params) {
           {noticeElig && (
             <section className="dsec lead" id="fit">
               <h2>내 조건에 맞는 단지</h2>
-              <p className="note" style={{ margin: "0 0 12px" }}>
-                이 공고문의 소득과 자산, 순위 기준에 내 조건을 대 보고 맞는 단지를 추립니다. 값은 어디로도 보내지 않습니다.
-              </p>
               <NoticeFit data={noticeElig.data} complexes={complexes} supply={supply} income={eligRules.income} tiers={eligRules.tiers} noticeSlug={n.slug} prior={prior} />
             </section>
           )}
@@ -434,9 +431,6 @@ export default async function NoticePage({ params }: Params) {
           {minganFit && (
             <section className="dsec lead" id="fit">
               <h2>내 조건에 맞는 주택형</h2>
-              <p className="note" style={{ margin: "0 0 12px" }}>
-                청년안심주택 민간임대의 소득과 자산, 순위 기준에 내 조건을 대 보고 넣을 수 있는 주택형을 추립니다. 값은 어디로도 보내지 않습니다.
-              </p>
               <NoticeFitMingan
                 supply={supply} types={eligRules.types} income={eligRules.income} tiers={eligRules.tiers}
                 complexGu={complexes[0]?.sigungu ?? n.sigungu ?? null} incomeYear={eligRules.incomeYear} noticeYear={noticeYear}
