@@ -236,8 +236,16 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
           {p.marital === "예비신혼부부" && (
             <label className="elig-f">
               <span>혼인 예정일</span>
-              <span className="elig-in">
-                <input type="date" value={p.weddingAt} onChange={(e) => set("weddingAt", e.target.value)} />
+              <span className="elig-in elig-date">
+                {/* 칸 아무 데나 눌러도 달력이 열리게 한다 — 네이티브는 달력 아이콘만 눌러야 열려서
+                    나머지 폭이 죽은 자리처럼 느껴진다. showPicker가 없는 브라우저는 그냥 지나간다 */}
+                <input
+                  type="date"
+                  className={p.weddingAt ? "" : "empty"}
+                  value={p.weddingAt}
+                  onChange={(e) => set("weddingAt", e.target.value)}
+                  onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch { /* 사용자 제스처가 아니면 조용히 넘긴다 */ } }}
+                />
               </span>
             </label>
           )}

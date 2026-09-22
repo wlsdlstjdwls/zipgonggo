@@ -1618,6 +1618,20 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-in input:focus { outline: none; }
 .elig-in:focus-within { border-color: var(--acc); }
 .elig-in em { flex: none; font-style: normal; font-weight: 700; font-size: 12.5px; color: var(--dim); }
+
+/* 날짜 칸 — 네이티브 date 입력을 숫자 칸과 같은 톤으로 맞춘다. 브라우저 기본 스핀 버튼과
+   달력 아이콘은 제 색·제 크기라 그냥 두면 이 칸만 튄다(사용자 지적 2026-09-22) */
+.elig-date { cursor: pointer; }
+.elig-date input { cursor: pointer; color: var(--ink); }
+/* 값이 비면 「연도-월-일」 자리표시가 본문처럼 진하다 — 셀렉트의 placeholder와 같은 회색으로 낮춘다 */
+.elig-date input.empty { color: var(--dim); }
+.elig-date input::-webkit-datetime-edit { padding: 0; }
+.elig-date input::-webkit-inner-spin-button, .elig-date input::-webkit-clear-button { display: none; }
+.elig-date input::-webkit-calendar-picker-indicator {
+  flex: none; width: 15px; height: 15px; margin: 0; padding: 0; opacity: 0.85; cursor: pointer;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 16 16' fill='none' stroke='%235f6672' stroke-width='1.6' stroke-linecap='round'%3E%3Crect x='2.2' y='3.2' width='11.6' height='10.6' rx='2'/%3E%3Cpath d='M5.2 1.8v2.4M10.8 1.8v2.4M2.2 6.6h11.6'/%3E%3C/svg%3E") no-repeat center / 15px 15px;
+}
+.elig-date:focus-within input::-webkit-calendar-picker-indicator { opacity: 1; }
 /* 거주지는 톤앤매너를 맞춘 공용 Select(components/select.tsx)를 쓴다 — OS 기본 드롭다운이 아니다.
    기본은 내용 폭만 차지해(inline-flex) 좁은 폼 칸 안에서 오그라들어 보였다(사용자 지적 2026-09-09) */
 .elig-f .selw, .elig-f .sel { width: 100%; }
