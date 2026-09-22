@@ -1596,7 +1596,18 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   min-height: 0; height: 100%;
   overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
 }
-.elig-form { display: flex; flex-direction: column; gap: 18px; padding-right: 4px; }
+.elig-form { display: flex; flex-direction: column; gap: 13px; padding-right: 4px; }
+/* 조건 칸은 한 판에 다 들어가는 게 목표다(사용자 요청 2026-09-22) — 이 칼럼 안에서만 치수를 줄인다.
+   .elig-grid·.elig-in은 공고 지면의 「내 조건」(fit-form)도 쓰는 클래스라 바깥으로 새면 안 된다 */
+.elig-form .elig-grid { gap: 9px; }
+.elig-form .elig-in, .elig-form .elig-seg button, .elig-form .sel { height: 34px; }
+.elig-form .elig-f { gap: 4px; }
+.elig-form .elig-f > span:first-child { font-size: 12px; }
+.elig-form .elig-checks { gap: 6px 14px; }
+.elig-form .elig-chk { font-size: 13.5px; }
+.elig-form .elig-cls legend { padding-bottom: 6px; }
+.elig-form .elig-chips { gap: 5px; }
+.elig-form .elig-chip { padding: 4px 9px; font-size: 13px; }
 .elig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .elig-f { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 /* 혼인 상태처럼 선택지가 3개로 늘면 반 칸(1fr)에선 글자가 눌린다 — 그 줄만 폭 전체를 쓴다 */

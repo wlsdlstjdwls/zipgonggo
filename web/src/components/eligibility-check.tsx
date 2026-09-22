@@ -12,7 +12,7 @@ import { classOptions, diagnoseAll, HOUSEHOLD_MAX, type Marital, type Profile, t
 import { fitJanggi, type FitProfile, type FitVerdict } from "@/lib/notice-fit";
 import { dateMD, daysUntil } from "@/lib/format";
 import { fromElig, reconcileRegion, toElig } from "@/lib/profile";
-import type { OpenSoonNotice, TypeHub } from "@/lib/queries";
+import type { OpenSoonNotice, ResidenceArea, TypeHub } from "@/lib/queries";
 import { noticePath, typePath } from "@/lib/routes";
 import { SIDOS, sidoShort } from "@/lib/sido";
 import type { EligibilityRules, JanggiRule } from "@/types/eligibility";
@@ -25,6 +25,7 @@ const DEFAULT: Profile = {
   age: 30,
   marital: "미혼",
   marriedYears: 0,
+  weddingAt: "",
   hasNewborn: false,
   household: 1,
   incomeSelfWon: 300 * MAN,
@@ -47,12 +48,14 @@ type JanggiExtra = { dual: boolean; newborns: number; olderMinor: boolean; depos
 /** 결과에 붙일 「지금 열린 공고」에 몇 줄까지 보일지. 나머지는 유형 지면으로 넘긴다 */
 const OPEN_ROWS = 6;
 
-export function EligibilityCheck({ rules, open = [], hubs = [] }: {
+export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
   rules: EligibilityRules;
   /** 마감 임박 순 열린 공고 한 줌. 통과한 유형만 골라 그린다 */
   open?: OpenSoonNotice[];
   /** 유형별 전국 현황 — 실어 온 한 줌에 안 들어온 공고까지 세어 「그 밖에 N건」을 적는다 */
   hubs?: TypeHub[];
+  /** 거주지 셀렉트에 세울 전국 시군구(공고가 있는 곳만) */
+  areas?: ResidenceArea[];
 }) {
   const { profile, ready: profileReady, patch } = useProfile();
   // 서버 HTML은 언제나 기본값이다 — 저장된 값은 마운트 뒤에 얹는다(하이드레이션이 어긋날 자리를 만들지 않는다)
@@ -116,7 +119,9 @@ export function EligibilityCheck({ rules, open = [], hubs = [] }: {
   const residenceOptions = useMemo(() => {
     const seen = new Set<string>();
     const out: { value: string; label: string }[] = [];
-    // 인천광역시는 연접 줄에도 있다 — 값으로도 표로도 한 번씩만 들어가게 둘 다 본다
+    // 인천광역시는 연접 줄에도 있다 — 값으로도 표로도 한 번씩만 들어가게 둘 다 본다.
+    // 시군구 이름은 시도를 건너 겹치기도 한다(고성군 강원/경남) — 먼저 들어온 쪽만 남는다.
+    // 값은 **시군구 이름 한 토막**으로 둔다: region_tier 조회(tierOf)와 공고의 sigungu 비교가 그 어휘를 쓴다
     const push = (value: string, label: string) => {
       if (seen.has(value) || seen.has(label)) return;
       seen.add(value); seen.add(label);
@@ -124,10 +129,26 @@ export function EligibilityCheck({ rules, open = [], hubs = [] }: {
     };
     for (const r of regions) push(r, r);
     for (const r of nearby) push(r, `${r} (연접지역)`);
-    // 강원도/강원특별자치도처럼 한 곳을 두 이름으로 든 줄이 있다 — 통칭이 같으면 앞의 것만 남는다
-    for (const sd of SIDOS) if (sd.name !== "서울특별시") push(sd.name, sidoShort(sd.name));
+    // 나머지는 시도별로 「전체」 한 줄 뒤에 그 시도의 시군구를 세운다. 시도 순서는 SIDOS를 따르고,
+    // 표에 없는 시도(통합특별시처럼 새로 생긴 이름)는 뒤에 붙인다
+    const bySido = new Map<string, string[]>();
+    for (const a of areas) {
+      if (a.sido === "서울특별시") continue;
+      const list = bySido.get(a.sido);
+      if (list) list.push(a.sigungu);
+      else bySido.set(a.sido, [a.sigungu]);
+    }
+    const order = (name: string) => {
+      const i = SIDOS.findIndex((sd) => sd.name === name);
+      return i < 0 ? SIDOS.length : i;
+    };
+    for (const sido of [...bySido.keys()].sort((a, b) => order(a) - order(b) || a.localeCompare(b, "ko"))) {
+      const short = sidoShort(sido);
+      push(sido, `${short} 전체`);
+      for (const gu of bySido.get(sido) ?? []) push(gu, `${short} ${gu}`);
+    }
     return out;
-  }, [regions, nearby]);
+  }, [regions, nearby, areas]);
 
   const verdicts = useMemo(() => diagnoseAll(p, rules), [p, rules]);
   const pass = verdicts.filter((v) => v.ok);
@@ -147,9 +168,10 @@ export function EligibilityCheck({ rules, open = [], hubs = [] }: {
   const mySido = useMemo(() => {
     if (!p.residence) return null;
     if (tierOf(p.residence, rules.tiers) === "서울") return "서울특별시";
-    // 시도를 골랐으면 그대로 쓴다. 시군구(연접)를 골랐으면 어느 시도인지 모르니 이름으로만 맞춘다
-    return SIDOS.some((sd) => sd.name === p.residence) ? p.residence : null;
-  }, [p.residence, rules.tiers]);
+    // 시도를 골랐으면 그대로. 시군구를 골랐으면 전국 목록에서 그 시군구의 시도를 찾는다
+    if (SIDOS.some((sd) => sd.name === p.residence)) return p.residence;
+    return areas.find((a) => a.sigungu === p.residence)?.sido ?? null;
+  }, [p.residence, rules.tiers, areas]);
   const openMine = useMemo(() => {
     const mine = open.filter((n) => passTypes.has(n.housing_type));
     if (!p.residence) return mine;
@@ -192,7 +214,9 @@ export function EligibilityCheck({ rules, open = [], hubs = [] }: {
     <div className="elig">
       <form className="elig-form" onSubmit={(e) => e.preventDefault()} aria-label="내 조건 입력">
         <div className="elig-grid">
+          {/* 나이와 가구원 수를 한 줄에 세운다 — 나이만 두면 옆칸이 비어 줄 하나를 통째로 먹는다 */}
           <Num label="나이" value={p.age} unit="세" onChange={(v) => set("age", v)} max={120} />
+          <Num label="가구원 수" value={p.household} unit="명" onChange={(v) => set("household", v)} min={1} max={HOUSEHOLD_MAX} />
           <div className="elig-f wide">
             <span>혼인 상태</span>
             {/* 혼인신고 전인 예비신혼부부도 신혼부부 유형 상당수가 받아 준다 — 미혼/기혼 둘로는 못 담는 상태다 */}
@@ -207,7 +231,16 @@ export function EligibilityCheck({ rules, open = [], hubs = [] }: {
           {p.marital === "기혼" && (
             <Num label="혼인 연차" value={p.marriedYears} unit="년차" onChange={(v) => set("marriedYears", v)} max={60} />
           )}
-          <Num label="가구원 수" value={p.household} unit="명" onChange={(v) => set("household", v)} min={1} max={HOUSEHOLD_MAX} />
+          {/* 기혼에만 칸이 뜨고 예비신혼부부에는 아무것도 없어 한쪽만 묻는 꼴이었다(사용자 지적 2026-09-22).
+              예비신혼부부는 입주 전까지 혼인신고를 마쳐야 자격이 서니 예정일을 묻는다 */}
+          {p.marital === "예비신혼부부" && (
+            <label className="elig-f">
+              <span>혼인 예정일</span>
+              <span className="elig-in">
+                <input type="date" value={p.weddingAt} onChange={(e) => set("weddingAt", e.target.value)} />
+              </span>
+            </label>
+          )}
           <Num label="본인 월소득" value={Math.round(p.incomeSelfWon / MAN)} unit="만 원" onChange={(v) => set("incomeSelfWon", v * MAN)} max={100_000} />
           <Num label="세대 합산 월소득" value={Math.round(p.incomeHouseholdWon / MAN)} unit="만 원" onChange={(v) => set("incomeHouseholdWon", v * MAN)} max={100_000} />
           {/* 자산을 두 칸으로 나눈 건 시드가 asset_scope를 「본인」 5개와 「세대」 17개로 갈라 두었기 때문이다.
@@ -318,11 +351,6 @@ export function EligibilityCheck({ rules, open = [], hubs = [] }: {
         <h2 className="mute">기준에 못 미치는 유형 <b>{fail.length}</b></h2>
         <ul className="elig-list">{fail.map((v) => <Card key={v.type.code} v={v} janggi={v.type.housing_type === "장기전세" ? jgVerdict : null} janggiRef={jg} group={jgFit?.group ?? null} />)}</ul>
 
-        <p className="elig-note">
-          도시근로자 월평균소득은 {rules.incomeYear}년 고시액 기준이다. 이 진단은 안내일 뿐 심사 결과가 아니다 —
-          실제 자격은 각 공고문과 기관 심사가 정한다. 입력한 값은 이 브라우저에 남아 공고 지면의 「내 조건」에도
-          그대로 쓰이며, 내 계정에서 저장을 켜지 않는 한 서버로 보내지 않는다.
-        </p>
       </div>
     </div>
   );

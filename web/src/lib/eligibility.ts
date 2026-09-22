@@ -13,6 +13,8 @@ export type Profile = {
   marital: Marital;
   /** 혼인 몇 년차. 기혼일 때만 본다 */
   marriedYears: number;
+  /** 예비신혼부부의 혼인(신고) 예정일 YYYY-MM-DD. 안 넣었으면 "" */
+  weddingAt: string;
   /** 2세 이하 자녀. 신혼 유형의 혼인기간 제한을 면제받는 조건 */
   hasNewborn: boolean;
   household: number;
@@ -113,7 +115,10 @@ function checkMarital(t: SupplyType, p: Profile): Check | null {
     return { label: "혼인", ok: false, detail: "혼인가구(예비신혼부부와 한부모 포함)만 신청할 수 있다" };
   }
   if (engaged) {
-    return { label: "혼인", ok: true, detail: "예비신혼부부(혼인신고 예정)로 신청할 수 있다" };
+    // 예비신혼부부는 **입주 전까지 혼인신고를 마쳐야** 자격이 선다 — 예정일을 넣었으면 그대로 적어 준다.
+    // 입주지정기간은 공고마다 다르니 여기서 가르지 않는다(공고 지면이 일정을 안다)
+    const when = p.weddingAt ? `혼인 예정일 ${p.weddingAt}` : "혼인신고 예정";
+    return { label: "혼인", ok: true, detail: `예비신혼부부(${when})로 신청할 수 있다. 입주 전까지 혼인신고를 마쳐야 한다` };
   }
   if (!t.marital_max_yr) return { label: "혼인", ok: true, detail: "혼인기간 제한 없음" };
   if (t.newborn_exempt && p.hasNewborn) {

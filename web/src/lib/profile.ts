@@ -44,6 +44,8 @@ export type UserProfile = {
   region: string;
   /** 공고 폼 어휘의 거주지 — 서울 자치구 | "연접" | "경기기타" | "기타" | "" */
   gu: string;
+  /** 예비신혼부부의 혼인(신고) 예정일 YYYY-MM-DD */
+  weddingAt: string;
   residenceYears: number;
   dual: boolean;
   /** 2023.3.28. 이후 출생 자녀 수 */
@@ -81,6 +83,7 @@ export const DEFAULT_PROFILE: UserProfile = {
   homelessSelf: true,
   region: "",
   gu: "",
+  weddingAt: "",
   residenceYears: 3,
   dual: false,
   newborns: 0,
@@ -168,6 +171,7 @@ export function sanitizeProfile(raw: unknown, keepSensitive = true): UserProfile
     homelessSelf,
     region: text(o.region, d.region),
     gu: text(o.gu, d.gu),
+    weddingAt: text(o.weddingAt, d.weddingAt),
     residenceYears: clampNum("residenceYears", o.residenceYears, d.residenceYears),
     dual: bool("dual"),
     newborns: clampNum("newborns", o.newborns, d.newborns),
@@ -250,6 +254,7 @@ export function toElig(p: UserProfile): Profile {
     age: p.age,
     marital: p.marital,
     marriedYears: p.marriedYears,
+    weddingAt: p.weddingAt,
     hasNewborn: p.under2,
     household: p.household,
     incomeSelfWon: p.incomeSelfWon,
@@ -270,6 +275,7 @@ export function fromElig(v: Profile, tiers: RegionTier[]): Partial<UserProfile> 
     age: v.age,
     marital: v.marital,
     marriedYears: v.marriedYears,
+    weddingAt: v.weddingAt,
     under2: v.hasNewborn,
     household: v.household,
     incomeSelfWon: v.incomeSelfWon,

@@ -553,6 +553,24 @@ export const listAreaTypePairs = cache(unstable_cache(
   CACHE_OPTS,
 ));
 
+export type ResidenceArea = { sido: string; sigungu: string };
+
+/**
+ * 거주지 셀렉트에 세울 전국 시군구. region_tier에는 서울 25구와 연접 13곳뿐이라
+ * 그 밖에 사는 사람은 고를 자리가 없었다(사용자 지적 2026-09-22).
+ * 공고가 한 건이라도 올라온 시군구만 — 고를 이유가 있는 데만 보인다.
+ */
+export const listResidenceAreas = cache(unstable_cache(
+  async (): Promise<ResidenceArea[]> =>
+    query<ResidenceArea>(
+      `SELECT DISTINCT sido, sigungu FROM notice_area
+        WHERE sido IS NOT NULL AND sigungu IS NOT NULL AND sigungu <> ''
+        ORDER BY sido, sigungu`,
+    ),
+  ["residence-areas-v1"],
+  CACHE_OPTS,
+));
+
 export type TypeHub = { housing_type: string; total: number; open: number; sidos: number };
 
 /** 유형별 전국 현황. /type/{유형}의 「전국 공고 현황」과 유형 목록이 같이 쓴다 */
