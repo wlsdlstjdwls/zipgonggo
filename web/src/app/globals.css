@@ -760,9 +760,26 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   transition: transform 240ms var(--sp), background 200ms var(--ease), color 200ms var(--ease); }
 .d-back:hover { transform: translateX(-2px); background: var(--line); color: var(--ink); }
 .d-tags { align-items: center; }
-.detail { display: grid; grid-template-columns: minmax(0, 1fr) 292px; }
-.detail-main { min-width: 0; }
+/* 오른쪽 패널은 두 행에 걸친다 — 왼쪽이 「지도·목록(.detail-lead)」과 「본문(.detail-main)」 두 덩이로
+   갈라져 있기 때문이다. 좁은 화면에서 지도·목록만 따로 맨 위로 올리려면 둘이 형제여야 한다(2026-09-22) */
+.detail { display: grid; grid-template-columns: minmax(0, 1fr) 292px; grid-template-rows: auto 1fr; }
+.detail-lead { grid-column: 1; grid-row: 1; min-width: 0; }
+.detail-main { grid-column: 1; grid-row: 2; min-width: 0; }
+.detail > .aside { grid-column: 2; grid-row: 1 / -1; }
 .dsec, .section { padding: 24px var(--pad); border-bottom: 1px solid var(--line); }
+/* 섹션 사이를 띠로 가른다(사용자 지적 2026-09-22: "컨텐츠 영역 구분이 잘 안 되네, 좀 애매해") —
+   1px 실선 하나는 위아래 24px 패딩 사이에 묻혀 어디서 한 덩이가 끝나는지 안 보였다.
+   상세 지면에서만 — 목록 지면의 .section은 원래 한 덩이라 띠를 넣으면 조각나 보인다 */
+.detail-lead > .dsec:last-child,
+.detail-main > .dsec:not(:last-child),
+.detail-main > .section:not(:last-child) {
+  /* 1px 실선을 9px 회색 띠로 바꾸고, 실선은 띠 위에 배경 한 줄로 다시 그린다(테두리는 한 겹뿐이라) */
+  border-bottom: 9px solid var(--sub);
+  background-image: linear-gradient(var(--line), var(--line));
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+  background-position: left bottom 9px;
+}
 /* 섹션 제목은 전부 같은 톤 — 작은 라벨(10.5px 자간 넓힘)은 제목처럼 안 읽혔다(사용자 요청 2026-09-09:
    "접수 일정처럼 타이틀 느낌나는 걸 다른 영역에도"). 왼쪽 강조 막대 + 19px 굵은 제목으로 통일한다. */
 .dsec > h2, .section > h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; font-weight: 900; font-size: 20px; line-height: 1.25; letter-spacing: -0.045em; color: var(--ink); }
@@ -816,6 +833,18 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 .step.on { background: var(--acc-soft); border-color: var(--acc); }
 .step.on > span { color: var(--acc); }
 .step.on b { color: var(--ink); }
+/* 지난 일정은 흐리게, 오늘과 앞으로의 일정에 눈이 가게(사용자 요청 2026-09-22).
+   감추지는 않는다 — 언제 무엇이 있었는지는 남은 일정을 읽는 근거다 */
+.step.past { background: var(--sub); border-color: var(--line); opacity: 0.55; }
+.step.now { background: var(--hot-soft); border-color: var(--hot); }
+.step.now > span { color: var(--hot); }
+.step.now b, .step.now b > i { color: var(--ink); }
+/* 「오늘」·「예정」·「진행 중」 꼬리표 — 날짜만으로는 어느 것이 급한지 안 읽힌다 */
+.st-flag { display: inline-flex; align-items: center; height: 17px; margin-left: 6px; padding: 0 7px; border-radius: var(--radius-pill);
+  font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: 0.02em; vertical-align: 1px; }
+.st-flag.now { background: var(--hot); color: #fff; }
+.st-flag.next { background: var(--acc); color: #fff; }
+.step.now .st-flag.now, .step.on .st-flag.next { box-shadow: 0 0 0 2px var(--bg); }
 /* 보증금·임대료 표 — 기본(headline) · pay(납부 구성, 들여쓴 하위 항목) · max(범위 위쪽 끝, 강조색) 세 그룹을 톤으로 구분한다.
    라벨을 짧게 줄이고(계약금·중도금·잔금) note는 <small>로 옆에 붙여, 예전처럼 길어서 잘려 보이던(nowrap+ellipsis) 문제를 없앤다. */
 .ptable { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
@@ -1045,7 +1074,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cs-pick { margin-bottom: 16px; }
 
 /* 칸이 둘 이상일 때의 탭. TAB_MAX를 넘으면 컴포넌트가 셀렉트(.cs-pick)로 바꾼다 */
-.cs-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 3px; margin-bottom: 16px; scrollbar-width: none; }
+/* 위아래 패딩은 호버 때 1.5px 떠오르는 버튼의 윗선을 담는 자리다 — 없으면 overflow-x:auto가 그 선을 잘라
+   버튼 위가 뚫려 보인다(사용자 지적 2026-09-22). 바깥 여백에서 같은 만큼 되돌려 자리는 그대로 둔다 */
+.cs-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; margin: -4px 0 12px; scrollbar-width: none; }
 .cs-tabs::-webkit-scrollbar { display: none; }
 .cs-tabs button {
   flex: 0 0 auto; font: inherit; font-size: 12.5px; font-weight: 800; letter-spacing: -0.02em;
@@ -1056,8 +1087,10 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cs-tabs button em { font-style: normal; font-weight: 700; font-size: 11.5px; color: var(--dim); margin-left: 5px; }
 .cs-tabs button:hover { transform: translateY(-1.5px); }
 .cs-tabs button:active { transform: scale(0.975); }
-.cs-tabs button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
-.cs-tabs button[aria-pressed="true"] em { color: var(--bg); opacity: 0.72; }
+/* 검은 칩은 「필터가 걸렸다」는 신호인데 여기는 거르는 게 아니라 늘 하나가 걸려 있는 자리다 —
+   어두운 바탕에서 글자가 묻힌다는 지적(2026-09-22)에 금액 셀렉트와 같은 강조 톤으로 바꾼다 */
+.cs-tabs button[aria-pressed="true"] { background: var(--acc-soft); border-color: var(--acc); color: var(--acc); }
+.cs-tabs button[aria-pressed="true"] em { color: var(--acc); opacity: 0.78; }
 
 /* 고른 값 — 보증금 왼쪽, 월임대료 오른쪽. 트랙 양 끝 글자와 세로로 줄이 맞는다 */
 .cs-now { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
@@ -1141,6 +1174,12 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cx-tools { position: relative; z-index: 3; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); }
 .cx-tools > * { flex: 1 1 132px; min-width: 0; }
 .cx-tools .cx-q { flex-basis: 100%; }
+/* 검색칸인 줄 모르겠다는 지적(2026-09-22) — 헤더 검색칸과 같은 돋보기를 칸 안에 넣는다.
+   래퍼가 칸 폭을 그대로 이어받아야 하므로 flex 자리를 래퍼가 맡고 input은 100%로 편다 */
+.cx-tools .cx-search { position: relative; display: flex; align-items: center; flex: 1 1 100%; }
+.cx-search .ss-ico { left: 12px; }
+.cx-search .cx-q { width: 100%; padding-left: 34px; }
+.cx-search:focus-within .ss-ico { color: var(--acc); }
 .cx-tools .selw, .cx-tools .sel { width: 100%; }
 .cx-more { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 13px; border-radius: var(--r-chip);
   border: 1px solid var(--line2); background: var(--bg); color: var(--mut); font-family: inherit; font-weight: 800; font-size: 13.5px; cursor: pointer;
@@ -1418,7 +1457,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 
 /* ── 반응형: 컨테이너 900px 한 단계 ──────────────────────── */
 @container (max-width: 900px) {
-  .detail { grid-template-columns: 1fr; }
+  /* 한 칸이 되면 격자 배치를 전부 푼다 — 안 풀면 오른쪽 패널이 없는 2열을 새로 만들어 붙는다 */
+  .detail { grid-template-columns: 1fr; grid-template-rows: none; }
+  .detail-lead, .detail-main, .detail > .aside { grid-column: 1; grid-row: auto; }
   .aside { border-left: 0; border-top: 1px solid var(--line); }
   .aside-in { position: static; }
   .hd-out .aside-in { top: auto; }
@@ -1426,6 +1467,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
      결정에 필요한 값(마감과 금액, 호수)을 제목 바로 밑으로 끌어올린다. 머리글을 두 칸 밖으로 빼 둔
      지면(.hd-out)에서만 돈다 — 단지 상세처럼 머리글이 본문 칸 안에 있는 지면은 제목보다 위로 올라가 버린다 */
   .hd-out { display: flex; flex-direction: column; }
+  /* 지도와 목록이 있는 공고는 그게 맨 위다(사용자 요청 2026-09-22) — 요약 패널보다도 먼저.
+     「어디에 몇 집이 나왔나」가 폰에서 첫 화면에 와야 할 본론이다 */
+  .hd-out > .detail-lead { order: -2; }
   .hd-out > .aside { order: -1; border-top: 0; border-bottom: 1px solid var(--line); }
   .hd-out > .aside .aside-in { padding: 14px var(--pad) 16px; gap: 10px; }
   /* D-day 카드를 누이면 요약 덩어리가 한 화면에 들어간다 */
@@ -1644,7 +1688,15 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .tl { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 0; border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
 .tl li { display: flex; align-items: baseline; gap: 12px; padding: 9px 14px; background: var(--bg); border-top: 1px solid var(--line); }
 .tl li:first-child { border-top: 0; }
-.tl li > span { flex: 0 0 132px; font-weight: 800; font-size: 12.5px; letter-spacing: 0.04em; color: var(--dim); }
+/* 흐름도 줄도 같은 규칙 — 지난 단계는 흐리고, 오늘과 다음 단계만 왼쪽에 색 막대를 세운다 */
+.tl li.past { opacity: 0.48; }
+.tl li.now { background: var(--hot-soft); box-shadow: inset 3px 0 0 var(--hot); }
+.tl li.next { background: var(--acc-soft); box-shadow: inset 3px 0 0 var(--acc); }
+.tl li.now > span { color: var(--hot); }
+.tl li.next > span { color: var(--acc); }
+/* 고정 132px이었다 — 꼬리표(「진행 중」·「다음」)가 붙는 줄이 그 칸을 넘겨 잘렸다. 최소 폭으로 바꿔
+   보통 줄의 자리맞춤은 그대로 두고 꼬리표가 있는 줄만 늘어나게 한다 */
+.tl li > span { flex: 0 0 auto; min-width: 132px; font-weight: 800; font-size: 12.5px; letter-spacing: 0.04em; color: var(--dim); }
 .tl li > b { display: flex; flex-wrap: wrap; gap: 4px 6px; font-weight: 700; font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .tl li > b i { font-style: normal; color: var(--mut); }
 .tl li > b em { font-style: normal; font-weight: 600; color: var(--dim); }

@@ -20,11 +20,30 @@ type Props = {
       단지 상세처럼 금액을 위쪽 요약 스트립이 이미 세고 있는 지면은 제원을 늘리지 않고 이 값만 따로 준다 */
   brief?: SpecRow[];
   rows: SpecRow[];
+  /** 제원 패널 밑에 붙는 두 번째 패널. 공고 상세의 「공고 정보」가 여기로 왔다(사용자 요청 2026-09-22) —
+      본문 칸에서 격자 한 판을 차지하던 값들인데, 읽고 넘기는 값이지 본문이 아니다 */
+  extra?: ReactNode;
   /** 단지 상세의 "이 페이지는 지도 앵커입니다" 같은 안내 한 줄 */
   footNote?: ReactNode;
 };
 
-export function DetailAside({ tone, ddayLabel, ddayNum, ddayNote, ddayExtra, cta, primary, brief, rows, footNote }: Props) {
+/** 오른쪽 패널의 라벨·값 묶음. 「공고 제원」과 「공고 정보」가 같은 모양을 쓴다 */
+export function AsideSpecs({ title, rows }: { title: string; rows: SpecRow[] }) {
+  return (
+    <div className="specs">
+      <span className="t">{title}</span>
+      {rows.map((r) => (
+        <div className={`r${r.value == null ? " empty" : ""}${r.lead ? " lead" : ""}`} key={r.label}>
+          <span>{r.label}</span>
+          {/* 빈칸 대신 「준비 중」— 왜 비었는지 말해 주지 않는 대시는 「없다」로 읽힌다(docs/handoff.md 표기 규칙) */}
+          <b>{r.value ?? "준비 중"}</b>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function DetailAside({ tone, ddayLabel, ddayNum, ddayNote, ddayExtra, cta, primary, brief, rows, extra, footNote }: Props) {
   // 하단 바에 세울 요약 — lead로 찍은 줄(금액과 보증금)이다. 값이 없는 줄은 바에 올릴 게 못 된다
   const bar = (brief ?? rows.filter((r) => r.lead)).filter((r) => r.value != null).slice(0, 2);
   return (
@@ -38,16 +57,8 @@ export function DetailAside({ tone, ddayLabel, ddayNum, ddayNote, ddayExtra, cta
             {ddayExtra && <em className="dcard-x">{ddayExtra}</em>}
           </div>
           {cta}
-          <div className="specs">
-            <span className="t">공고 제원</span>
-            {rows.map((r) => (
-              <div className={`r${r.value == null ? " empty" : ""}${r.lead ? " lead" : ""}`} key={r.label}>
-                <span>{r.label}</span>
-                {/* 빈칸 대신 「준비 중」— 왜 비었는지 말해 주지 않는 대시는 「없다」로 읽힌다(docs/handoff.md 표기 규칙) */}
-                <b>{r.value ?? "준비 중"}</b>
-              </div>
-            ))}
-          </div>
+          <AsideSpecs title="공고 제원" rows={rows} />
+          {extra}
           {footNote && <p className="note" style={{ margin: "12px 0 0" }}>{footNote}</p>}
         </div>
       </aside>

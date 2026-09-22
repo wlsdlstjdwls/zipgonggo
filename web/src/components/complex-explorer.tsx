@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { photoBadgeOn, sourceOf } from "@/lib/complex-images";
 import { noticeComplexPath } from "@/lib/routes";
 import { hasMapKey, type LatLng } from "@/lib/naver-maps-loader";
-import { num, wonExact, wonKo, wonShort } from "@/lib/format";
+import { num, wonShort } from "@/lib/format";
 import type { NoticeComplex } from "@/types/notice";
 import { ComplexMap, type MapItem } from "./complex-map";
 import { IconPhoto } from "./icons";
@@ -255,7 +255,14 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
     <div className="cx">
       <div className="cx-panel">
         <div className="cx-tools">
-          <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setSelected(null); }} placeholder="단지명, 주소 검색" aria-label="단지명, 주소 검색" className="fld cx-q" />
+          {/* 돋보기는 「여기에 쳐 넣을 수 있다」는 유일한 신호다 — 회색 테두리 칸만 두면 검색칸인 줄 모른다(사용자 지적 2026-09-22) */}
+          <span className="cx-search">
+            <svg className="ss-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.6-3.6" />
+            </svg>
+            <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setSelected(null); }} placeholder="단지명, 주소 검색" aria-label="단지명, 주소 검색" className="fld cx-q" />
+          </span>
           <Select
             value={gu}
             options={gus.map(([g, n]) => ({ value: g, label: g, count: n }))}
@@ -353,12 +360,11 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
                     </span>
                     <Trunc className="cx-addr" text={fullAddress(c)} />
                   </span>
+                  {/* 자치구 뱃지와 금액은 뺐다(사용자 요청 2026-09-22) — 자치구는 바로 위 주소 줄이 이미 말하고,
+                      금액은 단지 상세의 「보증금과 임대료」가 조건까지 붙여 말한다. 목록은 어디에 몇 집인지만 */}
                   <span className="cx-row-side">
-                    <span className="chip">{guLabel(c)}</span>
                     {noPin && <span className="cx-nopin">지도 미표시</span>}
                     {hasUnits && c.unit_count != null && <span className="cx-units">{num(c.unit_count, "호")}</span>}
-                    {hasUnits && c.min_deposit != null && <span className="cx-money" title={wonExact(c.min_deposit)}>보증금 {wonKo(c.min_deposit)}~</span>}
-                    {hasUnits && c.min_rent != null && <span className="cx-money" title={wonExact(c.min_rent)}>월 {wonKo(c.min_rent)}~</span>}
                   </span>
                 </button>
                 <Link href={noticeComplexPath(noticeSlug, c)} className="cx-go" aria-label={`${c.name} 상세`} title={`${c.name} 상세`}>→</Link>

@@ -6,7 +6,7 @@ import { AreaMap } from "@/components/area-map";
 import { CalcSeed } from "@/components/calc-context";
 import { ComplexExplorer } from "@/components/complex-explorer";
 import { ComplexFactsSection } from "@/components/complex-facts";
-import { DetailAside } from "@/components/detail-aside";
+import { AsideSpecs, DetailAside } from "@/components/detail-aside";
 import { DetailHeadBar } from "@/components/detail-headbar";
 import { DetailNav } from "@/components/detail-nav";
 import { ExternalLink } from "@/components/external-link";
@@ -17,13 +17,12 @@ import { NoticeFit } from "@/components/notice-fit";
 import { NoticeFitMingan } from "@/components/notice-fit-mingan";
 import { SaveButton } from "@/components/save-button";
 import { ShareButton } from "@/components/share-button";
-import { Spec, SpecList } from "@/components/spec-list";
 import { JsonLd } from "@/components/json-ld";
 import { agencyLabels } from "@/lib/agency";
 import { AREA_MIN_COUNT } from "@/lib/constants";
 import { HOUSEHOLD_MAX, ruleLines } from "@/lib/eligibility";
 import { noticeGraph } from "@/lib/jsonld";
-import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, isClosed, moneyOf, NO_DATE, num, won, wonKo, wonShort } from "@/lib/format";
+import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, isClosed, moneyOf, NO_DATE, num, todayKST, won, wonKo, wonShort } from "@/lib/format";
 import { MINGAN_INCOME_PCTS, minganRuleCards } from "@/lib/mingan-fit";
 import { recruitedTypeCodes } from "@/lib/notice-supply-type";
 import { moveInLabel } from "@/lib/notice-view";
@@ -260,8 +259,10 @@ export default async function NoticePage({ params }: Params) {
       value: at(s.start, s.start_time),
       sub: at(s.end, s.end_time),
       at: s.start,
+      /* 끝나는 날. 기간형 단계(서류 제출 09.28~09.30)는 끝날까지가 「진행 중」이다 */
+      till: s.end || s.start,
     })),
-    ...(n.announce_at ? [{ label: "당첨자 발표", value: at(n.announce_at, null), sub: null, at: n.announce_at }] : []),
+    ...(n.announce_at ? [{ label: "당첨자 발표", value: at(n.announce_at, null), sub: null, at: n.announce_at, till: n.announce_at }] : []),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
   // 카드는 사람이 달력에 적는 날짜만. 두 가지를 고쳤다(2026-09-21):
@@ -269,18 +270,38 @@ export default async function NoticePage({ params }: Params) {
   //  - 날짜를 못 읽은 공고는 「—」 카드 두 장이 자리만 먹었다 — 카드를 걷고 왜 비었는지 한 줄로 말한다
   const oneDay = Boolean(n.apply_start_at && n.apply_start_at === n.apply_end_at);
   const applyHours = [n.apply_start_tm, n.apply_end_tm].filter(Boolean).join(" ~ ") || null;
-  const keyCards: { label: string; value: Stamp; foot?: string | null; on?: boolean }[] = oneDay
-    ? [{ label: "접수", value: { date: dateK(n.apply_start_at, true), time: null }, foot: applyHours, on: true }]
+  const keyCards: { label: string; value: Stamp; foot?: string | null; from: string | null; till: string | null }[] = oneDay
+    ? [{ label: "접수", value: { date: dateK(n.apply_start_at, true), time: null }, foot: applyHours, from: n.apply_start_at, till: n.apply_start_at }]
     : [
-        ...(n.apply_start_at ? [{ label: "접수 시작", value: at(n.apply_start_at, n.apply_start_tm) as Stamp }] : []),
-        ...(n.apply_end_at ? [{ label: "접수 마감", value: at(n.apply_end_at, n.apply_end_tm) as Stamp, on: true }] : []),
+        ...(n.apply_start_at ? [{ label: "접수 시작", value: at(n.apply_start_at, n.apply_start_tm) as Stamp, from: n.apply_start_at, till: n.apply_start_at }] : []),
+        ...(n.apply_end_at ? [{ label: "접수 마감", value: at(n.apply_end_at, n.apply_end_tm) as Stamp, from: n.apply_end_at, till: n.apply_end_at }] : []),
       ];
   // 카드로 올라간 접수 날짜는 목록에서 뺀다 — 한 값은 한 곳
-  const restSteps: { label: string; value: Stamp | null; sub?: Stamp | null }[] = [
-    { label: "공고일", value: at(n.posted_at, null) },
+  const restSteps: { label: string; value: Stamp | null; sub?: Stamp | null; from?: string | null; till?: string | null }[] = [
+    { label: "공고일", value: at(n.posted_at, null), from: n.posted_at, till: n.posted_at },
     ...tail,
     ...(n.announce_at ? [] : [{ label: "당첨자 발표", value: null }]),
   ];
+
+  // 지난 일정은 흐리게, 오늘과 앞으로의 일정은 눈에 띄게(사용자 요청 2026-09-22).
+  // 「이미 지난 것보다 앞으로의 일정에 포커스」 — 지우지는 않는다. 흐름을 읽으려면 지난 단계도 있어야 한다.
+  // 기준은 KST 오늘. ISR 한 시간이라 자정 직후 최대 한 시간은 어제 기준으로 보일 수 있다 —
+  // 날짜 단위 표시라 「오늘」이 하루 어긋나는 게 전부고, 마감 판정(applyPhase)은 여기 기대지 않는다.
+  const today = todayKST();
+  type When = "past" | "now" | "ahead";
+  const whenOf = (from?: string | null, till?: string | null): When | null => {
+    const a = from ?? till;
+    const b = till ?? from;
+    if (!a || !b) return null;
+    if (b < today) return "past";
+    if (a <= today) return "now";
+    return "ahead";
+  };
+  // 「다음」 표는 하나뿐이다 — 앞으로 남은 것 중 가장 이른 하나. 여럿에 붙이면 강조가 아니라 배경이 된다
+  const keyWhen = keyCards.map((s) => whenOf(s.from, s.till));
+  const keyNext = keyWhen.indexOf("ahead");
+  const restWhen = restSteps.map((s) => whenOf(s.from, s.till));
+  const restNext = restWhen.indexOf("ahead");
 
   // 민간임대 카드(공통/특별공급/일반공급)는 **서로 대등한 유형이 아니다** — 한 제도를 세 측면으로 쪼갠 것이라
   // 공통 카드의 빈 소득 줄을 「해당 없음」으로 채우면 "소득을 안 본다"는 거짓말이 된다. 칸 맞춤은 유형 카드에만 건다
@@ -295,7 +316,6 @@ export default async function NoticePage({ params }: Params) {
     ...(noticeElig || minganFit ? [{ id: "fit", label: "내 조건" }] : []),
     ...(noticeElig || ruleCards.length > 0 ? [{ id: "eligibility", label: "신청자격" }] : []),
     ...(showAreaTable && areas.length > 0 ? [{ id: "areas", label: "지역별 호수" }] : []),
-    { id: "info", label: "공고 정보" },
   ];
 
   return (
@@ -350,16 +370,19 @@ export default async function NoticePage({ params }: Params) {
       <DetailNav items={navItems} />
 
       <div className="detail hd-out">
-        <div className="detail-main">
-
-          {complexes.length > 0 && (
+        {/* 지도와 목록은 본문 칸 **밖**의 형제다(2026-09-22) — 폰에서 이 덩이만 요약 패널보다도 위로
+            끌어올리려면 그래야 한다(사용자 요청). 넓은 화면에서는 격자 1행 1열이라 자리가 전과 같다 */}
+        {complexes.length > 0 && (
+          <div className="detail-lead">
             <section className="dsec lead" id="complexes">
               {/* 제목 줄(「공급 단지 62곳 | 1,484호」)은 탐색기 머리의 수량과 같은 말이라 뺐다(사용자 요청 2026-09-09).
                   호수는 탐색기 안 수량 줄이 이어받는다 */}
               <h2 className="sr-only">공급 단지</h2>
               <ComplexExplorer items={complexes} hasUnits={hasUnits} unitTotal={unitTotal} noticeSlug={n.slug} />
             </section>
-          )}
+          </div>
+        )}
+        <div className="detail-main">
 
           {/* 단지 탐색기가 이미 같은 곳에 핀을 찍고 있으면 그리지 않는다 — 민간임대(단지 1곳)는 공고 주소와 단지 주소가
               같아 지도가 두 번 나왔다(사용자 지적 2026-09-15). 단지가 여럿인 공고는 notice.address가 비어 있어 원래 안 그린다 */}
@@ -395,25 +418,41 @@ export default async function NoticePage({ params }: Params) {
                 {/* 달력에 적는 날짜만 카드. 나머지 단계는 한 줄씩 — 카드 여덟 장이 나란히 서면 어느 것이 급한지 안 보였다(2026-09-14) */}
                 {keyCards.length > 0 ? (
                   <div className="steps">
-                    {keyCards.map((s) => (
-                      <div key={s.label} className={`step key${s.on ? " on" : ""}`}>
-                        <span>{s.label}</span>
-                        <b><Stamped v={s.value} /></b>
-                        {s.foot && <em>{s.foot}</em>}
-                      </div>
-                    ))}
+                    {keyCards.map((s, i) => {
+                      const w = keyWhen[i];
+                      const next = w === "ahead" && i === keyNext;
+                      return (
+                        <div key={s.label} className={`step key${w === "past" ? " past" : w === "now" ? " on now" : next ? " on" : ""}`}>
+                          <span>
+                            {s.label}
+                            {w === "now" && <i className="st-flag now">오늘</i>}
+                            {next && <i className="st-flag next">예정</i>}
+                          </span>
+                          <b><Stamped v={s.value} /></b>
+                          {s.foot && <em>{s.foot}</em>}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   /* 빈 카드를 세우느니 왜 비었는지 말한다 — 공고문에서 접수 기간을 못 읽은 회차다 */
                   <p className="note" style={{ margin: "0 0 2px" }}>접수 기간은 {L.originalDoc}에서 확인하세요.</p>
                 )}
                 <ol className="tl">
-                  {restSteps.map((s) => (
-                    <li key={s.label}>
-                      <span>{s.label}</span>
-                      <b>{s.value ? <Stamped v={s.value} /> : "—"}{s.sub && <em><Stamped v={s.sub} pre=" ~ " /></em>}</b>
-                    </li>
-                  ))}
+                  {restSteps.map((s, i) => {
+                    const w = restWhen[i];
+                    const next = w === "ahead" && i === restNext;
+                    return (
+                      <li key={s.label} className={w === "past" ? "past" : w === "now" ? "now" : next ? "next" : undefined}>
+                        <span>
+                          {s.label}
+                          {w === "now" && <i className="st-flag now">진행 중</i>}
+                          {next && <i className="st-flag next">다음</i>}
+                        </span>
+                        <b>{s.value ? <Stamped v={s.value} /> : "—"}{s.sub && <em><Stamped v={s.sub} pre=" ~ " /></em>}</b>
+                      </li>
+                    );
+                  })}
                 </ol>
               </>
             ) : (
@@ -539,23 +578,6 @@ export default async function NoticePage({ params }: Params) {
             </section>
           )}
 
-          {/* 원문·포털 링크는 오른쪽 카드가 이미 준다 — 같은 링크를 두 번 걸지 않는다(사용자 요청 2026-09-09).
-              공급 구분·입주 시작·문의처도 태그 줄과 제원 패널이 이미 말한다 — 「한 값은 한 곳」(2026-09-14). 여기엔 그 밖의 값만 */}
-          <section className="dsec" id="info">
-            <h2>공고 정보</h2>
-            <SpecList>
-              <Spec label="공급 기관" value={n.agency} />
-              <Spec label="공고일" value={dateK(n.posted_at)} />
-              <Spec label="공급 유형" value={<Term>{n.housing_type}</Term>} />
-              <Spec label="단지명" value={n.complex_name} />
-              {/* 총세대수·난방·주소는 단지 정보 섹션이 더 정확한 값(마이홈 단지정보)으로 이미 말한다 —
-                  한 값은 한 곳. 두 벌을 나란히 두면 387세대와 388세대가 같은 지면에 뜬다 */}
-              {!facts && <Spec label="총세대수" value={n.total_household != null ? num(n.total_household, "세대") : null} />}
-              {!facts && <Spec label="난방" value={n.heating} />}
-              {!facts && <Spec label="주소" value={n.address} wide />}
-            </SpecList>
-          </section>
-
           <GlossaryList terms={terms} />
         </div>
 
@@ -575,6 +597,26 @@ export default async function NoticePage({ params }: Params) {
                 <ShareButton title={n.title} text={`${n.agency} | ${n.housing_type}`} />
               </div>
             </>
+          }
+          /* 본문 칸에서 격자 한 판을 먹던 「공고 정보」가 여기로 왔다(사용자 요청 2026-09-22:
+             "너무 많은 영역을 차지하는듯, 오른쪽 영역에 보여주자"). 값은 그대로다 */
+          extra={
+            <AsideSpecs
+              title="공고 정보"
+              rows={[
+                { label: "공급 기관", value: n.agency },
+                { label: "공고일", value: dateK(n.posted_at) },
+                { label: "공급 유형", value: <Term>{n.housing_type}</Term> },
+                { label: "단지명", value: n.complex_name },
+                /* 총세대수·난방·주소는 단지 정보 섹션이 더 정확한 값(마이홈 단지정보)으로 이미 말한다 —
+                   한 값은 한 곳. 두 벌을 나란히 두면 387세대와 388세대가 같은 지면에 뜬다 */
+                ...(facts ? [] : [
+                  { label: "총세대수", value: n.total_household != null ? num(n.total_household, "세대") : null },
+                  { label: "난방", value: n.heating },
+                  { label: "주소", value: n.address },
+                ]),
+              ].filter((r) => r.value != null && r.value !== "" && r.value !== "—")}
+            />
           }
           rows={[
             { label: m ? m.label : "금액", value: moneyRow ?? "원문 확인", lead: true },
