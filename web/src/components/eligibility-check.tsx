@@ -38,14 +38,8 @@ const DEFAULT: Profile = {
 };
 
 // 장기전세 세부 조건 — 순위·출생자녀·맞벌이·청약 회차. supply_type 한 줄(income_pct)로는 매트릭스를 못 푼다(handoff 0-1).
-// 기준은 장기전세 공고문의 표다. 공고마다 같은 양식이라 다음 공고에도 거의 그대로 가지만, 회차마다 소득 기준액과
-// 공급 구분이 조금씩 갈린다 — 그래서 기본은 최신 회차로 두고 화면에서 회차를 바꿔 볼 수 있게 열어 뒀다(사용자 요청 2026-09-15).
-/** 셀렉트에 걸 짧은 이름 — 「제51차 (2026.08.31)」. 회차를 못 읽으면 제목 앞머리를 쓴다 */
-function janggiLabel(o: JanggiRule): string {
-  const cha = /제\s*(\d+)\s*차/.exec(o.title);
-  const head = cha ? `제${cha[1]}차` : o.title.slice(0, 14);
-  return `${head} (${o.posted_at.replace(/-/g, ".")})`;
-}
+// 기준은 늘 **최신 회차** 공고문의 표다. 지난 회차로 바꿔 보는 칸을 뒀었지만(2026-09-15), 지금 넣을 수 있는
+// 건 최신 회차뿐이라 고를 일이 없었다 — 걷어 냈다(사용자 지적 2026-09-22). 어느 공고를 봤는지는 결과 카드가 링크로 밝힌다.
 
 type JanggiExtra = { dual: boolean; newborns: number; olderMinor: boolean; deposits: number };
 
@@ -82,17 +76,11 @@ export function EligibilityCheck({ rules, open = [], hubs = [] }: {
   /** 세대를 본인 아래로 내리면 본인도 따라 내린다 */
   const setAssetHousehold = (v: number) => setPair({ assetMan: v, ...(v < p.assetSelfMan ? { assetSelfMan: v } : {}) });
 
-  const jgList = rules.janggi ?? [];
-  // 기준 회차 — 기본은 맨 앞(최신). 회차를 바꾸면 그 공고문의 표로 다시 푼다
-  const [jgSlug, setJgSlug] = useState<string>(() => jgList[0]?.slug ?? "");
-  const jg = jgList.find((o) => o.slug === jgSlug) ?? jgList[0] ?? null;
+  // 기준 회차는 맨 앞(최신) 하나다
+  const jg: JanggiRule | null = (rules.janggi ?? [])[0] ?? null;
+  // 맞벌이·자녀·청약 회차는 여기서 묻지 않는다(사용자 요청 2026-09-22) — 장기전세 한 유형만 쓰는 값이라
+  // 칸 넷이 첫 화면을 다 먹었다. 공고 지면의 「내 조건」이 묻고 그 한 벌(ProfileProvider)을 여기서 읽어 쓴다
   const [jx, setJx] = useState<JanggiExtra>(() => ({ dual: false, newborns: 0, olderMinor: false, deposits: 24 }));
-  // 맞벌이·자녀·청약 회차는 공고 지면의 「내 조건」도 묻는 값이라 프로필로 올린다
-  const setJ = <K extends keyof JanggiExtra>(k: K, v: JanggiExtra[K]) => {
-    const next = { ...jx, [k]: v };
-    setJx(next);
-    patch({ dual: next.dual, newborns: next.newborns, olderMinor: next.olderMinor, deposits: next.deposits });
-  };
   // 공급 구분과 신청 면적은 묻지 않는다(사용자 지적 2026-09-22) — 단지마다 나오는 면적이 달라
   // 여기서 하나를 고르게 하면 고른 값이 곧 틀린 값이 된다. 대신 그 회차의 표를 전부 대 보고
   // 가장 앞선 자리 하나를 보인다. 면적을 안 주면 fitJanggi가 표 안의 모든 면적 줄을 순위 순으로 훑는다.
@@ -236,36 +224,6 @@ export function EligibilityCheck({ rules, open = [], hubs = [] }: {
             <span>2세 이하 자녀가 있다</span>
           </label>
         </div>
-
-        {jg && (
-          <fieldset className="elig-cls">
-            <legend>장기전세 세부 조건</legend>
-            <div className="elig-grid">
-              {/* 어느 회차의 표로 볼지. 기본은 최신 회차고, 지난 회차 표로 견줘 볼 수도 있다 */}
-              <div className="elig-f wide">
-                <span>기준 공고</span>
-                {jgList.length > 1 ? (
-                  <Select
-                    value={jg.slug}
-                    options={jgList.map((o) => ({ value: o.slug, label: janggiLabel(o) }))}
-                    onChange={(v) => setJgSlug(v || jgList[0].slug)}
-                    placeholder={janggiLabel(jgList[0])}
-                    ariaLabel="기준 공고"
-                    allowAll={false}
-                  />
-                ) : (
-                  <p className="elig-src">{janggiLabel(jg)}</p>
-                )}
-              </div>
-              <Num label="청약 납입 회차" value={jx.deposits} unit="회" onChange={(v) => setJ("deposits", v)} max={600} />
-              <Num label="2023.3.28. 이후 출생 자녀" value={jx.newborns} unit="명" onChange={(v) => setJ("newborns", v)} max={10} />
-            </div>
-            <div className="elig-checks" style={{ marginTop: 10 }}>
-              <label className="elig-chk"><input type="checkbox" checked={jx.dual} onChange={(e) => setJ("dual", e.target.checked)} /><span>맞벌이다</span></label>
-              <label className="elig-chk"><input type="checkbox" checked={jx.olderMinor} onChange={(e) => setJ("olderMinor", e.target.checked)} /><span>2023.3.27. 이전 출생 미성년 자녀가 있다</span></label>
-            </div>
-          </fieldset>
-        )}
 
         <fieldset className="elig-cls">
           <legend>해당하는 계층 (여러 개 고를 수 있다)</legend>

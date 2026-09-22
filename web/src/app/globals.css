@@ -1581,18 +1581,19 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .site-nav a { color: var(--mut); }
 .site-nav a:hover { color: var(--ink); }
 
-.elig-stage { padding: 0 var(--pad) 48px; }
-.elig-head { padding: 26px 0 18px; border-bottom: 1px solid var(--line); }
+/* 지면이 통째로 굴러가지 않게 한 판에 맞춘다(사용자 요청 2026-09-22) — 머리글 높이를 숫자로 빼 두면
+   글이 한 줄만 늘어도 어긋나므로, 세로를 flex로 잡고 남는 자리를 진단 칸에 준다. 밑에 남는 건 공용 푸터뿐이다 */
+.elig-stage { display: flex; flex-direction: column; height: calc(100dvh - var(--hdr)); padding: 0 var(--pad); }
+.elig-head { flex: none; padding: 22px 0 16px; border-bottom: 1px solid var(--line); }
 .elig-head h1 { font-size: 26px; font-weight: 900; letter-spacing: -0.03em; }
 .elig-head p { margin: 8px 0 0; max-width: 46em; font-size: 14px; line-height: 1.75; color: var(--mut); }
 
-.elig { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 28px; padding-top: 20px; align-items: start; }
+.elig { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 28px; padding: 18px 0; }
 /* 왼쪽 조건과 오른쪽 결과는 따로 굴린다(사용자 요청 2026-09-22) — 한 덩이로 굴리면 결과를 내려 보는 동안
    조건 칸이 화면 밖으로 빠져 값을 고치려면 다시 올라가야 한다. 두 칸 다 뷰포트 높이에 맞춰 잘라
    제 안에서만 스크롤한다. 셀렉트 목록은 body로 포털돼 캡처 단계 스크롤을 따라오니 잘리지 않는다(select.tsx) */
 .elig-form, .elig-out {
-  position: sticky; top: calc(var(--hdr) + 16px);
-  max-height: calc(100dvh - var(--hdr) - 32px);
+  min-height: 0; height: 100%;
   overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
 }
 .elig-form { display: flex; flex-direction: column; gap: 18px; padding-right: 4px; }
@@ -1610,7 +1611,6 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
    기본은 내용 폭만 차지해(inline-flex) 좁은 폼 칸 안에서 오그라들어 보였다(사용자 지적 2026-09-09) */
 .elig-f .selw, .elig-f .sel { width: 100%; }
 /* 기준 공고가 한 회차뿐이면 고를 게 없다 — 셀렉트 대신 이름만 적는다 */
-.elig-src { margin: 0; font-weight: 700; font-size: 13.5px; color: var(--mut); }
 .elig-seg { display: flex; gap: 6px; }
 .elig-seg button { flex: 1; height: 38px; border: 1px solid var(--line2); border-radius: var(--r-btn); background: var(--bg); font-weight: 800; font-size: 14px; color: var(--mut); cursor: pointer; transition: all var(--duration-fast) var(--ease); }
 .elig-seg button.on { border-color: var(--acc); background: var(--bg); color: var(--acc); }
@@ -1853,9 +1853,10 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-note { margin: 26px 0 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12.5px; line-height: 1.8; color: var(--dim); }
 
 @container (max-width: 900px) {
-  .elig { grid-template-columns: 1fr; }
   /* 위아래로 누우면 따로 굴릴 칸이 없다 — 지면 스크롤 하나로 되돌린다 */
-  .elig-form, .elig-out { position: static; max-height: none; overflow: visible; }
+  .elig-stage { display: block; height: auto; padding-bottom: 48px; }
+  .elig { grid-template-columns: 1fr; grid-template-rows: none; }
+  .elig-form, .elig-out { height: auto; overflow: visible; }
 }
 @media (max-width: 640px) {
   .elig-grid { grid-template-columns: 1fr; }

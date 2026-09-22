@@ -30,10 +30,11 @@ export default async function EligibilityPage() {
     <div className="elig-stage">
       <header className="elig-head">
         <h1>자격진단</h1>
+        {/* 넣은 값이 어디 남는지는 결과 아래 주석(elig-note)에 적는다 — 머리글에서 두 번 말하면
+            첫 화면이 세 줄로 불어 진단 칸이 접힌다(사용자 지적 2026-09-22) */}
         <p>
           공공임대는 유형마다 나이와 혼인, 소득, 자산, 자동차 기준이 다릅니다. 내 조건을 한 번 넣으면
-          {" "}{rules.types.length}개 공급유형을 한꺼번에 견줘 볼 수 있습니다. 넣은 값은 이 브라우저에 남아
-          공고 지면의 「내 조건」에도 그대로 쓰이며, 내 계정에서 저장을 켜지 않는 한 서버로 보내지 않습니다.
+          {" "}{rules.types.length}개 공급유형을 한꺼번에 견줘 볼 수 있습니다.
         </p>
       </header>
       <EligibilityCheck rules={rules} open={open} hubs={hubs} />
