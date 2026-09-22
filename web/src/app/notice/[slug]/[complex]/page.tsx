@@ -30,7 +30,7 @@ import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
 import { DepositOptionsTable, optionLabels } from "@/components/deposit-options-table";
-import { UnitTable } from "@/components/unit-table";
+import { UnitSheet } from "@/components/unit-sheet";
 import { JsonLd } from "@/components/json-ld";
 import { agencyLabels } from "@/lib/agency";
 import { complexGraph } from "@/lib/jsonld";
@@ -316,6 +316,7 @@ export default async function ComplexPage({ params }: Params) {
               제목은 다른 섹션과 같은 h2다(사용자 요청 2026-09-22: "이렇게 한 거 너무 좋은데 타이틀은 있어야지") */}
           <section className="dsec dsec-facts">
           <h2>기본 정보</h2>
+          <div className="facts-row">
           <ul className="facts">
             <Fact label="전용" term="전용면적" value={area} />
             <Fact label="공급" term="공급 호수" value={unitCount != null ? num(unitCount, "호") : null} sub={unitSub} />
@@ -332,6 +333,10 @@ export default async function ComplexPage({ params }: Params) {
             )}
             {specs.map(([label, value, term]) => <Fact key={label} label={label} value={value} term={term} />)}
           </ul>
+          {/* 동호수별 목록은 지면에 펼치지 않고 창으로 연다(사용자 결정 2026-09-22) —
+              172호짜리 단지가 지면 아래쪽을 다 밀어내던 자리다 */}
+          {unitTableWorth && <UnitSheet units={units} label={unitLabel} />}
+          </div>
           </section>
 
           {/* 제원은 위 요약 스트립으로 올라갔다(2026-09-22) — 여기 남는 건 여러 줄짜리 공급현황 표와
@@ -447,15 +452,6 @@ export default async function ComplexPage({ params }: Params) {
               />
             )}
           </section>
-
-          {/* 별첨 주택목록이 있는 공고만 — 동호수별로 갈라 본다(사용자 요청 2026-09-09).
-              호실마다 갈리는 값이 없으면 표를 세우지 않는다 — 호실 번호는 위 제원 줄이 적는다 */}
-          {unitTableWorth && (
-            <section className="dsec">
-              <h2>{unitLabel} | {num(units.length, "호")}</h2>
-              <UnitTable units={units} />
-            </section>
-          )}
 
           {minganRules && !noticeElig && supply.length > 0 && (
             <section className="dsec lead" id="fit">

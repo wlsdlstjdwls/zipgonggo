@@ -39,7 +39,8 @@ const FADE_RATIO = 0.6;
 
 const DESKTOP_QUERY = "(min-width: 768px)";
 
-export type SheetSize = "sm" | "md";
+/** 넓은 화면에서 창 너비 — sm 400px · md 560px · lg 860px(열 많은 표) */
+export type SheetSize = "sm" | "md" | "lg";
 
 type Props = {
   open: boolean;
@@ -49,7 +50,6 @@ type Props = {
   children: React.ReactNode;
   /** 아래 고정 줄(버튼 등). 없으면 그리지 않는다 */
   footer?: React.ReactNode;
-  /** 넓은 화면에서 창 너비 — sm 400px, md 560px */
   size?: SheetSize;
   /** 좁은 화면에서 시트 최대 높이 */
   maxHeight?: string;

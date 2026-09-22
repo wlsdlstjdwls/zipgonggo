@@ -355,6 +355,8 @@ small { font-size: 13.5px; }
 .sheet-b { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
   display: flex; flex-direction: column; gap: 18px; padding: 18px var(--pad) 20px; }
 .sheet-b .selw, .sheet-b .sel { width: 100%; }
+/* 표의 조건 줄(동/층/구조)은 나란히 선다 — 계산기 입력칸과 달리 한 줄에 여럿이다 */
+.sheet-b .ut-tools .selw, .sheet-b .ut-tools .sel { width: auto; }
 .sheet-f { flex: none; display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px;
   padding: 12px var(--pad) calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .sheet-f .btn { width: 100%; }
@@ -365,6 +367,8 @@ small { font-size: 13.5px; }
   border: 1px solid var(--line2); border-radius: var(--r-frame); box-shadow: var(--shadow-frame);
   padding-bottom: 0; animation: sheet-pop-in 180ms var(--ease) both; }
 .sheet-wrap.is-modal[data-size="sm"] .sheet { width: min(400px, calc(100vw - 32px)); }
+/* 열이 많은 표(동호수별 목록)는 560px에 넣으면 가로로만 긁게 된다 */
+.sheet-wrap.is-modal[data-size="lg"] .sheet { width: min(860px, calc(100vw - 32px)); max-height: min(86vh, 760px); }
 .sheet-wrap.is-modal .sheet-grab { display: none; }
 .sheet-wrap.is-modal .sheet-h { padding-top: 16px; }
 .sheet-wrap.is-modal .sheet-f { padding-bottom: 12px; }
@@ -1235,6 +1239,22 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* 제목이 이미 구획을 나누므로 이 섹션은 위아래를 바짝 붙인다 — 한 줄짜리 내용에 24px 여백은 과하다 */
 .dsec-facts { padding-top: 16px; padding-bottom: 16px; }
 .dsec-facts > h2 { margin-bottom: 11px; }
+/* 제원 줄 오른쪽에 동호수별 목록을 여는 버튼. 좁아지면 버튼이 아랫줄로 내려간다 */
+.facts-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 16px; }
+.facts-row > .facts { flex: 1 1 auto; }
+.facts-more { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
+  font: inherit; font-weight: 800; font-size: 12.5px; letter-spacing: -0.02em; color: var(--mut);
+  background: var(--bg); border: 1px solid var(--line2); border-radius: var(--r-chip);
+  padding: 8px 13px; cursor: pointer; transition: transform 240ms var(--sp), border-color 200ms var(--ease), color 200ms var(--ease); }
+.facts-more > b { font-weight: 900; color: var(--ink); }
+.facts-more > i { font-style: normal; font-weight: 800; color: var(--dim); transition: transform 320ms var(--sp); }
+.facts-more:hover { transform: translateY(-1.5px); border-color: var(--ink); color: var(--ink); }
+.facts-more:hover > i { transform: translateX(3px); color: var(--acc); }
+.facts-more:active { transform: scale(0.985); }
+/* 좁은 화면에서는 줄을 꽉 채워 누르기 쉽게 */
+@media (max-width: 560px) {
+  .facts-more { width: 100%; margin-left: 0; justify-content: center; }
+}
 .facts li { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .facts li > span { font-weight: 800; font-size: 11px; line-height: 1; letter-spacing: 0.1em; color: var(--dim); white-space: nowrap; }
 .facts li > b { font-weight: 800; font-size: 13.5px; letter-spacing: -0.02em; color: var(--ink);
@@ -1269,6 +1289,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* 세로는 가두지 않는다(overscroll-behavior-y를 걸지 않는 이유) — 상자 끝에서 막히면 표 위에 커서를 둔 채로는
    지면이 안 내려가 「스크롤이 먹통」으로 읽힌다. 끝까지 가면 지면 스크롤로 이어진다 */
 .tbl.ut-box { overflow-y: auto; max-height: min(58vh, 540px); }
+/* 창·시트 안에서는 조금 낮춘다 — 제목 줄과 조건 줄(약 18vh)을 더해도 시트 최대 높이(86vh) 안에 들어와야
+   스크롤이 하나로 끝난다. 두 겹이면 표를 굴리려다 시트가 따라 움직인다 */
+.sheet-b .tbl.ut-box { max-height: min(52vh, 520px); }
 .tbl.ut-box thead th { position: sticky; top: 0; z-index: 2; }
 /* 첫 열은 가로로도 고정이라 머리 칸은 둘이 겹친다 — 그 칸만 한 겹 더 올린다 */
 .tbl.ut-box thead th:first-child { z-index: 3; }
