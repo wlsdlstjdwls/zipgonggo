@@ -12,9 +12,6 @@
   --dim: #5f6672;        /* 8.5–11.5px 미세 텍스트. AA 통과값(5.78:1) — 더 밝게 바꾸지 말 것 */
   --acc: #3d5afe;        /* 링크·화살표·강조 핀·주요 CTA */
   --acc-soft: #eef1ff;
-  /* --acc-soft는 거의 흰색이라 「골라 놓은 것」을 스스로 말하지 못한다. 고른 탭·칩처럼
-     상태를 바탕색 하나로 말해야 하는 자리는 이 파스텔을 쓴다(사용자 요청 2026-09-22) */
-  --acc-pastel: #dde3ff;
   --hot: #c2340f;        /* D-4 이내 (AA 4.91:1 on hot-soft) */
   --hot-soft: #fdeeeb;
   --warn: #a35c06;       /* D-5~7 */
@@ -897,8 +894,8 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 .gal-tab:hover { border-color: var(--line-strong); color: var(--ink); }
 /* 「사진과 도면」 탭 — 필터가 아니라 **늘 하나가 걸려 있는 탭**이라 잉크를 뒤집지 않는다.
    검은 칩은 「걸렀다」는 신호고, 그건 홈 필터(.chip-f.on)와 셀렉트(.sel.on)에만 남긴다.
-   상호전환 탭(.cs-tabs)이 09-22에 먼저 간 길과 같다(사용자 결정) */
-.gal-tab.on { border-color: var(--acc); background: var(--acc-pastel); color: var(--acc); }
+   바탕은 채우지 않는다 — 테두리와 글자만(상호전환 탭과 같은 규칙, 사용자 결정 2026-09-22) */
+.gal-tab.on { border-color: var(--acc); background: var(--bg); color: var(--acc); }
 .gal-tab.on .gal-n { color: var(--acc); opacity: 0.72; }
 /* 이 공고에 없는 주택형 — 나머지 탭과 한 줄에 있되 같은 무게로 읽히면 안 된다 */
 .gal-tab.alt { margin-left: auto; border-style: dashed; }
@@ -1100,9 +1097,10 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cs-tabs button em { font-style: normal; font-weight: 700; font-size: 11.5px; color: var(--dim); margin-left: 5px; }
 .cs-tabs button:hover { transform: translateY(-1.5px); }
 .cs-tabs button:active { transform: scale(0.975); }
-/* 검은 칩은 「필터가 걸렸다」는 신호인데 여기는 거르는 게 아니라 늘 하나가 걸려 있는 자리다 —
-   어두운 바탕에서 글자가 묻힌다는 지적(2026-09-22)에 금액 셀렉트와 같은 강조 톤으로 바꾼다 */
-.cs-tabs button[aria-pressed="true"] { background: var(--acc-pastel); border-color: var(--acc); color: var(--acc); }
+/* 검은 칩은 「필터가 걸렸다」는 신호인데 여기는 거르는 게 아니라 늘 하나가 걸려 있는 자리다.
+   바탕을 채우지 않고 **테두리와 글자만** 파랗게 한다(사용자 결정 2026-09-22) —
+   지면 안 버튼이 면으로 칠해지면 그 자체가 덩어리로 읽혀 섹션 카드와 싸운다 */
+.cs-tabs button[aria-pressed="true"] { background: var(--bg); border-color: var(--acc); color: var(--acc); }
 .cs-tabs button[aria-pressed="true"] em { color: var(--acc); opacity: 0.82; }
 
 /* 고른 값 — 보증금 왼쪽, 월임대료 오른쪽. 트랙 양 끝 글자와 세로로 줄이 맞는다 */
@@ -1588,7 +1586,7 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-src { margin: 0; font-weight: 700; font-size: 13.5px; color: var(--mut); }
 .elig-seg { display: flex; gap: 6px; }
 .elig-seg button { flex: 1; height: 38px; border: 1px solid var(--line2); border-radius: var(--r-btn); background: var(--bg); font-weight: 800; font-size: 14px; color: var(--mut); cursor: pointer; transition: all var(--duration-fast) var(--ease); }
-.elig-seg button.on { border-color: var(--acc); background: var(--acc-pastel); color: var(--acc); }
+.elig-seg button.on { border-color: var(--acc); background: var(--bg); color: var(--acc); }
 
 .elig-checks { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .elig-chk { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14px; cursor: pointer; }
@@ -1747,7 +1745,7 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .fit-form .elig-grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 .fit-form .elig-in, .fit-form .elig-seg button, .fit-form .sel { background: var(--bg); }
 /* 위 줄이 같은 특이도의 .elig-seg button.on을 덮으면 켜진 칸이 흰 바탕에 흰 글자가 된다(탐색기 chip-f와 같은 함정, 2026-09-14) */
-.fit-form .elig-seg button.on { background: var(--acc-pastel); }
+.fit-form .elig-seg button.on { background: var(--bg); }
 .fit-form .sel.on { background: var(--ink); }
 .elig-seg.wrap { flex-wrap: wrap; }
 .elig-seg.wrap button { flex: 1 1 100px; }
