@@ -6,7 +6,7 @@ import { AreaMap } from "@/components/area-map";
 import { CalcSeed } from "@/components/calc-context";
 import { ComplexExplorer } from "@/components/complex-explorer";
 import { ComplexFactsSection } from "@/components/complex-facts";
-import { AsideSpecs, DetailAside } from "@/components/detail-aside";
+import { DetailAside } from "@/components/detail-aside";
 import { DetailHeadBar } from "@/components/detail-headbar";
 import { DetailNav } from "@/components/detail-nav";
 import { ExternalLink } from "@/components/external-link";
@@ -297,11 +297,16 @@ export default async function NoticePage({ params }: Params) {
     if (a <= today) return "now";
     return "ahead";
   };
-  // 「다음」 표는 하나뿐이다 — 앞으로 남은 것 중 가장 이른 하나. 여럿에 붙이면 강조가 아니라 배경이 된다
+  // 앞으로 남은 것 중 가장 이른 하나에만 꼬리표를 단다. 여럿에 붙이면 강조가 아니라 배경이 된다
   const keyWhen = keyCards.map((s) => whenOf(s.from, s.till));
   const keyNext = keyWhen.indexOf("ahead");
   const restWhen = restSteps.map((s) => whenOf(s.from, s.till));
   const restNext = restWhen.indexOf("ahead");
+  /** 꼬리표 글자 — 「예정」보다 「D-3」이 쓸모 있다(사용자 결정 2026-09-22). 기간형 단계는 시작일까지 센다 */
+  const dtag = (from?: string | null, till?: string | null) => {
+    const d = daysUntil(from ?? till ?? null);
+    return d == null ? null : d <= 0 ? "오늘" : `D-${d}`;
+  };
 
   // 민간임대 카드(공통/특별공급/일반공급)는 **서로 대등한 유형이 아니다** — 한 제도를 세 측면으로 쪼갠 것이라
   // 공통 카드의 빈 소득 줄을 「해당 없음」으로 채우면 "소득을 안 본다"는 거짓말이 된다. 칸 맞춤은 유형 카드에만 건다
@@ -426,7 +431,7 @@ export default async function NoticePage({ params }: Params) {
                           <span>
                             {s.label}
                             {w === "now" && <i className="st-flag now">오늘</i>}
-                            {next && <i className="st-flag next">예정</i>}
+                            {next && <i className="st-flag next">{dtag(s.from, s.till)}</i>}
                           </span>
                           <b><Stamped v={s.value} /></b>
                           {s.foot && <em>{s.foot}</em>}
@@ -446,8 +451,8 @@ export default async function NoticePage({ params }: Params) {
                       <li key={s.label} className={w === "past" ? "past" : w === "now" ? "now" : next ? "next" : undefined}>
                         <span>
                           {s.label}
-                          {w === "now" && <i className="st-flag now">진행 중</i>}
-                          {next && <i className="st-flag next">다음</i>}
+                          {w === "now" && <i className="st-flag now">{s.sub ? "진행 중" : "오늘"}</i>}
+                          {next && <i className="st-flag next">{dtag(s.from, s.till)}</i>}
                         </span>
                         <b>{s.value ? <Stamped v={s.value} /> : "—"}{s.sub && <em><Stamped v={s.sub} pre=" ~ " /></em>}</b>
                       </li>
@@ -598,35 +603,24 @@ export default async function NoticePage({ params }: Params) {
               </div>
             </>
           }
-          /* 본문 칸에서 격자 한 판을 먹던 「공고 정보」가 여기로 왔다(사용자 요청 2026-09-22:
-             "너무 많은 영역을 차지하는듯, 오른쪽 영역에 보여주자"). 값은 그대로다 */
-          extra={
-            <AsideSpecs
-              title="공고 정보"
-              rows={[
-                { label: "공급 기관", value: n.agency },
-                { label: "공고일", value: dateK(n.posted_at) },
-                { label: "공급 유형", value: <Term>{n.housing_type}</Term> },
-                { label: "단지명", value: n.complex_name },
-                /* 총세대수·난방·주소는 단지 정보 섹션이 더 정확한 값(마이홈 단지정보)으로 이미 말한다 —
-                   한 값은 한 곳. 두 벌을 나란히 두면 387세대와 388세대가 같은 지면에 뜬다 */
-                ...(facts ? [] : [
-                  { label: "총세대수", value: n.total_household != null ? num(n.total_household, "세대") : null },
-                  { label: "난방", value: n.heating },
-                  { label: "주소", value: n.address },
-                ]),
-              ].filter((r) => r.value != null && r.value !== "" && r.value !== "—")}
-            />
-          }
+          /* 「공고 제원」과 「공고 정보」를 한 패널로 합쳤다(사용자 요청 2026-09-22: "이거 합쳐주고
+             너무 많이 영역을 차지하는 것 같음"). 합치면서 **지면이 이미 말하는 값은 뺐다** —
+             공급 기관·공급 유형·공급 구분은 제목 위 태그 줄이, 공고일과 접수 기간은 「접수 일정」이 센다.
+             값이 빈 줄도 AsideSpecs가 지운다(「공급호수 준비 중」 같은 줄이 자리만 먹었다) */
           rows={[
             { label: m ? m.label : "금액", value: moneyRow ?? "원문 확인", lead: true },
             ...(m?.sub ? [{ label: "보증금", value: `${m.sub.replace("보증금 ", "")}부터`, lead: true }] : []),
-            /* 공급기관·공급유형은 제목 위 태그가 이미 말한다 — 카드에서 뺐다(사용자 지적 2026-09-09) */
             { label: "지역", value: region },
             { label: "공급호수", value: n.supply_count != null ? num(n.supply_count, "호") : null },
-            { label: "공급 구분", value: supplyKind },
             { label: "입주 시작", value: moveIn },
-            { label: "접수", value: period ?? NO_DATE },
+            { label: "단지명", value: n.complex_name },
+            /* 총세대수·난방·주소는 단지 정보 섹션이 더 정확한 값(마이홈 단지정보)으로 이미 말한다 —
+               한 값은 한 곳. 두 벌을 나란히 두면 387세대와 388세대가 같은 지면에 뜬다 */
+            ...(facts ? [] : [
+              { label: "총세대수", value: n.total_household != null ? num(n.total_household, "세대") : null },
+              { label: "난방", value: n.heating },
+              { label: "주소", value: n.address },
+            ]),
             { label: "문의처", value: n.contact },
           ]}
         />

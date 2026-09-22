@@ -351,6 +351,8 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
                   <span className="cx-row-main">
                     <span className="cx-name">
                       <Trunc text={c.name} />
+                      {/* 호수는 이름 바로 옆(사용자 요청 2026-09-22) — 오른쪽 줄 회색 글자로는 늦게 읽혔다 */}
+                      {hasUnits && c.unit_count != null && <span className="chip units">{num(c.unit_count, "호")}</span>}
                       {c.is_new && <span className="chip new">신규</span>}
                       {tag && (
                         <span className={`chip pic${tag.photo ? " on" : ""}`} title={tag.title}>
@@ -362,10 +364,12 @@ export function ComplexExplorer({ items, hasUnits, noticeSlug, unitTotal }: Prop
                   </span>
                   {/* 자치구 뱃지와 금액은 뺐다(사용자 요청 2026-09-22) — 자치구는 바로 위 주소 줄이 이미 말하고,
                       금액은 단지 상세의 「보증금과 임대료」가 조건까지 붙여 말한다. 목록은 어디에 몇 집인지만 */}
-                  <span className="cx-row-side">
-                    {noPin && <span className="cx-nopin">지도 미표시</span>}
-                    {hasUnits && c.unit_count != null && <span className="cx-units">{num(c.unit_count, "호")}</span>}
-                  </span>
+                  {/* 남은 건 「지도 미표시」뿐이라 있을 때만 줄을 만든다 */}
+                  {noPin && (
+                    <span className="cx-row-side">
+                      <span className="cx-nopin">지도 미표시</span>
+                    </span>
+                  )}
                 </button>
                 <Link href={noticeComplexPath(noticeSlug, c)} className="cx-go" aria-label={`${c.name} 상세`} title={`${c.name} 상세`}>→</Link>
               </li>

@@ -12,6 +12,9 @@
   --dim: #5f6672;        /* 8.5–11.5px 미세 텍스트. AA 통과값(5.78:1) — 더 밝게 바꾸지 말 것 */
   --acc: #3d5afe;        /* 링크·화살표·강조 핀·주요 CTA */
   --acc-soft: #eef1ff;
+  /* --acc-soft는 거의 흰색이라 「골라 놓은 것」을 스스로 말하지 못한다. 고른 탭·칩처럼
+     상태를 바탕색 하나로 말해야 하는 자리는 이 파스텔을 쓴다(사용자 요청 2026-09-22) */
+  --acc-pastel: #dde3ff;
   --hot: #c2340f;        /* D-4 이내 (AA 4.91:1 on hot-soft) */
   --hot-soft: #fdeeeb;
   --warn: #a35c06;       /* D-5~7 */
@@ -767,19 +770,24 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .detail-main { grid-column: 1; grid-row: 2; min-width: 0; }
 .detail > .aside { grid-column: 2; grid-row: 1 / -1; }
 .dsec, .section { padding: 24px var(--pad); border-bottom: 1px solid var(--line); }
-/* 섹션 사이를 띠로 가른다(사용자 지적 2026-09-22: "컨텐츠 영역 구분이 잘 안 되네, 좀 애매해") —
-   1px 실선 하나는 위아래 24px 패딩 사이에 묻혀 어디서 한 덩이가 끝나는지 안 보였다.
-   상세 지면에서만 — 목록 지면의 .section은 원래 한 덩이라 띠를 넣으면 조각나 보인다 */
-.detail-lead > .dsec:last-child,
-.detail-main > .dsec:not(:last-child),
-.detail-main > .section:not(:last-child) {
-  /* 1px 실선을 9px 회색 띠로 바꾸고, 실선은 띠 위에 배경 한 줄로 다시 그린다(테두리는 한 겹뿐이라) */
-  border-bottom: 9px solid var(--sub);
-  background-image: linear-gradient(var(--line), var(--line));
-  background-repeat: no-repeat;
-  background-size: 100% 1px;
-  background-position: left bottom 9px;
+/* 섹션 구분 — 실선도 띠도 부족했다(사용자 지적 2026-09-22, 두 번). 상세 지면에서는 아예 **카드**로 뗀다:
+   지면 바탕을 회색으로 깔고 섹션마다 흰 판을 얹는다. 경계가 선 하나가 아니라 면이라 눈이 못 흘린다.
+   상세(.detail) 안에서만 — 목록 지면의 .section은 원래 한 덩이라 조각내면 안 된다 */
+.detail { background: var(--sub); }
+.detail-lead, .detail-main { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+.detail-lead > *, .detail-main > * {
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-panel);
+  /* 카드가 자기 테두리를 가지므로 섹션의 밑줄은 필요 없다 */
+  border-bottom: 1px solid var(--line);
 }
+/* 카드 안쪽 여백 — 바깥 12px 자리를 카드가 나눠 가지므로 세로는 한 단 줄인다 */
+.detail-lead > .dsec, .detail-main > .dsec,
+.detail-lead > .section, .detail-main > .section { padding: 20px 18px; }
+.detail-main > .d-head { padding: 18px 18px 16px; }
+.detail .dsec.lead { padding-top: 20px; }
+.detail .dsec-facts { padding-top: 16px; padding-bottom: 16px; }
+/* 오른쪽 패널도 같은 바탕 위에 선다 — 안쪽 덩이(D-day 카드·버튼·제원 표)가 이미 제 테두리를 갖고 있다 */
+.detail > .aside { background: var(--sub); border-left: 1px solid var(--line); }
 /* 섹션 제목은 전부 같은 톤 — 작은 라벨(10.5px 자간 넓힘)은 제목처럼 안 읽혔다(사용자 요청 2026-09-09:
    "접수 일정처럼 타이틀 느낌나는 걸 다른 영역에도"). 왼쪽 강조 막대 + 19px 굵은 제목으로 통일한다. */
 .dsec > h2, .section > h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; font-weight: 900; font-size: 20px; line-height: 1.25; letter-spacing: -0.045em; color: var(--ink); }
@@ -1089,8 +1097,8 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cs-tabs button:active { transform: scale(0.975); }
 /* 검은 칩은 「필터가 걸렸다」는 신호인데 여기는 거르는 게 아니라 늘 하나가 걸려 있는 자리다 —
    어두운 바탕에서 글자가 묻힌다는 지적(2026-09-22)에 금액 셀렉트와 같은 강조 톤으로 바꾼다 */
-.cs-tabs button[aria-pressed="true"] { background: var(--acc-soft); border-color: var(--acc); color: var(--acc); }
-.cs-tabs button[aria-pressed="true"] em { color: var(--acc); opacity: 0.78; }
+.cs-tabs button[aria-pressed="true"] { background: var(--acc-pastel); border-color: var(--acc); color: var(--acc); }
+.cs-tabs button[aria-pressed="true"] em { color: var(--acc); opacity: 0.82; }
 
 /* 고른 값 — 보증금 왼쪽, 월임대료 오른쪽. 트랙 양 끝 글자와 세로로 줄이 맞는다 */
 .cs-now { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
@@ -1101,8 +1109,10 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 
 .cs-track { position: relative; margin-top: 16px; padding-inline: 2px; }
 .cs-ticks { position: relative; height: 9px; margin-bottom: -2px; }
-.cs-ticks i { position: absolute; top: 0; width: 1px; height: 5px; background: var(--line2); transform: translateX(-0.5px); }
-.cs-ticks i.mid { height: 9px; background: var(--acc); }
+/* 1px 짜리 --line2 눈금은 흰 바탕에서 사실상 안 보였다(사용자 지적 2026-09-22) —
+   두께와 길이를 키우고 색을 --dim까지 올린다. 가운데(기준) 눈금은 그보다 한 단 더 길고 진하다 */
+.cs-ticks i { position: absolute; top: 0; width: 2px; height: 6px; border-radius: 1px; background: var(--dim); opacity: 0.45; transform: translateX(-1px); }
+.cs-ticks i.mid { height: 10px; background: var(--acc); opacity: 1; }
 
 /* 바탕 레일(::before) 위에 채움(.cs-fill), 그 위에 손잡이만 보이는 투명 트랙 range를 얹는다 —
    네이티브 range 하나로는 「기준에서 얼마나 밀었나」를 색으로 못 그린다 */
@@ -1177,8 +1187,13 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* 검색칸인 줄 모르겠다는 지적(2026-09-22) — 헤더 검색칸과 같은 돋보기를 칸 안에 넣는다.
    래퍼가 칸 폭을 그대로 이어받아야 하므로 flex 자리를 래퍼가 맡고 input은 100%로 편다 */
 .cx-tools .cx-search { position: relative; display: flex; align-items: center; flex: 1 1 100%; }
-.cx-search .ss-ico { left: 12px; }
-.cx-search .cx-q { width: 100%; padding-left: 34px; }
+/* 돋보기는 칸 위에 얹힌다 — z-index를 안 박으면 뒤따르는 input 바탕에 가려 보였다 안 보였다 한다
+   (사용자 지적 2026-09-22: "돋보기가 사라졌다 생겼다") */
+.cx-search .ss-ico { left: 12px; z-index: 1; }
+/* 흰 칸에 회색 테두리 하나로는 칠 수 있는 자리인 줄 모른다 — 헤더 검색칸과 같은 회색 바탕을 깔고
+   포커스에서 흰 바탕 + 파란 테두리로 뒤집는다 */
+.cx-search .cx-q { width: 100%; padding-left: 34px; background: var(--sub); transition: background 200ms var(--ease), border-color 200ms var(--ease); }
+.cx-search .cx-q:focus { outline: none; background: var(--bg); border-color: var(--acc); }
 .cx-search:focus-within .ss-ico { color: var(--acc); }
 .cx-tools .selw, .cx-tools .sel { width: 100%; }
 .cx-more { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 13px; border-radius: var(--r-chip);
@@ -1229,6 +1244,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cx-name { font-weight: 800; font-size: 14px; letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .cx-name > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cx-name .chip { flex: none; }
+/* 호수는 이름 바로 옆 칩이다(사용자 요청 2026-09-22) — 오른쪽 줄에 회색 글자로 두니
+   「11호」가 주소보다 늦게 읽혔다. 파스텔 파랑으로 이름 줄에서 한 번에 잡힌다 */
+.chip.units { background: var(--acc-pastel); color: var(--acc); font-weight: 800; }
 .cx-addr { font-size: 12.5px; font-weight: 600; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 이름·주소 줄과 달리 자치구·호수·금액은 짧은 조각이라 줄바꿈으로 흘려도 읽기에 부담이 없다 */
 .cx-row-side { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; }
