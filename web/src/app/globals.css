@@ -768,7 +768,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .dsec.lead > h2 { margin-bottom: 8px; }
 .dsec.lead > .note { margin-top: 0; font-size: 13.5px; }
 .dsec.lead .d-map { height: 520px; }
-.d-head { padding: 18px var(--pad) 20px; border-bottom: 1px solid var(--line); }
+/* 아래 패딩이 작다 — 주소 줄(.d-sub)이 자기 아래 여백을 따로 두지 않아 여기서 한 번만 띄운다.
+   둘 다 두던 때는 제목과 첫 섹션 사이가 43px이라 빈 띠로 읽혔다(사용자 지적 2026-09-22) */
+.d-head { padding: 18px var(--pad) 15px; border-bottom: 1px solid var(--line); }
 .d-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .d-title { margin: 0 0 14px; font-weight: 900; font-size: 34px; line-height: 1.22; letter-spacing: -0.05em; color: var(--ink); max-width: 24em; }
 /* 공고 상세 헤드라인 밑 한 줄 — 금액 점보를 걷어낸 자리. 본론(단지 목록·지도)을 위로 끌어올리려고 낮게 유지한다 */
@@ -834,7 +836,7 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 .ptable .max .k small { color: var(--acc); opacity: 0.75; }
 .d-map { position: relative; height: 460px; border-radius: var(--r-panel); overflow: hidden; border: 1px solid var(--line); background: var(--sub); }
 .d-map .map { height: 100%; border-radius: 0; }
-.d-sub { margin: -14px 0 22px; font-weight: 600; font-size: 14px; color: var(--mut); }
+.d-sub { margin: -14px 0 0; font-weight: 600; font-size: 14px; color: var(--mut); }
 /* 프레임을 1,400px로 넓히면서 본문 칸이 1,070px가 됐다 — 여기 한 줄이 한글 70자를 넘으면 눈이 다음 줄을 못 찾는다.
    줄길이를 74자로 묶는다(2026-09-21). 색도 --dim에서 올린다 — 이 줄은 각주가 아니라 읽으라고 쓴 문장이다 */
 .note { margin: 12px 0 0; max-width: 58em; font-weight: 500; font-size: 13px; line-height: 1.75; color: var(--mut); }
@@ -1231,7 +1233,7 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .facts { display: flex; flex-wrap: wrap; align-items: baseline; gap: 7px 20px; list-style: none;
   margin: 0; padding: 0; }
 /* 제목이 이미 구획을 나누므로 이 섹션은 위아래를 바짝 붙인다 — 한 줄짜리 내용에 24px 여백은 과하다 */
-.dsec-facts { padding-top: 18px; padding-bottom: 18px; }
+.dsec-facts { padding-top: 16px; padding-bottom: 16px; }
 .dsec-facts > h2 { margin-bottom: 11px; }
 .facts li { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .facts li > span { font-weight: 800; font-size: 11px; line-height: 1; letter-spacing: 0.1em; color: var(--dim); white-space: nowrap; }
