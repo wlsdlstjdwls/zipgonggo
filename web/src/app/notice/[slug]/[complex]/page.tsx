@@ -382,13 +382,9 @@ export default async function ComplexPage({ params }: Params) {
             <h2>{showRent ? "보증금과 임대료" : "전세금"}</h2>
             {slideGroups.length > 0 ? (
               <>
+                {/* 한도와 이율은 슬라이더가 자기 칸의 두 끝에서 계산해 직접 적는다 —
+                    공급대상마다 값이 달라 여기서 한 줄로 적을 수 없다 */}
                 <ConvertSlider groups={slideGroups} />
-                {/* 설명은 이 한 줄뿐이다(사용자 결정 2026-09-22) — 배지와 문단을 다 걷어냈다.
-                    다만 전환 한도와 이율이 공고마다 다르다는 사실은 남긴다: 그게 빠지면
-                    우리가 계산한 금액을 공고문 금액으로 읽게 된다 */}
-                <p className="note">
-                  <Term>전세전환</Term>과 <Term>월세전환</Term>의 한도와 이율은 공고마다 다릅니다. 계약 조건은 {L.originalDoc}에서 확인하세요.
-                </p>
               </>
             ) : priceBreak.length > 0 ? (
               <>

@@ -16,6 +16,7 @@
 import { useId, useMemo, useState } from "react";
 import { wonExact, wonKo } from "@/lib/format";
 import type { ConvertGroup } from "@/lib/notice-view";
+import { Term } from "./glossary";
 import { Select, type SelectOption } from "./select";
 
 /** 한쪽을 몇 칸으로 나눌지. 공고가 비율 단위로만 전환을 허용하므로 연속으로 두지 않는다 */
@@ -53,6 +54,21 @@ function at(g: ConvertGroup, i: number): { deposit: number; rent: number } {
 /** 셀렉트 한 줄에 들어가는 이름. 탭은 이름과 보조 글자를 굵기로 가르지만 셀렉트는 한 줄이라 막대로 가른다 */
 const groupName = (g: ConvertGroup) => [g.label, g.note].filter(Boolean).join(" | ");
 
+/**
+ * 전환 한도 — 월임대료의 몇 %를 보증금으로 돌릴 수 있고, 보증금의 몇 %를 월임대료로 돌릴 수 있나(%).
+ * 이것도 두 끝에서 나온다. 해가온 0203호는 80% / 60%다 — calc.ts 기본값 50%가 아니다.
+ */
+function limits(g: ConvertGroup): { up: number; down: number } {
+  const [bd, br] = g.base;
+  return {
+    up: br > 0 ? Math.round(((br - g.max[1]) / br) * 100) : 0,
+    down: bd > 0 ? Math.round(((bd - g.min[0]) / bd) * 100) : 0,
+  };
+}
+
+/** 이율은 늘 소수 한 자리로 — 「연 6%」와 「연 2.5%」가 한 문장에 섞이면 자릿수가 어긋나 보인다 */
+const pct1 = (v: number) => v.toFixed(1);
+
 export function ConvertSlider({ groups }: { groups: ConvertGroup[] }) {
   const id = useId();
   const [gid, setGid] = useState(groups[0]?.id ?? "");
@@ -64,6 +80,7 @@ export function ConvertSlider({ groups }: { groups: ConvertGroup[] }) {
   if (!g) return null;
 
   const v = at(g, idx);
+  const lim = limits(g);
   // 기준에서 얼마나 밀었는지만 색으로 남긴다. 양쪽이 같은 색이다 —
   // 방향은 손잡이 자리와 양 끝 글자가 이미 말한다. 색을 갈라 두면 한쪽이 「경고」로 읽힌다
   const p = ((idx + NOTCH) / (NOTCH * 2)) * 100;
@@ -136,6 +153,15 @@ export function ConvertSlider({ groups }: { groups: ConvertGroup[] }) {
           </button>
         </div>
       </div>
+
+      {/* 한도와 이율을 그냥 적는다(사용자 결정 2026-09-22). 전에는 「원문 공고문에서 확인하세요」였는데
+          "원문 확인하기 싫어서 들어오는 건데 그런 말을 쓰면 어쩌나 — 차라리 한도와 이율을 적어 달라".
+          값은 상수가 아니라 이 칸의 두 끝에서 나온다 — 공고마다 다르기 때문이다. */}
+      <p className="cs-rule">
+        {g.source === "rule" && "SH 공통 기준으로, "}
+        월임대료의 <b>{lim.up}%</b>까지 보증금으로 올리거나(<Term>전세전환</Term>, 연 {pct1(rateOf(g, true))}%),
+        보증금의 <b>{lim.down}%</b>까지 월임대료로 내릴 수 있습니다(<Term>월세전환</Term>, 연 {pct1(rateOf(g, false))}%).
+      </p>
     </div>
   );
 }

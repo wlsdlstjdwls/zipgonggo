@@ -186,6 +186,8 @@ export type ConvertGroup = {
   max: [number, number];
   /** 보증금 최소 쪽 끝 */
   min: [number, number];
+  /** 양 끝이 어디서 왔나. notice면 공고문이 적어 둔 금액, rule이면 calc.ts 규칙으로 계산한 값 */
+  source: "notice" | "rule";
 };
 
 /** 별첨 호실 목록에서 — 금액이 같은 호실은 한 칸으로 묶는다(층만 다른 같은 값이 흔하다) */
@@ -207,6 +209,7 @@ function unitConvertGroups(units: NoticeUnit[]): ConvertGroup[] {
     base: [u.deposit as number, u.rent as number],
     max: [u.deposit_jeonse as number, u.rent_jeonse as number],
     min: [u.deposit_wolse as number, u.rent_wolse as number],
+    source: "notice" as const,
   }));
 }
 
@@ -228,6 +231,7 @@ export function convertGroups(supply: NoticeSupply[], units: NoticeUnit[]): Conv
         base: [r.base.deposit, r.base.rent] as [number, number],
         max: [r.max.deposit, r.max.rent] as [number, number],
         min: [r.min.deposit, r.min.rent] as [number, number],
+        source: "rule" as const,
       };
     });
 }

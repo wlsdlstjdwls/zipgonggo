@@ -1111,6 +1111,11 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cs-end:hover .n { border-bottom-color: currentColor; }
 .cs-end[aria-pressed="true"] { color: var(--acc); }
 
+/* 한도와 이율 — 「원문에서 확인하세요」 대신 숫자를 적는 자리(사용자 결정 2026-09-22).
+   .note와 같은 톤이되 슬라이더에 붙어 있으므로 위 여백만 좁다 */
+.cs-rule { margin: 14px 0 0; font-size: 12.5px; line-height: 1.75; color: var(--mut); }
+.cs-rule b { font-weight: 800; color: var(--ink); }
+
 @media (max-width: 420px) {
   .cs-now .v { font-size: 23px; }
 }
