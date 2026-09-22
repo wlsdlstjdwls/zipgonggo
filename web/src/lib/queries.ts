@@ -796,6 +796,53 @@ export const getEligibilityRules = unstable_cache(
   { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_ELIGIBILITY] },
 );
 
+/* ── 진단 결과에 붙일 「지금 열린 공고」 ────────────────────
+   진단은 브라우저에서 돌아 어느 유형이 통과인지 서버가 모른다. 그래서 유형별로 질의하지 않고
+   **마감이 가까운 열린 공고를 한 줌 미리 실어** 보내고, 화면이 통과한 유형만 골라 그린다.
+   열린 공고는 280건 남짓이라(실측 2026-09-22) 전량은 안 싣는다 — 마감 임박 순 앞머리면 족하다.
+   칸도 목록(LIST_COLS)보다 좁게 든다. 여기 필요한 건 제목과 마감일과 어디냐뿐이다. */
+
+export type OpenSoonNotice = {
+  id: number;
+  slug: string;
+  title: string;
+  agency: string;
+  housing_type: string;
+  sido: string | null;
+  sigungu: string | null;
+  apply_end_at: string | null;
+  /** 같은 제목으로 열려 있는 공고 수. LH는 한 모집을 seq 여러 개로 올려 제목이 겹친다 */
+  same_count: number;
+};
+
+/** 진단 화면이 싣는 공고 수. 통과 유형이 많아도 화면엔 몇 줄만 보이니 이만큼이면 넉넉하다 */
+export const ELIG_OPEN_LIMIT = 60;
+
+/**
+ * **제목 단위로 접어서** 낸다. LH는 「대구죽전 행복주택 예비 입주자 모집」 하나를 seq 넷으로 올리는데
+ * 넷 다 정본(canonical_id IS NULL)이라 접지 않으면 여섯 줄짜리 맛보기가 같은 제목으로 다 차 버린다
+ * (실측 2026-09-22). 접은 건수는 `same_count`로 들고 나가 화면이 「외 N건」을 적는다.
+ */
+export const listOpenSoon = unstable_cache(
+  async (limit: number = ELIG_OPEN_LIMIT): Promise<OpenSoonNotice[]> =>
+    query<OpenSoonNotice>(
+      `WITH o AS (
+         SELECT id, slug, ${titleCol()}, agency, housing_type::text AS housing_type, sido, sigungu, apply_end_at
+           FROM notice WHERE ${CANONICAL_ONLY} AND ${NOT_CLOSED}
+       ), f AS (
+         SELECT DISTINCT ON (title, agency)
+                id, slug, title, agency, housing_type, sido, sigungu, apply_end_at,
+                count(*) OVER (PARTITION BY title, agency)::int AS same_count
+           FROM o
+          ORDER BY title, agency, apply_end_at ASC NULLS LAST, id
+       )
+       SELECT * FROM f ORDER BY apply_end_at ASC NULLS LAST, id DESC LIMIT $1`,
+      [limit],
+    ),
+  ["elig-open-soon-v2"],
+  CACHE_OPTS,
+);
+
 /* ── 과거 경쟁률 (0014 notice_result) ────────────────────────
    「내 조건에 맞는 단지」에 지난 회차 경쟁률을 붙인다(사용자 요청 2026-09-14). 같은 housing_type이라도 청년 매입임대와
    장기미임대 매입임대는 신청자 풀이 달라 제목 계열(noticeFamily)로 한 번 더 가른다 — 계열이 다른 결과를 보이면 남의 경쟁률이다.

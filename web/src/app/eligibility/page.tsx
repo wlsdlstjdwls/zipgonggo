@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { EligibilityCheck } from "@/components/eligibility-check";
-import { getEligibilityRules } from "@/lib/queries";
+import { getEligibilityRules, listOpenSoon, listTypeHubs } from "@/lib/queries";
 import { ROUTES } from "@/lib/routes";
 
 // Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
@@ -23,7 +23,9 @@ export const metadata: Metadata = {
 };
 
 export default async function EligibilityPage() {
-  const rules = await getEligibilityRules();
+  // 진단은 브라우저에서 돈다 — 어느 유형이 통과인지 서버가 모르니 열린 공고를 미리 한 줌 실어 보내고
+  // 화면이 통과한 유형만 골라 그린다(lib/queries listOpenSoon)
+  const [rules, open, hubs] = await Promise.all([getEligibilityRules(), listOpenSoon(), listTypeHubs()]);
   return (
     <div className="elig-stage">
       <header className="elig-head">
@@ -34,7 +36,7 @@ export default async function EligibilityPage() {
           공고 지면의 「내 조건」에도 그대로 쓰이며, 내 계정에서 저장을 켜지 않는 한 서버로 보내지 않습니다.
         </p>
       </header>
-      <EligibilityCheck rules={rules} />
+      <EligibilityCheck rules={rules} open={open} hubs={hubs} />
     </div>
   );
 }

@@ -8,10 +8,12 @@
 // 장애 여부처럼 건강과 이어지는 계층은 켜도 서버로 가지 않는다(개인정보처리방침 3항).
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { classOptions, diagnoseAll, HOUSEHOLD_MAX, type Marital, type Profile, type Verdict } from "@/lib/eligibility";
+import { classOptions, diagnoseAll, HOUSEHOLD_MAX, type Marital, type Profile, tierOf, type Verdict } from "@/lib/eligibility";
 import { fitJanggi, janggiAreas, type FitProfile, type FitVerdict } from "@/lib/notice-fit";
+import { dateMD, daysUntil } from "@/lib/format";
 import { fromElig, reconcileRegion, toElig } from "@/lib/profile";
-import { noticePath } from "@/lib/routes";
+import type { OpenSoonNotice, TypeHub } from "@/lib/queries";
+import { noticePath, typePath } from "@/lib/routes";
 import type { EligibilityRules, JanggiRule } from "@/types/eligibility";
 import { useProfile } from "./profile-context";
 import { Select } from "./select";
@@ -47,7 +49,16 @@ function janggiLabel(o: JanggiRule): string {
 
 type JanggiExtra = { group: string | null; area: string | null; dual: boolean; newborns: number; olderMinor: boolean; deposits: number };
 
-export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
+/** 결과에 붙일 「지금 열린 공고」에 몇 줄까지 보일지. 나머지는 유형 지면으로 넘긴다 */
+const OPEN_ROWS = 6;
+
+export function EligibilityCheck({ rules, open = [], hubs = [] }: {
+  rules: EligibilityRules;
+  /** 마감 임박 순 열린 공고 한 줌. 통과한 유형만 골라 그린다 */
+  open?: OpenSoonNotice[];
+  /** 유형별 전국 현황 — 실어 온 한 줌에 안 들어온 공고까지 세어 「그 밖에 N건」을 적는다 */
+  hubs?: TypeHub[];
+}) {
   const { profile, ready: profileReady, patch } = useProfile();
   // 서버 HTML은 언제나 기본값이다 — 저장된 값은 마운트 뒤에 얹는다(하이드레이션이 어긋날 자리를 만들지 않는다)
   const [p, setP] = useState<Profile>(DEFAULT);
@@ -123,6 +134,35 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
   const verdicts = useMemo(() => diagnoseAll(p, rules), [p, rules]);
   const pass = verdicts.filter((v) => v.ok);
   const fail = verdicts.filter((v) => !v.ok);
+
+  // 통과한 공급유형의 housing_type들. 한 housing_type에 공급유형이 여럿 걸리니(행복주택 5개) 묶는다.
+  // supply_type.housing_type이 null인 「수요자맞춤형」과, 공고 쪽에만 있는 유형(10년임대·통합공공임대 등)은
+  // 짝이 없다 — 억지로 잇지 않고 빠뜨린다. 없는 짝을 있는 척하는 게 더 나쁘다
+  const passTypes = useMemo(() => {
+    const set = new Set<string>();
+    for (const v of pass) if (v.type.housing_type) set.add(v.type.housing_type);
+    return set;
+  }, [pass]);
+
+  // 내가 사는 데를 앞에 세운다. 마감 임박 순으로만 세우면 서울 사람에게 대구 공고가 먼저 뜬다.
+  // 거주지를 아직 안 골랐으면(기본값) 손대지 않고 마감 순 그대로 둔다
+  const mySido = useMemo(() => (p.residence && tierOf(p.residence, rules.tiers) === "서울" ? "서울특별시" : null), [p.residence, rules.tiers]);
+  const openMine = useMemo(() => {
+    const mine = open.filter((n) => passTypes.has(n.housing_type));
+    if (!p.residence) return mine;
+    const near = (n: OpenSoonNotice) => (n.sigungu === p.residence ? 0 : mySido && n.sido === mySido ? 1 : 2);
+    // 정렬이 안정적이라(ES2019) 같은 등급 안에서는 쿼리가 준 마감 임박 순이 그대로 남는다
+    return [...mine].sort((a, b) => near(a) - near(b));
+  }, [open, passTypes, p.residence, mySido]);
+  /** 실어 온 한 줌 밖의 공고까지 센 진짜 건수. hubs는 전국 현황이라 한 줌에 안 실린 것도 안다 */
+  const openTotal = useMemo(
+    () => hubs.filter((h) => passTypes.has(h.housing_type)).reduce((s, h) => s + h.open, 0),
+    [hubs, passTypes],
+  );
+  const openByType = useMemo(
+    () => hubs.filter((h) => passTypes.has(h.housing_type) && h.open > 0).sort((a, b) => b.open - a.open),
+    [hubs, passTypes],
+  );
 
   const toggleClass = (c: string) =>
     set("classes", p.classes.includes(c) ? p.classes.filter((x) => x !== c) : [...p.classes, c]);
@@ -262,6 +302,52 @@ export function EligibilityCheck({ rules }: { rules: EligibilityRules }) {
       </form>
 
       <div className="elig-out">
+        {/* 유형 목록에서 끝나면 「그래서 지금 뭘 넣나」에 답이 없다. 통과한 유형의 열린 공고로 잇는다 */}
+        {openTotal > 0 && (
+          <section className="elig-open">
+            <h2>
+              지금 신청할 수 있는 공고 <b>{openTotal.toLocaleString("ko-KR")}</b>
+              <small>내 조건에 맞는 유형 기준</small>
+            </h2>
+            <p className="elig-open-sub">
+              유형이 맞는다는 뜻이고, 공고마다 나이와 소득 기준이 조금씩 다릅니다. 신청 전에 공고문을 확인하세요.
+            </p>
+            {openMine.length > 0 && (
+              <ul className="elig-open-list">
+                {openMine.slice(0, OPEN_ROWS).map((n) => {
+                  const d = daysUntil(n.apply_end_at);
+                  return (
+                    <li key={n.id}>
+                      <Link href={noticePath(n.slug)}>
+                        <em>{n.housing_type}</em>
+                        <b>{n.title}</b>
+                        <span>
+                          {[n.agency, n.sigungu || n.sido].filter(Boolean).join(" | ")}
+                          {/* LH는 한 모집을 seq 여러 개로 올린다 — 접어 놓고 몇 건인지는 밝힌다 */}
+                          {n.same_count > 1 && <u>외 {n.same_count - 1}건</u>}
+                          {n.apply_end_at && (
+                            <i>
+                              {d !== null && d >= 0 ? (d === 0 ? "오늘 마감" : `D-${d}`) : "마감"}
+                              {" "}({dateMD(n.apply_end_at)})
+                            </i>
+                          )}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <p className="elig-open-more">
+              {openByType.map((h) => (
+                <Link key={h.housing_type} href={typePath(h.housing_type)}>
+                  {h.housing_type} {h.open}
+                </Link>
+              ))}
+            </p>
+          </section>
+        )}
+
         <h2>
           신청해 볼 수 있는 유형 <b>{pass.length}</b>
           <small>전체 {verdicts.length}개 중</small>
