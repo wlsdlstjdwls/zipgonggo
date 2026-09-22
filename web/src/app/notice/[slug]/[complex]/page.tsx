@@ -22,7 +22,6 @@ import { DetailHeadBar } from "@/components/detail-headbar";
 import { ExternalLink } from "@/components/external-link";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
-import { NoticeFit } from "@/components/notice-fit";
 import { NoticeFitMingan } from "@/components/notice-fit-mingan";
 import { ConvertSlider } from "@/components/convert-slider";
 import { Pending } from "@/components/pending";
@@ -38,7 +37,7 @@ import { complexGraph } from "@/lib/jsonld";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
 import { applyPhase, count, dateK, deadlineChip, hoText, NO_DATE, num, wonKo } from "@/lib/format";
 import { areaText, classLabel, commonArea, complexPriceRows, convertGroups, m2, moveInLabel, typeLabel, unitPriceRows } from "@/lib/notice-view";
-import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition, getYouthHouse, isComplexIndexable } from "@/lib/queries";
+import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getYouthHouse, isComplexIndexable } from "@/lib/queries";
 import { ComplexGallery } from "@/components/complex-gallery";
 import { imagesEnabled, shownImages } from "@/lib/complex-images";
 import { complexSegment, noticeComplexPath, noticePath, ROUTES } from "@/lib/routes";
@@ -134,7 +133,6 @@ export default async function ComplexPage({ params }: Params) {
   ]);
   // 「내 조건에 맞는 단지」를 단지 상세에도(사용자 요청 2026-09-14) — 공고 상세와 같은 자격 묶음·공급현황으로 판정하고
   // 이 단지가 드는지 먼저 말한다. 자격 묶음이 있는 공고만 질의한다
-  const [noticeSupply, eligRules, prior] = noticeElig ? await Promise.all([getNoticeSupply(n.id), getEligibilityRules(), getPriorCompetition(n)]) : [[], null, null];
   // 호수는 (공급유형, 공급대상)마다 한 칸이다 — 청년 소득있음/없음 두 줄이 같은 칸을 나눠 써 두 번 세면 안 된다
   const counted = new Map(supply.filter((s) => s.units_total != null).map((s) => [`${s.supply_type}|${s.tenant_class}`, s]));
   const unitTotal = [...counted.values()].reduce((a, s) => a + (s.units_total ?? 0), 0);
@@ -470,12 +468,10 @@ export default async function ComplexPage({ params }: Params) {
             </section>
           )}
 
-          {noticeElig && eligRules && (
-            <section className="dsec lead" id="fit">
-              <h2>내 조건에 맞는 단지</h2>
-              <NoticeFit data={noticeElig.data} complexes={siblings} supply={noticeSupply} income={eligRules.income} tiers={eligRules.tiers} noticeSlug={n.slug} currentId={c.id} prior={prior} />
-            </section>
-          )}
+          {/* 「내 조건에 맞는 단지」는 단지 상세에서 뺐다(사용자 결정 2026-09-22) —
+              같은 공고의 **다른** 단지를 추리는 자리라 공고 상세가 맡는다. 여기 놓으면 지금 보는 단지를
+              제쳐 두고 옆 단지를 훑게 된다. 공고 상세(/notice/{공고})에는 그대로 있다.
+              바로 위 「내 조건에 맞는 주택형」은 남긴다 — 그건 이 단지 안에서 갈리는 값이다 */}
 
           <section className="dsec">
             <h2>위치</h2>
