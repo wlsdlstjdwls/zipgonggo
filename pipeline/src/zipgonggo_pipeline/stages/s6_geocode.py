@@ -33,7 +33,7 @@ from ..db import connect
 from ..geo.entrance import default_db_path
 from ..geo.juso_search import JusoSearch
 from ..geo.store import EntranceStore
-from ..repo import set_complex_geom, set_notice_complex_geom, upsert_address_match
+from ..repo import apply_geo_matches
 from .common import Stats, finish_ingest, stage_main, utc_now
 
 log = logging.getLogger("s6")
@@ -131,11 +131,7 @@ def run(args: argparse.Namespace) -> Stats:
             conn = connect()
             try:
                 with conn.cursor() as cur:
-                    for table, row_id, match in matched:
-                        setter = set_notice_complex_geom if table == "notice_complex" else set_complex_geom
-                        upsert_address_match(cur, match)
-                        setter(cur, row_id, match)
-                        stats.updated += 1
+                    stats.updated += apply_geo_matches(cur, matched)
                     finish_ingest(cur, stage=STAGE, source=SOURCE, stats=stats, started=started,
                                   precision=dict(precision_count), misses=misses[:20])
                 conn.commit()

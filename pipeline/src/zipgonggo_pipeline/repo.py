@@ -408,38 +408,30 @@ INSERT INTO address_match (normalized_addr, geom, precision, matched_by)
 VALUES (%(normalized_addr)s, {_POINT}, %(precision)s, %(matched_by)s)
 ON CONFLICT (normalized_addr) DO UPDATE SET
   geom = EXCLUDED.geom, precision = EXCLUDED.precision, matched_by = EXCLUDED.matched_by
-RETURNING id
 """
 
 
-def upsert_address_match(cur, match) -> int:
-    """address_match 1행. 키는 공고 표기가 아니라 요약DB가 돌려준 정규 주소다."""
-    cur.execute(ADDRESS_MATCH_SQL, _geo_params(match))
-    return cur.fetchone()["id"]
-
-
-def set_notice_complex_geom(cur, complex_id: int, match) -> None:
-    cur.execute(
-        f"""
-        UPDATE notice_complex SET
+def _set_geom_sql(table: str) -> str:
+    return f"""
+        UPDATE {table} SET
           geom = {_POINT}, geo_precision = %(precision)s, geo_matched_by = %(matched_by)s,
           geo_matched_at = now(), updated_at = now()
         WHERE id = %(id)s
-        """,
-        {"id": complex_id, **_geo_params(match)},
-    )
+        """
 
 
-def set_complex_geom(cur, complex_id: int, match) -> None:
-    cur.execute(
-        f"""
-        UPDATE complex SET
-          geom = {_POINT}, geo_precision = %(precision)s, geo_matched_by = %(matched_by)s,
-          geo_matched_at = now(), updated_at = now()
-        WHERE id = %(id)s
-        """,
-        {"id": complex_id, **_geo_params(match)},
-    )
+def apply_geo_matches(cur, matched: list[tuple[str, int, Any]]) -> int:
+    """S6 결과를 한 번에 쓴다 — address_match upsert + 대상 표(notice_complex·complex)의 좌표.
+
+    줄마다 execute하면 쿼리 둘 × Neon 왕복 230ms가 행 수만큼 쌓인다. LH 단지 2,456곳에 19분이 걸렸다(2026-10-02).
+    executemany는 파이프라인으로 한 번에 보낸다. address_match의 키는 공고 표기가 아니라 요약DB가 돌려준 정규 주소다.
+    """
+    cur.executemany(ADDRESS_MATCH_SQL, [_geo_params(m) for _, _, m in matched])
+    for table in ("notice_complex", "complex"):
+        rows = [{"id": row_id, **_geo_params(m)} for t, row_id, m in matched if t == table]
+        if rows:
+            cur.executemany(_set_geom_sql(table), rows)
+    return len(matched)
 
 
 def _geo_params(match) -> dict[str, Any]:
