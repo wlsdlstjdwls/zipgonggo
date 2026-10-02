@@ -8,7 +8,7 @@
 
 대상: 원문이 apply.lh.or.kr이고 주소가 빈 매입임대 공고 중 **아직 단지가 없는 것**(`--all`이면 있는 것도 다시).
 전세임대는 집을 본인이 구해 오는 제도라 목록이 없다 — 고르지 않는다.
-받은 파일은 pipeline/data/lh/{panId}/{fileid}.xlsx 에 둔다(커밋 금지). `--cached`는 그것만 다시 읽는다.
+받은 파일은 pipeline/data/lh/{panId}/{fileid}.xlsx.bin 에 둔다(커밋 금지). `--cached`는 그것만 다시 읽는다.
 
 좌표는 여기서 안 넣는다. 단지 행의 도로명주소를 S6이 요약DB와 오프라인 조인한다(CLAUDE.md 하지 말 것 1).
 """
@@ -59,8 +59,12 @@ def only_region(units: list[LhUnit], sigungu: str | None) -> list[LhUnit]:
 
 
 def _load_cached(pid: str) -> list[tuple[str, bytes]]:
+    """받아 둔 목록. zip이 아닌 파일은 버린다 — 회사 PC 문서보안(DRM)이 .xlsx를 OLE로 암호화해 둔 것이다(2026-10-02)."""
     d = CACHE_ROOT / pid
-    return [(p.stem, p.read_bytes()) for p in sorted(d.glob("*.xlsx"))] if d.is_dir() else []
+    if not d.is_dir():
+        return []
+    files = [(p.name.split(".")[0], p.read_bytes()) for p in sorted(d.glob("*.xlsx*"))]
+    return [(fid, data) for fid, data in files if data[:2] == b"PK"]
 
 
 def run(*, dry_run: bool, limit: int, slug: str | None, all_: bool = False, cached: bool = False) -> Stats:
@@ -100,7 +104,8 @@ def run(*, dry_run: bool, limit: int, slug: str | None, all_: bool = False, cach
                         for a in lists:
                             data = client.download(a)
                             (CACHE_ROOT / pid).mkdir(parents=True, exist_ok=True)
-                            (CACHE_ROOT / pid / f"{a.file_id}.xlsx").write_bytes(data)
+                            # .xlsx로 두면 문서보안(DRM)이 암호화해 --cached로 못 읽는다
+                            (CACHE_ROOT / pid / f"{a.file_id}.xlsx.bin").write_bytes(data)
                             files.append((a.file_id, data))
                     units: list[LhUnit] = []
                     for _, data in files:

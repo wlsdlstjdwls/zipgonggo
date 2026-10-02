@@ -42,6 +42,8 @@ robots.txt는 여전히 `lhFile.do`를 `Disallow`로 둔다 — **기관 허용�
   Neon 왕복 230ms가 호실 수만큼 쌓여 631호 공고 하나에 2분이 넘었다. 지금은 56호에 2초.
   S6 좌표 쓰기도 같은 이유로 `apply_geo_matches`(executemany)로 묶었다 — 2,456행 19분 → 2,514행 16초
 - 단지코드가 없어 `unit` → `notice_complex` 연결은 `nc_name`+`nc_road`(단지 유일키)로 한다
+- **이 PC의 문서보안(DRM)이 프로젝트 폴더의 `.xlsx`를 OLE로 암호화한다**(주기 검사라 몇 분~수십 분 뒤). 정답지와 캐시를
+  `.xlsx.bin`으로 둔다. 테스트가 「zip이 아니다」로 깨지면 파서가 아니라 파일 문제다 — `git checkout`으로 되돌린다
 
 ### 다음에 할 일
 

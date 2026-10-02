@@ -19,7 +19,11 @@ FIX = Path(__file__).parent / "fixtures" / "lh_house_list"
 
 
 def load(name: str):
-    return parse_house_list((FIX / name).read_bytes())
+    # 확장자가 .xlsx.bin인 건 이 저장소를 여는 회사 PC의 문서보안(DRM)이 .xlsx를 OLE로 암호화해 버려서다(2026-10-02).
+    # 그래도 걸리면 zip이 아니게 된다 — 파서 회귀가 아니라 파일이 바뀐 것이니 그렇게 알린다
+    data = (FIX / f"{name}.bin").read_bytes()
+    assert data[:2] == b"PK", f"{name}: zip이 아니다 — DRM이 암호화했을 수 있다. git checkout으로 되돌릴 것"
+    return parse_house_list(data)
 
 
 @pytest.fixture(scope="module")
