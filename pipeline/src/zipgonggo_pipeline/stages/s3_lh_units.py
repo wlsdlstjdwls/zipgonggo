@@ -8,7 +8,7 @@
 
 대상: 원문이 apply.lh.or.kr이고 주소가 빈 매입임대 공고 중 **아직 단지가 없는 것**(`--all`이면 있는 것도 다시).
 전세임대는 집을 본인이 구해 오는 제도라 목록이 없다 — 고르지 않는다.
-받은 파일은 pipeline/data/lh/{panId}/{fileid}.xlsx.bin 에 둔다(커밋 금지). `--cached`는 그것만 다시 읽는다.
+받은 파일은 pipeline/data/lh/{panId}/{fileid}.xlsx.bin(PDF 목록은 .pdf.bin) 에 둔다(커밋 금지). `--cached`는 그것만 다시 읽는다.
 
 좌표는 여기서 안 넣는다. 단지 행의 도로명주소를 S6이 요약DB와 오프라인 조인한다(CLAUDE.md 하지 말 것 1).
 """
@@ -63,8 +63,9 @@ def _load_cached(pid: str) -> list[tuple[str, bytes]]:
     d = CACHE_ROOT / pid
     if not d.is_dir():
         return []
-    files = [(p.name.split(".")[0], p.read_bytes()) for p in sorted(d.glob("*.xlsx*"))]
-    return [(fid, data) for fid, data in files if data[:2] == b"PK"]
+    paths = sorted([*d.glob("*.xlsx*"), *d.glob("*.pdf.bin")])
+    files = [(p.name.split(".")[0], p.read_bytes()) for p in paths]
+    return [(fid, data) for fid, data in files if data[:2] == b"PK" or data[:4] == b"%PDF"]
 
 
 def run(*, dry_run: bool, limit: int, slug: str | None, all_: bool = False, cached: bool = False) -> Stats:
@@ -95,8 +96,11 @@ def run(*, dry_run: bool, limit: int, slug: str | None, all_: bool = False, cach
                     else:
                         atts = find_attachments(client.fetch_detail(n["source_url"]))
                         lists = [a for a in atts if a.is_house_list]
+                        # 같은 목록을 엑셀과 PDF로 둘 다 붙이면 호실이 두 번 들어간다 — 엑셀이 있으면 엑셀만
+                        if any(a.ext != "pdf" for a in lists):
+                            lists = [a for a in lists if a.ext != "pdf"]
                         if not lists:
-                            # PDF·hwpx 목록(전남 보유주택목록, 경남 목록요약)과 목록 없는 공고. 사람이 볼 수 있게 이름을 남긴다
+                            # 보유주택목록 PDF, hwpx 목록요약과 목록 없는 공고. 사람이 볼 수 있게 이름을 남긴다
                             stats.skip("no_xlsx_list")
                             log.info("%s xlsx 목록 없음: %s", n["slug"], [a.name for a in atts])
                             continue
@@ -105,7 +109,8 @@ def run(*, dry_run: bool, limit: int, slug: str | None, all_: bool = False, cach
                             data = client.download(a)
                             (CACHE_ROOT / pid).mkdir(parents=True, exist_ok=True)
                             # .xlsx로 두면 문서보안(DRM)이 암호화해 --cached로 못 읽는다
-                            (CACHE_ROOT / pid / f"{a.file_id}.xlsx.bin").write_bytes(data)
+                            ext = "pdf" if a.ext == "pdf" else "xlsx"
+                            (CACHE_ROOT / pid / f"{a.file_id}.{ext}.bin").write_bytes(data)
                             files.append((a.file_id, data))
                     units: list[LhUnit] = []
                     for _, data in files:

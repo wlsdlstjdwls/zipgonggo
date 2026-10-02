@@ -240,8 +240,44 @@ def parse_sheet(name: str, rows: list[tuple]) -> list[LhUnit]:
     return out
 
 
+# 줄 머리가 도로명 꼬리 — 「로 45」 「번길 5」 「길 9-11」 「번안길 3」. 뒤에 공백·숫자·괄호가 와야 한다(「로데오」는 아니다)
+_ROAD_TAIL_HEAD = re.compile(r"^(?:대?로|번?[가-힣]?길)(?=[\s\d(]|$)")
+
+
+def _join_wrapped(v: str | None) -> str | None:
+    """PDF 칸 안 줄바꿈을 잇는다. 도로명 중간에서 끊긴 줄(「우치로110번\\n길 9-11」, 「대남대로85\\n번길 5」,
+    「선운중앙\\n로 45」)은 붙이고, 나머지는 띄운다 — 「무등로\\n374」는 띄워도 붙여도 도로명 파서가 읽는다."""
+    if not v:
+        return v
+    lines = [s.strip() for s in v.split("\n")]
+    out = lines[0]
+    for s in lines[1:]:
+        glue = out.endswith(("번", "-")) or bool(_ROAD_TAIL_HEAD.match(s))
+        out += s if glue else f" {s}"
+    return out
+
+
+def parse_house_list_pdf(data: bytes) -> list[LhUnit]:
+    """PDF 바이트 → 호실. 2026년 3차 전국 공고는 목록을 엑셀 대신 PDF로만 붙였다(2026-10-02 실측 4건).
+
+    엑셀과 칸 구성이 같고 괘선 있는 텍스트 PDF라 표가 그대로 뽑힌다. **쪽마다 머리행이 다시 나와서**
+    쪽 하나를 시트 하나로 보고 parse_sheet에 넘긴다. 머리행 없는 쪽은 parse_sheet가 알아서 건너뛴다.
+    """
+    import pdfplumber   # PDF 목록이 있을 때만 쓴다
+
+    units: list[LhUnit] = []
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        for i, page in enumerate(pdf.pages, 1):
+            for t, table in enumerate(page.extract_tables()):
+                rows = [tuple(_join_wrapped(c) for c in r) for r in table]
+                units.extend(parse_sheet(f"p{i}" + (f"-{t + 1}" if t else ""), rows))
+    return units
+
+
 def parse_house_list(data: bytes) -> list[LhUnit]:
-    """xlsx 바이트 → 모든 시트의 호실. 안내 시트(머리행 없음)는 조용히 건너뛴다."""
+    """xlsx(또는 PDF) 바이트 → 모든 시트의 호실. 안내 시트(머리행 없음)는 조용히 건너뛴다."""
+    if data[:4] == b"%PDF":
+        return parse_house_list_pdf(data)
     wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     try:
         units: list[LhUnit] = []

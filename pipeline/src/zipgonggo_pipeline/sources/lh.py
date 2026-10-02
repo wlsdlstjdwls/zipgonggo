@@ -34,8 +34,17 @@ class LhAttachment:
 
     @property
     def is_house_list(self) -> bool:
-        """「공급주택목록」·「주택목록」·「공급대상주택목록」 엑셀. 「보유주택목록」 PDF·「목록요약」 hwpx는 아직 못 읽는다."""
-        return ("목록" in self.name or "리스트" in self.name) and self.ext in ("xlsx", "xlsm")
+        """「공급주택목록」·「주택목록」·「공급대상주택목록」 엑셀, 같은 칸 구성의 PDF.
+
+        경기남부지역본부는 같은 표를 「공급대상주택내역」이라 붙인다(2026-10-02 실측 5건).
+        2026년 3차 전국 공고는 목록을 PDF로만 붙였다. 「보유주택목록」 PDF는 호실이 아니라 건물별 보유 호수
+        집계라 고르지 않는다. 「목록요약」 hwpx는 아직 못 읽는다.
+        """
+        if not any(w in self.name for w in ("목록", "리스트", "주택내역")):
+            return False
+        if self.ext == "pdf":
+            return "보유" not in self.name
+        return self.ext in ("xlsx", "xlsm")
 
 
 def find_attachments(page_html: str) -> list[LhAttachment]:

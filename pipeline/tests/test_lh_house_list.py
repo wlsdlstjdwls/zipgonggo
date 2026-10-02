@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from zipgonggo_pipeline.parsers.lh_house_list import _clean_name, build_rows, parse_house_list
+from zipgonggo_pipeline.parsers.lh_house_list import _clean_name, _join_wrapped, build_rows, parse_house_list
 from zipgonggo_pipeline.sources.lh import LhAttachment, find_attachments, pan_id
 from zipgonggo_pipeline.stages.s3_lh_units import only_region
 
@@ -140,3 +140,38 @@ def test_find_attachments_and_pan_id():
     assert not LhAttachment("1", "보유주택목록.pdf").is_house_list
     url = "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300020843&mi=1026"
     assert pan_id(url) == "2015122300020843"
+
+
+def test_list_attachment_names():
+    # 경기남부는 「공급대상주택내역」, 3차 전국 공고는 PDF 목록. 보유주택목록 PDF는 호실이 아니라 집계다
+    assert LhAttachment("1", "('26-3차)청년매입임대공급대상주택내역.xlsx").is_house_list
+    assert LhAttachment("1", "2026년3차청년매입임대주택공급주택목록.pdf").is_house_list
+    assert not LhAttachment("1", "일반매입임대주택보유주택목록(전남광주통합특별시서구).pdf").is_house_list
+    assert not LhAttachment("1", "2026년청년매입임대QnA.pdf").is_house_list
+
+
+def test_pdf_list_repeats_header_every_page():
+    # 2쪽짜리 PDF. 쪽마다 머리행 두 줄이 다시 나온다 — 빼고 세면 공고 39호와 같다
+    units = parse_house_list((FIX / "21290_gwangju_newlywed1.pdf.bin").read_bytes())
+    assert len(units) == 39
+    u = units[0]
+    assert u.address == "전남광주통합특별시 서구 운천로154번길 30-5(쌍촌동) 대명빌"
+    assert (u.ho, u.area, u.floor, u.elevator) == ("302A", Decimal("64.35"), 3, "N")
+    # 첫 금액 묶음(수급자 등)이 보증금과 임대료다
+    assert (u.deposit, u.rent) == (7_068_000, 250_270)
+    complexes, rows = build_rows(units, default_sido="전남광주통합특별시")
+    assert len(complexes) == 19 and len(rows) == 39
+    # 광주 네 구와 목포. 「후광대로 143번안길」처럼 띄어 쓴 번안길이 시군구로 새지 않아야 한다
+    assert {c["sigungu"] for c in complexes} == {"서구", "남구", "북구", "광산구", "목포시"}
+
+
+@pytest.mark.parametrize("raw, want", [
+    ("전남광주통합특별시 북구 우치로110번\n길 9-11(용봉동)", "전남광주통합특별시 북구 우치로110번길 9-11(용봉동)"),
+    ("전남광주통합특별시 남구 대남대로85\n번길 5(방림동)", "전남광주통합특별시 남구 대남대로85번길 5(방림동)"),
+    ("전남광주통합특별시 동구 무등로\n374(계림동,두산위브)", "전남광주통합특별시 동구 무등로 374(계림동,두산위브)"),
+    ("광산구 선운중앙\n로 45(선암동,선운 모아엘가)", "광산구 선운중앙로 45(선암동,선운 모아엘가)"),
+    ("무안군 삼향읍 후광대\n로 324 남악도휘에드가7차오피스텔", "무안군 삼향읍 후광대로 324 남악도휘에드가7차오피스텔"),
+    ("광주 북구\n로데오빌", "광주 북구 로데오빌"),
+])
+def test_pdf_cell_line_breaks(raw, want):
+    assert _join_wrapped(raw) == want
