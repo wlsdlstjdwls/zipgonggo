@@ -283,13 +283,13 @@ private 저장소 Free는 **월 2,000분**이다. 매시 = 월 730회.
 
 ### 2. 주소 요약DB 릴리스
 
-전국본 `entrance.sqlite`는 641만 행 1.16GB라 CI가 매번 받기엔 무겁고 커밋도 금지다.
-수도권만 추리면 **173만 행 301MB(gz 48MB)** 로 떨어지는데, 실측에서 전국본과 매칭 결과가 완전히 같았다
-(1,226행 중 1,060 매칭 · 미스 166 — 양쪽 동일, 2026-09-10).
+CI는 **전국본** `entrance.sqlite.gz`(641만 행, 1.16GB → gz 195MB)를 받는다(2026-10-02부터).
+그 전엔 수도권 축소본(`entrance-capital`, gz 48MB)을 썼다 — SH·청년안심주택만 다룰 땐 전국본과 결과가 같았는데
+**LH 주택목록은 전국이라** 축소본으론 지방 단지 좌표가 빈다. 축소본은 릴리스에 그대로 남겨 둔다(로컬 시험용).
 
 ```bash
-cd pipeline && python scripts/make_capital_juso.py
-gh release upload juso-data data/juso/entrance-capital.sqlite.gz --clobber
+cd pipeline/data/juso && gzip -k -f entrance.sqlite
+gh release upload juso-data entrance.sqlite.gz --clobber -R wlsdlstjdwls/zipgonggo
 ```
 
 행안부가 원본을 갱신하면(월 단위) 다시 만들어 올린다. 산출물은 커밋하지 않는다.

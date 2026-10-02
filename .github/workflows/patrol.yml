@@ -210,13 +210,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p data/juso
-          gh release download juso-data --pattern 'entrance-capital.sqlite.gz' --clobber --dir data/juso
-          gunzip -f data/juso/entrance-capital.sqlite.gz
+          # 전국본(gz 195MB). LH 주택목록이 전국이라 수도권 축소본으론 지방 단지가 빈다(2026-10-02)
+          gh release download juso-data --pattern 'entrance.sqlite.gz' --clobber --dir data/juso
+          gunzip -f data/juso/entrance.sqlite.gz
 
       - name: S6 주소-좌표 조인
         run: |
           set -o pipefail
-          python -m zipgonggo_pipeline.stages.s6_geocode --db data/juso/entrance-capital.sqlite --juso-api > s6.json
+          python -m zipgonggo_pipeline.stages.s6_geocode --db data/juso/entrance.sqlite --juso-api > s6.json
           cat s6.json
           {
             echo "## 좌표"
