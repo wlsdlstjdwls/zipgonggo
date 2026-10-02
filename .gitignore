@@ -37,6 +37,9 @@ pipeline/data/ish/
 # 청년안심주택(민간임대) 첨부 공고문 PDF — s3_youth가 받아 둔 원본
 pipeline/data/youth/
 
+# LH 첨부 공급주택목록 엑셀 — s3_lh_units가 받아 둔 원본. 47MB짜리도 있다
+pipeline/data/lh/
+
 # OG 생성용 글꼴 — 필요할 때 내려받는다(design/brand/README.md)
 design/brand/Pretendard-*.otf
 

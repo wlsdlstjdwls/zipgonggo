@@ -199,6 +199,15 @@ jobs:
           done
           echo "fail=$fail" >> "$GITHUB_OUTPUT"
 
+      # LH 매입임대·든든전세의 주택 주소는 첨부 「공급주택목록」 엑셀에만 있다(마이홈 API는 시군구까지).
+      # 아직 단지가 없는 공고만(기본 선택) 최신 30건. 수집 허용은 2026-09-08에 받았다(docs/data-sources.md 6절)
+      - name: S3 LH 공급주택목록
+        run: |
+          set -o pipefail
+          python -m zipgonggo_pipeline.stages.s3_lh_units --limit 30 > s3-lh.json
+          cat s3-lh.json
+          jq -r '"- LH 주택목록 — 공고 \(.updated)건 / 호실 \(.inserted)건" + (if (.skipped | length) > 0 then " (건너뜀 \(.skipped))" else "" end)' s3-lh.json >> "$GITHUB_STEP_SUMMARY"
+
       # 민간임대 첨부 PDF — 아직 공급현황이 없는 공고만(기본 선택) 최신 20건. 표 없는 첨부는 no_table로 남고 다음 회차에 또 본다
       - name: S3 청년안심주택 첨부 공고문
         run: |

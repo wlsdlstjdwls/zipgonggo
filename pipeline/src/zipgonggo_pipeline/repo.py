@@ -103,24 +103,23 @@ def replace_notice_complexes(cur, notice_id: int, rows: list[dict[str, Any]]) ->
         (notice_id,),
     )
     cur.execute("DELETE FROM notice_complex WHERE notice_id = %s", (notice_id,))
-    for r in rows:
-        cur.execute(
-            """
-            INSERT INTO notice_complex
-              (notice_id, name, sido, sigungu, road_address, zone, is_new, source_page,
-               complex_code, unit_count, min_deposit, min_rent, area_min, area_max, heating)
-            VALUES (%(notice_id)s, %(name)s, %(sido)s, %(sigungu)s, %(road_address)s, %(zone)s, %(is_new)s, %(source_page)s,
-                    %(complex_code)s, %(unit_count)s, %(min_deposit)s, %(min_rent)s, %(area_min)s, %(area_max)s, %(heating)s)
-            ON CONFLICT (notice_id, name, road_address) DO UPDATE SET
-              unit_count = COALESCE(notice_complex.unit_count, 0) + COALESCE(EXCLUDED.unit_count, 0),
-              min_deposit = LEAST(notice_complex.min_deposit, EXCLUDED.min_deposit),
-              min_rent = LEAST(notice_complex.min_rent, EXCLUDED.min_rent),
-              area_min = LEAST(notice_complex.area_min, EXCLUDED.area_min),
-              area_max = GREATEST(notice_complex.area_max, EXCLUDED.area_max)
-            """,
-            {"notice_id": notice_id, "zone": None, "complex_code": None, "unit_count": None, "heating": None,
-             "min_deposit": None, "min_rent": None, "area_min": None, "area_max": None, **r},
-        )
+    cur.executemany(
+        """
+        INSERT INTO notice_complex
+          (notice_id, name, sido, sigungu, road_address, zone, is_new, source_page,
+           complex_code, unit_count, min_deposit, min_rent, area_min, area_max, heating)
+        VALUES (%(notice_id)s, %(name)s, %(sido)s, %(sigungu)s, %(road_address)s, %(zone)s, %(is_new)s, %(source_page)s,
+                %(complex_code)s, %(unit_count)s, %(min_deposit)s, %(min_rent)s, %(area_min)s, %(area_max)s, %(heating)s)
+        ON CONFLICT (notice_id, name, road_address) DO UPDATE SET
+          unit_count = COALESCE(notice_complex.unit_count, 0) + COALESCE(EXCLUDED.unit_count, 0),
+          min_deposit = LEAST(notice_complex.min_deposit, EXCLUDED.min_deposit),
+          min_rent = LEAST(notice_complex.min_rent, EXCLUDED.min_rent),
+          area_min = LEAST(notice_complex.area_min, EXCLUDED.area_min),
+          area_max = GREATEST(notice_complex.area_max, EXCLUDED.area_max)
+        """,
+        [{"notice_id": notice_id, "zone": None, "complex_code": None, "unit_count": None, "heating": None,
+          "min_deposit": None, "min_rent": None, "area_min": None, "area_max": None, **r} for r in rows],
+    )
     cur.execute(
         """
         UPDATE notice_complex c SET geom = COALESCE(g.geom, c.geom), geo_precision = COALESCE(g.geo_precision, c.geo_precision),
@@ -165,26 +164,31 @@ def replace_units(cur, notice_id: int, rows: list[dict[str, Any]]) -> int:
 
     별첨 주택목록(sh_units)에서만 나오는 값이다 — 동·호·구조(원룸/투룸)·승강기·전환 금액.
     unit_key는 공고 안에서만 유일하면 된다: 「단지코드-호」(0001J-0201).
+    LH 주택목록에는 단지코드가 없어 `nc_name`·`nc_road`(단지 이름·주소)로 잇는다 — 둘 다 replace_notice_complexes의 유일키다.
     """
     cur.execute("DELETE FROM unit WHERE notice_id = %s", (notice_id,))
-    for r in rows:
-        cur.execute(
-            """
-            INSERT INTO unit
-              (notice_id, notice_complex_id, unit_key, road_address, complex_name, building, room, floor,
-               sido, sigungu, area_m2, deposit, rent, deposit_jeonse, rent_jeonse, deposit_wolse, rent_wolse,
-               room_layout, elevator, has_elevator, seq, source_page)
-            VALUES (%(notice_id)s,
-                    (SELECT id FROM notice_complex
-                      WHERE notice_id = %(notice_id)s AND complex_code = %(complex_code)s LIMIT 1),
-                    %(unit_key)s, %(road_address)s, %(complex_name)s, %(building)s, %(room)s, %(floor)s,
-                    %(sido)s, %(sigungu)s, %(area_m2)s, %(deposit)s, %(rent)s,
-                    %(deposit_jeonse)s, %(rent_jeonse)s, %(deposit_wolse)s, %(rent_wolse)s,
-                    %(room_layout)s, %(elevator)s, %(has_elevator)s, %(seq)s, %(source_page)s)
-            ON CONFLICT (notice_id, unit_key) DO NOTHING
-            """,
-            {"notice_id": notice_id, **r},
-        )
+    # executemany는 psycopg 3.1부터 파이프라인으로 한 번에 보낸다. 줄마다 execute하면 Neon 왕복(230ms)이 호실 수만큼 쌓여
+    # LH 경기남부 631호 공고 하나에 2분 넘게 걸렸다(2026-10-02)
+    cur.executemany(
+        """
+        INSERT INTO unit
+          (notice_id, notice_complex_id, unit_key, road_address, complex_name, building, room, floor,
+           sido, sigungu, area_m2, deposit, rent, deposit_jeonse, rent_jeonse, deposit_wolse, rent_wolse,
+           room_layout, elevator, has_elevator, seq, source_page)
+        VALUES (%(notice_id)s,
+                COALESCE(
+                  (SELECT id FROM notice_complex
+                    WHERE notice_id = %(notice_id)s AND complex_code = %(complex_code)s LIMIT 1),
+                  (SELECT id FROM notice_complex
+                    WHERE notice_id = %(notice_id)s AND name = %(nc_name)s AND road_address = %(nc_road)s LIMIT 1)),
+                %(unit_key)s, %(road_address)s, %(complex_name)s, %(building)s, %(room)s, %(floor)s,
+                %(sido)s, %(sigungu)s, %(area_m2)s, %(deposit)s, %(rent)s,
+                %(deposit_jeonse)s, %(rent_jeonse)s, %(deposit_wolse)s, %(rent_wolse)s,
+                %(room_layout)s, %(elevator)s, %(has_elevator)s, %(seq)s, %(source_page)s)
+        ON CONFLICT (notice_id, unit_key) DO NOTHING
+        """,
+        [{"notice_id": notice_id, "nc_name": None, "nc_road": None, **r} for r in rows],
+    )
     return len(rows)
 
 
