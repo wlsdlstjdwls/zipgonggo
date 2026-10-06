@@ -41,8 +41,10 @@ export function recruitedTypeCodes(housingType: string, title: string): string[]
   const out = new Set<string>();
 
   if (housingType === "매입임대") {
-    // 든든전세(HUG)는 매입임대 유형 어느 것과도 같지 않다 — 손대지 않고 제도 전체를 보여 준다
-    if (t.includes("든든전세")) return [];
+    // 든든전세는 매입임대 유형 어느 것과도 같지 않다. 전에는 손대지 않고 매입임대 6종을 다 펼쳤는데
+    // 든든전세 공고에 청년/신혼 카드만 늘어섰다(사용자 지적 2026-10-06). 시드의 든든전세 카드(safe,
+    // housing_type 든든전세)를 세우고 매입임대 6종은 접어 둔다 — 소득과 자산 무관, 무주택 세대구성원 추첨
+    if (t.includes("든든전세")) return ["safe"];
     if (t.includes("장기미임대")) out.add("buy_long");
     if (t.includes("공공전세")) out.add("pub_ls");
     if (t.includes("청년") || t.includes("기숙사형")) out.add("buy_youth");

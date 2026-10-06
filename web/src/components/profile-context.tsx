@@ -26,6 +26,9 @@ type Ctx = {
   profile: UserProfile;
   /** localStorage를 한 번 읽고 난 뒤 true. 화면은 이때 제 폼에 값을 얹는다 */
   ready: boolean;
+  /** 사람이 넣은 값이 있다(브라우저나 계정에 저장분이 있거나 이번에 고쳤다). false면 profile은 기본값일 뿐이라
+   *  남의 조건처럼 판정을 매기면 안 된다 — 공고 신청자격 카드의 판정이 이걸 본다(2026-10-06) */
+  saved: boolean;
   /** 계정 저장이 켜져 있다(서버에 행이 있다). 로그아웃이면 언제나 false */
   sync: boolean;
   /** 아직 서버에 물어보는 중 */
@@ -92,6 +95,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const { toast } = useSave();
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [ready, setReady] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [sync, setSyncState] = useState(false);
   const [syncLoading, setSyncLoading] = useState(true);
 
@@ -108,11 +112,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     const local = readLocal();
     if (local) {
       setProfile(local.p);
+      setSaved(true);
       updatedAt.current = local.updatedAt;
     } else {
       const moved = migrateLegacy();
       if (moved) {
         setProfile(moved);
+        setSaved(true);
         updatedAt.current = new Date().toISOString();
         writeLocal({ p: moved, updatedAt: updatedAt.current });
       }
@@ -160,6 +166,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
             return merged;
           });
           updatedAt.current = d.updatedAt ?? "";
+          setSaved(true);
           toast("계정에 저장해 둔 조건을 불러왔습니다");
         }
       } catch {
@@ -195,6 +202,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const patch = useCallback((part: Partial<UserProfile>) => {
     dirty.current = true;
+    setSaved(true);
     setProfile((prev) => {
       const next = sanitizeProfile({ ...prev, ...part });
       const at = new Date().toISOString();
@@ -230,8 +238,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, [user, profile, putServer, toast]);
 
   const value = useMemo<Ctx>(
-    () => ({ profile, ready, sync, syncLoading, patch, setSync }),
-    [profile, ready, sync, syncLoading, patch, setSync],
+    () => ({ profile, ready, saved, sync, syncLoading, patch, setSync }),
+    [profile, ready, saved, sync, syncLoading, patch, setSync],
   );
   return <ProfileCtx.Provider value={value}>{children}</ProfileCtx.Provider>;
 }

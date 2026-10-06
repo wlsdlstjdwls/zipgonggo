@@ -9,6 +9,7 @@ import { ComplexFactsSection } from "@/components/complex-facts";
 import { DetailAside } from "@/components/detail-aside";
 import { DetailHeadBar } from "@/components/detail-headbar";
 import { DetailNav } from "@/components/detail-nav";
+import { EligRuleCards, type RuleCardView } from "@/components/elig-rule-cards";
 import { ExternalLink } from "@/components/external-link";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
@@ -80,7 +81,7 @@ function Stamped({ v, pre }: { v: Stamp; pre?: string }) {
   );
 }
 
-type RuleCard = { key: string; title: string; sub: string; right: string | null; lines: { label: string; text: string }[]; note: string | null };
+type RuleCard = Omit<RuleCardView, "lines"> & { lines: { label: string; text: string }[] };
 
 // 신청자격 카드 — 유형마다 빠진 항목이 달라 가로로 훑을 수가 없었다(2026-09-21).
 // 쓰이는 기준을 모두 모아 같은 차례로 세우고, 그 유형이 안 보는 기준은 감추지 않고 「해당 없음」이라 쓴다.
@@ -102,38 +103,14 @@ function alignCards(cards: RuleCard[], align: boolean) {
         ...c,
         lines: slots.map((s) => {
           const h = c.lines.find((l) => slotOf(l.label) === s);
-          return h ? { label: h.label, text: h.text, off: false } : { label: s, text: "해당 없음", off: true };
+          // 「해당 없음」은 내가 해당하지 않는다는 말로 읽혔다(2026-10-06) — 이 유형이 그 기준을 안 본다는 뜻을 그대로 쓴다
+          return h ? { label: h.label, text: h.text, off: false } : { label: s, text: "보지 않음", off: true };
         }),
       }))
     : cards.map((c) => ({ ...c, lines: c.lines.map((l) => ({ label: l.label, text: l.text, off: false })) }));
   const anyNote = align && out.some((c) => c.note);
   // 칸 맞춤에 쓸 줄 수 — 머리줄 + 기준 줄들 + (메모 줄)
   return { cards: out, align, anyNote, rows: 1 + slots.length + (anyNote ? 1 : 0) };
-}
-
-function EligCards({ block }: { block: ReturnType<typeof alignCards> }) {
-  return (
-    /* 표(가로 스크롤)는 좁은 화면에서 유형 열이 밀려나 안 보인다는 지적(2026-09-09) — 자가진단
-       카드(elig-card/elig-why)와 같은 모양으로 유형 하나당 카드 하나씩 쌓는다 */
-    <ul className={`elig-list${block.align ? " elig-align" : ""}`} style={block.align ? ({ "--rows": block.rows } as React.CSSProperties) : undefined}>
-      {block.cards.map((c) => (
-        <li key={c.key} className="elig-card">
-          <div className="elig-card-h">
-            <b>{c.title}</b>
-            <span>{c.sub}</span>
-            {c.right && <span className="elig-card-r"><small>{c.right}</small></span>}
-          </div>
-          <ul className="elig-why">
-            {c.lines.map((l) => (
-              <li key={l.label} className={l.off ? "off" : undefined}><span>{l.label}</span><p>{l.text}</p></li>
-            ))}
-          </ul>
-          {/* 메모가 있는 카드가 하나라도 있으면 없는 카드도 자리를 비워 둔다 — 안 그러면 칸 맞춤이 한 줄씩 어긋난다 */}
-          {block.anyNote && (c.note ? <p className="elig-memo">{c.note}</p> : <p className="elig-memo" aria-hidden="true" />)}
-        </li>
-      ))}
-    </ul>
-  );
 }
 
 function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
@@ -180,13 +157,33 @@ export default async function NoticePage({ params }: Params) {
   // 정작 이 공고 유형이 묻혔다(사용자 지적 2026-09-21). 못 고르면 예전처럼 전부 그린다.
   // 고른 뒤에도 나머지를 지우지 않고 접어 둔다 — 제목으로 가른 것이라 틀렸을 때 길이 막히면 안 된다
   const picked = allTypes.length ? recruitedTypeCodes(n.housing_type, n.title) : [];
-  const hit = allTypes.filter((t) => picked.includes(t.code));
+  // 든든전세는 매입임대 유형이 아니라 따로 선 시드(safe, housing_type 든든전세)라 allTypes 밖에서 찾는다
+  const hit = eligRules.types.filter((t) => picked.includes(t.code));
   const eligTypes = hit.length ? hit : allTypes;
   const restTypes = hit.length ? allTypes.filter((t) => !picked.includes(t.code)) : [];
   const minganCards = isMingan ? minganRuleCards(eligRules.types) : [];
   // 공급현황 표를 못 읽은 공고(첨부가 안내문이거나 CID 폰트)는 고를 주택형이 없어 「내 조건」을 띄우지 않는다
   const minganFit = isMingan && supply.length > 0;
-  const cardOf = (t: (typeof eligRules.types)[number]): RuleCard => ({ key: t.code, title: t.category, sub: t.name, right: t.ranking_method, lines: ruleLines(t), note: t.note });
+  // 소득 줄에 %만 있으면 얼마인지 알려면 접힌 표를 열어 맞춰 봐야 했다(사용자 지적 2026-10-06) — 1인 가구 금액을 바로 붙인다.
+  // 내 가구원수 기준 금액은 저장된 조건이 있을 때 판정 줄(EligRuleCards)이 따로 말한다
+  const oneLimit = (pct: number | null) => (pct == null ? null : eligRules.income.find((r) => r.household === 1 && r.pct === pct)?.monthly_won ?? null);
+  const cardOf = (t: (typeof eligRules.types)[number]): RuleCard => ({
+    key: t.code,
+    title: t.category,
+    // 시드의 든든전세 카드는 HUG 이름표를 달고 있다 — LH 공고에서 「(HUG)」를 달면 다른 기관 공고처럼 읽힌다
+    sub: t.code === "safe" && !/HUG|주택도시보증/.test(n.agency) ? "" : t.name,
+    // 시드의 「무관」은 선정 방식이 아니라 빈칸이다 — 오른쪽 꼬리표로 달면 뜻이 없다
+    right: t.ranking_method && t.ranking_method !== "무관" ? t.ranking_method : null,
+    lines: ruleLines(t).map((l) => {
+      const lim = l.label === "소득" ? oneLimit(t.income_pct) : null;
+      return lim ? { ...l, text: `${l.text} (1인 가구 월 ${won(lim)})` } : l;
+    }),
+    note: t.note,
+    // 판정에 안 쓰는 배점/순위 칸은 덜어 낸다 — 카드마다 통째로 실으면 RSC 짐이 유형 수만큼 불어난다
+    type: { ...t, score: {}, ranks: [], general_ranks: [], note: null },
+  });
+  // 제목이 다른 제도(든든전세)를 가리키면 절 머리도 그 제도 이름으로
+  const ruleHousing = eligTypes.every((t) => t.housing_type === eligTypes[0]?.housing_type) && eligTypes[0]?.housing_type ? eligTypes[0].housing_type : n.housing_type;
   const ruleCards: RuleCard[] = minganCards.length
     ? minganCards.map((c) => ({ key: c.title, title: c.title, sub: c.sub, right: null, lines: c.lines, note: null }))
     : eligTypes.map(cardOf);
@@ -311,6 +308,8 @@ export default async function NoticePage({ params }: Params) {
   // 민간임대 카드(공통/특별공급/일반공급)는 **서로 대등한 유형이 아니다** — 한 제도를 세 측면으로 쪼갠 것이라
   // 공통 카드의 빈 소득 줄을 「해당 없음」으로 채우면 "소득을 안 본다"는 거짓말이 된다. 칸 맞춤은 유형 카드에만 건다
   const mainBlock = alignCards(ruleCards, minganCards.length === 0);
+  // 판정은 지역 제한이 「서울」인 유형만 등급표를 본다 — 서울 등급 줄만 넘겨 클라이언트 짐을 줄인다
+  const seoulTiers = eligRules.tiers.filter((t) => t.tier === "서울");
   const restBlock = alignCards(restTypes.map(cardOf), true);
 
   // 차례 — 머리글 밑에 붙어 따라다닌다(components/detail-nav.tsx). 여기 적힌 id는 아래 섹션의 id와 같아야 한다
@@ -488,17 +487,17 @@ export default async function NoticePage({ params }: Params) {
 
           {ruleCards.length > 0 && (
             <section className="dsec" id="eligibility">
-              <h2>신청자격 <small className="dsec-src">{minganCards.length ? "청년안심주택 민간임대 제도 기준" : `${n.housing_type} 제도 일반 기준`}</small></h2>
+              <h2>신청자격 <small className="dsec-src">{minganCards.length ? "청년안심주택 민간임대 제도 기준" : `${ruleHousing} 제도 일반 기준`}</small></h2>
               <p className="ne-sum">
                 {minganCards.length
                   ? <>특별공급과 일반공급으로 나뉩니다. 이 공고가 실제로 모집하는 계층과 세부 조건은 {L.originalDoc} 기준.</>
                   : restTypes.length > 0
-                    ? <>공고 제목이 가리키는 유형은 <b>{eligTypes.map((t) => t.name).join(" | ")}</b>입니다. 세부 조건은 {L.originalDoc} 기준.</>
+                    ? <>공고 제목이 가리키는 유형은 <b>{eligTypes.map((t) => (t.code === "safe" ? t.category : t.name)).join(" | ")}</b>입니다. 세부 조건은 {L.originalDoc} 기준.</>
                     : <>유형 {eligTypes.length}개. 이 공고가 실제로 모집하는 유형과 세부 조건은 {L.originalDoc} 기준.</>}{" "}
                 {/* 자격진단은 아직 안 열었다 — 운영자에게만 보인다(2026-09-21) */}
                 <AdminOnly><Link href={ROUTES.eligibility}>내 조건으로 진단하기 →</Link></AdminOnly>
               </p>
-              <EligCards block={mainBlock} />
+              <EligRuleCards block={mainBlock} income={eligRules.income} tiers={seoulTiers} />
 
               {/* 제목으로 가른 것이라 틀릴 수 있다 — 나머지 유형을 지우지 않고 접어 둔다 */}
               {restBlock.cards.length > 0 && (
@@ -507,7 +506,7 @@ export default async function NoticePage({ params }: Params) {
                     <b>{n.housing_type} 제도의 다른 유형 {restBlock.cards.length}가지</b>
                     <small>이 공고에는 해당하지 않을 수 있습니다</small>
                   </summary>
-                  <div className="ne-fold-body"><EligCards block={restBlock} /></div>
+                  <div className="ne-fold-body"><EligRuleCards block={restBlock} income={eligRules.income} tiers={seoulTiers} /></div>
                 </details>
               )}
 

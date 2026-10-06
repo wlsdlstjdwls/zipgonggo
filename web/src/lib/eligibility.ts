@@ -90,7 +90,7 @@ function checkAge(t: SupplyType, p: Profile): Check | null {
   const bounded = t.age_min > 0 || t.age_max < 999;
   if (!bounded) return null;
   const exempt = has(t.age_exempt, p.classes);
-  const range = `${t.age_min}~${t.age_max === 999 ? "제한 없음" : `${t.age_max}세`}`;
+  const range = ageRange(t);
   if (exempt) return { label: "나이", ok: true, detail: `${t.age_exempt.join(" | ")} 해당이라 나이 제한 면제` };
   const ok = p.age >= t.age_min && p.age <= t.age_max;
   return { label: "나이", ok, detail: `기준 ${range}, 입력 ${p.age}세` };
@@ -222,10 +222,17 @@ export function diagnoseAll(p: Profile, rules: EligibilityRules): Verdict[] {
 // 공고상세용 — 프로필 없이 유형 사양 자체를 문구로 보여준다. diagnose()의 조건 계산과 같은 기준을 쓰되
 // 통과/미달을 매기지 않는다. null이면 그 항목은 이 유형에서 안 보는 기준이라 화면에서도 뺀다.
 
+/** 「19~제한 없음」은 읽히지 않는다(사용자 지적 2026-10-06) — 한쪽만 막혔으면 「19세 이상」 「39세 이하」로 */
+function ageRange(t: SupplyType): string {
+  if (t.age_max >= 999) return `${t.age_min}세 이상`;
+  if (t.age_min <= 0) return `${t.age_max}세 이하`;
+  return `${t.age_min}~${t.age_max}세`;
+}
+
 export function ageRuleText(t: SupplyType): string {
   const bounded = t.age_min > 0 || t.age_max < 999;
   if (!bounded) return "나이 제한 없음";
-  const range = `${t.age_min}~${t.age_max === 999 ? "제한 없음" : `${t.age_max}세`}`;
+  const range = ageRange(t);
   return t.age_exempt.length ? `${range} (${t.age_exempt.join("/")}은 면제)` : range;
 }
 
