@@ -19,7 +19,7 @@ import { absoluteUrl } from "@/lib/site-url";
 export const revalidate = 3600;
 export const preferredRegion = "iad1";
 
-const TITLE = "공공임대 사업 한눈에 — 유형별 정부 임대주택 사업 정리";
+const TITLE = "임대 종류 한눈에 — 공공임대 유형과 정부 사업 정리";
 const DESCRIPTION =
   "행복주택, 국민임대, 매입임대부터 든든전세, 미리내집, 장기미임대, 신혼신생아 매입임대까지. 정부 임대주택 사업을 유형별로 묶어 제도 설명과 모집공고를 모았다.";
 
@@ -55,7 +55,7 @@ export default async function ProgramIndexPage() {
     },
     breadcrumb(crumbId, [
       { name: "공고 목록", path: ROUTES.home },
-      { name: "임대주택 사업", path: ROUTES.program },
+      { name: "임대 종류", path: ROUTES.program },
     ]),
   ];
 
@@ -66,7 +66,7 @@ export default async function ProgramIndexPage() {
         <Link href={ROUTES.home} className="back">← 목록</Link>
       </div>
       <div className="legal-in">
-        <h1>공공임대 사업 한눈에</h1>
+        <h1>임대 종류 한눈에</h1>
         <p className="legal-eff">유형 {num(types.length, "개")} | 사업 {num(Object.keys(PROGRAM_DOCS).length, "개")} | {SITE_NAME}</p>
         <div className="legal-body">
           <p>

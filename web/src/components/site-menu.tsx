@@ -66,6 +66,7 @@ export function SiteMenu() {
         <div className="acct-menu smenu-panel" role="menu">
           {/* 자격진단은 2026-10-06에 열었다(사용자 결정) */}
           <Link href={ROUTES.eligibility} role="menuitem">자격진단</Link>
+          <Link href={ROUTES.program} role="menuitem">임대 종류</Link>
           <Link href={ROUTES.my} role="menuitem">
             관심공고
             {n > 0 && <em className="nav-badge">{n}</em>}

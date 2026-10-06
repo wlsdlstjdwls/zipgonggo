@@ -111,7 +111,7 @@ export default async function ProgramHubPage({ params }: Params) {
     },
     breadcrumb(crumbId, [
       { name: "공고 목록", path: ROUTES.home },
-      { name: "임대주택 사업", path: ROUTES.program },
+      { name: "임대 종류", path: ROUTES.program },
       { name: program, path: programPath(program) },
     ]),
   ];
@@ -120,7 +120,7 @@ export default async function ProgramHubPage({ params }: Params) {
     <article className="stage legal">
       <JsonLd graph={graph} />
       <div className="crumb">
-        <Link href={ROUTES.program} className="back">← 사업 전체</Link>
+        <Link href={ROUTES.program} className="back">← 임대 종류 전체</Link>
       </div>
       <div className="legal-in">
         <h1>{program}</h1>

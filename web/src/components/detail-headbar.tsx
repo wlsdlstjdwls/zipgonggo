@@ -56,6 +56,7 @@ export function DetailHeadBar({ title, sub, state, back, action }: Props) {
             <nav className="dhb-nav" aria-label="주요 메뉴">
               {/* 헤더와 같은 규칙 — 2026-10-06에 열었다 */}
               <Link href={ROUTES.eligibility} tabIndex={on ? 0 : -1}>자격진단</Link>
+              <Link href={ROUTES.program} tabIndex={on ? 0 : -1}>임대 종류</Link>
             </nav>
             <span className="dhb-div" aria-hidden="true" />
             <Link href={back.href} className="dhb-back" tabIndex={on ? 0 : -1}>{back.label}</Link>
