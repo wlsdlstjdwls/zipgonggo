@@ -1595,7 +1595,7 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-head h1 { font-size: 26px; font-weight: 900; letter-spacing: -0.03em; }
 .elig-head p { margin: 8px 0 0; max-width: 46em; font-size: 14px; line-height: 1.75; color: var(--mut); }
 
-.elig { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 28px; padding: 18px 0; }
+.elig { flex: 1; min-height: 0; display: grid; grid-template-columns: 380px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 28px; padding: 18px 0; }
 /* 왼쪽 조건과 오른쪽 결과는 따로 굴린다(사용자 요청 2026-09-22) — 한 덩이로 굴리면 결과를 내려 보는 동안
    조건 칸이 화면 밖으로 빠져 값을 고치려면 다시 올라가야 한다. 두 칸 다 뷰포트 높이에 맞춰 잘라
    제 안에서만 스크롤한다. 셀렉트 목록은 body로 포털돼 캡처 단계 스크롤을 따라오니 잘리지 않는다(select.tsx) */
@@ -1663,6 +1663,89 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-out h2.mute b { color: var(--mut); }
 .elig-out h2 small { font-weight: 700; font-size: 12.5px; color: var(--dim); }
 .elig-none { margin: 0; padding: 18px; border: 1px dashed var(--line2); border-radius: var(--r-card); font-size: 14px; color: var(--mut); }
+
+/* ── 자격진단 개편(2026-10-06, 사용자 요청 「보기 편하고 가독성 가시성 높이고」) ──
+   입력은 주제별 다섯 덩이(ej-sec), 결과는 요약 셋(ej-sum) → 가능 → 열린 공고 → 한 가지만 걸림 → 접힌 어려움.
+   .elig-grid 같은 공용 클래스는 공고 지면 「내 조건」도 쓰므로 여기서 고치는 건 .ej-form 안으로 가둔다 */
+.ej-form { gap: 12px; }
+.ej-sec { display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 15px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
+.ej-sec h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 900; letter-spacing: -0.02em; color: var(--ink); }
+.ej-sec h3 i { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--acc); color: #fff; font-style: normal; font-size: 11.5px; font-weight: 900; }
+.ej-sec h3 small { margin-left: auto; font-weight: 700; font-size: 12px; color: var(--dim); }
+.ej-form .elig-f > span:first-child { font-size: 12.5px; color: var(--mut); }
+.ej-form .elig-in, .ej-form .elig-seg button, .ej-form .sel { height: 38px; }
+.ej-form .elig-in input { font-size: 15px; font-weight: 700; }
+.ej-fhelp { display: block; font-size: 11.5px; line-height: 1.5; color: var(--dim); }
+.ej-fhelp b { font-weight: 800; color: var(--acc); }
+.ej-help { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--sub); font-size: 12px; line-height: 1.6; color: var(--mut); }
+.ej-form .elig-chk small { display: block; font-weight: 600; font-size: 11.5px; color: var(--dim); }
+.ej-form .elig-chk { align-items: flex-start; }
+.ej-form .elig-chk input { margin-top: 2px; }
+.ej-clsg { display: flex; flex-direction: column; gap: 6px; }
+.ej-clsg + .ej-clsg { margin-top: 4px; }
+.ej-clsg > b { font-weight: 800; font-size: 12px; color: var(--mut); }
+.ej-form .elig-chip { padding: 6px 11px; font-size: 13.5px; }
+
+.ej-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 8px; }
+.ej-sum a { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-card); text-decoration: none; background: var(--bg); }
+.ej-sum a b { font-size: 26px; font-weight: 900; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.ej-sum a span { font-weight: 800; font-size: 13px; color: var(--mut); }
+.ej-sum a.ok { border-color: rgba(21, 128, 61, 0.3); background: var(--success-bg); }
+.ej-sum a.ok b { color: var(--ok); }
+.ej-sum a.near { border-color: rgba(163, 92, 6, 0.28); background: var(--warn-soft); }
+.ej-sum a.near b { color: var(--warn); }
+.ej-sum a.far b { color: var(--mut); }
+.ej-note { margin: 0 0 22px; font-size: 12.5px; line-height: 1.6; color: var(--dim); }
+
+.ej-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; margin: 0 0 28px; padding: 0; list-style: none; }
+.ej-card { display: flex; flex-direction: column; gap: 10px; padding: 14px 15px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
+.ej-card.ok { border-color: rgba(21, 128, 61, 0.28); }
+.ej-card.near { border-color: rgba(163, 92, 6, 0.28); }
+.ej-card-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.ej-card-h b { font-weight: 900; font-size: 15.5px; letter-spacing: -0.02em; }
+.ej-card-h span { font-weight: 700; font-size: 14px; color: var(--mut); }
+.ej-badge { margin-left: auto; padding: 3px 9px; border-radius: 999px; font-style: normal; font-weight: 800; font-size: 12px; white-space: nowrap; }
+.ej-badge.ok { background: var(--success-bg); color: var(--ok); }
+.ej-badge.near { background: var(--warn-soft); color: var(--warn); }
+.ej-card-s { margin: 0; font-size: 13px; color: var(--mut); }
+.ej-gap { margin: 0; font-weight: 800; font-size: 14.5px; line-height: 1.5; color: var(--warn); }
+
+.ej-meter { display: flex; flex-direction: column; gap: 6px; }
+.ej-meter-t { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.ej-meter-t span { font-weight: 700; color: var(--mut); }
+.ej-meter-t b { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
+.ej-meter-t small { font-weight: 600; color: var(--dim); }
+.ej-meter-bar { position: relative; height: 7px; border-radius: 99px; background: var(--sub); }
+.ej-meter-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--ok); }
+.ej-meter-bar u { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); opacity: 0.35; }
+.ej-meter.over .ej-meter-bar i { background: var(--hot); }
+
+.ej-more summary { cursor: pointer; font-weight: 700; font-size: 12.5px; color: var(--acc); list-style: none; }
+.ej-more summary::-webkit-details-marker { display: none; }
+.ej-more summary::before { content: "+ "; }
+.ej-more[open] summary::before { content: "− "; }
+.ej-more .elig-why { margin-top: 8px; }
+
+.elig-out h2.ej-h-near b { color: var(--warn); }
+.ej-far { margin: 0 0 20px; border: 1px solid var(--line); border-radius: var(--r-card); }
+.ej-far summary { display: flex; align-items: baseline; gap: 8px; padding: 13px 15px; cursor: pointer; list-style: none; }
+.ej-far summary::-webkit-details-marker { display: none; }
+.ej-far summary b { font-weight: 900; font-size: 15px; color: var(--mut); }
+.ej-far summary small { font-weight: 600; font-size: 12.5px; color: var(--dim); }
+.ej-far summary::after { content: "펼치기"; margin-left: auto; font-weight: 700; font-size: 12.5px; color: var(--acc); }
+.ej-far[open] summary::after { content: "접기"; }
+.ej-farlist { margin: 0; padding: 0 15px 10px; list-style: none; }
+.ej-farlist li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+.ej-farlist b { font-weight: 800; font-size: 13.5px; }
+.ej-farlist b span { font-weight: 600; color: var(--mut); }
+.ej-farlist p { margin: 0; font-size: 12.5px; color: var(--dim); text-align: right; }
+@media (max-width: 560px) {
+  .ej-sum a { padding: 10px; }
+  .ej-sum a b { font-size: 22px; }
+  .ej-sum a span { font-size: 12px; }
+  .ej-farlist li { flex-direction: column; gap: 2px; }
+  .ej-farlist p { text-align: left; }
+}
 
 /* 진단 결과와 공고를 잇는 자리. 유형 목록에서 끝나면 「그래서 지금 뭘 넣나」에 답이 없다(2026-09-22) */
 .elig-open { margin: 0 0 30px; padding: 16px 18px; border: 1px solid var(--acc); border-radius: var(--r-card); background: var(--acc-soft); }
@@ -1906,6 +1989,19 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 }
 @media (max-width: 640px) {
   .elig-grid { grid-template-columns: 1fr; }
+  /* 자격진단 칸은 숫자 몇 자리라 폰에서도 두 칸이 들어간다 — 한 줄씩 쌓으면 폼이 화면 다섯 장이 된다 */
+  .ej-form .elig-grid { grid-template-columns: 1fr 1fr; }
+  .ej-form .elig-grid .elig-f.wide { grid-column: 1 / -1; }
+}
+.ej-jump { display: none; }
+/* 지름길로 내려오면 제목이 고정 머리글 밑에 깔렸다 — 머리글 높이만큼 띄워 멈춘다 */
+#ej-pass, #ej-near, #ej-far { scroll-margin-top: calc(var(--hdr) + 12px); }
+@container (max-width: 900px) {
+  .ej-jump { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    border-radius: var(--r-btn); background: var(--ink); color: #fff; text-decoration: none; box-shadow: 0 6px 20px rgba(15, 18, 22, 0.22); }
+  .ej-jump span { font-weight: 800; font-size: 14px; }
+  .ej-jump b { margin-left: auto; font-weight: 900; font-size: 14px; color: #8ff0b0; }
+  .ej-jump small { font-weight: 700; font-size: 12.5px; color: #ffd38a; }
 }
 
 

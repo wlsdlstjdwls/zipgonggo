@@ -137,10 +137,15 @@ function checkClass(t: SupplyType, p: Profile): Check | null {
   };
 }
 
+/** 시드의 소득 범위 코드를 화면 말로. 「청년특공_분기」(청년안심주택 민간 청년특공, 본인 소득으로 본다)가 그대로 새어 나왔다(2026-10-06) */
+function scopeLabel(scope: string): string {
+  return scope === "청년특공_분기" ? "본인" : scope;
+}
+
 function checkIncome(t: SupplyType, p: Profile, limit: number | null): Check | null {
   if (t.income_pct === null || limit === null) return null;
   const mine = incomeOf(t.income_scope, p);
-  const scope = t.income_scope === "본인+부모" ? "본인과 부모 합산(세대 합산으로 갈음)" : `${t.income_scope} 기준`;
+  const scope = t.income_scope === "본인+부모" ? "본인과 부모 합산(세대 합산으로 갈음)" : `${scopeLabel(t.income_scope)} 기준`;
   return {
     label: "소득",
     ok: mine <= limit,
@@ -250,7 +255,7 @@ export function classRuleText(t: SupplyType): string | null {
 
 export function incomeRuleText(t: SupplyType): string | null {
   if (t.income_pct === null) return null;
-  const scope = t.income_scope === "본인+부모" ? "본인+부모(세대 합산으로 갈음)" : t.income_scope;
+  const scope = t.income_scope === "본인+부모" ? "본인+부모(세대 합산으로 갈음)" : scopeLabel(t.income_scope);
   return `${scope} 도시근로자 월평균소득 ${t.income_pct}% 이하`;
 }
 

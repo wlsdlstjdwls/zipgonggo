@@ -7,11 +7,11 @@
 // (사용자 지적 2026-09-22). 그 한 벌은 브라우저에 있고, 로그인한 뒤 계정 저장을 켠 사람만 서버에도 사본을 둔다.
 // 장애 여부처럼 건강과 이어지는 계층은 켜도 서버로 가지 않는다(개인정보처리방침 3항).
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { classOptions, diagnoseAll, HOUSEHOLD_MAX, type Marital, type Profile, tierOf, type Verdict } from "@/lib/eligibility";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { type Check, classOptions, diagnoseAll, HOUSEHOLD_MAX, type Marital, type Profile, tierOf, type Verdict } from "@/lib/eligibility";
 import { fitJanggi, type FitProfile, type FitVerdict } from "@/lib/notice-fit";
-import { dateMD, daysUntil } from "@/lib/format";
-import { fromElig, reconcileRegion, toElig } from "@/lib/profile";
+import { dateMD, daysUntil, wonKo } from "@/lib/format";
+import { fromElig, reconcileRegion, SENSITIVE_CLASSES, toElig } from "@/lib/profile";
 import type { OpenSoonNotice, ResidenceArea, TypeHub } from "@/lib/queries";
 import { noticePath, typePath } from "@/lib/routes";
 import { SIDOS, sidoShort } from "@/lib/sido";
@@ -210,52 +210,96 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
     if (fix) patch(fix);
   }, [profileReady, profile, rules.tiers, patch]);
 
+  // 결과를 세 묶음으로 가른다(사용자 요청 2026-10-06: "가능/불가뿐이라 밋밋하다").
+  // 한 가지 기준만 걸린 유형은 「얼마나 모자라나」를 말해 줄 수 있어 따로 세운다 — 무엇을 바꾸면 되는지가 보인다
+  const near = fail.filter((v) => v.checks.filter((c) => !c.ok).length === 1);
+  const far = fail.filter((v) => v.checks.filter((c) => !c.ok).length > 1);
+  const classGroups = useMemo(() => groupClasses(classes), [classes]);
+
   return (
     <div className="elig">
-      <form className="elig-form" onSubmit={(e) => e.preventDefault()} aria-label="내 조건 입력">
-        <div className="elig-grid">
-          {/* 나이와 가구원 수를 한 줄에 세운다 — 나이만 두면 옆칸이 비어 줄 하나를 통째로 먹는다 */}
-          <Num label="나이" value={p.age} unit="세" onChange={(v) => set("age", v)} max={120} />
-          <Num label="가구원 수" value={p.household} unit="명" onChange={(v) => set("household", v)} min={1} max={HOUSEHOLD_MAX} />
-          <div className="elig-f wide">
-            <span>혼인 상태</span>
-            {/* 혼인신고 전인 예비신혼부부도 신혼부부 유형 상당수가 받아 준다 — 미혼/기혼 둘로는 못 담는 상태다 */}
-            <div className="elig-seg" role="group" aria-label="혼인 상태">
-              {(["미혼", "예비신혼부부", "기혼"] as Marital[]).map((m) => (
-                <button key={m} type="button" className={p.marital === m ? "on" : ""} onClick={() => set("marital", m)}>
-                  {m}
-                </button>
-              ))}
+      <form className="elig-form ej-form" onSubmit={(e) => e.preventDefault()} aria-label="내 조건 입력">
+        {/* 입력을 주제별 다섯 덩이로 묶는다(사용자 요청 2026-10-06: 가독성). 한 질문씩 넘기는 마법사는 만들지 않는다 —
+            값을 바꿔 가며 결과를 견주는 게 이 화면의 쓸모다(사용자 결정 2026-09-22) */}
+        <Section n={1} title="나와 가구">
+          <div className="elig-grid">
+            <Num label="나이" value={p.age} unit="세" onChange={(v) => set("age", v)} max={120} help="만 나이" />
+            <Num label="가구원 수" value={p.household} unit="명" onChange={(v) => set("household", v)} min={1} max={HOUSEHOLD_MAX} help="나를 포함해 등본에 함께 오른 사람" />
+            <div className="elig-f wide">
+              <span>혼인 상태</span>
+              {/* 혼인신고 전인 예비신혼부부도 신혼부부 유형 상당수가 받아 준다 — 미혼/기혼 둘로는 못 담는 상태다 */}
+              <div className="elig-seg" role="group" aria-label="혼인 상태">
+                {(["미혼", "예비신혼부부", "기혼"] as Marital[]).map((m) => (
+                  <button key={m} type="button" className={p.marital === m ? "on" : ""} onClick={() => set("marital", m)}>
+                    {m}
+                  </button>
+                ))}
+              </div>
             </div>
+            {p.marital === "기혼" && (
+              <Num label="혼인 연차" value={p.marriedYears} unit="년차" onChange={(v) => set("marriedYears", v)} max={60} help="혼인신고일부터 센다" />
+            )}
+            {/* 예비신혼부부는 입주 전까지 혼인신고를 마쳐야 자격이 서니 예정일을 묻는다(사용자 지적 2026-09-22) */}
+            {p.marital === "예비신혼부부" && (
+              <label className="elig-f">
+                <span>혼인 예정일</span>
+                <span className="elig-in elig-date">
+                  {/* 칸 아무 데나 눌러도 달력이 열리게 한다. showPicker가 없는 브라우저는 그냥 지나간다 */}
+                  <input
+                    type="date"
+                    className={p.weddingAt ? "" : "empty"}
+                    value={p.weddingAt}
+                    onChange={(e) => set("weddingAt", e.target.value)}
+                    onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch { /* 사용자 제스처가 아니면 조용히 넘긴다 */ } }}
+                  />
+                </span>
+              </label>
+            )}
           </div>
-          {p.marital === "기혼" && (
-            <Num label="혼인 연차" value={p.marriedYears} unit="년차" onChange={(v) => set("marriedYears", v)} max={60} />
-          )}
-          {/* 기혼에만 칸이 뜨고 예비신혼부부에는 아무것도 없어 한쪽만 묻는 꼴이었다(사용자 지적 2026-09-22).
-              예비신혼부부는 입주 전까지 혼인신고를 마쳐야 자격이 서니 예정일을 묻는다 */}
-          {p.marital === "예비신혼부부" && (
-            <label className="elig-f">
-              <span>혼인 예정일</span>
-              <span className="elig-in elig-date">
-                {/* 칸 아무 데나 눌러도 달력이 열리게 한다 — 네이티브는 달력 아이콘만 눌러야 열려서
-                    나머지 폭이 죽은 자리처럼 느껴진다. showPicker가 없는 브라우저는 그냥 지나간다 */}
-                <input
-                  type="date"
-                  className={p.weddingAt ? "" : "empty"}
-                  value={p.weddingAt}
-                  onChange={(e) => set("weddingAt", e.target.value)}
-                  onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch { /* 사용자 제스처가 아니면 조용히 넘긴다 */ } }}
-                />
-              </span>
-            </label>
-          )}
-          <Num label="본인 월소득" value={Math.round(p.incomeSelfWon / MAN)} unit="만 원" onChange={(v) => set("incomeSelfWon", v * MAN)} max={100_000} />
-          <Num label="세대 합산 월소득" value={Math.round(p.incomeHouseholdWon / MAN)} unit="만 원" onChange={(v) => set("incomeHouseholdWon", v * MAN)} max={100_000} />
-          {/* 자산을 두 칸으로 나눈 건 시드가 asset_scope를 「본인」 5개와 「세대」 17개로 갈라 두었기 때문이다.
+          <label className="elig-chk">
+            <input type="checkbox" checked={p.hasNewborn} onChange={(e) => set("hasNewborn", e.target.checked)} />
+            <span>2세 이하 자녀가 있다 <small>신혼 유형의 혼인기간 제한이 풀린다</small></span>
+          </label>
+        </Section>
+
+        <Section n={2} title="한 달 소득" hint="세금 떼기 전, 월평균">
+          <div className="elig-grid">
+            <Num label="본인 월소득" value={Math.round(p.incomeSelfWon / MAN)} unit="만 원" onChange={(v) => set("incomeSelfWon", v * MAN)} max={100_000} read />
+            <Num label="세대 합산 월소득" value={Math.round(p.incomeHouseholdWon / MAN)} unit="만 원" onChange={(v) => set("incomeHouseholdWon", v * MAN)} max={100_000} read />
+          </div>
+          <p className="ej-help">
+            연봉이면 12로 나눠 넣습니다(연봉 4,200만 원이면 350). 세대 합산은 등본에 함께 오른 배우자와 부모 등의 소득을 모두 더한 값입니다.
+          </p>
+        </Section>
+
+        <Section n={3} title="자산과 자동차">
+          {/* 자산을 두 칸으로 나눈 건 시드가 asset_scope를 「본인」과 「세대」로 갈라 두었기 때문이다.
               한 칸으로 보면 부모와 사는 청년이 세대 자산 때문에 청년 유형까지 떨어진다(2026-09-22 정정) */}
-          <Num label="본인 총자산" value={p.assetSelfMan} unit="만 원" onChange={(v) => setAssetSelf(v)} max={1_000_000} />
-          <Num label="세대 총자산" value={p.assetMan} unit="만 원" onChange={(v) => setAssetHousehold(v)} max={1_000_000} />
-          <Num label="자동차가액" value={p.carMan} unit="만 원" onChange={(v) => set("carMan", v)} max={100_000} />
+          <div className="elig-grid">
+            <Num label="본인 총자산" value={p.assetSelfMan} unit="만 원" onChange={(v) => setAssetSelf(v)} max={1_000_000} read />
+            <Num label="세대 총자산" value={p.assetMan} unit="만 원" onChange={(v) => setAssetHousehold(v)} max={1_000_000} read />
+            <Num label="자동차가액" value={p.carMan} unit="만 원" onChange={(v) => set("carMan", v)} max={100_000} read help="없으면 0" />
+          </div>
+          <p className="ej-help">
+            총자산은 부동산, 예금과 주식, 전월세 보증금, 자동차를 더하고 빚을 뺀 값입니다. 자동차가액은 보험개발원 차량기준가액으로 봅니다.
+          </p>
+        </Section>
+
+        <Section n={4} title="집과 사는 곳">
+          <div className="elig-checks">
+            {/* 무주택도 시드가 「본인」과 「세대원」으로 갈라 두었다. 본인이 유주택이면 세대도 유주택이라
+                세대 칸은 본인이 무주택일 때만 묻는다 */}
+            <label className="elig-chk">
+              <input type="checkbox" checked={p.homelessSelf} onChange={(e) => setHomelessSelf(e.target.checked)} />
+              <span>본인 명의 주택이 없다</span>
+            </label>
+            {p.homelessSelf && (
+              <label className="elig-chk">
+                <input type="checkbox" checked={p.homeless} onChange={(e) => set("homeless", e.target.checked)} />
+                <span>세대원(부모 등) 명의 주택도 없다</span>
+              </label>
+            )}
+          </div>
           <div className="elig-f">
             <span>거주지</span>
             <Select
@@ -265,51 +309,63 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
               placeholder="선택 안 함"
               ariaLabel="거주지"
             />
+            <small className="ej-fhelp">서울 거주자만 받는 유형이 있어 묻습니다</small>
           </div>
-        </div>
+        </Section>
 
-        <div className="elig-checks">
-          {/* 무주택도 시드가 「본인」 8개와 「세대원」 24개로 갈라 두었다. 본인이 유주택이면 세대도 유주택이라
-              세대 칸은 본인이 무주택일 때만 묻는다 — 질문을 하나라도 줄인다 */}
-          <label className="elig-chk">
-            <input type="checkbox" checked={p.homelessSelf} onChange={(e) => setHomelessSelf(e.target.checked)} />
-            <span>본인 명의 주택이 없다</span>
-          </label>
-          {p.homelessSelf && (
-            <label className="elig-chk">
-              <input type="checkbox" checked={p.homeless} onChange={(e) => set("homeless", e.target.checked)} />
-              <span>세대원(부모 등) 명의 주택도 없다</span>
-            </label>
-          )}
-          <label className="elig-chk">
-            <input type="checkbox" checked={p.hasNewborn} onChange={(e) => set("hasNewborn", e.target.checked)} />
-            <span>2세 이하 자녀가 있다</span>
-          </label>
-        </div>
+        <Section n={5} title="해당하는 대상" hint="여러 개 고를 수 있어요">
+          {classGroups.map((g) => (
+            <div key={g.title} className="ej-clsg">
+              <b>{g.title}</b>
+              <div className="elig-chips">
+                {g.items.map((c) => (
+                  <button key={c} type="button" className={`elig-chip${p.classes.includes(c) ? " on" : ""}`} aria-pressed={p.classes.includes(c)} onClick={() => toggleClass(c)}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+              {g.sensitive && <small className="ej-fhelp">이 항목은 이 기기에만 남고 계정에 저장해도 서버로 보내지 않습니다</small>}
+            </div>
+          ))}
+        </Section>
 
-        <fieldset className="elig-cls">
-          <legend>해당하는 계층 (여러 개 고를 수 있다)</legend>
-          <div className="elig-chips">
-            {classes.map((c) => (
-              <button key={c} type="button" className={`elig-chip${p.classes.includes(c) ? " on" : ""}`} aria-pressed={p.classes.includes(c)} onClick={() => toggleClass(c)}>
-                {c}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        {/* 폰에서는 조건 칸 다섯 덩이 밑에 결과가 있어 한참 내려가야 한다 — 조건을 넣는 동안 바닥에 붙어 따라오는 지름길.
+            조건 칸이 끝나면 같이 밀려 올라가 결과와 겹치지 않는다(sticky) */}
+        <a href="#ej-pass" className="ej-jump">
+          <span>결과 보기</span>
+          <b>지원 가능 {pass.length}</b>
+          <small>한 가지만 걸림 {near.length}</small>
+        </a>
       </form>
 
       <div className="elig-out">
+        {/* 한눈에 셋 — 몇 개가 되고, 몇 개가 한 끗 차이고, 몇 개가 멀었나. 누르면 그 묶음으로 내려간다 */}
+        <nav className="ej-sum" aria-label="진단 요약">
+          <a href="#ej-pass" className="ok"><b>{pass.length}</b><span>지원 가능</span></a>
+          <a href="#ej-near" className="near"><b>{near.length}</b><span>한 가지만 걸림</span></a>
+          <a href="#ej-far" className="far"><b>{far.length}</b><span>지원 어려움</span></a>
+        </nav>
+        <p className="ej-note">제도 일반 기준으로 본 결과입니다. 공고마다 기준이 조금씩 달라 실제 자격은 공고문과 기관 심사가 정합니다.</p>
+
+        <h2 id="ej-pass">지원 가능한 유형 <b>{pass.length}</b></h2>
+        {pass.length === 0 ? (
+          <p className="elig-none">지금 조건으로 바로 되는 유형은 없습니다. 아래 「한 가지만 걸림」에서 무엇이 모자란지 볼 수 있어요.</p>
+        ) : (
+          <ul className="ej-list">
+            {pass.map((v) => (
+              <PassCard key={v.type.code} v={v} p={p} janggi={v.type.housing_type === "장기전세" ? jgVerdict : null} janggiRef={jg} group={jgFit?.group ?? null} />
+            ))}
+          </ul>
+        )}
+
         {/* 유형 목록에서 끝나면 「그래서 지금 뭘 넣나」에 답이 없다. 통과한 유형의 열린 공고로 잇는다 */}
         {openTotal > 0 && (
           <section className="elig-open">
             <h2>
               지금 신청할 수 있는 공고 <b>{openTotal.toLocaleString("ko-KR")}</b>
-              <small>내 조건에 맞는 유형 기준</small>
+              <small>지원 가능한 유형 기준</small>
             </h2>
-            <p className="elig-open-sub">
-              유형이 맞는다는 뜻이고, 공고마다 나이와 소득 기준이 조금씩 다릅니다. 신청 전에 공고문을 확인하세요.
-            </p>
+            <p className="elig-open-sub">유형이 맞는다는 뜻이고, 공고마다 나이와 소득 기준이 조금씩 다릅니다. 신청 전에 공고문을 확인하세요.</p>
             {openMine.length > 0 && (
               <ul className="elig-open-list">
                 {openMine.slice(0, OPEN_ROWS).map((n) => {
@@ -346,50 +402,108 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
           </section>
         )}
 
-        <h2>
-          신청해 볼 수 있는 유형 <b>{pass.length}</b>
-          <small>전체 {verdicts.length}개 중</small>
-        </h2>
-        {pass.length === 0 ? (
-          <p className="elig-none">조건에 맞는 유형이 없다. 아래 미달 목록에서 어떤 기준에 걸리는지 볼 수 있다.</p>
+        <h2 id="ej-near" className="ej-h-near">한 가지만 걸리는 유형 <b>{near.length}</b><small>이것만 맞으면 지원할 수 있어요</small></h2>
+        {near.length === 0 ? (
+          <p className="elig-none">한 가지 기준만 걸리는 유형은 없습니다.</p>
         ) : (
-          <ul className="elig-list">{pass.map((v) => <Card key={v.type.code} v={v} janggi={v.type.housing_type === "장기전세" ? jgVerdict : null} janggiRef={jg} group={jgFit?.group ?? null} />)}</ul>
+          <ul className="ej-list">{near.map((v) => <NearCard key={v.type.code} v={v} p={p} />)}</ul>
         )}
 
-        <h2 className="mute">기준에 못 미치는 유형 <b>{fail.length}</b></h2>
-        <ul className="elig-list">{fail.map((v) => <Card key={v.type.code} v={v} janggi={v.type.housing_type === "장기전세" ? jgVerdict : null} janggiRef={jg} group={jgFit?.group ?? null} />)}</ul>
-
+        {/* 여러 기준에 걸리는 유형은 접어 둔다 — 펴 두면 지면 절반이 「안 된다」로 찬다 */}
+        <details className="ej-far" id="ej-far">
+          <summary>
+            <b>지원 어려운 유형 {far.length}개</b>
+            <small>두 가지 이상 기준에 걸립니다</small>
+          </summary>
+          <ul className="ej-farlist">
+            {far.map((v) => {
+              const failed = v.checks.filter((c) => !c.ok);
+              return (
+                <li key={v.type.code}>
+                  <b>{v.type.category} <span>{v.type.name}</span></b>
+                  <p>{failed.map((c) => c.label).join(", ")} 기준에 걸림</p>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
       </div>
     </div>
   );
 }
 
-function Card({ v, janggi, janggiRef, group }: { v: Verdict; janggi?: FitVerdict | null; janggiRef?: JanggiRule | null; group?: string | null }) {
-  const t = v.type;
-  const failed = v.checks.filter((c) => !c.ok);
+/** 대상 칩을 성격별로 묶는다. 시드에 새 계층이 생기면 「그 밖의 대상」으로 떨어진다 — 목록을 코드에 박아 두되 잃지는 않는다 */
+const CLASS_GROUPS: { title: string; items: string[]; sensitive?: boolean }[] = [
+  { title: "청년과 학생", items: ["청년", "대학생", "취업준비생", "사회초년생"] },
+  { title: "신혼과 자녀", items: ["신혼", "혼인가구", "신생아", "한부모", "다자녀"] },
+  { title: "고령과 소득 지원", items: ["고령자", "수급자", "차상위", "저소득"] },
+  { title: "보호 대상", items: SENSITIVE_CLASSES, sensitive: true },
+];
+
+function groupClasses(all: string[]) {
+  const used = new Set<string>();
+  const out = CLASS_GROUPS.map((g) => {
+    const items = g.items.filter((c) => all.includes(c));
+    items.forEach((c) => used.add(c));
+    return { ...g, items };
+  }).filter((g) => g.items.length > 0);
+  const rest = all.filter((c) => !used.has(c));
+  if (rest.length) out.push({ title: "그 밖의 대상", items: rest });
+  return out;
+}
+
+function Section({ n, title, hint, children }: { n: number; title: string; hint?: string; children: ReactNode }) {
   return (
-    <li className={`elig-card${v.ok ? " ok" : ""}`}>
-      <div className="elig-card-h">
+    <section className="ej-sec">
+      <h3><i>{n}</i>{title}{hint && <small>{hint}</small>}</h3>
+      {children}
+    </section>
+  );
+}
+
+/** 이 유형이 내 소득을 어느 칸으로 보나 — lib/eligibility incomeOf와 같은 규칙 */
+function myIncome(scope: string, p: Profile): number {
+  return scope === "본인" || scope === "청년특공_분기" ? p.incomeSelfWon : p.incomeHouseholdWon;
+}
+
+/** 화면에는 만 원 단위로만 — 「381만 3,363원」은 읽히지 않는다. 정확한 값은 title로 */
+const roundMan = (n: number) => Math.round(n / MAN) * MAN;
+
+/** 시드 선정 방식 칸의 메모 말투를 화면 말로 */
+const RANKING_TEXT: Record<string, string> = { 자치구별상이: "자치구마다 다름" };
+const rankingText = (m: string | null) => (m && m !== "무관" ? RANKING_TEXT[m] ?? m : null);
+
+/** 소득처럼 금액으로 견주는 기준을 막대 하나로. 막대가 짧을수록 여유가 있다 */
+function Meter({ mine, limit, label }: { mine: number; limit: number; label: string }) {
+  const ratio = limit > 0 ? Math.min(mine / limit, 1.25) : 0;
+  const over = mine > limit;
+  return (
+    <div className={`ej-meter${over ? " over" : ""}`}>
+      <div className="ej-meter-t">
+        <span>{label}</span>
+        <b title={`${mine.toLocaleString("ko-KR")}원 / 기준 ${limit.toLocaleString("ko-KR")}원`}>
+          내 {wonKo(roundMan(mine))} <small>/ 기준 {wonKo(roundMan(limit))}</small>
+        </b>
+      </div>
+      <div className="ej-meter-bar"><i style={{ width: `${Math.min(ratio / 1.25, 1) * 100}%` }} /><u style={{ left: `${(1 / 1.25) * 100}%` }} /></div>
+    </div>
+  );
+}
+
+function PassCard({ v, p, janggi, janggiRef, group }: { v: Verdict; p: Profile; janggi?: FitVerdict | null; janggiRef?: JanggiRule | null; group?: string | null }) {
+  const t = v.type;
+  const income = v.incomeLimitWon != null ? { mine: myIncome(t.income_scope, p), limit: v.incomeLimitWon } : null;
+  return (
+    <li className="ej-card ok">
+      <div className="ej-card-h">
         <b>{t.category}</b>
         <span>{t.name}</span>
-        {/* 카드 색만으로는 통과·미달이 잘 안 읽힌다는 지적(2026-09-09) — 말로도 못 박는다 */}
-        <span className="elig-card-r">
-          <em className={`elig-badge${v.ok ? " ok" : ""}`}>{v.ok ? "신청 가능" : "신청불가"}</em>
-          {t.ranking_method && <small>{t.ranking_method}</small>}
-        </span>
+        <em className="ej-badge ok">지원 가능</em>
       </div>
-      <ul className="elig-why">
-        {(v.ok ? v.checks : failed).map((c) => (
-          <li key={c.label} className={c.ok ? "y" : "n"}>
-            <span>{c.label}</span>
-            <p>{c.detail}</p>
-          </li>
-        ))}
-      </ul>
-      {v.ok && t.ranks.length > 0 && (
-        <p className="elig-rank">
-          순위 {t.ranks.map((r, i) => `${i + 1}순위 ${r}`).join(" | ")}
-        </p>
+      {income ? (
+        <Meter mine={income.mine} limit={income.limit} label={`소득 ${t.income_pct}% 기준`} />
+      ) : (
+        <p className="ej-card-s">소득 기준 없음</p>
       )}
       {janggi && janggiRef && (
         /* 시드 한 줄(income_pct)이 아니라 최근 공고문의 면적×순위 매트릭스로 본 자리 — 순위가 곧 당락 순서다 */
@@ -399,13 +513,69 @@ function Card({ v, janggi, janggiRef, group }: { v: Verdict; janggi?: FitVerdict
           <small> | <Link href={noticePath(janggiRef.slug)}>{janggiRef.title}</Link> 기준</small>
         </p>
       )}
-      {v.ok && t.note && <p className="elig-memo">{t.note}</p>}
+      <details className="ej-more">
+        <summary>기준 {v.checks.length}가지 모두 보기{rankingText(t.ranking_method) ? ` | 선정 ${rankingText(t.ranking_method)}` : ""}</summary>
+        <ul className="elig-why">
+          {v.checks.map((c) => (
+            <li key={c.label} className="y"><span>{c.label}</span><p>{c.detail}</p></li>
+          ))}
+        </ul>
+        {t.note && <p className="elig-memo">{t.note}</p>}
+      </details>
     </li>
   );
 }
 
-function Num({ label, value, unit, onChange, min = 0, max }: {
+/** 하나 걸린 기준을 「얼마나 모자라나」로 바꿔 말한다. 금액이면 차이를, 나머지는 기준 문장을 그대로 */
+function gapText(c: Check, v: Verdict, p: Profile): string {
+  const t = v.type;
+  if (c.label === "소득" && v.incomeLimitWon != null) {
+    return `월 ${wonKo(roundMan(myIncome(t.income_scope, p) - v.incomeLimitWon))} 넘습니다 (기준 월 ${wonKo(roundMan(v.incomeLimitWon))} 이하)`;
+  }
+  if (c.label === "자산" && t.asset_limit_man != null) {
+    const mine = t.asset_scope === "본인" ? p.assetSelfMan : p.assetMan;
+    return `${wonKo((mine - t.asset_limit_man) * MAN)} 넘습니다 (기준 ${wonKo(t.asset_limit_man * MAN)} 이하)`;
+  }
+  if (c.label === "자동차" && t.car_limit_man) {
+    return `${wonKo((p.carMan - t.car_limit_man) * MAN)} 넘습니다 (기준 ${wonKo(t.car_limit_man * MAN)} 이하)`;
+  }
+  if (c.label === "나이") {
+    if (p.age < t.age_min) return `${t.age_min - p.age}년 뒤 나이 기준(${t.age_min}세 이상)에 듭니다`;
+    if (t.age_max < 999) return `나이 기준(${t.age_max}세 이하)을 넘습니다`;
+  }
+  return c.detail;
+}
+
+function NearCard({ v, p }: { v: Verdict; p: Profile }) {
+  const t = v.type;
+  const c = v.checks.find((x) => !x.ok)!;
+  return (
+    <li className="ej-card near">
+      <div className="ej-card-h">
+        <b>{t.category}</b>
+        <span>{t.name}</span>
+        <em className="ej-badge near">{c.label} 기준</em>
+      </div>
+      <p className="ej-gap">{gapText(c, v, p)}</p>
+      <details className="ej-more">
+        <summary>기준 {v.checks.length}가지 모두 보기</summary>
+        <ul className="elig-why">
+          {v.checks.map((x) => (
+            <li key={x.label} className={x.ok ? "y" : "n"}><span>{x.label}</span><p>{x.detail}</p></li>
+          ))}
+        </ul>
+        {t.note && <p className="elig-memo">{t.note}</p>}
+      </details>
+    </li>
+  );
+}
+
+function Num({ label, value, unit, onChange, min = 0, max, help, read }: {
   label: string; value: number; unit: string; onChange: (v: number) => void; min?: number; max: number;
+  /** 칸 밑 한 줄 도움말 */
+  help?: string;
+  /** 만 원 단위 칸 — 「15000」을 「1억 5,000만 원」으로 밑에 읽어 준다. 0이 넷 넘으면 눈으로 못 센다 */
+  read?: boolean;
 }) {
   return (
     <label className="elig-f">
@@ -421,6 +591,13 @@ function Num({ label, value, unit, onChange, min = 0, max }: {
         />
         <em>{unit}</em>
       </span>
+      {(read || help) && (
+        <small className="ej-fhelp">
+          {read && <b>{value > 0 ? wonKo(value * MAN) : "0원"}</b>}
+          {read && help ? " | " : ""}
+          {help}
+        </small>
+      )}
     </label>
   );
 }
