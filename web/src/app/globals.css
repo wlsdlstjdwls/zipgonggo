@@ -1667,9 +1667,23 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
    .elig-grid 같은 공용 클래스는 공고 지면 「내 조건」도 쓰므로 여기서 고치는 건 .ej-form 안으로 가둔다 */
 .ej-form { gap: 12px; }
 .ej-sec { display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 15px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
-.ej-sec h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 900; letter-spacing: -0.02em; color: var(--ink); }
-.ej-sec h3 i { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--acc); color: #fff; font-style: normal; font-size: 11.5px; font-weight: 900; }
-.ej-sec h3 small { margin-left: auto; font-weight: 700; font-size: 12px; color: var(--dim); }
+.ej-sec h3 { margin: 0; }
+/* 제목 줄 전체가 접기 단추다 — 번호, 제목, (펴짐: 입력 요령 / 접힘: 넣은 값 요약), 꺾쇠 */
+.ej-sec h3 button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 0; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.ej-sec h3 i { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--acc); color: #fff; font-style: normal; font-size: 11.5px; font-weight: 900; }
+.ej-sec-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 15px; font-weight: 900; letter-spacing: -0.02em; color: var(--ink); }
+.ej-sec-t small { font-weight: 700; font-size: 12.5px; letter-spacing: 0; color: var(--mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ej-sec.open .ej-sec-t small { font-size: 12px; color: var(--dim); }
+.ej-chev { flex: none; color: var(--dim); transition: transform var(--duration-fast) var(--ease); }
+.ej-sec.open .ej-chev { transform: rotate(180deg); }
+.ej-sec h3 button:focus-visible { outline: 2px solid var(--acc); outline-offset: 4px; border-radius: 4px; }
+.ej-sec:not(.open) { padding-bottom: 14px; }
+.ej-sec:not(.open):hover { border-color: var(--line-strong); }
+.ej-sec-b { display: flex; flex-direction: column; gap: 10px; }
+.ej-sec-b[hidden] { display: none; }
+.ej-formbar { display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px; }
+.ej-formbar b { font-weight: 900; font-size: 16px; letter-spacing: -0.02em; }
+.ej-formbar button { padding: 0; border: 0; background: none; font: inherit; font-weight: 700; font-size: 12.5px; color: var(--acc); cursor: pointer; }
 .ej-form .elig-f > span:first-child { font-size: 12.5px; color: var(--mut); }
 .ej-form .elig-in, .ej-form .elig-seg button, .ej-form .sel { height: 38px; }
 .ej-form .elig-in input { font-size: 15px; font-weight: 700; }
@@ -2024,7 +2038,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 }
 .ej-jump { display: none; }
 /* 지름길로 내려오면 제목이 고정 머리글 밑에 깔렸다 — 머리글 높이만큼 띄워 멈춘다 */
-#ej-pass, #ej-near, #ej-far { scroll-margin-top: calc(var(--hdr) + 12px); }
+#ej-pass, #ej-near, #ej-far { scroll-margin-top: calc(var(--hdr) + var(--ej-sum-h, 0px) + 12px); }
+/* PC에서는 요약 셋(ej-sum)이 머리글 밑에 붙어 있어 그 높이까지 비켜 멈춰야 한다 — 안 그러면 제목이 요약 밑에 깔린다(사용자 지적 2026-10-06).
+   높이는 화면이 재서 --ej-sum-h로 넣는다(eligibility-check.tsx). 폰에서는 요약이 붙지 않아 0이다 */
 @container (max-width: 900px) {
   .ej-jump { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 12px 16px;
     border-radius: var(--r-btn); background: var(--ink); color: #fff; text-decoration: none; box-shadow: 0 6px 20px rgba(15, 18, 22, 0.22); }

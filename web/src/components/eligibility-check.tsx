@@ -59,7 +59,7 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
   /** 거주지 셀렉트에 세울 전국 시군구(공고가 있는 곳만) */
   areas?: ResidenceArea[];
 }) {
-  const { profile, ready: profileReady, patch } = useProfile();
+  const { profile, ready: profileReady, saved, patch } = useProfile();
   // 서버 HTML은 언제나 기본값이다 — 저장된 값은 마운트 뒤에 얹는다(하이드레이션이 어긋날 자리를 만들지 않는다)
   const [p, setP] = useState<Profile>(DEFAULT);
   // setP의 갱신 함수 안에서 patch를 부르지 않는다 — 렌더 중에 남의 컴포넌트를 고치는 짓이 된다
@@ -220,12 +220,65 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
   const far = fail.filter((v) => v.checks.filter((c) => !c.ok).length > 1);
   const classGroups = useMemo(() => groupClasses(classes), [classes]);
 
+  // 다섯 덩이를 접었다 폈다(사용자 요청 2026-10-06) — 접히면 제목 옆에 넣은 값을 한 줄로 보인다.
+  // 저장된 조건이 있으면 다 접은 채로 시작한다(결과가 바로 보이게), 처음 온 사람에게는 다 펴 둔다.
+  // 서버 HTML은 펼친 꼴이다 — 저장분을 읽은 뒤(profileReady)에 한 번만 접는다. 사람이 손댄 뒤엔 건드리지 않는다
+  const [opened, setOpened] = useState<boolean[]>([true, true, true, true, true]);
+  const folded = useRef(false);
+  useEffect(() => {
+    if (!profileReady || folded.current) return;
+    folded.current = true;
+    if (saved) setOpened([false, false, false, false, false]);
+  }, [profileReady, saved]);
+  const toggle = (i: number) => {
+    folded.current = true;
+    setOpened((o) => o.map((v, j) => (j === i ? !v : v)));
+  };
+  const allOpen = opened.every(Boolean);
+  const man = (v: number) => (v > 0 ? wonKo(v * MAN) : "0원");
+  const residenceLabel = residenceOptions.find((o) => o.value === p.residence)?.label ?? p.residence;
+  const summaries = [
+    [
+      `${p.age}세`,
+      `${p.household}인 가구`,
+      p.marital === "기혼" ? `기혼 ${p.marriedYears}년차` : p.marital === "예비신혼부부" && p.weddingAt ? `예비신혼부부(${dateMD(p.weddingAt)})` : p.marital,
+      p.hasNewborn ? "2세 이하 자녀" : "",
+    ],
+    [`본인 ${man(Math.round(p.incomeSelfWon / MAN))}`, `세대 ${man(Math.round(p.incomeHouseholdWon / MAN))}`, p.marital !== "미혼" && p.dual ? "맞벌이" : ""],
+    [`본인 ${man(p.assetSelfMan)}`, `세대 ${man(p.assetMan)}`, p.carMan > 0 ? `자동차 ${man(p.carMan)}` : "자동차 없음"],
+    [p.homeless ? "세대 무주택" : p.homelessSelf ? "본인만 무주택" : "주택 있음", p.residence ? residenceLabel : "거주지 선택 안 함"],
+    [p.classes.length ? p.classes.join(", ") : "선택 안 함"],
+  ].map((xs) => xs.filter(Boolean).join(" | "));
+  const sec = (i: number) => ({ open: opened[i], onToggle: () => toggle(i), summary: summaries[i] });
+
+  // 요약 셋이 머리에 붙어 있을 때만 그 높이를 잰다 — 묶음으로 건너뛸 때 그만큼 비켜 멈추게(globals.css scroll-margin-top).
+  // 글자 크기나 폭에 따라 높이가 달라 숫자로 박지 않는다
+  const sumRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = sumRef.current;
+    if (!el) return;
+    const measure = () => {
+      const stuck = getComputedStyle(el).position === "sticky";
+      el.closest<HTMLElement>(".elig")?.style.setProperty("--ej-sum-h", stuck ? `${el.offsetHeight}px` : "0px");
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div className="elig">
       <form className="elig-form ej-form" onSubmit={(e) => e.preventDefault()} aria-label="내 조건 입력">
         {/* 입력을 주제별 다섯 덩이로 묶는다(사용자 요청 2026-10-06: 가독성). 한 질문씩 넘기는 마법사는 만들지 않는다 —
             값을 바꿔 가며 결과를 견주는 게 이 화면의 쓸모다(사용자 결정 2026-09-22) */}
-        <Section n={1} title="나와 가구">
+        <div className="ej-formbar">
+          <b>내 조건</b>
+          <button type="button" onClick={() => { folded.current = true; setOpened(opened.map(() => !allOpen)); }}>
+            {allOpen ? "모두 접기" : "모두 펼치기"}
+          </button>
+        </div>
+        <Section n={1} title="나와 가구" {...sec(0)}>
           <div className="elig-grid">
             <Num label="나이" value={p.age} unit="세" onChange={(v) => set("age", v)} max={120} help="만 나이" />
             <Num label="가구원 수" value={p.household} unit="명" onChange={(v) => set("household", v)} min={1} max={HOUSEHOLD_MAX} help="나를 포함해 등본에 함께 오른 사람" />
@@ -258,7 +311,7 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
           </label>
         </Section>
 
-        <Section n={2} title="한 달 소득" hint="세금 떼기 전, 월평균">
+        <Section n={2} title="한 달 소득" hint="세금 떼기 전, 월평균" {...sec(1)}>
           <div className="elig-grid">
             <Num label="본인 월소득" value={Math.round(p.incomeSelfWon / MAN)} unit="만 원" onChange={(v) => set("incomeSelfWon", v * MAN)} max={100_000} read />
             <Num label="세대 합산 월소득" value={Math.round(p.incomeHouseholdWon / MAN)} unit="만 원" onChange={(v) => set("incomeHouseholdWon", v * MAN)} max={100_000} read />
@@ -275,7 +328,7 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
           </p>
         </Section>
 
-        <Section n={3} title="자산과 자동차">
+        <Section n={3} title="자산과 자동차" {...sec(2)}>
           {/* 자산을 두 칸으로 나눈 건 시드가 asset_scope를 「본인」과 「세대」로 갈라 두었기 때문이다.
               한 칸으로 보면 부모와 사는 청년이 세대 자산 때문에 청년 유형까지 떨어진다(2026-09-22 정정) */}
           <div className="elig-grid">
@@ -288,7 +341,7 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
           </p>
         </Section>
 
-        <Section n={4} title="집과 사는 곳">
+        <Section n={4} title="집과 사는 곳" {...sec(3)}>
           <div className="elig-checks">
             {/* 무주택도 시드가 「본인」과 「세대원」으로 갈라 두었다. 본인이 유주택이면 세대도 유주택이라
                 세대 칸은 본인이 무주택일 때만 묻는다 */}
@@ -316,7 +369,7 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
           </div>
         </Section>
 
-        <Section n={5} title="해당하는 대상" hint="여러 개 고를 수 있어요">
+        <Section n={5} title="해당하는 대상" hint="여러 개 고를 수 있어요" {...sec(4)}>
           {classGroups.map((g) => (
             <div key={g.title} className="ej-clsg">
               <b>{g.title}</b>
@@ -343,10 +396,11 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
 
       <div className="elig-out">
         {/* 한눈에 셋 — 몇 개가 되고, 몇 개가 한 끗 차이고, 몇 개가 멀었나. 누르면 그 묶음으로 내려간다 */}
-        <nav className="ej-sum" aria-label="진단 요약">
+        <nav className="ej-sum" aria-label="진단 요약" ref={sumRef}>
           <a href="#ej-pass" className="ok"><b>{pass.length}</b><span>지원 가능{passUnsure > 0 ? ` (확인 ${passUnsure})` : ""}</span></a>
           <a href="#ej-near" className="near"><b>{near.length}</b><span>한 가지만 걸림</span></a>
-          <a href="#ej-far" className="far"><b>{far.length}</b><span>지원 어려움</span></a>
+          {/* 어려움 묶음은 접혀 있다 — 눌러서 건너왔는데 닫힌 상자만 보이면 헛걸음이라 같이 편다 */}
+          <a href="#ej-far" className="far" onClick={() => { const d = document.getElementById("ej-far"); if (d instanceof HTMLDetailsElement) d.open = true; }}><b>{far.length}</b><span>지원 어려움</span></a>
         </nav>
         <p className="ej-note">제도 일반 기준으로 본 결과입니다. 공고마다 기준이 조금씩 달라 실제 자격은 공고문과 기관 심사가 정합니다.</p>
 
@@ -455,11 +509,27 @@ function groupClasses(all: string[]) {
   return out;
 }
 
-function Section({ n, title, hint, children }: { n: number; title: string; hint?: string; children: ReactNode }) {
+function Section({ n, title, hint, summary, open, onToggle, children }: {
+  n: number; title: string; hint?: string;
+  /** 접혔을 때 제목 밑에 보일 한 줄 — 넣은 값 요약 */
+  summary: string; open: boolean; onToggle: () => void; children: ReactNode;
+}) {
+  const id = `ej-sec-${n}`;
   return (
-    <section className="ej-sec">
-      <h3><i>{n}</i>{title}{hint && <small>{hint}</small>}</h3>
-      {children}
+    <section className={`ej-sec${open ? " open" : ""}`}>
+      <h3>
+        <button type="button" aria-expanded={open} aria-controls={id} onClick={onToggle}>
+          <i>{n}</i>
+          <span className="ej-sec-t">
+            {title}
+            {/* 펴져 있으면 칸이 값을 보이니 요약 대신 입력 요령을, 접혀 있으면 넣은 값을 */}
+            <small>{open ? hint : summary}</small>
+          </span>
+          <svg className="ej-chev" width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1.5 1.5l4.5 4.5 4.5-4.5" /></svg>
+        </button>
+      </h3>
+      {/* 접어도 지우지 않는다(hidden) — 칸 상태와 포커스 순서를 그대로 둔다 */}
+      <div id={id} className="ej-sec-b" hidden={!open}>{children}</div>
     </section>
   );
 }
