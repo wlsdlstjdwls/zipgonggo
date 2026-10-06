@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Fragment } from "react";
 import { AreaMap } from "@/components/area-map";
 import { CalcSeed } from "@/components/calc-context";
 import { ComplexExplorer } from "@/components/complex-explorer";
@@ -298,11 +299,17 @@ export default async function NoticePage({ params }: Params) {
     if (a <= today) return "now";
     return "ahead";
   };
-  // 앞으로 남은 것 중 가장 이른 하나에만 꼬리표를 단다. 여럿에 붙이면 강조가 아니라 배경이 된다
-  const keyWhen = keyCards.map((s) => whenOf(s.from, s.till));
-  const keyNext = keyWhen.indexOf("ahead");
-  const restWhen = restSteps.map((s) => whenOf(s.from, s.till));
-  const restNext = restWhen.indexOf("ahead");
+  // 앞으로 남은 것 중 가장 이른 하나에만 꼬리표를 단다(tlNext). 여럿에 붙이면 강조가 아니라 배경이 된다
+  // 타임라인 한 줄 — 접수 카드와 나머지 단계를 날짜순으로 섞는다. 날짜 없는 단계(발표 미정)는 맨 뒤
+  type TlStep = { label: string; value: Stamp | null; sub?: Stamp | null; foot?: string | null; from?: string | null; till?: string | null; key: boolean };
+  const tlSteps: TlStep[] = [
+    ...keyCards.map((s) => ({ ...s, key: true })),
+    ...restSteps.map((s) => ({ ...s, key: false })),
+  ].sort((a, b) => (a.from ?? a.till ?? "9999").localeCompare(b.from ?? b.till ?? "9999"));
+  const tlWhen = tlSteps.map((s) => whenOf(s.from, s.till));
+  const tlNext = tlWhen.indexOf("ahead");
+  // 오늘 눈금 — 오늘 걸린 단계가 없을 때만, 지난 단계와 다음 단계 사이에 세운다. 다 지났거나 아무것도 안 지났으면 안 세운다
+  const tlTodayAt = !tlWhen.includes("now") && tlNext > 0 && tlWhen[tlNext - 1] === "past" ? tlNext : -1;
   /** 꼬리표 글자 — 「예정」보다 「D-3」이 쓸모 있다(사용자 결정 2026-09-22). 기간형 단계는 시작일까지 센다 */
   const dtag = (from?: string | null, till?: string | null) => {
     const d = daysUntil(from ?? till ?? null);
@@ -370,11 +377,8 @@ export default async function NoticePage({ params }: Params) {
             아래 내용은 이 회차 기준입니다.
           </p>
         )}
-        {/* 헤드라인은 금액이 아니라 접수 상태다. 다만 한 줄로 — 본론은 아래 단지 목록과 지도다(사용자 요청 2026-09-09) */}
-        <p className="d-when">
-          <b className={`when ${ph.tone}`}>{ph.label}</b>
-          {ph.note && <span>{ph.note}</span>}
-        </p>
+        {/* 제목 밑 접수 상태 줄(.d-when)은 뺐다(사용자 결정 2026-10-06) — 오른쪽(폰에선 바로 밑) 요약 패널의
+            D-day 카드와 접수 일정 섹션이 같은 말을 한다. 상태는 헤더 바(DetailHeadBar)에도 뜬다 */}
       </header>
 
       {/* 긴 페이지의 차례 — 무엇이 어디 있는지 먼저 보인다(사용자 지적 2026-09-14: "나열식이라 보기 힘들다").
@@ -427,42 +431,36 @@ export default async function NoticePage({ params }: Params) {
             <h2>접수 일정</h2>
             {hasSchedule ? (
               <>
-                {/* 달력에 적는 날짜만 카드. 나머지 단계는 한 줄씩 — 카드 여덟 장이 나란히 서면 어느 것이 급한지 안 보였다(2026-09-14) */}
-                {keyCards.length > 0 ? (
-                  <div className="steps">
-                    {keyCards.map((s, i) => {
-                      const w = keyWhen[i];
-                      const next = w === "ahead" && i === keyNext;
-                      return (
-                        <div key={s.label} className={`step key${w === "past" ? " past" : w === "now" ? " on now" : next ? " on" : ""}`}>
-                          <span>
+                {/* 일정은 표가 아니라 **선 하나**로 본다(사용자 요청 2026-10-06: 「금액 슬라이더처럼 한눈에」).
+                    카드(접수)와 줄 목록(공고일, 서류, 발표)으로 둘로 갈라 두던 것을 날짜순 한 줄에 꿰었다 —
+                    지난 단계는 선이 채워지고, 오늘 자리에 빨간 눈금이 서고, 다음 단계에 D-day가 붙는다.
+                    접수(달력에 적는 날짜)는 점과 글자를 키워 여전히 제일 먼저 읽힌다 */}
+                {keyCards.length === 0 && (
+                  /* 접수 날짜를 못 읽은 회차 — 선 위에 빈 점을 세우느니 왜 비었는지 말한다 */
+                  <p className="note" style={{ margin: "0 0 12px" }}>접수 기간은 {L.originalDoc}에서 확인하세요.</p>
+                )}
+                <ol className="tline">
+                  {tlSteps.map((s, i) => {
+                    const w = tlWhen[i];
+                    const next = w === "ahead" && i === tlNext;
+                    const cls = ["tl-s", s.key ? "key" : "", w ?? "", next ? "next" : ""].filter(Boolean).join(" ");
+                    return (
+                      <Fragment key={s.label}>
+                        {i === tlTodayAt && <li className="tl-today" aria-label="오늘"><span>오늘</span></li>}
+                        <li className={cls}>
+                          <i className="tl-dot" aria-hidden="true" />
+                          <span className="tl-l">
                             {s.label}
-                            {w === "now" && <i className="st-flag now">오늘</i>}
+                            {w === "now" && <i className="st-flag now">{s.sub ? "진행 중" : "오늘"}</i>}
                             {next && <i className="st-flag next">{dtag(s.from, s.till)}</i>}
                           </span>
-                          <b><Stamped v={s.value} /></b>
-                          {s.foot && <em>{s.foot}</em>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  /* 빈 카드를 세우느니 왜 비었는지 말한다 — 공고문에서 접수 기간을 못 읽은 회차다 */
-                  <p className="note" style={{ margin: "0 0 2px" }}>접수 기간은 {L.originalDoc}에서 확인하세요.</p>
-                )}
-                <ol className="tl">
-                  {restSteps.map((s, i) => {
-                    const w = restWhen[i];
-                    const next = w === "ahead" && i === restNext;
-                    return (
-                      <li key={s.label} className={w === "past" ? "past" : w === "now" ? "now" : next ? "next" : undefined}>
-                        <span>
-                          {s.label}
-                          {w === "now" && <i className="st-flag now">{s.sub ? "진행 중" : "오늘"}</i>}
-                          {next && <i className="st-flag next">{dtag(s.from, s.till)}</i>}
-                        </span>
-                        <b>{s.value ? <Stamped v={s.value} /> : "—"}{s.sub && <em><Stamped v={s.sub} pre=" ~ " /></em>}</b>
-                      </li>
+                          <b className="tl-d">
+                            {s.value ? <Stamped v={s.value} /> : "미정"}
+                            {s.sub && <em><Stamped v={s.sub} pre="~ " /></em>}
+                          </b>
+                          {s.foot && <em className="tl-f">{s.foot}</em>}
+                        </li>
+                      </Fragment>
                     );
                   })}
                 </ol>
