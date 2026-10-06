@@ -9,7 +9,7 @@
 // - 서버 HTML은 언제나 판정 없는 카드다 — 하이드레이션이 어긋날 자리를 만들지 않고, 지면은 ISR 그대로다
 // - 프로필은 여기서 읽기만 한다. 어디로도 보내지 않는다
 // - 「확인 필요」는 엔진이 unsure로 돌려준 항목이다(세대주 여부, 부모 소득, 6세 이하 자녀, 거주지 미입력) — lib/eligibility
-import { diagnose, type Check } from "@/lib/eligibility";
+import { diagnose, ruleHead, ruleTextAddsInfo, type Check } from "@/lib/eligibility";
 import { toElig } from "@/lib/profile";
 import type { IncomeStandard, RegionTier, SupplyType } from "@/types/eligibility";
 import { useProfile } from "./profile-context";
@@ -77,15 +77,22 @@ export function EligRuleCards({ block, income, tiers }: { block: RuleBlock; inco
                   </span>
                 )}
               </div>
-              <ul className="elig-why">
+              {/* 줄마다 결정값을 크게 세운다(사용자 지적 2026-10-06) — 「19세 이상」 「70% 이하」가 먼저 잡히고 문장은 그 밑에 작게.
+                  소득은 150% 눈금 막대(100% 자리에 금). 값을 못 뽑은 줄은 전처럼 문장만 */}
+              <ul className="elig-why rt">
                 {c.lines.map((l) => {
                   const hit = j?.byslot.get(slotOf(l.label));
                   const cls = l.off ? "off" : hit ? (hit.state === "ok" ? "y" : hit.state === "no" ? "n" : "q") : undefined;
+                  const h = l.off ? null : ruleHead(l.label, l.text);
                   return (
                     <li key={l.label} className={cls}>
                       <span>{l.label}</span>
                       <p>
-                        {l.text}
+                        {h && <b className="rt-head">{h.head}</b>}
+                        {h?.gauge != null && (
+                          <span className="rt-gauge" aria-hidden="true"><i style={{ width: `${h.gauge}%` }} /><u /></span>
+                        )}
+                        {(!h || ruleTextAddsInfo(l.text, h.head)) && (h ? <small className="rt-text">{l.text}</small> : l.text)}
                         {/* 통과한 줄은 기준만으로 충분하다 — 걸린 줄과 물어볼 줄만 내 값을 붙인다 */}
                         {hit && hit.state !== "ok" && <small className="elig-mine">{hit.check.detail}</small>}
                       </p>

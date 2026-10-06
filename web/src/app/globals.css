@@ -2552,3 +2552,21 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .hub-rule-tabs { margin-top: 16px; }
 .hub-rule-tabs .hub-rule { margin-top: 12px; }
 .hub-rule-tabs .ctabs-panel { border: 0; padding: 0; background: none; }
+
+/* ── 신청자격 줄의 결정값(.elig-why.rt, components/elig-rule-cards.tsx) ──
+   사용자 지적 2026-10-06 「신청자격은 여전히 보기 힘들다」 — 라벨 옆 문장만 있던 줄에 결정값을 크게 세운다.
+   줄 사이를 넓히고 가는 선으로 가른다. 문장은 결정값 밑에 작게 */
+.elig-why.rt { gap: 0; margin-top: 8px; }
+.elig-why.rt li { align-items: flex-start; padding: 9px 0; border-top: 1px solid var(--line); }
+.elig-why.rt li:first-child { border-top: 0; }
+.elig-why.rt li > span { padding-top: 3px; width: 50px; }
+.elig-why.rt li > p { font-size: 12.5px; line-height: 1.55; color: var(--dim); }
+.rt-head { display: block; margin-bottom: 2px; font-weight: 900; font-size: 16px; line-height: 1.3; letter-spacing: -0.03em; color: var(--ink); }
+.elig-why.rt li.y .rt-head { color: var(--ok); }
+.elig-why.rt li.n .rt-head { color: var(--hot); }
+.rt-gauge { position: relative; display: block; max-width: 240px; height: 6px; margin: 4px 0 6px; border-radius: 3px; background: var(--line); }
+.rt-gauge i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--acc); }
+/* 100% 눈금 — 150% 눈금 끝 기준 2/3 자리 */
+.rt-gauge u { position: absolute; top: -3px; bottom: -3px; left: 66.67%; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.35; }
+/* 칸 맞춤(elig-align, subgrid) 지면에서 줄 높이가 카드끼리 맞도록 선은 줄 자체에 둔다 — 위 규칙 그대로 쓰인다 */
+.rt-text { display: block; font-size: inherit; }

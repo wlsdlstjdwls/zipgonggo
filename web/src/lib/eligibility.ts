@@ -376,3 +376,59 @@ export function ruleLines(t: SupplyType): { label: string; text: string }[] {
   if (region) lines.push({ label: "거주지", text: region });
   return lines;
 }
+
+/**
+ * 자격 줄 글에서 **큰 글씨로 세울 값 하나**를 뽑는다(사용자 지적 2026-10-06: 「신청자격은 여전히 보기 힘들다」).
+ * 줄 글은 그대로 두고 그 위에 「19세 이상」 「70% 이하」 「3억 4,500만 원」처럼 결정값만 크게 — 훑을 때 숫자가 먼저 잡히게.
+ * 글에 있는 말만 잘라 낸다. 못 뽑으면 null — 지어내지 않는다. gauge는 소득 %(눈금 끝 150%)
+ */
+export function ruleHead(label: string, text: string): { head: string; gauge?: number } | null {
+  const t = text.trim();
+  // 첫 마디가 「없음」이면 그게 결정값이다. 뒤에 붙은 단서(「2세 이하 자녀가 있으면 기간 면제」)는 문장이 말한다
+  const first = t.split(/[.,(]/)[0];
+  if (/(기준|요건|제한) 없음/.test(first) && !/\d/.test(first)) return { head: /제한 없음/.test(first) ? "제한 없음" : "기준 없음" };
+  const money = /(\d[\d,]*억(?: [\d,]+만)?(?: [\d,]+)?|[\d,]+만) 원/.exec(t)?.[1];
+  switch (label) {
+    case "나이": {
+      const m = /(\d+~\d+세|\d+세 이상|\d+세 이하)/.exec(t);
+      return m ? { head: m[1] } : null;
+    }
+    case "혼인":
+    case "혼인기간": {
+      if (/미혼만/.test(t)) return { head: "미혼만" };
+      const m = /혼인 (\d+)년 이내/.exec(t);
+      return m ? { head: `혼인 ${m[1]}년 이내` } : null;
+    }
+    case "무주택":
+      return { head: "무주택" };
+    case "계층": {
+      const m = /^(.+) 중 하나 해당$/.exec(t);
+      return m ? { head: m[1] } : null;
+    }
+    case "소득": {
+      const m = /(\d+)%(?:\(맞벌이 (\d+)%\))? 이하/.exec(t);
+      if (!m) return null;
+      const pct = Number(m[1]);
+      return { head: m[2] ? `${pct}% 이하 (맞벌이 ${m[2]}%)` : `${pct}% 이하`, gauge: Math.min(100, Math.round((pct / 150) * 100)) };
+    }
+    case "자산":
+      return money ? { head: `${money} 원 이하` } : null;
+    case "자동차":
+      if (/소유 불가/.test(t)) return { head: "소유 불가" };
+      return money ? { head: `${money} 원 이하` } : null;
+    case "거주지":
+      if (/서울 거주자만/.test(t)) return { head: "서울 거주" };
+      if (/모집하는 지역/.test(t)) return { head: "모집 지역 거주" };
+      return null;
+    default:
+      return null;
+  }
+}
+
+/** 결정값을 세운 뒤에도 문장을 밑에 붙일 값이 있나 — 「19세 이상」 밑에 「19세 이상」을 또 쓰지 않는다 */
+export function ruleTextAddsInfo(text: string, head: string): boolean {
+  const squash = (x: string) => x.replace(/\s|이어야 한다|기준|나이|해당/g, "");
+  const a = squash(text);
+  const b = squash(head);
+  return !(a === b || (a.includes(b) && a.length - b.length <= 3));
+}
