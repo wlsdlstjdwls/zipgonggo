@@ -1,5 +1,5 @@
 // 표시용 포맷. 계산은 전부 KST 날짜 기준.
-import { DDAY_URGENT_DAYS } from "./constants";
+import { DDAY_SOON_DAYS, DDAY_URGENT_DAYS } from "./constants";
 import type { NoticeListItem } from "@/types/notice";
 
 const KO = "ko-KR";
@@ -108,7 +108,7 @@ export function ddayChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_a
   if (announced(n)) return { num: "마감", unit: "종료", tone: "soft", days: toEnd, solid: true };
   if (toEnd === null) {
     if (n.status === "접수중") return { num: "모집", unit: "진행 중", tone: "acc", days: null, solid: true };
-    if (n.status === "정정공고중") return { num: "정정", unit: "공고 중", tone: "soft", days: null, solid: true };
+    if (n.status === "정정공고중") return { num: "정정", unit: "공고 중", tone: "warn", days: null, solid: true };
     if (n.status === "접수마감") return { num: "마감", unit: "종료", tone: "soft", days: null, solid: true };
     return { num: "원문", unit: "확인", tone: "soft", days: null };
   }
@@ -120,9 +120,7 @@ export function ddayChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_end_a
   if (toStart === 0) return { num: "오늘", unit: "접수 시작", tone: "acc", days: toEnd, solid: true };
   // 마감이 코앞이면 숫자 칩이라도 같이 강조한다
   if (toEnd <= DDAY_URGENT_DAYS) return { num: `D-${toEnd}`, unit: "마감", tone: "hot", days: toEnd, solid: true };
-  // 색은 셋만(사용자 지적 2026-10-06: 「색상이 너무 다양해서 오히려 보기 힘들다」) — 급함 빨강, 신청 가능 파랑, 나머지 회색.
-  // 접수 중이면 남은 날과 상관없이 파랑이다. D-5~7 주황(warn)은 접었다
-  return { num: `D-${toEnd}`, unit: "마감", tone: "acc", days: toEnd };
+  return { num: `D-${toEnd}`, unit: "마감", tone: toEnd <= DDAY_SOON_DAYS ? "warn" : "soft", days: toEnd };
 }
 
 /** 2026-09-07 → 09.07 (행 접수기간처럼 연도가 뻔한 자리) */
@@ -211,7 +209,7 @@ export function applyPhase(n: Pick<NoticeListItem, "apply_start_at" | "apply_end
   if (toStart !== null && toStart > 0) return { kind: "before", label: `${toStart}일 뒤 접수 시작`, note: span, live: `D-${toStart} 시작`, tone: "soon" };
   if (toEnd === 0) return { kind: "today-close", label: "오늘 접수 마감", note: span, live: "오늘 마감", tone: "hot" };
   if (toEnd !== null && toEnd > 0) {
-    return { kind: "open", label: `접수 중, ${toEnd}일 남음`, note: endNote, live: "접수 중", tone: toEnd <= DDAY_URGENT_DAYS ? "hot" : "acc" };
+    return { kind: "open", label: `접수 중, ${toEnd}일 남음`, note: endNote, live: "접수 중", tone: toEnd <= DDAY_URGENT_DAYS ? "hot" : toEnd <= DDAY_SOON_DAYS ? "warn" : "acc" };
   }
   if (toEnd !== null && toEnd < 0) return { kind: "closed", label: "접수 마감", note: endNote, live: null, tone: "soft" };
   return { kind: "none", label: NO_DATE, note: "접수 기간이 공고문에 없어 기관 원문에서 확인해야 합니다", live: null, tone: "soft" };
@@ -224,7 +222,7 @@ export function deadlineChip(n: Pick<NoticeListItem, "apply_start_at" | "apply_e
   if (toEnd === null) return ddayChip(n);
   if (toEnd < 0) return { num: "마감", unit: "종료", tone: "soft", days: toEnd };
   if (toEnd === 0) return { num: "오늘", unit: "마감", tone: "hot", days: 0 };
-  return { num: `D-${toEnd}`, unit: "마감까지", tone: toEnd <= DDAY_URGENT_DAYS ? "hot" : "acc", days: toEnd };
+  return { num: `D-${toEnd}`, unit: "마감까지", tone: toEnd <= DDAY_URGENT_DAYS ? "hot" : toEnd <= DDAY_SOON_DAYS ? "warn" : "acc", days: toEnd };
 }
 
 /** 예산 칩·목록 요약에 쓰는 짧은 금액. 만 단위 아래를 버린다 — 「5,000만」·「1억」·「30만」.
