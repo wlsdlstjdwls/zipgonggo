@@ -8,6 +8,8 @@ export const ROUTES = {
   notice: "/notice",
   area: "/area",
   type: "/type",
+  // 정부 사업(든든전세, 미리내집 …) 목록과 사업 허브. 사업 판정은 pipeline이 notice.programs에 적는다
+  program: "/program",
   api: "/api",
   apiNotices: "/api/notices",
   // 저장(★) 목록이 id 묶음으로 공고를 받아 오는 자리. 개인 목록이라 캐시하지 않는다
@@ -89,6 +91,11 @@ export function areaTypeSegment(p: { sido: string; sigungu: string; ambiguous: b
 
 export function areaTypePath(p: { sido: string; sigungu: string; ambiguous: boolean }, housingType: string): string {
   return `${ROUTES.area}/${encodeURIComponent(areaTypeSegment(p))}/${encodeURIComponent(housingType)}`;
+}
+
+/** /program/{사업} 사업 허브 경로. 사업 값(notice.programs)이 곧 식별자다 */
+export function programPath(program: string): string {
+  return `${ROUTES.program}/${encodeURIComponent(program)}`;
 }
 
 /** /type/{유형} 유형 허브 경로. */

@@ -157,6 +157,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                         </Link>
                       </li>
                     ))}
+                    <li><Link href={ROUTES.program}>사업별 안내</Link></li>
                   </ul>
                 </nav>
               )}

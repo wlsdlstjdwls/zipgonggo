@@ -330,7 +330,7 @@ export const getNoticeBySlug = cache(async (slug: string): Promise<Notice | null
             max_deposit, max_rent, schedule_source, schedule_steps,
             to_char(apply_start_tm, 'HH24:MI') AS apply_start_tm,
             to_char(apply_end_tm, 'HH24:MI') AS apply_end_tm,
-            canonical_id,
+            canonical_id, programs,
             (SELECT c.slug FROM notice c WHERE c.id = notice.canonical_id) AS canonical_slug,
             to_char(updated_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') AS updated_at
      FROM notice WHERE slug = $1`,
@@ -586,11 +586,36 @@ export const listTypeHubs = cache(unstable_cache(
   CACHE_OPTS,
 ));
 
-/** 착지 페이지가 그리는 목록. 진행 중을 먼저, 그다음 최신순. 페이징 없이 limit까지만 */
+export type ProgramHub = { program: string; total: number; open: number; sidos: number };
+
+/** 사업별 전국 현황(0039 notice.programs). /program 목록, 사업 허브의 건수, 사이트맵이 같이 쓴다 */
+export const listProgramHubs = cache(unstable_cache(
+  async (): Promise<ProgramHub[]> =>
+    query<ProgramHub>(
+      `SELECT p AS program, count(*)::int AS total,
+              count(*) FILTER (WHERE ${NOT_CLOSED})::int AS open,
+              count(DISTINCT sido)::int AS sidos
+         FROM notice, unnest(programs) AS p
+        WHERE ${CANONICAL_ONLY} GROUP BY 1 ORDER BY 2 DESC`,
+    ),
+  ["program-hubs-v1"],
+  CACHE_OPTS,
+));
+
+/** 착지 페이지가 그리는 목록. 진행 중을 먼저, 그다음 최신순. 페이징 없이 limit까지만.
+ *  유형(/type, /area×유형) 또는 사업(/program) 가운데 하나로 좁힌다 */
 export const listLandingNotices = unstable_cache(
-  async (f: { type: string; sido?: string; sigungu?: string }, limit: number): Promise<NoticeListItem[]> => {
-    const params: unknown[] = [f.type];
-    const where = [CANONICAL_ONLY, `housing_type::text = $1`];
+  async (f: { type?: string; program?: string; sido?: string; sigungu?: string }, limit: number): Promise<NoticeListItem[]> => {
+    const params: unknown[] = [];
+    const where = [CANONICAL_ONLY];
+    if (f.type) {
+      params.push(f.type);
+      where.push(`housing_type::text = $${params.length}`);
+    }
+    if (f.program) {
+      params.push(f.program);
+      where.push(`$${params.length} = ANY(programs)`);
+    }
     if (f.sigungu) {
       params.push(f.sigungu);
       const pSigungu = params.length;
@@ -610,7 +635,7 @@ export const listLandingNotices = unstable_cache(
       params,
     );
   },
-  ["landing-notices-v1"],
+  ["landing-notices-v2"],
   CACHE_OPTS,
 );
 

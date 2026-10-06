@@ -10,12 +10,14 @@ import re
 from datetime import date, datetime
 from typing import Any
 
+from .programs import classify as classify_programs
+
 NOTICE_COLS = [
     "slug", "fingerprint", "source", "source_key", "amends_source_key", "agency", "title",
     "housing_type", "sector", "house_type", "sido", "sigungu", "complex_name", "address", "pnu", "heating",
     "total_household", "supply_count", "min_deposit", "min_rent", "min_down_payment", "min_interim",
     "min_balance", "posted_at", "apply_start_at", "apply_end_at", "announce_at", "status",
-    "source_status", "source_url", "portal_url", "contact", "source_rank", "raw",
+    "source_status", "source_url", "portal_url", "contact", "source_rank", "raw", "programs",
 ]
 # 재수집 시 갱신하지 않는 것: slug(URL 불변), source, source_key, publish, created_at
 _UPDATE_COLS = [c for c in NOTICE_COLS if c not in ("slug", "source", "source_key")]
@@ -65,6 +67,8 @@ def upsert_notice(cur, notice: dict[str, Any], areas: list[dict[str, Any]]) -> b
     """notice 1행 upsert + notice_area 교체를 **한 문장**으로. True면 신규."""
     row = dict(notice)
     row["raw"] = json.dumps(row["raw"], ensure_ascii=False)
+    # 사업 이름(0039)은 소스가 아니라 여기서 매긴다 — 소스마다 따로 부르면 한 곳이 빠진다
+    row["programs"] = classify_programs(row["title"], row["housing_type"])
     row["areas"] = json.dumps(
         [{"sido": a["sido"], "sigungu": a["sigungu"], "supply_count": a["supply_count"]} for a in areas],
         ensure_ascii=False,

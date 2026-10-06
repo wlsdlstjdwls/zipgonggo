@@ -30,7 +30,8 @@ import {
   getAmendChain, getComplexFacts, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition,
   listFilterOptions,
 } from "@/lib/queries";
-import { areaPath, noticePath, ROUTES } from "@/lib/routes";
+import { programDoc } from "@/lib/programs";
+import { areaPath, noticePath, programPath, ROUTES } from "@/lib/routes";
 import { regionLabel, sidoShort } from "@/lib/sido";
 import type { Notice, NoticeListItem } from "@/types/notice";
 
@@ -346,6 +347,10 @@ export default async function NoticePage({ params }: Params) {
           <Link href={ROUTES.home} className="d-back">← 목록</Link>
           {/* D-day는 오른쪽 카드가 크게 센다 — 여기서 또 세지 않는다 */}
           <span className="tag type"><Term>{n.housing_type}</Term></span>
+          {/* 사업 태그(0039) — 같은 사업의 다른 공고와 제도 설명으로 건너가는 길. 글이 있는 사업만 링크로 단다 */}
+          {(n.programs ?? []).filter((p) => programDoc(p)).map((p) => (
+            <Link key={p} href={programPath(p)} className="tag link">{p}</Link>
+          ))}
           <span className="tag">{n.agency}</span>
           {/* 지역 태그는 /area/{시도}로 가는 링크다 — 상세에서 같은 지역 다른 공고로 건너가는 유일한 길이고,
               크롤러가 상세에서 목록으로 되돌아 나가는 길이기도 하다(2026-09-15 SEO 점검) */}

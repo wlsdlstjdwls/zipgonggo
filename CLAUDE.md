@@ -113,6 +113,7 @@ Fluid Compute라 함수별 리전 지정이 안 먹기 때문이다 — 자세�
 /area/{시도}/{시군구}/{읍면동}
 /area/{시군구}/{유형}
 /type/{유형}
+/program/{사업}        든든전세, 미리내집처럼 유형 아래 정부 사업(notice.programs)
 ```
 
 전체 규칙과 title/meta 템플릿은 [`docs/url-structure.md`](docs/url-structure.md).

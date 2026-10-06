@@ -53,6 +53,8 @@ export type NoticeListItem = {
 export type ScheduleStep = { label: string; start: string; end: string | null; start_time?: string | null; end_time?: string | null };
 
 export type Notice = NoticeListItem & {
+  /** 정부 사업 이름(0039). pipeline programs.py가 매긴다. 빈 배열이면 특정 사업 아님 */
+  programs: string[];
   source_key: string | null;
   /** 공고 내 최대 보증금·월임대료(원). SH 첨부 공급현황 표(0009). API 공고는 NULL */
   max_deposit: number | null;

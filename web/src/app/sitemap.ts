@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { AREA_MIN_COUNT, SITEMAP_MAX_URLS, SITEMAP_PRIORITY_CLOSED, SITEMAP_PRIORITY_OPEN } from "@/lib/constants";
-import { AREA_TYPE_MIN_COUNT, listAreaTypePairs, listFilterOptions, listSitemapComplexes, listSitemapNotices, listTypeHubs } from "@/lib/queries";
-import { areaPath, areaTypePath, noticeComplexPath, noticePath, ROUTES, typePath } from "@/lib/routes";
+import { AREA_TYPE_MIN_COUNT, listAreaTypePairs, listFilterOptions, listProgramHubs, listSitemapComplexes, listSitemapNotices, listTypeHubs } from "@/lib/queries";
+import { areaPath, areaTypePath, noticeComplexPath, noticePath, programPath, ROUTES, typePath } from "@/lib/routes";
+import { PROGRAM_MIN_COUNT, programDoc } from "@/lib/programs";
 import { housingTypeDoc } from "@/lib/housing-types";
 import { absoluteUrl } from "@/lib/site-url";
 
@@ -13,12 +14,13 @@ import { absoluteUrl } from "@/lib/site-url";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [notices, options, complexes, hubs, pairs] = await Promise.all([
+  const [notices, options, complexes, hubs, pairs, programs] = await Promise.all([
     listSitemapNotices(SITEMAP_MAX_URLS),
     listFilterOptions(undefined),
     listSitemapComplexes(SITEMAP_MAX_URLS),
     listTypeHubs(),
     listAreaTypePairs(),
+    listProgramHubs(),
   ]);
   const latest = notices[0] ? new Date(notices[0].updated_at) : new Date();
   return [
@@ -31,6 +33,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 유형 허브 — 직접 쓴 제도 설명이 있는 유형만. 페이지 자체가 그 기준으로 404를 낸다
     ...hubs.filter((h) => housingTypeDoc(h.housing_type)).map((h) => ({
       url: absoluteUrl(typePath(h.housing_type)),
+      lastModified: latest,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    })),
+    // 사업 목록과 사업 허브 — 글이 있고 공고 3건 이상인 사업만. 미달은 페이지도 noindex다
+    { url: absoluteUrl(ROUTES.program), lastModified: latest, changeFrequency: "weekly" as const, priority: 0.6 },
+    ...programs.filter((p) => programDoc(p.program) && p.total >= PROGRAM_MIN_COUNT).map((p) => ({
+      url: absoluteUrl(programPath(p.program)),
       lastModified: latest,
       changeFrequency: "weekly" as const,
       priority: 0.7,
