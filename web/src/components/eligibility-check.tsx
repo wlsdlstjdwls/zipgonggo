@@ -16,6 +16,7 @@ import type { OpenSoonNotice, ResidenceArea, TypeHub } from "@/lib/queries";
 import { noticePath, typePath } from "@/lib/routes";
 import { SIDOS, sidoShort } from "@/lib/sido";
 import type { EligibilityRules, JanggiRule } from "@/types/eligibility";
+import { DateField } from "./date-field";
 import { useProfile } from "./profile-context";
 import { Select } from "./select";
 
@@ -244,19 +245,11 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
             )}
             {/* 예비신혼부부는 입주 전까지 혼인신고를 마쳐야 자격이 서니 예정일을 묻는다(사용자 지적 2026-09-22) */}
             {p.marital === "예비신혼부부" && (
-              <label className="elig-f">
+              <div className="elig-f wide">
                 <span>혼인 예정일</span>
-                <span className="elig-in elig-date">
-                  {/* 칸 아무 데나 눌러도 달력이 열리게 한다. showPicker가 없는 브라우저는 그냥 지나간다 */}
-                  <input
-                    type="date"
-                    className={p.weddingAt ? "" : "empty"}
-                    value={p.weddingAt}
-                    onChange={(e) => set("weddingAt", e.target.value)}
-                    onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch { /* 사용자 제스처가 아니면 조용히 넘긴다 */ } }}
-                  />
-                </span>
-              </label>
+                {/* OS 달력 대신 셀렉트와 같은 톤의 달력(사용자 지적 2026-10-06) */}
+                <DateField value={p.weddingAt} onChange={(v) => set("weddingAt", v)} ariaLabel="혼인 예정일" />
+              </div>
             )}
           </div>
           <label className="elig-chk">

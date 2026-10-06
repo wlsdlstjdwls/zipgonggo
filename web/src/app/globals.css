@@ -1590,19 +1590,17 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 
 /* 지면이 통째로 굴러가지 않게 한 판에 맞춘다(사용자 요청 2026-09-22) — 머리글 높이를 숫자로 빼 두면
    글이 한 줄만 늘어도 어긋나므로, 세로를 flex로 잡고 남는 자리를 진단 칸에 준다. 밑에 남는 건 공용 푸터뿐이다 */
-.elig-stage { display: flex; flex-direction: column; height: calc(100dvh - var(--hdr)); padding: 0 var(--pad); }
+/* 지면 스크롤 하나로 간다(사용자 지적 2026-10-06: "스크롤이 각각 생겨 불편하다"). 09-22에 두 칸을 따로 굴렸지만
+   도움말과 묶음 제목이 붙어 조건 칸이 한 판을 넘자 칸마다 스크롤바가 생겼다. 대신 결과 요약(ej-sum)을 머리에 붙여 둔다 */
+.elig-stage { padding: 0 var(--pad) 48px; }
 .elig-head { flex: none; padding: 22px 0 16px; border-bottom: 1px solid var(--line); }
 .elig-head h1 { font-size: 26px; font-weight: 900; letter-spacing: -0.03em; }
 .elig-head p { margin: 8px 0 0; max-width: 46em; font-size: 14px; line-height: 1.75; color: var(--mut); }
 
-.elig { flex: 1; min-height: 0; display: grid; grid-template-columns: 380px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 28px; padding: 18px 0; }
-/* 왼쪽 조건과 오른쪽 결과는 따로 굴린다(사용자 요청 2026-09-22) — 한 덩이로 굴리면 결과를 내려 보는 동안
-   조건 칸이 화면 밖으로 빠져 값을 고치려면 다시 올라가야 한다. 두 칸 다 뷰포트 높이에 맞춰 잘라
-   제 안에서만 스크롤한다. 셀렉트 목록은 body로 포털돼 캡처 단계 스크롤을 따라오니 잘리지 않는다(select.tsx) */
-.elig-form, .elig-out {
-  min-height: 0; height: 100%;
-  overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
-}
+.elig { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 28px; align-items: start; padding: 18px 0; }
+/* 09-22에는 두 칸을 따로 굴렸다(결과를 내려 보는 동안 조건 칸이 빠져나가지 않게). 칸마다 스크롤바가 생겨
+   불편하다는 지적(2026-10-06)으로 지면 스크롤 하나로 되돌렸다 — 결과 요약(ej-sum)이 머리에 붙어 따라온다 */
+.elig-form, .elig-out { min-width: 0; }
 .elig-form { display: flex; flex-direction: column; gap: 13px; padding-right: 4px; }
 /* 조건 칸은 한 판에 다 들어가는 게 목표다(사용자 요청 2026-09-22) — 이 칼럼 안에서만 치수를 줄인다.
    .elig-grid·.elig-in은 공고 지면의 「내 조건」(fit-form)도 쓰는 클래스라 바깥으로 새면 안 된다 */
@@ -1686,7 +1684,8 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .ej-clsg > b { font-weight: 800; font-size: 12px; color: var(--mut); }
 .ej-form .elig-chip { padding: 6px 11px; font-size: 13.5px; }
 
-.ej-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 8px; }
+.ej-sum { position: sticky; top: var(--hdr); z-index: 5; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+  margin: 0 0 8px; padding: 8px 0; background: var(--bg); }
 .ej-sum a { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-card); text-decoration: none; background: var(--bg); }
 .ej-sum a b { font-size: 26px; font-weight: 900; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .ej-sum a span { font-weight: 800; font-size: 13px; color: var(--mut); }
@@ -1808,6 +1807,32 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-align .elig-card-h { margin-bottom: 5px; }
 .elig-align .elig-memo { margin: 6px 0 0; min-height: 1px; }
 .elig-sub small { margin-left: 8px; font-weight: 600; font-size: 12.5px; color: var(--dim); }
+
+/* ── 날짜 칸(date-field.tsx) — 셀렉트 목록(.selmenu)과 같은 판, 같은 그림자 ── */
+.df-btn { width: 100%; justify-content: space-between; padding: 0 12px; font: inherit; font-weight: 700; font-size: 14.5px; color: var(--ink); cursor: pointer; text-align: left; }
+.df-btn.empty { color: var(--dim); font-weight: 600; }
+.df-btn svg { flex: none; color: var(--dim); }
+.df-btn:hover, .df-btn.open { border-color: var(--line-strong); }
+.df-btn:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.df-pop { position: fixed; z-index: 70; padding: 12px; background: var(--bg); border: 1px solid var(--line2); border-radius: var(--r-panel); box-shadow: var(--shadow-float); }
+.df-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 8px; }
+.df-head b { font-weight: 900; font-size: 15px; letter-spacing: -0.02em; }
+.df-nav { width: 32px; height: 32px; border: 0; border-radius: var(--radius-sm); background: none; font-size: 20px; line-height: 1; color: var(--mut); cursor: pointer; }
+.df-nav:hover { background: var(--sub); color: var(--ink); }
+.df-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.df-dow { display: grid; place-items: center; height: 26px; font-weight: 800; font-size: 11.5px; color: var(--dim); }
+.df-dow.sun, .df-day.sun { color: var(--hot); }
+.df-dow.sat, .df-day.sat { color: var(--acc); }
+.df-day { height: 36px; border: 0; border-radius: var(--radius-sm); background: none; font: inherit; font-weight: 700; font-size: 13.5px; color: var(--ink);
+  font-variant-numeric: tabular-nums; cursor: pointer; }
+.df-day:hover { background: var(--sub); }
+.df-day.out { opacity: 0.35; }
+.df-day.today { box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.df-day.on { background: var(--acc); color: #fff; }
+.df-day:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.df-foot { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.df-foot button { padding: 6px 11px; border: 1px solid var(--line2); border-radius: var(--r-chip); background: var(--bg); font: inherit; font-weight: 700; font-size: 12.5px; color: var(--mut); cursor: pointer; }
+.df-foot button:hover { background: var(--sub); color: var(--ink); }
 
 /* 제도 일반 기준 카드에 얹는 내 조건 판정(elig-rule-cards.tsx, 2026-10-06). 색만으로 말하지 않게 꼬리표 글자를 같이 단다 */
 .elig-verdict-lead { margin: 0 0 10px; padding: 9px 12px; border-radius: var(--r-card); background: var(--sub); font-size: 13px; line-height: 1.6; color: var(--mut); }
@@ -1987,9 +2012,9 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 
 @container (max-width: 900px) {
   /* 위아래로 누우면 따로 굴릴 칸이 없다 — 지면 스크롤 하나로 되돌린다 */
-  .elig-stage { display: block; height: auto; padding-bottom: 48px; }
-  .elig { grid-template-columns: 1fr; grid-template-rows: none; }
-  .elig-form, .elig-out { height: auto; overflow: visible; }
+  .elig { grid-template-columns: 1fr; }
+  /* 폰에서는 바닥 「결과 보기」 바(ej-jump)가 그 일을 한다 — 머리에 붙이면 화면 위아래를 둘 다 먹는다 */
+  .ej-sum { position: static; padding: 0; }
 }
 @media (max-width: 640px) {
   .elig-grid { grid-template-columns: 1fr; }
