@@ -285,15 +285,18 @@ small { font-size: 13.5px; }
 .foot-copy { margin-top: 10px; font-size: 11.5px; color: var(--dim); }
 
 /* ── 정책 문서(이용약관·개인정보처리방침) ────────────────── */
-.legal-in { max-width: 720px; padding: 26px var(--pad) 56px; }
+/* 넓은 화면에서 왼쪽에 붙은 720px 한 단은 오른쪽 절반이 텅 비어 기울어 보였다 — 가운데로 모은다(2026-10-06).
+   뒤로가기 줄(.crumb)도 같은 선에 세운다. 본문 글자는 14px → 15px */
+.legal-in { max-width: 760px; margin: 0 auto; padding: 26px var(--pad) 56px; }
+.legal > .crumb { max-width: 760px; margin: 0 auto; }
 .legal-in h1 { margin: 0; font-weight: 900; font-size: 28px; line-height: 1.2; letter-spacing: -0.05em; color: var(--ink); }
 .legal-eff { margin: 8px 0 0; font-weight: 700; font-size: 12.5px; color: var(--dim); }
 .legal-body { display: flex; flex-direction: column; gap: 26px; margin-top: 28px; }
 .legal-sec h2 { margin: 0 0 8px; font-weight: 800; font-size: 16px; letter-spacing: -0.03em; color: var(--ink); }
-.legal-sec p { margin: 0 0 8px; font-weight: 500; font-size: 14px; line-height: 1.85; color: var(--mut); }
+.legal-sec p { margin: 0 0 8px; font-weight: 500; font-size: 15px; line-height: 1.85; color: var(--mut); }
 .legal-sec p:last-child { margin-bottom: 0; }
 .legal-sec ul { margin: 0 0 8px; padding-left: 18px; }
-.legal-sec li { margin-bottom: 6px; font-weight: 500; font-size: 14px; line-height: 1.85; color: var(--mut); }
+.legal-sec li { margin-bottom: 6px; font-weight: 500; font-size: 15px; line-height: 1.85; color: var(--mut); }
 .legal-sec li:last-child { margin-bottom: 0; }
 .legal-sec strong { font-weight: 800; color: var(--ink); }
 .legal-sec a { font-weight: 700; color: var(--acc); text-decoration: underline; text-underline-offset: 3px; }
@@ -501,8 +504,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .tag.soft { background: var(--sub); color: var(--mut); }
 .tag.soon { background: var(--soon-soft); color: var(--soon); }
 /* 누를 수 있는 태그(지역 → /area/{시도}). 같은 줄의 다른 태그와 구별되게 테두리만 준다 */
-.tag.link { background: transparent; border: 1px solid var(--line2); color: var(--mut); }
-.tag.link:hover { border-color: var(--acc); color: var(--acc); }
+/* 링크 태그도 테두리 없이 같은 회색 판(2026-10-06 가시성 정리) — 테두리 칩과 면 칩이 한 줄에 섞이면 어수선했다.
+   누를 수 있다는 건 호버 색과 밑줄로 말한다 */
+.tag.link { background: var(--sub); color: var(--mut); transition: color 160ms var(--ease), background 160ms var(--ease); }
+.tag.link:hover { background: var(--acc-soft); color: var(--acc); text-decoration: underline; text-underline-offset: 3px; }
 .chip { display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--sub); color: var(--mut); font-size: 12.5px; font-weight: 700; line-height: 17px; white-space: nowrap; }
 .chip.amend { background: var(--acc-soft); color: var(--acc); }
 /* 「신규」 칩은 지도 신규 핀과 같은 주황이다 — 목록과 지도가 다른 색으로 같은 말을 하면 안 된다(2026-09-09) */
@@ -665,7 +670,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    본문을 세로 flex로 세우고 날짜를 바닥으로 밀어 한 행의 카드끼리 밑줄을 맞춘다 */
 .rows.v-card .row-body { width: 100%; margin-top: 12px; flex: 1; display: flex; flex-direction: column; }
 .rows.v-card .row-title { font-size: 16px; }
-.rows.v-card .row-dates { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); }
+/* 날짜 줄 위 실선은 뺐다(2026-10-06 가시성 정리) — 카드 안에 선이 하나 더 있으면 제목과 날짜가 두 칸으로
+   갈라져 읽혔다. 바닥 정렬(margin-top: auto)만으로 한 행의 날짜 줄은 그대로 맞는다 */
+.rows.v-card .row-dates { margin-top: auto; padding-top: 12px; }
 .rows.v-card .row-act { position: absolute; top: 10px; right: 10px; }
 .rows.v-card .row-act .arrow { display: none; }
 /* 호버에 크기·페이드를 걸었더니 별이 흐릿해졌다 진해져 어지럽다(사용자 지적 2026-09-09) —
@@ -1546,6 +1553,16 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   .hd-out > .aside .specs > .t, .hd-out > .aside .specs .r.lead { grid-column: 1 / -1; }
   /* 두 칸의 길이가 다를 때 짧은 쪽 밑줄이 허공에 뜨지 않게 — 칸이 글자를 따라 줄어든다 */
   .hd-out > .aside .specs .r { align-self: start; }
+  /* 원문 버튼은 하단 고정 바(.dbar)가 늘 들고 있다 — 요약 패널에서 또 크게 세우면 본문이 한 뼘 밀린다
+     (2026-10-06 가시성 정리). 포털, 담기, 공유는 이 패널에만 있으니 남긴다 */
+  .hd-out > .aside .btn.acc.lg { display: none; }
+  /* 남은 버튼은 한 단 낮게, 제원은 테두리 없이 — 패널 안에 상자가 또 있으면 폰에서 상자만 보인다 */
+  .hd-out > .aside .btn.lg, .hd-out > .aside .cta-row > * { height: 42px; }
+  .hd-out > .aside .specs { padding: 4px 2px 0; border: 0; }
+  /* 카드 바깥 회색 여백을 줄여 글 폭을 넓힌다 — 폰에서는 24px이 글 두세 자다 */
+  .detail-lead, .detail-main { gap: 8px; padding: 8px; }
+  .detail-lead > .dsec, .detail-main > .dsec,
+  .detail-lead > .section, .detail-main > .section { padding: 18px 14px; }
   .d-title { font-size: 30px; }
   .cx { grid-template-columns: minmax(0, 1fr); }
   .cx-map-wrap { position: static; order: -1; min-width: 0; height: 400px; }
