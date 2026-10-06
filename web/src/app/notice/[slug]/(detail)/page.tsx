@@ -21,7 +21,7 @@ import { ShareButton } from "@/components/share-button";
 import { JsonLd } from "@/components/json-ld";
 import { agencyLabels } from "@/lib/agency";
 import { AREA_MIN_COUNT } from "@/lib/constants";
-import { HOUSEHOLD_MAX, ruleLines } from "@/lib/eligibility";
+import { HOUSEHOLD_MAX, incomeLimit, incomePctFor, ruleLines } from "@/lib/eligibility";
 import { noticeGraph } from "@/lib/jsonld";
 import { applyPhase, dateK, dateMD, daysUntil, deadlineChip, isClosed, moneyOf, NO_DATE, num, todayKST, won, wonKo, wonShort } from "@/lib/format";
 import { MINGAN_INCOME_PCTS, minganRuleCards } from "@/lib/mingan-fit";
@@ -166,7 +166,11 @@ export default async function NoticePage({ params }: Params) {
   const minganFit = isMingan && supply.length > 0;
   // 소득 줄에 %만 있으면 얼마인지 알려면 접힌 표를 열어 맞춰 봐야 했다(사용자 지적 2026-10-06) — 1인 가구 금액을 바로 붙인다.
   // 내 가구원수 기준 금액은 저장된 조건이 있을 때 판정 줄(EligRuleCards)이 따로 말한다
-  const oneLimit = (pct: number | null) => (pct == null ? null : eligRules.income.find((r) => r.household === 1 && r.pct === pct)?.monthly_won ?? null);
+  // 1인 가구 금액은 소규모 가구 가산(+20%p)을 얹은 값이다 — 공고도 「(1인) 4,576,036원」처럼 가산한 금액을 싣는다
+  const oneLimit = (t: (typeof eligRules.types)[number]) => {
+    const pct = incomePctFor(t, { dual: false, marital: "미혼", household: 1 });
+    return pct == null ? null : incomeLimit(eligRules.income, 1, pct);
+  };
   const cardOf = (t: (typeof eligRules.types)[number]): RuleCard => ({
     key: t.code,
     title: t.category,
@@ -175,7 +179,7 @@ export default async function NoticePage({ params }: Params) {
     // 시드의 「무관」은 선정 방식이 아니라 빈칸이다 — 오른쪽 꼬리표로 달면 뜻이 없다
     right: t.ranking_method && t.ranking_method !== "무관" ? t.ranking_method : null,
     lines: ruleLines(t).map((l) => {
-      const lim = l.label === "소득" ? oneLimit(t.income_pct) : null;
+      const lim = l.label === "소득" ? oneLimit(t) : null;
       return lim ? { ...l, text: `${l.text} (1인 가구 월 ${won(lim)})` } : l;
     }),
     note: t.note,

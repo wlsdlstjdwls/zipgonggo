@@ -27,6 +27,12 @@ export type SupplyType = {
   ranks: string[];
   general_ranks: string[];
   score: Record<string, string>;
+  /** 맞벌이 기준 %(0038). income_pct는 외벌이(기본) 기준이다 */
+  income_pct_dual: number | null;
+  /** 1인 +20%p, 2인 +10%p 가산을 쓰는 유형(0038) */
+  income_small_bonus: boolean;
+  /** 이 사양을 대조한 공고 slug, 쉼표로 여럿(0038) */
+  basis: string | null;
 };
 
 export type IncomeStandard = { household: number; pct: number; monthly_won: number };

@@ -266,6 +266,7 @@ export function toElig(p: UserProfile): Profile {
     homelessSelf: p.homelessSelf,
     classes: p.classes,
     residence: p.region,
+    dual: p.dual,
   };
 }
 
@@ -288,6 +289,7 @@ export function fromElig(v: Profile, tiers: RegionTier[]): Partial<UserProfile> 
     classes: v.classes,
     region: v.residence,
     gu: regionToGu(v.residence, tiers),
+    dual: v.dual,
   };
 }
 

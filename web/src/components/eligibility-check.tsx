@@ -8,7 +8,7 @@
 // 장애 여부처럼 건강과 이어지는 계층은 켜도 서버로 가지 않는다(개인정보처리방침 3항).
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { type Check, classOptions, diagnoseAll, HOUSEHOLD_MAX, type Marital, type Profile, tierOf, type Verdict } from "@/lib/eligibility";
+import { type Check, classOptions, diagnoseAll, HOUSEHOLD_MAX, incomePctFor, incomeUsed, type Marital, type Profile, tierOf, type Verdict } from "@/lib/eligibility";
 import { fitJanggi, type FitProfile, type FitVerdict } from "@/lib/notice-fit";
 import { dateMD, daysUntil, wonKo } from "@/lib/format";
 import { fromElig, reconcileRegion, SENSITIVE_CLASSES, toElig } from "@/lib/profile";
@@ -37,6 +37,7 @@ const DEFAULT: Profile = {
   homelessSelf: true,
   classes: ["청년"],
   residence: "",
+  dual: false,
 };
 
 // 장기전세 세부 조건 — 순위·출생자녀·맞벌이·청약 회차. supply_type 한 줄(income_pct)로는 매트릭스를 못 푼다(handoff 0-1).
@@ -91,7 +92,7 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
   const jgFit = useMemo((): { v: FitVerdict; group: string | null } | null => {
     if (!jg) return null;
     const fp: FitProfile = {
-      household: p.household, incomeWon: p.incomeHouseholdWon, dual: jx.dual, newborns: jx.newborns, olderMinor: jx.olderMinor,
+      household: p.household, incomeWon: p.incomeHouseholdWon, dual: p.dual, newborns: jx.newborns, olderMinor: jx.olderMinor,
       assetMan: p.assetMan, carMan: p.carMan, deposits: jx.deposits, gu: p.residence, residenceYears: 0, age: p.age, under2: p.hasNewborn,
       special: false, group: null, area: null, cls: null,
       applicantType: null, priorityClass: null, selfIncomeWon: 0, parentsHomeless: false, disabledSelf: false, disabledFamily: false,
@@ -213,6 +214,8 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
   // 결과를 세 묶음으로 가른다(사용자 요청 2026-10-06: "가능/불가뿐이라 밋밋하다").
   // 한 가지 기준만 걸린 유형은 「얼마나 모자라나」를 말해 줄 수 있어 따로 세운다 — 무엇을 바꾸면 되는지가 보인다
   const near = fail.filter((v) => v.checks.filter((c) => !c.ok).length === 1);
+  /** 지원 가능 중 우리가 단정 못 한 항목이 섞인 것 — 카드가 「확인 필요」로 그린다 */
+  const passUnsure = pass.filter((v) => v.unsure).length;
   const far = fail.filter((v) => v.checks.filter((c) => !c.ok).length > 1);
   const classGroups = useMemo(() => groupClasses(classes), [classes]);
 
@@ -258,7 +261,7 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
           </div>
           <label className="elig-chk">
             <input type="checkbox" checked={p.hasNewborn} onChange={(e) => set("hasNewborn", e.target.checked)} />
-            <span>2세 이하 자녀가 있다 <small>신혼 유형의 혼인기간 제한이 풀린다</small></span>
+            <span>2세 이하 자녀가 있다 <small>신혼 유형은 만 6세 이하 자녀가 있으면 혼인기간 제한이 풀린다</small></span>
           </label>
         </Section>
 
@@ -267,6 +270,13 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
             <Num label="본인 월소득" value={Math.round(p.incomeSelfWon / MAN)} unit="만 원" onChange={(v) => set("incomeSelfWon", v * MAN)} max={100_000} read />
             <Num label="세대 합산 월소득" value={Math.round(p.incomeHouseholdWon / MAN)} unit="만 원" onChange={(v) => set("incomeHouseholdWon", v * MAN)} max={100_000} read />
           </div>
+          {/* 신혼 계열은 외벌이와 맞벌이 기준이 다르다(외벌이 70% / 맞벌이 90% 등, docs/eligibility-audit.md) */}
+          {p.marital !== "미혼" && (
+            <label className="elig-chk">
+              <input type="checkbox" checked={p.dual} onChange={(e) => set("dual", e.target.checked)} />
+              <span>맞벌이다 <small>본인과 배우자 모두 소득이 있으면 신혼 유형의 소득 기준이 올라간다</small></span>
+            </label>
+          )}
           <p className="ej-help">
             연봉이면 12로 나눠 넣습니다(연봉 4,200만 원이면 350). 세대 합산은 등본에 함께 오른 배우자와 부모 등의 소득을 모두 더한 값입니다.
           </p>
@@ -341,7 +351,7 @@ export function EligibilityCheck({ rules, open = [], hubs = [], areas = [] }: {
       <div className="elig-out">
         {/* 한눈에 셋 — 몇 개가 되고, 몇 개가 한 끗 차이고, 몇 개가 멀었나. 누르면 그 묶음으로 내려간다 */}
         <nav className="ej-sum" aria-label="진단 요약">
-          <a href="#ej-pass" className="ok"><b>{pass.length}</b><span>지원 가능</span></a>
+          <a href="#ej-pass" className="ok"><b>{pass.length}</b><span>지원 가능{passUnsure > 0 ? ` (확인 ${passUnsure})` : ""}</span></a>
           <a href="#ej-near" className="near"><b>{near.length}</b><span>한 가지만 걸림</span></a>
           <a href="#ej-far" className="far"><b>{far.length}</b><span>지원 어려움</span></a>
         </nav>
@@ -461,11 +471,6 @@ function Section({ n, title, hint, children }: { n: number; title: string; hint?
   );
 }
 
-/** 이 유형이 내 소득을 어느 칸으로 보나 — lib/eligibility incomeOf와 같은 규칙 */
-function myIncome(scope: string, p: Profile): number {
-  return scope === "본인" || scope === "청년특공_분기" ? p.incomeSelfWon : p.incomeHouseholdWon;
-}
-
 /** 화면에는 만 원 단위로만 — 「381만 3,363원」은 읽히지 않는다. 정확한 값은 title로 */
 const roundMan = (n: number) => Math.round(n / MAN) * MAN;
 
@@ -492,19 +497,24 @@ function Meter({ mine, limit, label }: { mine: number; limit: number; label: str
 
 function PassCard({ v, p, janggi, janggiRef, group }: { v: Verdict; p: Profile; janggi?: FitVerdict | null; janggiRef?: JanggiRule | null; group?: string | null }) {
   const t = v.type;
-  const income = v.incomeLimitWon != null ? { mine: myIncome(t.income_scope, p), limit: v.incomeLimitWon } : null;
+  const income = v.incomeLimitWon != null ? { mine: incomeUsed(t, p), limit: v.incomeLimitWon } : null;
+  // 단정 못 한 항목(세대주 여부, 부모 소득, 6세 이하 자녀, 거주지 미입력)은 숨기지 않고 카드 위로 올린다
+  const unsure = v.checks.filter((c) => c.unsure);
   return (
-    <li className="ej-card ok">
+    <li className={`ej-card ${v.unsure ? "near" : "ok"}`}>
       <div className="ej-card-h">
         <b>{t.category}</b>
         <span>{t.name}</span>
-        <em className="ej-badge ok">지원 가능</em>
+        <em className={`ej-badge ${v.unsure ? "near" : "ok"}`}>{v.unsure ? "확인 필요" : "지원 가능"}</em>
       </div>
       {income ? (
-        <Meter mine={income.mine} limit={income.limit} label={`소득 ${t.income_pct}% 기준`} />
+        <Meter mine={income.mine} limit={income.limit} label={`소득 ${incomePctFor(t, p)}% 기준`} />
       ) : (
         <p className="ej-card-s">소득 기준 없음</p>
       )}
+      {unsure.map((c) => (
+        <p key={c.label} className="ej-unsure"><b>{c.label}</b> {c.detail}</p>
+      ))}
       {janggi && janggiRef && (
         /* 시드 한 줄(income_pct)이 아니라 최근 공고문의 면적×순위 매트릭스로 본 자리 — 순위가 곧 당락 순서다 */
         <p className={`elig-rank elig-jg${janggi.ok === false ? " n" : ""}`}>
@@ -517,7 +527,7 @@ function PassCard({ v, p, janggi, janggiRef, group }: { v: Verdict; p: Profile; 
         <summary>기준 {v.checks.length}가지 모두 보기{rankingText(t.ranking_method) ? ` | 선정 ${rankingText(t.ranking_method)}` : ""}</summary>
         <ul className="elig-why">
           {v.checks.map((c) => (
-            <li key={c.label} className="y"><span>{c.label}</span><p>{c.detail}</p></li>
+            <li key={c.label} className={c.unsure ? "q" : "y"}><span>{c.label}</span><p>{c.detail}</p></li>
           ))}
         </ul>
         {t.note && <p className="elig-memo">{t.note}</p>}
@@ -530,7 +540,7 @@ function PassCard({ v, p, janggi, janggiRef, group }: { v: Verdict; p: Profile; 
 function gapText(c: Check, v: Verdict, p: Profile): string {
   const t = v.type;
   if (c.label === "소득" && v.incomeLimitWon != null) {
-    return `월 ${wonKo(roundMan(myIncome(t.income_scope, p) - v.incomeLimitWon))} 넘습니다 (기준 월 ${wonKo(roundMan(v.incomeLimitWon))} 이하)`;
+    return `월 ${wonKo(roundMan(incomeUsed(t, p) - v.incomeLimitWon))} 넘습니다 (기준 월 ${wonKo(roundMan(v.incomeLimitWon))} 이하)`;
   }
   if (c.label === "자산" && t.asset_limit_man != null) {
     const mine = t.asset_scope === "본인" ? p.assetSelfMan : p.assetMan;

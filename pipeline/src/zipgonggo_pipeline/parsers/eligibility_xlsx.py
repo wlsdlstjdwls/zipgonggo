@@ -17,6 +17,8 @@ from typing import Any
 
 import openpyxl
 
+from .eligibility_corrections import apply_corrections, fix_income_standard
+
 SHEET_RULE = "신청자격DB"
 SHEET_SCORE = "순위가점DB"
 SHEET_INCOME = "소득기준"
@@ -206,8 +208,9 @@ def parse_workbook(path: Path, *, year: int) -> dict[str, Any]:
         return {
             "source": path.name,
             "income_year": year,
-            "supply_types": parse_supply_types(wb),
-            "income_standard": parse_income_standard(wb, year=year),
+            # 엑셀 값에 공고문 대조 정정을 얹는다(eligibility_corrections.py, docs/eligibility-audit.md)
+            "supply_types": apply_corrections(parse_supply_types(wb)),
+            "income_standard": fix_income_standard(parse_income_standard(wb, year=year)),
             "region_tiers": parse_region_tiers(wb),
         }
     finally:

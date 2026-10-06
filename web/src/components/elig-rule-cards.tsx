@@ -8,8 +8,7 @@
 // - 저장분이 없으면(saved=false) 아무것도 얹지 않는다. 기본 프로필(30세 미혼 청년…)로 남의 판정을 매기면 거짓말이다
 // - 서버 HTML은 언제나 판정 없는 카드다 — 하이드레이션이 어긋날 자리를 만들지 않고, 지면은 ISR 그대로다
 // - 프로필은 여기서 읽기만 한다. 어디로도 보내지 않는다
-// - 「확인 필요」는 우리가 대신 가를 수 없는 경우다: 본인+부모 합산 소득(부모 소득을 안 받는다),
-//   거주지를 안 넣었는데 지역 제한이 있는 유형
+// - 「확인 필요」는 엔진이 unsure로 돌려준 항목이다(세대주 여부, 부모 소득, 6세 이하 자녀, 거주지 미입력) — lib/eligibility
 import { diagnose, type Check } from "@/lib/eligibility";
 import { toElig } from "@/lib/profile";
 import type { IncomeStandard, RegionTier, SupplyType } from "@/types/eligibility";
@@ -40,11 +39,7 @@ function judge(t: SupplyType, income: IncomeStandard[], tiers: RegionTier[], p: 
   const v = diagnose(t, p, { types: [t], income, tiers, incomeYear: 0 });
   const byslot = new Map<string, { check: Check; state: State }>();
   for (const c of v.checks) {
-    let state: State = c.ok ? "ok" : "no";
-    // 부모 소득을 따로 받지 않아 세대 합산으로 갈음한다 — 통과여도 단정하지 않는다
-    if (c.label === "소득" && t.income_scope === "본인+부모") state = "check";
-    // 거주지를 안 넣었으면 떨어뜨리지 않고 묻는다
-    if (c.label === "거주지" && !p.residence) state = "check";
+    const state: State = c.unsure ? "check" : c.ok ? "ok" : "no";
     byslot.set(slotOf(c.label), { check: c, state });
   }
   const states = [...byslot.values()].map((x) => x.state);

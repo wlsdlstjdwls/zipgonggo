@@ -1709,6 +1709,10 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .ej-badge.near { background: var(--warn-soft); color: var(--warn); }
 .ej-card-s { margin: 0; font-size: 13px; color: var(--mut); }
 .ej-gap { margin: 0; font-weight: 800; font-size: 14.5px; line-height: 1.5; color: var(--warn); }
+/* 단정 못 한 항목 — 지원 가능 카드에 섞여 있으면 막대 밑으로 올려 묻는다 */
+.ej-unsure { margin: 0; padding: 7px 10px; border-radius: var(--radius-sm); background: var(--warn-soft); font-size: 12.5px; line-height: 1.55; color: var(--mut); }
+.ej-unsure b { margin-right: 4px; font-weight: 800; color: var(--warn); }
+.elig-why li.q > span { color: var(--warn); }
 
 .ej-meter { display: flex; flex-direction: column; gap: 6px; }
 .ej-meter-t { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12.5px; }

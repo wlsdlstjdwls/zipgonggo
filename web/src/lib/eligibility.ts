@@ -37,10 +37,14 @@ export type Profile = {
   classes: string[];
   /** 거주지 시군구 또는 시도 */
   residence: string;
+  /** 본인과 배우자 모두 소득이 있다(맞벌이). 신혼 계열은 맞벌이면 기준 %가 올라간다(income_pct_dual) */
+  dual: boolean;
 };
 
-export type Check = { label: string; ok: boolean; detail: string };
-export type Verdict = { type: SupplyType; ok: boolean; checks: Check[]; incomeLimitWon: number | null };
+/** unsure: 막지는 않지만 대신 단정할 수 없는 항목(세대주 여부, 부모 소득, 6세 이하 자녀처럼 안 묻는 값).
+ *  ok는 true로 두고 화면이 「확인 필요」로 그린다 — 떨어뜨리면 놓치고, 그냥 통과시키면 헛걸음한다 */
+export type Check = { label: string; ok: boolean; detail: string; unsure?: boolean };
+export type Verdict = { type: SupplyType; ok: boolean; unsure: boolean; checks: Check[]; incomeLimitWon: number | null };
 
 export const HOUSEHOLD_MAX = 7;
 const MAN = 10_000;
@@ -63,15 +67,36 @@ export function tierOf(residence: string, tiers: RegionTier[]): string {
   return sido ? sido.tier : "기타";
 }
 
-/** 가구원수 × % → 월소득 한도(원). 표에 없는 가구원수는 마지막 줄로 갈음한다. */
-export function incomeLimit(income: IncomeStandard[], household: number, pct: number): number | null {
-  const size = Math.min(Math.max(household, 1), HOUSEHOLD_MAX);
-  return income.find((r) => r.household === size && r.pct === pct)?.monthly_won ?? null;
+/** 1인 가구 +20%p, 2인 가구 +10%p(income_small_bonus 유형만). 공고가 「(1인) 4,576,036원」처럼 가산한 금액을 싣는다 */
+export function smallBonus(household: number): number {
+  return household <= 1 ? 20 : household === 2 ? 10 : 0;
 }
 
-function incomeOf(scope: string, p: Profile): number {
-  // 본인+부모 합산은 부모 소득을 따로 안 받는다 — 세대 합산으로 갈음하고 화면에서 그렇게 밝힌다
-  return scope === "본인" || scope === "청년특공_분기" ? p.incomeSelfWon : p.incomeHouseholdWon;
+/** 가구원수 × % → 월소득 한도(원). 표에 없는 가구원수는 마지막 줄로 갈음한다.
+ *  표에 없는 %(가산으로 생긴 60, 80, 140% 등)는 100% 줄에 곱해 반올림한다 — 표의 % 줄도 그렇게 만들어졌다 */
+export function incomeLimit(income: IncomeStandard[], household: number, pct: number): number | null {
+  const size = Math.min(Math.max(household, 1), HOUSEHOLD_MAX);
+  const hit = income.find((r) => r.household === size && r.pct === pct);
+  if (hit) return hit.monthly_won;
+  const base = income.find((r) => r.household === size && r.pct === 100)?.monthly_won;
+  return base == null ? null : Math.round((base * pct) / 100);
+}
+
+/** 이 유형이 이 사람에게 쓰는 기준 % — 맞벌이 기준과 소규모 가구 가산을 얹은 값 */
+export function incomePctFor(t: SupplyType, p: Pick<Profile, "dual" | "marital" | "household">): number | null {
+  if (t.income_pct === null) return null;
+  const base = p.dual && p.marital !== "미혼" && t.income_pct_dual ? t.income_pct_dual : t.income_pct;
+  return base + (t.income_small_bonus ? smallBonus(p.household) : 0);
+}
+
+/** 세대원이냐 세대주냐로 갈리는 범위(행복주택 청년 「세대주분기」, 민간 청년안심 특공 「청년특공_분기」). 혼자면 본인과 세대가 같다 */
+const BRANCH_SCOPES = new Set(["세대주분기", "청년특공_분기"]);
+
+/** 막대 그래프 등에서 쓰는 「이 유형이 보는 내 소득」 한 값. 갈래 범위는 혼자 살면 본인, 아니면 세대.
+ *  본인+부모 합산은 부모 소득을 따로 안 받아 세대 합산으로 갈음한다 */
+export function incomeUsed(t: SupplyType, p: Profile): number {
+  if (BRANCH_SCOPES.has(t.income_scope)) return p.household <= 1 ? p.incomeSelfWon : p.incomeHouseholdWon;
+  return t.income_scope === "본인" ? p.incomeSelfWon : p.incomeHouseholdWon;
 }
 
 function won(n: number): string {
@@ -122,9 +147,13 @@ function checkMarital(t: SupplyType, p: Profile): Check | null {
   }
   if (!t.marital_max_yr) return { label: "혼인", ok: true, detail: "혼인기간 제한 없음" };
   if (t.newborn_exempt && p.hasNewborn) {
-    return { label: "혼인기간", ok: true, detail: `2세 이하 자녀가 있어 혼인 ${t.marital_max_yr}년 제한 면제` };
+    return { label: "혼인기간", ok: true, detail: `어린 자녀가 있어 혼인 ${t.marital_max_yr}년 제한 면제` };
   }
   const ok = byClass || p.marriedYears <= t.marital_max_yr;
+  // 공고는 「만 6세 이하 자녀」면 혼인기간을 안 본다. 화면은 2세 이하만 묻는다 — 3~6세 자녀를 둔 가구를 떨어뜨리지 않고 묻는다
+  if (!ok && t.newborn_exempt) {
+    return { label: "혼인기간", ok: true, unsure: true, detail: `혼인 ${t.marital_max_yr}년이 지났다(입력 ${p.marriedYears}년차). 만 6세 이하 자녀가 있으면 신청할 수 있다` };
+  }
   return { label: "혼인기간", ok, detail: `기준 혼인 ${t.marital_max_yr}년 이내, 입력 ${p.marriedYears}년차` };
 }
 
@@ -139,28 +168,52 @@ function checkClass(t: SupplyType, p: Profile): Check | null {
 
 /** 시드의 소득 범위 코드를 화면 말로. 「청년특공_분기」(청년안심주택 민간 청년특공, 본인 소득으로 본다)가 그대로 새어 나왔다(2026-10-06) */
 function scopeLabel(scope: string): string {
-  return scope === "청년특공_분기" ? "본인" : scope;
+  return BRANCH_SCOPES.has(scope) ? "본인 또는 세대" : scope;
 }
 
-function checkIncome(t: SupplyType, p: Profile, limit: number | null): Check | null {
-  if (t.income_pct === null || limit === null) return null;
-  const mine = incomeOf(t.income_scope, p);
-  const scope = t.income_scope === "본인+부모" ? "본인과 부모 합산(세대 합산으로 갈음)" : `${scopeLabel(t.income_scope)} 기준`;
-  return {
-    label: "소득",
-    ok: mine <= limit,
-    detail: `${scope} 도시근로자 ${t.income_pct}% 이하는 월 ${won(limit)}, 입력 월 ${won(mine)}`,
-  };
+function checkIncome(t: SupplyType, p: Profile, limit: number | null, pct: number | null): Check | null {
+  if (pct === null || limit === null) return null;
+  const add = t.income_small_bonus ? smallBonus(p.household) : 0;
+  const bonus = add ? ` (${p.household}인 가구 +${add}%p 가산)` : "";
+  const dual = p.dual && p.marital !== "미혼" && t.income_pct_dual ? "맞벌이 기준 " : "";
+  const rule = `${dual}도시근로자 ${pct}% 이하는 월 ${won(limit)}${bonus}`;
+  if (BRANCH_SCOPES.has(t.income_scope) && p.household > 1) {
+    // 세대원이면 본인 소득, 세대주면 세대 전체 — 세대주인지는 안 묻는다. 둘 다 되거나 둘 다 안 될 때만 단정한다
+    const self = p.incomeSelfWon <= limit;
+    const hh = p.incomeHouseholdWon <= limit;
+    if (self && hh) return { label: "소득", ok: true, detail: `${rule}, 본인과 세대 모두 기준 안` };
+    if (!self && !hh) return { label: "소득", ok: false, detail: `${rule}, 입력 본인 월 ${won(p.incomeSelfWon)} / 세대 월 ${won(p.incomeHouseholdWon)}` };
+    return {
+      label: "소득", ok: true, unsure: true,
+      detail: `${rule}. 세대원이면 본인 소득(월 ${won(p.incomeSelfWon)}), 세대주면 세대 소득(월 ${won(p.incomeHouseholdWon)})으로 본다`,
+    };
+  }
+  const mine = incomeUsed(t, p);
+  if (t.income_scope === "본인+부모") {
+    // 부모 소득을 따로 안 받아 세대 합산으로 갈음한다 — 통과여도 단정하지 않는다
+    const ok = mine <= limit;
+    return { label: "소득", ok, unsure: ok, detail: `본인과 부모 합산 ${rule}, 입력 세대 월 ${won(mine)}(부모와 따로 살면 합산해 다시 볼 것)` };
+  }
+  return { label: "소득", ok: mine <= limit, detail: `${scopeLabel(t.income_scope)} 기준 ${rule}, 입력 월 ${won(mine)}` };
 }
 
 /** 자산을 누구 것으로 보나. 「본인」은 청년 계열 5개뿐이고 나머지는 세대 기준이다.
  *  부모와 사는 청년이 세대 자산 때문에 청년 유형까지 떨어지던 자리다(2026-09-22 정정). */
 function assetOf(scope: string, p: Profile): number {
+  if (BRANCH_SCOPES.has(scope)) return p.household <= 1 ? p.assetSelfMan : p.assetMan;
   return scope === "본인" ? p.assetSelfMan : p.assetMan;
 }
 
 function checkAsset(t: SupplyType, p: Profile): Check | null {
   if (t.asset_limit_man === null) return null;
+  if (BRANCH_SCOPES.has(t.asset_scope) && p.household > 1) {
+    const self = p.assetSelfMan <= t.asset_limit_man;
+    const hh = p.assetMan <= t.asset_limit_man;
+    const rule = `총자산 ${man(t.asset_limit_man)} 이하`;
+    if (self && hh) return { label: "자산", ok: true, detail: `${rule}, 본인과 세대 모두 기준 안` };
+    if (!self && !hh) return { label: "자산", ok: false, detail: `${rule}, 입력 본인 ${man(p.assetSelfMan)} / 세대 ${man(p.assetMan)}` };
+    return { label: "자산", ok: true, unsure: true, detail: `${rule}. 세대원이면 본인 자산(${man(p.assetSelfMan)}), 세대주면 세대 자산(${man(p.assetMan)})으로 본다` };
+  }
   const mine = assetOf(t.asset_scope, p);
   return {
     label: "자산",
@@ -199,25 +252,32 @@ function checkHomeless(t: SupplyType, p: Profile): Check {
 }
 
 function checkRegion(t: SupplyType, p: Profile, tier: string): Check | null {
+  if (t.region_limit === "모집지역") {
+    // 공고마다 모집하는 시군구나 권역이 달라 여기서는 못 가른다 — 막지 않고 알린다
+    return { label: "거주지", ok: true, detail: "모집하는 지역에 주민등록이 있어야 한다(공고마다 다르다)" };
+  }
   if (t.region_limit !== "서울") return null;
-  return { label: "거주지", ok: tier === "서울", detail: `서울 거주자만 신청할 수 있다. 입력 ${p.residence || "미입력"}` };
+  // 거주지를 안 넣었으면 떨어뜨리지 않고 묻는다
+  if (!p.residence) return { label: "거주지", ok: true, unsure: true, detail: "서울 거주자만 신청할 수 있다. 거주지를 넣으면 가려 준다" };
+  return { label: "거주지", ok: tier === "서울", detail: `서울 거주자만 신청할 수 있다. 입력 ${p.residence}` };
 }
 
 /** 유형 하나를 진단한다. checks에는 실제로 본 항목만 담긴다 — 안 보는 기준을 통과로 적으면 오해를 부른다. */
 export function diagnose(t: SupplyType, p: Profile, rules: EligibilityRules): Verdict {
-  const limit = t.income_pct === null ? null : incomeLimit(rules.income, p.household, t.income_pct);
+  const pct = incomePctFor(t, p);
+  const limit = pct === null ? null : incomeLimit(rules.income, p.household, pct);
   const tier = tierOf(p.residence, rules.tiers);
   const checks = [
     checkAge(t, p),
     checkMarital(t, p),
     checkClass(t, p),
     checkHomeless(t, p),
-    checkIncome(t, p, limit),
+    checkIncome(t, p, limit, pct),
     checkAsset(t, p),
     checkCar(t, p),
     checkRegion(t, p, tier),
   ].filter((c): c is Check => c !== null);
-  return { type: t, ok: checks.every((c) => c.ok), checks, incomeLimitWon: limit };
+  return { type: t, ok: checks.every((c) => c.ok), unsure: checks.some((c) => c.unsure), checks, incomeLimitWon: limit };
 }
 
 export function diagnoseAll(p: Profile, rules: EligibilityRules): Verdict[] {
@@ -255,8 +315,10 @@ export function classRuleText(t: SupplyType): string | null {
 
 export function incomeRuleText(t: SupplyType): string | null {
   if (t.income_pct === null) return null;
-  const scope = t.income_scope === "본인+부모" ? "본인+부모(세대 합산으로 갈음)" : scopeLabel(t.income_scope);
-  return `${scope} 도시근로자 월평균소득 ${t.income_pct}% 이하`;
+  const scope = t.income_scope === "본인+부모" ? "본인과 부모 합산" : BRANCH_SCOPES.has(t.income_scope) ? "세대원은 본인, 세대주는 세대" : scopeLabel(t.income_scope);
+  const dual = t.income_pct_dual ? `(맞벌이 ${t.income_pct_dual}%)` : "";
+  const bonus = t.income_small_bonus ? ", 1인 가구 +20%p, 2인 가구 +10%p" : "";
+  return `${scope} 도시근로자 월평균소득 ${t.income_pct}%${dual} 이하${bonus}`;
 }
 
 export function assetRuleText(t: SupplyType): string | null {
@@ -271,7 +333,9 @@ export function carRuleText(t: SupplyType): string | null {
 }
 
 export function regionRuleText(t: SupplyType): string | null {
-  return t.region_limit === "서울" ? "서울 거주자만 신청 가능" : null;
+  if (t.region_limit === "서울") return "서울 거주자만 신청 가능";
+  if (t.region_limit === "모집지역") return "모집하는 지역에 주민등록이 있어야 신청 가능";
+  return null;
 }
 
 /** 유형 하나를 카드로 그릴 때 쓰는 라벨-문구 줄. 표(가로 스크롤)보다 카드가 모바일에서 읽기 쉽다는

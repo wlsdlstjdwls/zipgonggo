@@ -3,6 +3,9 @@
   "income_year": 2025,
   "supply_types": [
     {
+      "income_pct_dual": null,
+      "income_small_bonus": true,
+      "basis": "sh-2026-309337-haengbok",
       "code": "happy_student",
       "category": "행복주택",
       "name": "대학생/취준생",
@@ -54,6 +57,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": true,
+      "basis": "sh-2026-309337-haengbok",
       "code": "happy_youth",
       "category": "행복주택",
       "name": "청년",
@@ -61,7 +67,9 @@
       "sort_order": 2,
       "age_min": 19,
       "age_max": 39,
-      "age_exempt": [],
+      "age_exempt": [
+        "사회초년생"
+      ],
       "marital": "미혼",
       "marital_max_yr": 0,
       "newborn_exempt": false,
@@ -70,14 +78,14 @@
         "사회초년생"
       ],
       "homeless_scope": "본인",
-      "income_scope": "본인",
+      "income_scope": "세대주분기",
       "income_pct": 100,
-      "asset_scope": "본인",
+      "asset_scope": "세대주분기",
       "asset_limit_man": 25100,
       "car_limit_man": 4542,
       "region_limit": "전국",
       "birth_bonus": true,
-      "note": "미혼만 신청할 수 있고, 소득과 자산은 본인 것만 본다",
+      "note": "미혼만 신청할 수 있다. 소득과 자산은 세대원이면 본인 것만, 세대주면 세대 전체를 본다. 입주 전까지 청약통장에 가입해야 한다",
       "ranking_method": "우선→배점→추첨",
       "ranks": [
         "해당자치구",
@@ -102,6 +110,9 @@
       }
     },
     {
+      "income_pct_dual": 120,
+      "income_small_bonus": true,
+      "basis": "sh-2026-309337-haengbok",
       "code": "happy_newlywed",
       "category": "행복주택",
       "name": "신혼부부",
@@ -120,13 +131,13 @@
       ],
       "homeless_scope": "세대원",
       "income_scope": "세대",
-      "income_pct": 120,
+      "income_pct": 100,
       "asset_scope": "세대",
       "asset_limit_man": 34500,
       "car_limit_man": 4542,
       "region_limit": "전국",
       "birth_bonus": true,
-      "note": "맞벌이 가구는 소득 120% 이하. 예비신혼부부와 한부모가족도 신청할 수 있다",
+      "note": "외벌이 가구는 소득 100% 이하, 맞벌이 가구는 120% 이하. 예비신혼부부와 한부모가족도 신청할 수 있다. 만 6세 이하 자녀가 있으면 혼인기간을 보지 않는다",
       "ranking_method": "우선→배점→추첨",
       "ranks": [
         "해당자치구",
@@ -150,6 +161,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": true,
+      "basis": "sh-2026-309337-haengbok",
       "code": "happy_elderly",
       "category": "행복주택",
       "name": "고령자",
@@ -197,6 +211,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": "sh-2026-309337-haengbok",
       "code": "happy_welfare",
       "category": "행복주택",
       "name": "주거급여수급자",
@@ -243,6 +260,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": true,
+      "basis": "sh-2026-302646-cheongnyeon",
       "code": "ys_youth",
       "category": "청년안심주택(공공)",
       "name": "청년",
@@ -250,10 +270,7 @@
       "sort_order": 6,
       "age_min": 19,
       "age_max": 39,
-      "age_exempt": [
-        "대학생",
-        "취업준비생"
-      ],
+      "age_exempt": [],
       "marital": "미혼",
       "marital_max_yr": 0,
       "newborn_exempt": false,
@@ -293,6 +310,9 @@
       }
     },
     {
+      "income_pct_dual": 90,
+      "income_small_bonus": true,
+      "basis": "sh-2026-302646-cheongnyeon",
       "code": "ys_new1",
       "category": "청년안심주택(공공)",
       "name": "신혼Ⅰ",
@@ -311,13 +331,13 @@
       ],
       "homeless_scope": "세대원",
       "income_scope": "세대",
-      "income_pct": 90,
+      "income_pct": 70,
       "asset_scope": "세대",
       "asset_limit_man": 34500,
       "car_limit_man": 4542,
       "region_limit": "전국",
       "birth_bonus": true,
-      "note": "외벌이 가구는 소득 70% 이하, 맞벌이 가구는 90% 이하",
+      "note": "외벌이 가구는 소득 70% 이하, 맞벌이 가구는 90% 이하. 만 6세 이하 자녀가 있으면 혼인기간을 보지 않는다",
       "ranking_method": "순위→배점→추첨",
       "ranks": [
         "신생아/보호대상한부모",
@@ -341,6 +361,9 @@
       }
     },
     {
+      "income_pct_dual": 200,
+      "income_small_bonus": true,
+      "basis": "sh-2026-302646-cheongnyeon",
       "code": "ys_new2",
       "category": "청년안심주택(공공)",
       "name": "신혼Ⅱ",
@@ -359,19 +382,20 @@
       ],
       "homeless_scope": "세대원",
       "income_scope": "세대",
-      "income_pct": 200,
+      "income_pct": 130,
       "asset_scope": "세대",
       "asset_limit_man": 36200,
-      "car_limit_man": 4542,
+      "car_limit_man": null,
       "region_limit": "전국",
       "birth_bonus": true,
-      "note": "외벌이 가구는 소득 130% 이하, 맞벌이 가구는 200% 이하",
+      "note": "외벌이 가구는 소득 130% 이하, 맞벌이 가구는 200% 이하. 혼인기간과 무관하게 신청할 수 있다. 자동차는 따로 보지 않고 총자산에 더한다",
       "ranking_method": "순위→배점→추첨",
       "ranks": [
         "신생아/보호대상한부모",
         "유자녀신혼",
         "무자녀신혼",
-        "6세이하혼인가구"
+        "6세이하혼인가구",
+        "그밖의혼인가구"
       ],
       "general_ranks": [],
       "score": {
@@ -389,6 +413,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": "youth-2026-6645-mingan",
       "code": "ys_priv_youth",
       "category": "청년안심주택(민간)",
       "name": "청년특별공급",
@@ -411,7 +438,7 @@
       "car_limit_man": 4542,
       "region_limit": "전국",
       "birth_bonus": false,
-      "note": "미혼만 신청할 수 있고, 소득과 자산은 본인 것만 본다",
+      "note": "미혼만 신청할 수 있다. 소득은 단독 세대주면 본인, 세대원이거나 가족이 있는 세대주면 세대 전체를 본다. 자산은 본인 것만 본다",
       "ranking_method": "소득순위→지역순위→추첨",
       "ranks": [
         "소득100% 이하",
@@ -434,6 +461,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": "youth-2026-6645-mingan",
       "code": "ys_priv_newlywed",
       "category": "청년안심주택(민간)",
       "name": "신혼특별공급",
@@ -479,6 +509,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": "youth-2026-6645-mingan",
       "code": "ys_priv_general",
       "category": "청년안심주택(민간)",
       "name": "일반",
@@ -518,6 +551,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": true,
+      "basis": "lh-2026-21304-0-maeip,sh-2026-306214-maeip",
       "code": "buy_youth",
       "category": "매입임대",
       "name": "청년(SH,LH)",
@@ -549,8 +585,8 @@
       "ranking_method": "순위→배점→추첨",
       "ranks": [
         "수급자/차상위/한부모",
-        "본인+부모소득100%+자산33700",
-        "본인소득100%+자산25400"
+        "본인+부모소득100%+자산34500",
+        "본인소득100%+자산25100"
       ],
       "general_ranks": [],
       "score": {
@@ -568,6 +604,9 @@
       }
     },
     {
+      "income_pct_dual": 90,
+      "income_small_bonus": true,
+      "basis": "lh-2026-21302-0-maeip",
       "code": "buy_new1",
       "category": "매입임대",
       "name": "신매입Ⅰ",
@@ -586,13 +625,13 @@
       ],
       "homeless_scope": "세대원",
       "income_scope": "세대",
-      "income_pct": 90,
+      "income_pct": 70,
       "asset_scope": "세대",
       "asset_limit_man": 34500,
       "car_limit_man": 4542,
       "region_limit": "전국",
       "birth_bonus": true,
-      "note": "외벌이 가구는 소득 70% 이하, 맞벌이 가구는 90% 이하",
+      "note": "외벌이 가구는 소득 70% 이하, 맞벌이 가구는 90% 이하. 만 6세 이하 자녀가 있으면 혼인기간을 보지 않는다",
       "ranking_method": "순위→배점→추첨",
       "ranks": [
         "신생아/보호대상한부모",
@@ -616,6 +655,9 @@
       }
     },
     {
+      "income_pct_dual": 200,
+      "income_small_bonus": true,
+      "basis": "lh-2026-21303-0-maeip,sh-2026-308644-maeip",
       "code": "buy_new2",
       "category": "매입임대",
       "name": "신매입Ⅱ",
@@ -634,19 +676,20 @@
       ],
       "homeless_scope": "세대원",
       "income_scope": "세대",
-      "income_pct": 200,
+      "income_pct": 130,
       "asset_scope": "세대",
       "asset_limit_man": 36200,
       "car_limit_man": null,
       "region_limit": "전국",
       "birth_bonus": true,
-      "note": "외벌이 가구는 소득 130% 이하, 맞벌이 가구는 200% 이하. 자동차는 심사하지 않는다",
+      "note": "외벌이 가구는 소득 130% 이하, 맞벌이 가구는 200% 이하. 혼인기간과 무관하게 신청할 수 있다. 자동차는 따로 보지 않고 총자산에 더한다",
       "ranking_method": "순위→배점→추첨",
       "ranks": [
         "신생아/보호대상한부모",
         "유자녀신혼",
         "무자녀신혼",
-        "6세이하혼인가구"
+        "6세이하혼인가구",
+        "그밖의혼인가구"
       ],
       "general_ranks": [],
       "score": {
@@ -664,6 +707,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": "sh-2026-310107-maeip",
       "code": "buy_long",
       "category": "매입임대",
       "name": "장기미임대",
@@ -682,11 +728,14 @@
       "asset_scope": "무관",
       "asset_limit_man": null,
       "car_limit_man": null,
-      "region_limit": "전국",
+      "region_limit": "모집지역",
       "birth_bonus": true,
-      "note": "소득과 자산을 보지 않고 추첨한다",
-      "ranking_method": "추첨",
-      "ranks": [],
+      "note": "소득과 자산 자격 요건은 없다. 소득 130% 이하 세대가 1순위이고 같은 순위는 추첨한다. SH 공고는 서울 주민등록자만 받는다",
+      "ranking_method": "순위→추첨",
+      "ranks": [
+        "소득130%이하",
+        "소득130%초과"
+      ],
       "general_ranks": [],
       "score": {
         "거주기간MAX": "0",
@@ -700,6 +749,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": true,
+      "basis": "lh-2026-21330-0-maeip",
       "code": "buy_gen",
       "category": "매입임대",
       "name": "일반",
@@ -720,13 +772,13 @@
       ],
       "homeless_scope": "세대원",
       "income_scope": "세대",
-      "income_pct": 100,
+      "income_pct": 50,
       "asset_scope": "세대",
-      "asset_limit_man": 25100,
+      "asset_limit_man": 24500,
       "car_limit_man": 4542,
-      "region_limit": "전국",
+      "region_limit": "모집지역",
       "birth_bonus": true,
-      "note": "수급자, 한부모가족, 고령자, 장애인 가구가 대상이다",
+      "note": "수급자, 한부모가족, 고령자, 장애인 가구가 1순위다. 그 밖에는 소득 50% 이하(장애인은 100%)여야 한다. 모집하는 시군구에 주민등록이 있어야 한다",
       "ranking_method": "순위→배점→추첨",
       "ranks": [
         "수급/한부모/고령/70%장애",
@@ -749,6 +801,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": true,
+      "basis": "sh-2026-308340-gungmin",
       "code": "rent_nat",
       "category": "임대주택",
       "name": "국민임대",
@@ -767,9 +822,9 @@
       "asset_scope": "세대",
       "asset_limit_man": 34500,
       "car_limit_man": 4542,
-      "region_limit": "전국",
+      "region_limit": "모집지역",
       "birth_bonus": true,
-      "note": "소득 70% 이하",
+      "note": "소득 70% 이하. 50㎡ 미만은 소득 50% 이하 가구가 먼저 뽑힌다. SH 공고는 서울 거주자만 받는다",
       "ranking_method": "배점합산→추첨",
       "ranks": [
         "소득50%+청약24회",
@@ -793,6 +848,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": true,
+      "basis": "lh-2026-21379-1-yeonggu",
       "code": "rent_perm",
       "category": "임대주택",
       "name": "영구임대",
@@ -814,13 +872,13 @@
       ],
       "homeless_scope": "세대원",
       "income_scope": "세대",
-      "income_pct": 90,
+      "income_pct": 50,
       "asset_scope": "세대",
-      "asset_limit_man": 25100,
+      "asset_limit_man": 24500,
       "car_limit_man": 4542,
       "region_limit": "전국",
       "birth_bonus": true,
-      "note": "수급자, 한부모가족, 장애인 가구 등이 대상이다",
+      "note": "일반 신청자는 소득 50% 이하. 수급자와 한부모가족 등은 증명서로 소득 심사를 갈음하고, 국가유공자와 북한이탈주민 등은 70%까지 본다",
       "ranking_method": "별도배점",
       "ranks": [
         "수급자",
@@ -841,6 +899,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": true,
+      "basis": "sh-2026-310041-jaegaebal",
       "code": "rent_redev",
       "category": "임대주택",
       "name": "재개발임대",
@@ -885,6 +946,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": "lh-2026-19631-0-jeonse",
       "code": "ls_youth",
       "category": "전세임대",
       "name": "청년",
@@ -913,7 +977,7 @@
       "car_limit_man": null,
       "region_limit": "전국",
       "birth_bonus": true,
-      "note": "수급자, 한부모가족, 차상위계층이 먼저 뽑힌다",
+      "note": "2026년 상시 모집은 수급자, 한부모가족, 차상위계층 가구의 청년만 받는다",
       "ranking_method": "선착순",
       "ranks": [
         "수급/한부모/차상위",
@@ -932,6 +996,9 @@
       }
     },
     {
+      "income_pct_dual": 90,
+      "income_small_bonus": true,
+      "basis": "lh-2026-19833-0-jeonse,sh-2026-302368-jeonse",
       "code": "ls_new1",
       "category": "전세임대",
       "name": "신혼Ⅰ",
@@ -950,18 +1017,19 @@
       ],
       "homeless_scope": "세대원",
       "income_scope": "세대",
-      "income_pct": 90,
+      "income_pct": 70,
       "asset_scope": "세대",
-      "asset_limit_man": 36200,
+      "asset_limit_man": 34500,
       "car_limit_man": 4542,
       "region_limit": "전국",
       "birth_bonus": true,
-      "note": "맞벌이 가구는 소득 90% 이하. 같은 순위 안에서는 선착순",
+      "note": "외벌이 가구는 소득 70% 이하, 맞벌이 가구는 90% 이하. 만 6세 이하 자녀가 있으면 혼인기간을 보지 않는다. 같은 순위 안에서는 선착순",
       "ranking_method": "순위별선착순",
       "ranks": [
         "신생아/보호대상한부모",
         "유자녀신혼",
-        "무자녀신혼"
+        "무자녀신혼",
+        "6세이하혼인가구"
       ],
       "general_ranks": [],
       "score": {
@@ -976,6 +1044,9 @@
       }
     },
     {
+      "income_pct_dual": 200,
+      "income_small_bonus": true,
+      "basis": "lh-2026-19832-0-jeonse",
       "code": "ls_new2",
       "category": "전세임대",
       "name": "신혼Ⅱ",
@@ -985,7 +1056,7 @@
       "age_max": 999,
       "age_exempt": [],
       "marital": "혼인",
-      "marital_max_yr": 0,
+      "marital_max_yr": 7,
       "newborn_exempt": true,
       "required_class": [
         "신혼",
@@ -994,18 +1065,19 @@
       ],
       "homeless_scope": "세대원",
       "income_scope": "세대",
-      "income_pct": 200,
+      "income_pct": 130,
       "asset_scope": "세대",
       "asset_limit_man": 36200,
       "car_limit_man": null,
       "region_limit": "전국",
       "birth_bonus": true,
-      "note": "맞벌이 가구는 소득 200% 이하. 자동차는 심사하지 않는다",
+      "note": "외벌이 가구는 소득 130% 이하, 맞벌이 가구는 200% 이하. 만 6세 이하 자녀가 있으면 혼인기간을 보지 않는다. 자동차는 따로 보지 않고 총자산에 더한다",
       "ranking_method": "순위별선착순",
       "ranks": [
         "신생아/보호대상한부모",
         "유자녀신혼",
-        "무자녀신혼"
+        "무자녀신혼",
+        "6세이하혼인가구"
       ],
       "general_ranks": [],
       "score": {
@@ -1020,6 +1092,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": true,
+      "basis": "lh-2026-19834-0-jeonse",
       "code": "ls_multi",
       "category": "전세임대",
       "name": "다자녀",
@@ -1028,7 +1103,7 @@
       "age_min": 0,
       "age_max": 999,
       "age_exempt": [],
-      "marital": "혼인",
+      "marital": "무관",
       "marital_max_yr": 0,
       "newborn_exempt": false,
       "required_class": [
@@ -1058,6 +1133,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": null,
       "code": "ls_gen",
       "category": "전세임대",
       "name": "일반(SH)",
@@ -1107,12 +1185,15 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": "sh-2026-309467-janggi",
       "code": "lt1",
       "category": "장기전세",
       "name": "장기전세Ⅰ",
       "housing_type": "장기전세",
       "sort_order": 25,
-      "age_min": 0,
+      "age_min": 19,
       "age_max": 999,
       "age_exempt": [],
       "marital": "무관",
@@ -1125,9 +1206,9 @@
       "asset_scope": "세대",
       "asset_limit_man": 66200,
       "car_limit_man": 4542,
-      "region_limit": "전국",
+      "region_limit": "서울",
       "birth_bonus": true,
-      "note": "면적과 순위별 소득기준이 다르다(60㎡ 이하 1,2순위 70%, 3,4순위 105%, 60㎡ 초과 150%. 맞벌이는 140~200%). 2023.3.28. 이후 출생자녀가 있으면 10~20%p 가산. 청약 24회 이상 필수(1순위). 총자산 6억 6,200만 원은 제51차(2026.8.) 공고 기준",
+      "note": "면적과 순위별 소득기준이 다르다(60㎡ 이하 1,2순위 70%, 3,4순위 105%, 60㎡ 초과 150%. 맞벌이는 140~200%). 2023.3.28. 이후 출생자녀가 있으면 10~20%p 가산. 청약 24회 이상은 1순위 조건이고 못 미쳐도 아래 순위로 신청할 수 있다. 서울 거주자만 받는다",
       "ranking_method": "배점합산→추첨",
       "ranks": [
         "배점합산"
@@ -1149,30 +1230,33 @@
       }
     },
     {
+      "income_pct_dual": 200,
+      "income_small_bonus": false,
+      "basis": "sh-2026-308944-janggi",
       "code": "lt2",
       "category": "장기전세",
       "name": "장기전세Ⅱ",
       "housing_type": "장기전세",
       "sort_order": 26,
-      "age_min": 0,
+      "age_min": 19,
       "age_max": 999,
       "age_exempt": [],
       "marital": "혼인",
       "marital_max_yr": 7,
-      "newborn_exempt": true,
+      "newborn_exempt": false,
       "required_class": [
         "신혼",
         "신생아"
       ],
       "homeless_scope": "세대원",
       "income_scope": "세대",
-      "income_pct": 200,
+      "income_pct": 150,
       "asset_scope": "세대",
-      "asset_limit_man": 64000,
+      "asset_limit_man": 66200,
       "car_limit_man": 4542,
       "region_limit": "서울",
       "birth_bonus": true,
-      "note": "미리내집. 서울 거주자만 신청할 수 있다",
+      "note": "60㎡ 이하는 소득 120%(맞벌이 180%), 60㎡ 초과는 150%(맞벌이 200%). 신청자와 배우자가 최근 5년간 계속 무주택이어야 한다. 서울 거주자만 받는다",
       "ranking_method": "배점합산→추첨",
       "ranks": [
         "배점합산"
@@ -1192,9 +1276,12 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": "lh-2026-21370-0-maeip",
       "code": "safe",
       "category": "든든전세",
-      "name": "든든전세(HUG)",
+      "name": "든든전세",
       "housing_type": "든든전세",
       "sort_order": 27,
       "age_min": 0,
@@ -1210,10 +1297,10 @@
       "asset_scope": "무관",
       "asset_limit_man": null,
       "car_limit_man": null,
-      "region_limit": "전국",
+      "region_limit": "모집지역",
       "birth_bonus": false,
-      "note": "소득과 자산을 보지 않고 추첨한다",
-      "ranking_method": "무관",
+      "note": "소득과 자산은 보지 않는다. 신생아 가구와 자녀 수로 배점을 매기고 같은 점수는 추첨한다. 모집 권역(예: 서울, 인천, 경기)에 주민등록이 있어야 한다",
+      "ranking_method": "배점합산→추첨",
       "ranks": [],
       "general_ranks": [],
       "score": {
@@ -1228,6 +1315,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": null,
       "code": "pub_ls",
       "category": "전세형매입임대",
       "name": "공공전세",
@@ -1268,6 +1358,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": true,
+      "basis": "sh-2026-308799-maeip",
       "code": "custom",
       "category": "수요자맞춤형",
       "name": "수요자맞춤형",
@@ -1290,7 +1383,7 @@
       "asset_scope": "세대",
       "asset_limit_man": 25100,
       "car_limit_man": 4542,
-      "region_limit": "전국",
+      "region_limit": "서울",
       "birth_bonus": false,
       "note": "자치구마다 조건이 다르다",
       "ranking_method": "자치구별상이",
@@ -1311,6 +1404,9 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": "youth-2026-6645-mingan",
       "code": "ppmh_youth",
       "category": "공공지원민간임대",
       "name": "청년특별공급",
@@ -1328,12 +1424,12 @@
       "homeless_scope": "본인",
       "income_scope": "청년특공_분기",
       "income_pct": 120,
-      "asset_scope": "무관",
-      "asset_limit_man": null,
-      "car_limit_man": null,
+      "asset_scope": "본인",
+      "asset_limit_man": 25100,
+      "car_limit_man": 4542,
       "region_limit": "전국",
       "birth_bonus": false,
-      "note": "소득만 보고, 자산과 자동차는 심사하지 않는다",
+      "note": "소득은 단독 세대주면 본인, 세대원이거나 가족이 있는 세대주면 세대 전체를 본다. 자산은 본인 것만 본다",
       "ranking_method": "소득순위→지역순위→추첨",
       "ranks": [
         "소득100% 이하",
@@ -1356,13 +1452,16 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": "youth-2026-6645-mingan",
       "code": "ppmh_newlywed",
       "category": "공공지원민간임대",
       "name": "신혼특별공급",
       "housing_type": "공공지원민간임대",
       "sort_order": 31,
       "age_min": 19,
-      "age_max": 999,
+      "age_max": 39,
       "age_exempt": [],
       "marital": "혼인",
       "marital_max_yr": 7,
@@ -1373,12 +1472,12 @@
       "homeless_scope": "세대원",
       "income_scope": "세대",
       "income_pct": 120,
-      "asset_scope": "무관",
-      "asset_limit_man": null,
-      "car_limit_man": null,
+      "asset_scope": "세대",
+      "asset_limit_man": 34500,
+      "car_limit_man": 4542,
       "region_limit": "전국",
       "birth_bonus": false,
-      "note": "소득만 보고, 자산과 자동차는 심사하지 않는다",
+      "note": "세대 합산 소득 120% 이하. 자산과 자동차도 심사한다",
       "ranking_method": "소득순위→지역순위→추첨",
       "ranks": [
         "소득100% 이하",
@@ -1401,13 +1500,16 @@
       }
     },
     {
+      "income_pct_dual": null,
+      "income_small_bonus": false,
+      "basis": "youth-2026-6645-mingan",
       "code": "ppmh_general",
       "category": "공공지원민간임대",
       "name": "일반",
       "housing_type": "공공지원민간임대",
       "sort_order": 32,
       "age_min": 19,
-      "age_max": 999,
+      "age_max": 39,
       "age_exempt": [],
       "marital": "무관",
       "marital_max_yr": 0,
@@ -1418,10 +1520,10 @@
       "income_pct": null,
       "asset_scope": "무관",
       "asset_limit_man": null,
-      "car_limit_man": null,
+      "car_limit_man": 4542,
       "region_limit": "전국",
       "birth_bonus": false,
-      "note": "소득과 자산을 보지 않고 추첨한다",
+      "note": "소득과 자산 요건 없이 추첨한다. 나이와 혼인, 무주택, 자동차는 청년안심주택 공통 요건으로 본다",
       "ranking_method": "추첨",
       "ranks": [],
       "general_ranks": [],
@@ -1769,55 +1871,55 @@
       "year": 2025,
       "household": 7,
       "pct": 50,
-      "monthly_won": 5325640
+      "monthly_won": 5242771
     },
     {
       "year": 2025,
       "household": 7,
       "pct": 70,
-      "monthly_won": 7455895
+      "monthly_won": 7339879
     },
     {
       "year": 2025,
       "household": 7,
       "pct": 90,
-      "monthly_won": 9586151
+      "monthly_won": 9436987
     },
     {
       "year": 2025,
       "household": 7,
       "pct": 100,
-      "monthly_won": 10651279
+      "monthly_won": 10485541
     },
     {
       "year": 2025,
       "household": 7,
       "pct": 110,
-      "monthly_won": 11716407
+      "monthly_won": 11534095
     },
     {
       "year": 2025,
       "household": 7,
       "pct": 120,
-      "monthly_won": 12781535
+      "monthly_won": 12582649
     },
     {
       "year": 2025,
       "household": 7,
       "pct": 130,
-      "monthly_won": 13846663
+      "monthly_won": 13631203
     },
     {
       "year": 2025,
       "household": 7,
       "pct": 150,
-      "monthly_won": 15976919
+      "monthly_won": 15728312
     },
     {
       "year": 2025,
       "household": 7,
       "pct": 200,
-      "monthly_won": 21302558
+      "monthly_won": 20971082
     }
   ],
   "income_standard_prior": {

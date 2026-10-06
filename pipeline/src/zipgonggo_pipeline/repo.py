@@ -453,6 +453,8 @@ SUPPLY_TYPE_COLS = [
     "required_class", "homeless_scope", "income_scope", "income_pct",
     "asset_scope", "asset_limit_man", "car_limit_man", "region_limit", "birth_bonus", "note",
     "ranking_method", "ranks", "general_ranks", "score",
+    # 0038 — 공고문 대조로 생긴 칸
+    "income_pct_dual", "income_small_bonus", "basis",
 ]
 
 SUPPLY_TYPE_SQL = (

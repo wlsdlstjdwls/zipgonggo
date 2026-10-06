@@ -18,6 +18,7 @@ from pathlib import Path
 
 from ..config import PIPELINE_ROOT
 from ..db import connect
+from ..parsers.eligibility_corrections import apply_corrections, fix_income_standard
 from ..parsers.eligibility_xlsx import parse_workbook
 from ..repo import replace_income_standard, replace_region_tiers, replace_supply_types
 from .common import Stats, finish_ingest, stage_main, utc_now
@@ -51,7 +52,9 @@ def run(args: argparse.Namespace) -> Stats:
             return stats
         data = json.loads(args.seed.read_text(encoding="utf-8"))
 
-    types, income, tiers = data["supply_types"], data["income_standard"], data["region_tiers"]
+    # 시드를 손으로 고쳤거나 정정표가 시드보다 새것이어도 DB에는 정정이 얹힌 값이 들어가게 한 번 더 건다(멱등)
+    types = apply_corrections(data["supply_types"])
+    income, tiers = fix_income_standard(data["income_standard"]), data["region_tiers"]
     # 이전 통계연도 100% 기준액 — 2025년 공고(제49차 장기전세 등)의 소득표 검산용. 화면(/eligibility)은 최신 연도만 쓴다
     prior = data.get("income_standard_prior", {}).get("rows", [])
     stats.fetched_rows = len(types) + len(income) + len(tiers) + len(prior)

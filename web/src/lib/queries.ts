@@ -792,7 +792,7 @@ export const getEligibilityRules = unstable_cache(
         `SELECT code, category, name, housing_type, sort_order, age_min, age_max, age_exempt, marital,
                 marital_max_yr, newborn_exempt, required_class, homeless_scope, income_scope, income_pct,
                 asset_scope, asset_limit_man, car_limit_man, region_limit, birth_bonus, note,
-                ranking_method, ranks, general_ranks, score
+                ranking_method, ranks, general_ranks, score, income_pct_dual, income_small_bonus, basis
            FROM supply_type ORDER BY sort_order`,
       ),
       query<IncomeStandard & { year: number }>(
