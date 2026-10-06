@@ -2444,3 +2444,111 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   .tl-today > span { top: 50%; left: 30px; transform: translateY(-50%); }
   .tl-today::after { top: 50%; left: 4px; width: calc(100% - 4px); height: 2px; margin: -1px 0 0; background: linear-gradient(90deg, var(--hot) 0 18px, transparent 18px); }
 }
+
+/* ── 소득 기준 막대(components/income-bars.tsx) ─────────────
+   가구원수 탭 + 비율별 가로 막대. 막대 100%는 그 가구의 가장 큰 한도. 금액 글자는 막대 오른쪽에 늘 보인다 */
+/* 탭은 한 줄을 나눠 갖는다 — 일곱 개가 폰에서 두 줄로 접히면 「7인」만 따로 떨어져 보였다 */
+.ibars-tabs { display: flex; gap: 4px; max-width: 520px; margin-bottom: 14px; }
+.ibars-tabs .chip-f { flex: 1 1 0; min-width: 0; justify-content: center; height: 34px; padding: 0; font-size: 13px; }
+.ibars-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ibars-list li { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.ibars-k { display: flex; flex-direction: column; line-height: 1.2; }
+.ibars-k b { font-weight: 900; font-size: 15px; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ibars-k small { font-weight: 700; font-size: 11.5px; color: var(--dim); }
+.ibars-track { position: relative; height: 12px; border-radius: 6px; background: var(--sub); overflow: hidden; }
+.ibars-track i { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: var(--acc); opacity: 0.85; transition: width 320ms var(--sp); }
+.ibars-v { min-width: 104px; text-align: right; font-weight: 800; font-size: 14.5px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@container (max-width: 480px) {
+  .ibars-list li { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 8px; }
+  .ibars-v { min-width: 0; font-size: 13.5px; }
+}
+
+/* ── 허브 지면 덩이(components/hub-blocks.tsx) ─────────────
+   /type/{유형}, /program/{사업}. 글은 그대로, 그릇만 — 숫자 타일, 자격 타일, 건수 막대, 접기(사용자 지적 2026-10-06).
+   .legal-sec의 ul/li/a 규칙(밑줄 링크, 들여쓴 목록)을 이기려고 선택자를 .legal-sec 아래로 한 단 더 내린다 */
+.hub-stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.hub-stats li { display: flex; flex-direction: column; gap: 3px; min-width: 104px; padding: 11px 15px; border-radius: var(--r-card); background: var(--sub); }
+.hub-stats b { font-weight: 900; font-size: 22px; line-height: 1.1; letter-spacing: -0.04em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.hub-stats span { font-weight: 700; font-size: 12.5px; color: var(--dim); }
+.hub-stats li.hot { background: var(--acc-soft); }
+.hub-stats li.hot b, .hub-stats li.hot span { color: var(--acc); }
+.legal-body > .hub-lede { margin: 0; padding: 16px 18px; border-left: 4px solid var(--acc); border-radius: 0 var(--r-card) var(--r-card) 0;
+  background: var(--acc-soft); font-weight: 700; font-size: 16px; line-height: 1.7; color: var(--ink); }
+.hub-paras p strong { color: var(--ink); }
+.hub-paras p + p { margin-top: 12px; }
+
+.hub-rule { margin-top: 18px; }
+.hub-rule h3 { margin: 0 0 10px; font-weight: 900; font-size: 16px; letter-spacing: -0.03em; color: var(--ink); }
+.legal-sec .hub-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.legal-sec .hub-tiles li { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 13px 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
+.hub-tile-k { font-weight: 800; font-size: 12px; letter-spacing: 0.04em; color: var(--dim); }
+.hub-tiles b { font-weight: 900; font-size: 17px; line-height: 1.35; letter-spacing: -0.03em; color: var(--ink); }
+.hub-tiles small { font-weight: 600; font-size: 12.5px; line-height: 1.6; color: var(--mut); }
+.hub-gauge { position: relative; display: block; height: 8px; margin: 4px 0 2px; border-radius: 4px; background: var(--sub); }
+.hub-gauge i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--acc); }
+.hub-gauge u { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.35; text-decoration: none; }
+.hub-income { margin-top: 22px; padding: 16px; border-radius: var(--r-card); background: var(--sub); }
+.hub-income h3 { margin: 0 0 12px; font-weight: 900; font-size: 16px; letter-spacing: -0.03em; color: var(--ink); }
+.hub-income h3 small { margin-left: 6px; font-weight: 700; font-size: 12.5px; color: var(--dim); letter-spacing: 0; }
+.hub-income .ibars-track { background: var(--bg); }
+.legal-sec .hub-income ul { padding-left: 0; }
+.legal-sec .hub-income li { margin: 0; }
+
+.legal-sec .hub-bars { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 6px 16px; margin: 0; padding: 0; list-style: none; }
+.legal-sec .hub-bars li { margin: 0; }
+.legal-sec .hub-bars a { display: grid; grid-template-columns: 120px minmax(0, 1fr) 44px; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px;
+  color: var(--ink); text-decoration: none; font-weight: 700; font-size: 14px; }
+.legal-sec .hub-bars a:hover { background: var(--sub); color: var(--acc); }
+.hub-bars-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-bars-t { height: 10px; border-radius: 5px; background: var(--sub); overflow: hidden; }
+.hub-bars-t i { display: block; height: 100%; border-radius: 5px; background: var(--acc); opacity: 0.75; }
+.hub-bars-v { text-align: right; font-weight: 800; font-size: 13px; color: var(--mut); font-variant-numeric: tabular-nums; }
+
+.legal-sec .hub-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.legal-sec .hub-chips li { margin: 0; }
+.legal-sec .hub-chips a { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 13px; border-radius: var(--r-chip); background: var(--sub);
+  color: var(--ink); font-weight: 800; font-size: 13.5px; text-decoration: none; }
+.legal-sec .hub-chips a:hover { background: var(--acc-soft); color: var(--acc); }
+.hub-chips small { font-weight: 700; font-size: 12px; color: var(--dim); }
+
+.hub-faq { display: flex; flex-direction: column; gap: 6px; }
+.hub-faq details { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
+.hub-faq summary { display: flex; align-items: center; gap: 10px; padding: 13px 15px; font-weight: 800; font-size: 15px; color: var(--ink); cursor: pointer; list-style: none; }
+.hub-faq summary::-webkit-details-marker { display: none; }
+.hub-faq summary::before { content: "Q"; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px;
+  background: var(--acc-soft); color: var(--acc); font-weight: 900; font-size: 12px; }
+.hub-faq summary::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim); transform: rotate(45deg); transition: transform 200ms var(--ease); }
+.hub-faq details[open] summary::after { transform: rotate(-135deg); }
+.legal-sec .hub-faq p { margin: 0; padding: 0 15px 14px 47px; }
+
+/* ── 임대 종류 한눈에(/program) — 유형 카드 격자 ── */
+.legal-in.wide { max-width: 1080px; }
+.legal > .crumb:has(+ .legal-in.wide) { max-width: 1080px; }
+.pg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.pg-card { display: flex; flex-direction: column; gap: 10px; padding: 18px; border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--bg); }
+.pg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pg-head h2 { margin: 0; font-weight: 900; font-size: 20px; letter-spacing: -0.04em; }
+.pg-head h2 a { color: var(--ink); text-decoration: none; }
+.pg-head h2 a:hover { color: var(--acc); }
+.pg-count { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 12.5px; color: var(--dim); }
+.pg-count b { padding: 2px 8px; border-radius: var(--radius-pill); background: var(--acc-soft); color: var(--acc); font-weight: 800; }
+.pg-lede { margin: 0; font-weight: 500; font-size: 14.5px; line-height: 1.7; color: var(--mut); }
+.pg-progs { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 0; padding: 0; list-style: none; }
+.pg-progs a { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: var(--r-chip); background: var(--sub); text-decoration: none; transition: background 160ms var(--ease); }
+.pg-progs a:hover { background: var(--acc-soft); }
+.pg-prog-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pg-prog-h b { font-weight: 800; font-size: 14.5px; color: var(--ink); }
+.pg-progs a:hover .pg-prog-h b { color: var(--acc); }
+.pg-prog-h small { font-weight: 700; font-size: 12px; color: var(--dim); }
+.pg-prog-l { font-weight: 500; font-size: 13px; line-height: 1.6; color: var(--mut); }
+.pg-more { margin-top: auto; align-self: flex-start; font-weight: 800; font-size: 13.5px; color: var(--acc); }
+.pg-card.big { grid-column: 1 / -1; }
+.pg-card.big .pg-progs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
+/* 허브 지면에 실린 공고 카드는 본문 링크가 아니다 — .legal-sec a의 밑줄을 걷는다 */
+.legal-sec .rows a { text-decoration: none; }
+/* 폰에서도 자격 타일은 두 단 — 한 단이면 유형 하나가 한 화면을 넘었다. 글이 긴 소득 타일만 한 줄을 다 쓴다 */
+.legal-sec .hub-tiles { grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); }
+.legal-sec .hub-tiles li:has(.hub-gauge) { grid-column: 1 / -1; }
+.hub-rule-tabs { margin-top: 16px; }
+.hub-rule-tabs .hub-rule { margin-top: 12px; }
+.hub-rule-tabs .ctabs-panel { border: 0; padding: 0; background: none; }

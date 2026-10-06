@@ -12,6 +12,7 @@ import { DetailNav } from "@/components/detail-nav";
 import { EligRuleCards, type RuleCardView } from "@/components/elig-rule-cards";
 import { ExternalLink } from "@/components/external-link";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
+import { IncomeBars } from "@/components/income-bars";
 import { NaverMap } from "@/components/naver-map";
 import { NoticeEligibilitySection } from "@/components/notice-eligibility";
 import { NoticeFit } from "@/components/notice-fit";
@@ -527,25 +528,12 @@ export default async function NoticePage({ params }: Params) {
                       {noticeYear ? (noticeYear > eligRules.incomeYear ? `, ${noticeYear}년 공고에 적용` : `, 지금 기준이라 ${noticeYear}년 공고 당시와 다릅니다`) : ""}
                     </small>
                   </summary>
-                  <div className="tbl ne-fold-body">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>가구원수</th>
-                          {incomePcts.map((pct) => <th key={pct} className="num">{pct}%</th>)}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {incomeRows.map((row) => (
-                          <tr key={row.household}>
-                            <td>{row.household}인</td>
-                            {row.values.map((v, i) => (
-                              <td key={incomePcts[i]} className="num">{v != null ? wonKo(v) : "—"}</td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  {/* 표 대신 가구원수 탭 + 비율별 막대(사용자 요청 2026-10-06) */}
+                  <div className="ne-fold-body">
+                    <IncomeBars
+                      households={incomeRows.map((r) => r.household)}
+                      rows={incomePcts.map((pct, j) => ({ pct, won: incomeRows.map((r) => r.values[j]) }))}
+                    />
                   </div>
                 </details>
               )}

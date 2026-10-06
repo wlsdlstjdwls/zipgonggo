@@ -12,6 +12,7 @@ import { wonKo } from "@/lib/format";
 import { classKey } from "@/lib/notice-fit";
 import type { EligClassBlock, EligRankTable, EligScoreTable, EligSelection, NoticeEligibility } from "@/types/eligibility";
 import { ClassTabs } from "./class-tabs";
+import { IncomeBars } from "./income-bars";
 
 type Props = {
   elig: NoticeEligibility;
@@ -422,28 +423,11 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
             공고문은 통계청이 발표한 전년도 도시근로자 가구당 월평균소득을 씁니다. 연도가 공고보다 한 해 앞서는 이유입니다.
             {income.bump && Object.keys(income.bump).length > 0 && " 1인 가구는 20%p, 2인 가구는 10%p를 더한 금액이 표에 그대로 적혀 있습니다."}
           </p>
-          <div className="tbl ne-tbl">
-            <table>
-              <thead>
-                <tr>
-                  <th>비율</th>
-                  {hasConditions && <th>적용 조건</th>}
-                  {income.households.map((h) => <th key={h} className="num">{h}인</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {income.rows.map((r) => (
-                  <tr key={r.pct}>
-                    <td className="ne-area">{r.pct}%</td>
-                    {hasConditions && <td className="ne-req">{(r.conditions ?? []).join(" / ") || "—"}</td>}
-                    {r.won.map((v, k) => (
-                      <td key={k} className="num" title={v == null ? undefined : `${v.toLocaleString("ko-KR")}원`}>{v == null ? "—" : wonKo(v)}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {/* 표 대신 가구원수 탭 + 비율별 막대(사용자 요청 2026-10-06). 적용 조건은 비율 밑에 작게 */}
+          <IncomeBars
+            households={income.households}
+            rows={income.rows.map((r) => ({ pct: r.pct, note: hasConditions ? (r.conditions ?? []).join(" / ") || null : null, won: r.won }))}
+          />
           {income.per_person_won && Object.keys(income.per_person_won).length > 0 && (
             <p className="elig-memo">
               6인 이상 가구는 5인 값에 1인당 {Object.entries(income.per_person_won).map(([k, v]) => `${k}% ${wonKo(v)}`).join(", ")}을 더합니다.

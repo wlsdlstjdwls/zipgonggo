@@ -5,7 +5,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { JsonLd } from "@/components/json-ld";
-import { LegalSection } from "@/components/legal-doc";
 import { SITE_NAME } from "@/lib/constants";
 import { num } from "@/lib/format";
 import { HOUSING_TYPE_DOCS } from "@/lib/housing-types";
@@ -65,7 +64,7 @@ export default async function ProgramIndexPage() {
       <div className="crumb">
         <Link href={ROUTES.home} className="back">← 목록</Link>
       </div>
-      <div className="legal-in">
+      <div className="legal-in wide">
         <h1>임대 종류 한눈에</h1>
         <p className="legal-eff">유형 {num(types.length, "개")} | 사업 {num(Object.keys(PROGRAM_DOCS).length, "개")} | {SITE_NAME}</p>
         <div className="legal-body">
@@ -75,28 +74,45 @@ export default async function ProgramIndexPage() {
             같은 매입임대라도 사업이 다르면 자격과 금액이 전혀 다르다. 아래는 유형마다 그 안의 사업을 묶어 둔 것이다.
           </p>
 
-          {types.map(({ type, hub, programs }) => (
-            <LegalSection key={type} title={type}>
-              <p>{HOUSING_TYPE_DOCS[type].lede}</p>
-              <p>
-                <Link href={typePath(type)}>{type} 제도와 전국 공고 보기 →</Link>
-                {hub && <> 모은 공고 {num(hub.total, "건")} | 진행 중 {num(hub.open, "건")}</>}
-              </p>
-              {programs.length > 0 && (
-                <ul>
-                  {programs.map((p) => {
-                    const c = programCount(p);
-                    return (
-                      <li key={p}>
-                        <Link href={programPath(p)}><b>{p}</b></Link>
-                        {c ? ` ${num(c.total, "건")}${c.open ? ` (진행 중 ${num(c.open, "건")})` : ""}` : ""} — {PROGRAM_DOCS[p].lede}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </LegalSection>
-          ))}
+          {/* 유형마다 카드 한 장(사용자 지적 2026-10-06: 「임대 종류 화면도 가시성」). 글이 이어지던 목록을
+              카드 격자로 — 머리에 유형 이름과 건수, 밑에 그 유형 안의 사업 칩. 글은 그대로다 */}
+          <ul className="pg-grid">
+            {types.map(({ type, hub, programs }) => (
+              /* 사업이 넷 이상인 유형(매입임대)은 한 줄을 다 쓰고 사업을 두 단으로 — 반 칸에 세로로 쌓으면
+                 옆 카드가 빈 채로 길게 늘었다 */
+              <li key={type} className={`pg-card${programs.length >= 4 ? " big" : ""}`}>
+                <div className="pg-head">
+                  <h2><Link href={typePath(type)}>{type}</Link></h2>
+                  {hub && (
+                    <span className="pg-count">
+                      {hub.open > 0 && <b>진행 중 {num(hub.open, "건")}</b>}
+                      <span>모은 공고 {num(hub.total, "건")}</span>
+                    </span>
+                  )}
+                </div>
+                <p className="pg-lede">{HOUSING_TYPE_DOCS[type].lede}</p>
+                {programs.length > 0 && (
+                  <ul className="pg-progs">
+                    {programs.map((p) => {
+                      const c = programCount(p);
+                      return (
+                        <li key={p}>
+                          <Link href={programPath(p)}>
+                            <span className="pg-prog-h">
+                              <b>{p}</b>
+                              {c && <small>{num(c.total, "건")}{c.open ? ` | 진행 중 ${num(c.open, "건")}` : ""}</small>}
+                            </span>
+                            <span className="pg-prog-l">{PROGRAM_DOCS[p].lede}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <Link href={typePath(type)} className="pg-more">{type} 제도와 전국 공고 →</Link>
+              </li>
+            ))}
+          </ul>
 
           <p className="legal-eff">
             어느 공고가 어느 사업인지는 공고 제목으로 가렸다. 제목에 사업 이름이 없는 공고는 유형으로만 묶인다.

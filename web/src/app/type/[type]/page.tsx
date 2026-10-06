@@ -8,11 +8,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { HubAreaBars, HubChips, HubFaq, HubIncome, HubLede, HubParas, HubStats, RuleTileGroup } from "@/components/hub-blocks";
 import { JsonLd } from "@/components/json-ld";
 import { LegalSection } from "@/components/legal-doc";
 import { NoticeRow } from "@/components/notice-row";
 import { SITE_NAME } from "@/lib/constants";
-import { assetRuleText, ageRuleText, carRuleText, classRuleText, incomeRuleText, maritalRuleText } from "@/lib/eligibility";
 import { num } from "@/lib/format";
 import { HOUSING_TYPE_DOCS, housingTypeDoc } from "@/lib/housing-types";
 import { breadcrumb, ORG_ID, WEBSITE_ID } from "@/lib/jsonld";
@@ -113,14 +113,21 @@ export default async function TypeHubPage({ params }: Params) {
       </div>
       <div className="legal-in">
         <h1>{type}</h1>
-        <p className="legal-eff">
-          {hub ? `전국 ${num(hub.total, "건")} | 진행 중 ${num(hub.open, "건")} | ${num(hub.sidos, "개")} 시도` : "공고 준비 중"} | {SITE_NAME}
-        </p>
+        {/* 숫자는 글 한 줄이 아니라 타일로(사용자 지적 2026-10-06: 「글만 있으니 읽기 어렵네」) */}
+        {hub ? (
+          <HubStats items={[
+            { label: "진행 중", value: num(hub.open, "건"), hot: hub.open > 0 },
+            { label: "모은 공고", value: num(hub.total, "건") },
+            { label: "시도", value: num(hub.sidos, "곳") },
+          ]} />
+        ) : (
+          <p className="legal-eff">공고 준비 중 | {SITE_NAME}</p>
+        )}
         <div className="legal-body">
-          <p>{doc.lede}</p>
+          <HubLede>{doc.lede}</HubLede>
 
           <LegalSection title={`${type}는 어떤 제도인가`}>
-            {doc.body.map((para) => <p key={para.slice(0, 20)}>{para}</p>)}
+            <HubParas paras={doc.body} />
           </LegalSection>
 
           {seeds.length > 0 && (
@@ -129,25 +136,8 @@ export default async function TypeHubPage({ params }: Params) {
                 아래는 제도 일반 기준이다. <strong>같은 유형이라도 공고마다 우선공급 몫과 배점이 다르므로</strong> 마지막 판단은
                 각 공고의 신청자격 절이 한다. 금액 기준은 {rules.incomeYear}년 자료다.
               </p>
-              {seeds.map((t) => {
-                const lines = [
-                  { k: "나이", v: ageRuleText(t) },
-                  { k: "혼인", v: maritalRuleText(t) },
-                  { k: "계층", v: classRuleText(t) },
-                  { k: "무주택", v: `${t.homeless_scope} 기준 무주택` },
-                  { k: "소득", v: incomeRuleText(t) },
-                  { k: "자산", v: assetRuleText(t) },
-                  { k: "자동차", v: carRuleText(t) },
-                ].filter((l) => l.v);
-                return (
-                  <section key={t.code} className="legal-sec">
-                    <h3>{t.name}</h3>
-                    <ul>
-                      {lines.map((l) => <li key={l.k}><b>{l.k}</b> {l.v}</li>)}
-                    </ul>
-                  </section>
-                );
-              })}
+              <RuleTileGroup types={seeds} income={rules.income} />
+              <HubIncome types={seeds} income={rules.income} year={rules.incomeYear} />
             </LegalSection>
           )}
 
@@ -165,34 +155,17 @@ export default async function TypeHubPage({ params }: Params) {
           {areas.length > 0 && (
             <LegalSection title="지역으로 좁혀 보기">
               <p>공고가 {AREA_TYPE_MIN_COUNT}건 이상 쌓인 지역만 따로 발행한다.</p>
-              <ul>
-                {areas.map((p) => (
-                  <li key={`${p.sido}|${p.sigungu}`}>
-                    <Link href={areaTypePath(p, type)}>{sidoShort(p.sido)} {p.sigungu} {type}</Link> {num(p.count, "건")}
-                  </li>
-                ))}
-              </ul>
+              <HubAreaBars items={areas.map((p) => ({ href: areaTypePath(p, type), label: `${sidoShort(p.sido)} ${p.sigungu}`, count: p.count }))} />
             </LegalSection>
           )}
 
           <LegalSection title="자주 묻는 것">
-            {doc.faq.map((f) => (
-              <section key={f.q} className="legal-sec">
-                <h3>{f.q}</h3>
-                <p>{f.a}</p>
-              </section>
-            ))}
+            <HubFaq items={doc.faq} />
           </LegalSection>
 
           {others.length > 0 && (
             <LegalSection title="다른 유형">
-              <ul>
-                {others.map((h) => (
-                  <li key={h.housing_type}>
-                    <Link href={typePath(h.housing_type)}>{h.housing_type}</Link> {num(h.total, "건")}
-                  </li>
-                ))}
-              </ul>
+              <HubChips items={others.map((h) => ({ href: typePath(h.housing_type), label: h.housing_type, count: h.total }))} />
             </LegalSection>
           )}
 
