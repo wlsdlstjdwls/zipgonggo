@@ -8,7 +8,6 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { SITE_NAME } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
-import { AdminOnly } from "./admin-only";
 import { BrandMark } from "./brand-mark";
 import { CalcButton } from "./calc-context";
 import { Trunc } from "./trunc";
@@ -55,8 +54,8 @@ export function DetailHeadBar({ title, sub, state, back, action }: Props) {
               <b>{SITE_NAME}</b>
             </Link>
             <nav className="dhb-nav" aria-label="주요 메뉴">
-              {/* 헤더와 같은 규칙 — 아직 안 열어 운영자에게만 보인다(2026-09-21) */}
-              <AdminOnly><Link href={ROUTES.eligibility} tabIndex={on ? 0 : -1}>자격진단</Link></AdminOnly>
+              {/* 헤더와 같은 규칙 — 2026-10-06에 열었다 */}
+              <Link href={ROUTES.eligibility} tabIndex={on ? 0 : -1}>자격진단</Link>
             </nav>
             <span className="dhb-div" aria-hidden="true" />
             <Link href={back.href} className="dhb-back" tabIndex={on ? 0 : -1}>{back.label}</Link>

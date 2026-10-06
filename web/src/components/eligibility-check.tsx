@@ -8,7 +8,7 @@
 // 장애 여부처럼 건강과 이어지는 계층은 켜도 서버로 가지 않는다(개인정보처리방침 3항).
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { type Check, classOptions, diagnoseAll, HOUSEHOLD_MAX, incomePctFor, incomeUsed, type Marital, type Profile, tierOf, type Verdict } from "@/lib/eligibility";
+import { type Check, classOptions, diagnoseAll, HOUSEHOLD_MAX, incomeUsed, type Marital, type Profile, tierOf, type Verdict } from "@/lib/eligibility";
 import { fitJanggi, type FitProfile, type FitVerdict } from "@/lib/notice-fit";
 import { dateMD, daysUntil, wonKo } from "@/lib/format";
 import { fromElig, reconcileRegion, SENSITIVE_CLASSES, toElig } from "@/lib/profile";
@@ -497,7 +497,9 @@ function Meter({ mine, limit, label }: { mine: number; limit: number; label: str
 
 function PassCard({ v, p, janggi, janggiRef, group }: { v: Verdict; p: Profile; janggi?: FitVerdict | null; janggiRef?: JanggiRule | null; group?: string | null }) {
   const t = v.type;
-  const income = v.incomeLimitWon != null ? { mine: incomeUsed(t, p), limit: v.incomeLimitWon } : null;
+  // 소득이 세대주 여부로 갈리면 막대 하나로 그릴 수 없다 — 막대를 걷고 아래 「확인 필요」 줄이 두 갈래를 말한다
+  const incomeUnsure = v.checks.some((c) => c.label === "소득" && c.unsure);
+  const income = v.incomeLimitWon != null && !incomeUnsure ? { mine: incomeUsed(t, p), limit: v.incomeLimitWon } : null;
   // 단정 못 한 항목(세대주 여부, 부모 소득, 6세 이하 자녀, 거주지 미입력)은 숨기지 않고 카드 위로 올린다
   const unsure = v.checks.filter((c) => c.unsure);
   return (
@@ -508,8 +510,8 @@ function PassCard({ v, p, janggi, janggiRef, group }: { v: Verdict; p: Profile; 
         <em className={`ej-badge ${v.unsure ? "near" : "ok"}`}>{v.unsure ? "확인 필요" : "지원 가능"}</em>
       </div>
       {income ? (
-        <Meter mine={income.mine} limit={income.limit} label={`소득 ${incomePctFor(t, p)}% 기준`} />
-      ) : (
+        <Meter mine={income.mine} limit={income.limit} label={`소득 ${v.incomePct}% 기준`} />
+      ) : !incomeUnsure && (
         <p className="ej-card-s">소득 기준 없음</p>
       )}
       {unsure.map((c) => (

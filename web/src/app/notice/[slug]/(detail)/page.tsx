@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AdminOnly } from "@/components/admin-only";
 import { AreaMap } from "@/components/area-map";
 import { CalcSeed } from "@/components/calc-context";
 import { ComplexExplorer } from "@/components/complex-explorer";
@@ -498,8 +497,8 @@ export default async function NoticePage({ params }: Params) {
                   : restTypes.length > 0
                     ? <>공고 제목이 가리키는 유형은 <b>{eligTypes.map((t) => (t.code === "safe" ? t.category : t.name)).join(" | ")}</b>입니다. 세부 조건은 {L.originalDoc} 기준.</>
                     : <>유형 {eligTypes.length}개. 이 공고가 실제로 모집하는 유형과 세부 조건은 {L.originalDoc} 기준.</>}{" "}
-                {/* 자격진단은 아직 안 열었다 — 운영자에게만 보인다(2026-09-21) */}
-                <AdminOnly><Link href={ROUTES.eligibility}>내 조건으로 진단하기 →</Link></AdminOnly>
+                {/* 2026-10-06에 자격진단을 열었다 — 여기서 넣은 조건이 위 카드의 판정에도 그대로 쓰인다 */}
+                <Link href={ROUTES.eligibility}>내 조건으로 진단하기 →</Link>
               </p>
               <EligRuleCards block={mainBlock} income={eligRules.income} tiers={seoulTiers} />
 

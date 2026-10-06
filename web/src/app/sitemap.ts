@@ -23,8 +23,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const latest = notices[0] ? new Date(notices[0].updated_at) : new Date();
   return [
     { url: absoluteUrl(ROUTES.home), lastModified: latest, changeFrequency: "hourly", priority: 1 },
-    // 자격진단은 아직 안 열었다(사용자 결정 2026-09-21) — 사이트맵에서 뺀다.
-    // 주소는 살려 둔다(URL을 지우지 않는다). 열면 이 줄을 되살리고 page.tsx의 robots도 같이 돌린다
+    // 자격진단 — 2026-10-06에 열었다. 규칙(시드)이 바뀌어야 내용이 바뀌는 지면이라 주 단위로 둔다
+    { url: absoluteUrl(ROUTES.eligibility), lastModified: latest, changeFrequency: "weekly", priority: 0.7 },
     // 정책 문서 — 내용이 거의 안 바뀌지만 색인은 시켜 둔다(신뢰 신호)
     { url: absoluteUrl(ROUTES.terms), lastModified: latest, changeFrequency: "yearly", priority: 0.2 },
     { url: absoluteUrl(ROUTES.privacy), lastModified: latest, changeFrequency: "yearly", priority: 0.2 },

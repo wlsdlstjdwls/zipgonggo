@@ -21,7 +21,7 @@ import { useSave } from "./save-context";
 import { IconMenu } from "./icons";
 
 export function SiteMenu() {
-  const { user, admin, loading, enabled } = useAuth();
+  const { user, loading, enabled } = useAuth();
   const { saved } = useSave();
   const { toggle: toggleCalc } = useCalc();
   const pathname = usePathname();
@@ -64,8 +64,8 @@ export function SiteMenu() {
 
       {open && (
         <div className="acct-menu smenu-panel" role="menu">
-          {/* 아직 안 연 메뉴는 운영자에게만 — AdminOnly와 같은 값(admin)을 본다 */}
-          {admin && <Link href={ROUTES.eligibility} role="menuitem">자격진단</Link>}
+          {/* 자격진단은 2026-10-06에 열었다(사용자 결정) */}
+          <Link href={ROUTES.eligibility} role="menuitem">자격진단</Link>
           <Link href={ROUTES.my} role="menuitem">
             관심공고
             {n > 0 && <em className="nav-badge">{n}</em>}

@@ -44,7 +44,8 @@ export type Profile = {
 /** unsure: 막지는 않지만 대신 단정할 수 없는 항목(세대주 여부, 부모 소득, 6세 이하 자녀처럼 안 묻는 값).
  *  ok는 true로 두고 화면이 「확인 필요」로 그린다 — 떨어뜨리면 놓치고, 그냥 통과시키면 헛걸음한다 */
 export type Check = { label: string; ok: boolean; detail: string; unsure?: boolean };
-export type Verdict = { type: SupplyType; ok: boolean; unsure: boolean; checks: Check[]; incomeLimitWon: number | null };
+/** incomeLimitWon/incomePct는 화면 막대가 견줄 한도와 그 % — 본인 범위면 1인 가구 기준이다 */
+export type Verdict = { type: SupplyType; ok: boolean; unsure: boolean; checks: Check[]; incomeLimitWon: number | null; incomePct: number | null };
 
 export const HOUSEHOLD_MAX = 7;
 const MAN = 10_000;
@@ -92,6 +93,18 @@ export function incomePctFor(t: SupplyType, p: Pick<Profile, "dual" | "marital" 
 /** 세대원이냐 세대주냐로 갈리는 범위(행복주택 청년 「세대주분기」, 민간 청년안심 특공 「청년특공_분기」). 혼자면 본인과 세대가 같다 */
 const BRANCH_SCOPES = new Set(["세대주분기", "청년특공_분기"]);
 
+type IncomeLimits = { pct: number | null; limit: number | null; selfPct: number | null; selfLimit: number | null; used: number | null; usedPct: number | null };
+
+/** 세대 기준(가구원수)과 본인 기준(1인 가구) 한도를 함께. used는 화면 막대가 견줄 한도 — incomeUsed와 짝이다 */
+export function incomeLimits(t: SupplyType, p: Profile, income: IncomeStandard[]): IncomeLimits {
+  const pct = incomePctFor(t, p);
+  const selfPct = incomePctFor(t, { ...p, household: 1 });
+  const limit = pct === null ? null : incomeLimit(income, p.household, pct);
+  const selfLimit = selfPct === null ? null : incomeLimit(income, 1, selfPct);
+  const selfSide = t.income_scope === "본인" || (BRANCH_SCOPES.has(t.income_scope) && p.household <= 1);
+  return { pct, limit, selfPct, selfLimit, used: selfSide ? selfLimit : limit, usedPct: selfSide ? selfPct : pct };
+}
+
 /** 막대 그래프 등에서 쓰는 「이 유형이 보는 내 소득」 한 값. 갈래 범위는 혼자 살면 본인, 아니면 세대.
  *  본인+부모 합산은 부모 소득을 따로 안 받아 세대 합산으로 갈음한다 */
 export function incomeUsed(t: SupplyType, p: Profile): number {
@@ -103,8 +116,9 @@ function won(n: number): string {
   return `${Math.round(n / MAN).toLocaleString("ko-KR")}만 원`;
 }
 
+/** 만 원 단위 → 「2억 5,100만 원」. 「25,100만 원」은 0을 세야 읽힌다(사용자 요청 2026-10-06: 가독성) */
 function man(n: number): string {
-  return `${n.toLocaleString("ko-KR")}만 원`;
+  return wonKo(n * MAN);
 }
 
 function has(list: string[], classes: string[]): boolean {
@@ -171,30 +185,36 @@ function scopeLabel(scope: string): string {
   return BRANCH_SCOPES.has(scope) ? "본인 또는 세대" : scope;
 }
 
-function checkIncome(t: SupplyType, p: Profile, limit: number | null, pct: number | null): Check | null {
-  if (pct === null || limit === null) return null;
-  const add = t.income_small_bonus ? smallBonus(p.household) : 0;
-  const bonus = add ? ` (${p.household}인 가구 +${add}%p 가산)` : "";
+function ruleText(t: SupplyType, p: Profile, household: number, pct: number, limit: number): string {
+  const add = t.income_small_bonus ? smallBonus(household) : 0;
+  const bonus = add ? ` (${household}인 가구 +${add}%p 가산)` : "";
   const dual = p.dual && p.marital !== "미혼" && t.income_pct_dual ? "맞벌이 기준 " : "";
-  const rule = `${dual}도시근로자 ${pct}% 이하는 월 ${won(limit)}${bonus}`;
+  return `${dual}${household}인 가구 도시근로자 ${pct}% 이하는 월 ${won(limit)}${bonus}`;
+}
+
+function checkIncome(t: SupplyType, p: Profile, lim: IncomeLimits): Check | null {
+  if (lim.pct === null || lim.limit === null || lim.selfLimit === null || lim.selfPct === null) return null;
+  const rule = ruleText(t, p, p.household, lim.pct, lim.limit);
   if (BRANCH_SCOPES.has(t.income_scope) && p.household > 1) {
-    // 세대원이면 본인 소득, 세대주면 세대 전체 — 세대주인지는 안 묻는다. 둘 다 되거나 둘 다 안 될 때만 단정한다
-    const self = p.incomeSelfWon <= limit;
-    const hh = p.incomeHouseholdWon <= limit;
-    if (self && hh) return { label: "소득", ok: true, detail: `${rule}, 본인과 세대 모두 기준 안` };
-    if (!self && !hh) return { label: "소득", ok: false, detail: `${rule}, 입력 본인 월 ${won(p.incomeSelfWon)} / 세대 월 ${won(p.incomeHouseholdWon)}` };
-    return {
-      label: "소득", ok: true, unsure: true,
-      detail: `${rule}. 세대원이면 본인 소득(월 ${won(p.incomeSelfWon)}), 세대주면 세대 소득(월 ${won(p.incomeHouseholdWon)})으로 본다`,
-    };
+    // 세대원이면 본인 소득(1인 기준), 세대주면 세대 전체 — 세대주인지는 안 묻는다. 둘 다 되거나 둘 다 안 될 때만 단정한다
+    const self = p.incomeSelfWon <= lim.selfLimit;
+    const hh = p.incomeHouseholdWon <= lim.limit;
+    const both = `세대원이면 본인 월 ${won(p.incomeSelfWon)}을 1인 기준 월 ${won(lim.selfLimit)}과, 세대주면 세대 월 ${won(p.incomeHouseholdWon)}을 ${p.household}인 기준 월 ${won(lim.limit)}과 견준다`;
+    if (self && hh) return { label: "소득", ok: true, detail: `${both}. 어느 쪽이든 기준 안` };
+    if (!self && !hh) return { label: "소득", ok: false, detail: `${both}. 어느 쪽이든 넘는다` };
+    return { label: "소득", ok: true, unsure: true, detail: `${both}. 세대주인지에 따라 갈린다` };
+  }
+  if (t.income_scope === "본인" || BRANCH_SCOPES.has(t.income_scope)) {
+    const mine = p.incomeSelfWon;
+    return { label: "소득", ok: mine <= lim.selfLimit, detail: `본인 기준 ${ruleText(t, p, 1, lim.selfPct, lim.selfLimit)}, 입력 월 ${won(mine)}` };
   }
   const mine = incomeUsed(t, p);
   if (t.income_scope === "본인+부모") {
     // 부모 소득을 따로 안 받아 세대 합산으로 갈음한다 — 통과여도 단정하지 않는다
-    const ok = mine <= limit;
+    const ok = mine <= lim.limit;
     return { label: "소득", ok, unsure: ok, detail: `본인과 부모 합산 ${rule}, 입력 세대 월 ${won(mine)}(부모와 따로 살면 합산해 다시 볼 것)` };
   }
-  return { label: "소득", ok: mine <= limit, detail: `${scopeLabel(t.income_scope)} 기준 ${rule}, 입력 월 ${won(mine)}` };
+  return { label: "소득", ok: mine <= lim.limit, detail: `${scopeLabel(t.income_scope)} 기준 ${rule}, 입력 월 ${won(mine)}` };
 }
 
 /** 자산을 누구 것으로 보나. 「본인」은 청년 계열 5개뿐이고 나머지는 세대 기준이다.
@@ -264,20 +284,19 @@ function checkRegion(t: SupplyType, p: Profile, tier: string): Check | null {
 
 /** 유형 하나를 진단한다. checks에는 실제로 본 항목만 담긴다 — 안 보는 기준을 통과로 적으면 오해를 부른다. */
 export function diagnose(t: SupplyType, p: Profile, rules: EligibilityRules): Verdict {
-  const pct = incomePctFor(t, p);
-  const limit = pct === null ? null : incomeLimit(rules.income, p.household, pct);
+  const lim = incomeLimits(t, p, rules.income);
   const tier = tierOf(p.residence, rules.tiers);
   const checks = [
     checkAge(t, p),
     checkMarital(t, p),
     checkClass(t, p),
     checkHomeless(t, p),
-    checkIncome(t, p, limit, pct),
+    checkIncome(t, p, lim),
     checkAsset(t, p),
     checkCar(t, p),
     checkRegion(t, p, tier),
   ].filter((c): c is Check => c !== null);
-  return { type: t, ok: checks.every((c) => c.ok), unsure: checks.some((c) => c.unsure), checks, incomeLimitWon: limit };
+  return { type: t, ok: checks.every((c) => c.ok), unsure: checks.some((c) => c.unsure), checks, incomeLimitWon: lim.used, incomePct: lim.usedPct };
 }
 
 export function diagnoseAll(p: Profile, rules: EligibilityRules): Verdict[] {
