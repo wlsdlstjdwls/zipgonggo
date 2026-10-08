@@ -184,7 +184,7 @@ function ScoreTable({ t }: { t: EligScoreTable }) {
   return (
     <div className="ne-block">
       {t.group && <h4 className="ne-group">{t.group}</h4>}
-      <div className="tbl ne-tbl">
+      <div className="tbl ne-tbl stack">
         <table>
           <thead>
             <tr>
@@ -200,7 +200,7 @@ function ScoreTable({ t }: { t: EligScoreTable }) {
                   {it.label}
                   {it.note && <small>{it.note}</small>}
                 </td>
-                {it.cells.map((c, k) => <td key={k} className={`ne-cell${c.length > 24 ? " wrap" : ""}`}>{c || "—"}</td>)}
+                {it.cells.map((c, k) => <td key={k} data-label={`${t.points[k]}점`} className={`ne-cell${c.length > 24 ? " wrap" : ""}`}>{c || "—"}</td>)}
               </tr>
             ))}
           </tbody>
@@ -363,7 +363,7 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
             </ul>
           )}
           {d.income_matrix && (
-            <div className="tbl ne-tbl">
+            <div className="tbl ne-tbl stack">
               <table>
                 <thead>
                   <tr>
@@ -376,8 +376,8 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
                   {d.income_matrix.rows.map((r, i) => (
                     <tr key={i}>
                       <td className="ne-area">{r.area ?? "—"}</td>
-                      <td className="ne-req">{r.applicant || "전체"}</td>
-                      {r.pcts.map((p, k) => <td key={k} className="num">{p == null ? <span className="ne-dim">—</span> : `${p}%`}</td>)}
+                      <td className="ne-req" data-label="신청자">{r.applicant || "전체"}</td>
+                      {r.pcts.map((p, k) => <td key={k} className="num" data-label={d.income_matrix!.columns[k]}>{p == null ? <span className="ne-dim">—</span> : `${p}%`}</td>)}
                     </tr>
                   ))}
                 </tbody>
@@ -391,7 +391,7 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
       {d.asset && (
         <Fold title={kind === "haengbok" ? "자산과 자동차 기준" : "자산 기준"}
           hint={kind === "haengbok" ? "계층별, 출생자녀가 있으면 완화" : kind === "cheongnyeon" ? "2순위는 본인과 부모, 3순위는 본인 자산" : undefined}>
-          <div className="tbl ne-tbl">
+          <div className="tbl ne-tbl stack">
             <table>
               <thead>
                 <tr>
@@ -404,7 +404,7 @@ export function NoticeEligibilitySection({ elig, incomeYear, noticeYear, origina
                   <tr key={i}>
                     <td className="ne-area">{r.label}</td>
                     {r.values_man.map((v, k) => (
-                      <td key={k} className="num" title={v == null ? undefined : `${(v * 10_000).toLocaleString("ko-KR")}원`}>
+                      <td key={k} className="num" data-label={d.asset!.columns[k]} title={v == null ? undefined : `${(v * 10_000).toLocaleString("ko-KR")}원`}>
                         {v == null ? "—" : v === 0 ? "소유 불가" : `${wonKo(v * 10_000)} 이하`}
                       </td>
                     ))}

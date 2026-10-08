@@ -22,7 +22,7 @@ export function DepositOptionsTable({ supply, hasClass }: Props) {
   const rows = supply.filter((s) => (s.deposit_options?.length ?? 0) > 0);
   if (labels.length < 2 || rows.length === 0) return null;
   return (
-    <div className="tbl wide">
+    <div className="tbl wide stack">
       <table className="supply options">
         <thead>
           <tr>
@@ -41,9 +41,9 @@ export function DepositOptionsTable({ supply, hasClass }: Props) {
                 </td>
                 {labels.map((l) => {
                   const o = byLabel.get(l);
-                  if (!o || (o.deposit == null && o.rent == null)) return <td key={l} className="num">—</td>;
+                  if (!o || (o.deposit == null && o.rent == null)) return <td key={l} className="num" data-label={`보증금 ${l}`}>—</td>;
                   return (
-                    <td key={l} className="num stack">
+                    <td key={l} className="num stack" data-label={`보증금 ${l}`}>
                       <b title={o.deposit != null ? wonExact(o.deposit) : undefined}>{wonKo(o.deposit)}</b>
                       <small title={o.rent != null ? wonExact(o.rent) : undefined}>{o.rent != null ? `월 ${wonKo(o.rent)}` : "월임대료 미표기"}</small>
                     </td>

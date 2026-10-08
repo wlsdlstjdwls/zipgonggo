@@ -45,7 +45,7 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
       {facts.types.length > 0 && (
         <div className="dsub">
           <h3>주택형별 기본 보증금과 임대료</h3>
-          <div className="tbl">
+          <div className="tbl stack">
             <table>
               <thead>
                 <tr>
@@ -61,11 +61,11 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
                 {facts.types.map((t) => (
                   <tr key={`${t.style_name}-${t.base_deposit}-${t.base_rent}`}>
                     <td>{t.style_name}형</td>
-                    <td className="num">{area(t.exclusive_area, t.exclusive_area_max)}</td>
-                    <td className="num">{area(t.common_area, t.common_area_max)}</td>
-                    <td className="num">{wonKo(t.base_deposit)}</td>
-                    <td className="num">{t.base_rent ? wonKo(t.base_rent) : "—"}</td>
-                    <td className="num">{t.conversion_deposit_limit ? wonKo(t.conversion_deposit_limit) : "—"}</td>
+                    <td className="num" data-label="전용면적">{area(t.exclusive_area, t.exclusive_area_max)}</td>
+                    <td className="num" data-label="공용면적">{area(t.common_area, t.common_area_max)}</td>
+                    <td className="num" data-label="보증금">{wonKo(t.base_deposit)}</td>
+                    <td className="num" data-label="월임대료">{t.base_rent ? wonKo(t.base_rent) : "—"}</td>
+                    <td className="num" data-label="전세전환">{t.conversion_deposit_limit ? wonKo(t.conversion_deposit_limit) : "—"}</td>
                   </tr>
                 ))}
               </tbody>

@@ -33,7 +33,7 @@ export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
   const hasSplit = supply.some((s) => s.units_priority != null || s.units_general != null);
 
   return (
-    <div className="tbl wide">
+    <div className="tbl wide stack">
       <table className="supply">
         <thead>
           <tr>
@@ -59,21 +59,21 @@ export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
                 {hasClass && classLabel(s) && <span className="tc-tag"><TermText>{classLabel(s)}</TermText></span>}
                 <TermText>{typeLabel(s)}</TermText>
               </td>
-              <td className="num strong">{s.units_total != null ? num(s.units_total, "호") : "—"}</td>
+              <td className="num strong" data-label="공급호수">{s.units_total != null ? num(s.units_total, "호") : "—"}</td>
               {hasSplit && (
-                <td className="num stack">
+                <td className="num stack" data-label={hasReserve ? "공가" : "우선/일반"}>
                   <b>{num((s.units_priority ?? 0) + (s.units_general ?? 0), "호")}</b>
                   <small><Term as="우선">우선공급</Term> {s.units_priority ?? 0} / <Term as="일반">일반공급</Term> {s.units_general ?? 0}</small>
                 </td>
               )}
-              {hasReserve && <td className="num">{s.units_reserve != null ? num(s.units_reserve, "호") : "—"}</td>}
-              <td className={s.deposit_options && s.deposit_options.length > 1 ? "num stack" : "num strong"} title={s.deposit != null ? wonExact(s.deposit) : undefined}>
+              {hasReserve && <td className="num" data-label="예비입주자">{s.units_reserve != null ? num(s.units_reserve, "호") : "—"}</td>}
+              <td className={s.deposit_options && s.deposit_options.length > 1 ? "num stack" : "num strong"} data-label={hasRent ? "임대보증금" : "전세금"} title={s.deposit != null ? wonExact(s.deposit) : undefined}>
                 {s.deposit_options && s.deposit_options.length > 1
                   ? <><b>{wonKo(s.deposit)}</b><small>보증금 {baseOption(s)?.label} 기준</small></>
                   : wonKo(s.deposit)}
               </td>
-              {hasRent && <td className="num" title={s.rent != null ? wonExact(s.rent) : undefined}>{wonKo(s.rent)}</td>}
-              <td className="num stack"><AreaCell s={s} /></td>
+              {hasRent && <td className="num" data-label="월임대료" title={s.rent != null ? wonExact(s.rent) : undefined}>{wonKo(s.rent)}</td>}
+              <td className="num stack" data-label="면적"><AreaCell s={s} /></td>
             </tr>
           ))}
         </tbody>

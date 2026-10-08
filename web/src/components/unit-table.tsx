@@ -174,7 +174,7 @@ export function UnitTable({ units }: Props) {
           </em>
         )}
       </p>
-      <div className="tbl wide ut-box">
+      <div className="tbl wide stack ut-box">
         <table className="supply">
           <thead>
             <tr>
@@ -199,11 +199,11 @@ export function UnitTable({ units }: Props) {
                   )}
                   {hoText(u.room)}{u.floor != null && <small> {u.floor}층</small>}
                 </td>
-                {col.area && <td className="num">{u.area_m2 != null ? `${u.area_m2}㎡` : "—"}</td>}
-                {col.layout && <td>{u.room_layout ?? "—"}</td>}
-                {col.elevator && <td>{u.elevator ?? "—"}</td>}
-                {col.deposit && <td className="num strong"><Money v={u.deposit} /></td>}
-                {col.rent && <td className="num"><Money v={u.rent} /></td>}
+                {col.area && <td className="num" data-label="전용면적">{u.area_m2 != null ? `${u.area_m2}㎡` : "—"}</td>}
+                {col.layout && <td data-label="구조">{u.room_layout ?? "—"}</td>}
+                {col.elevator && <td data-label="승강기">{u.elevator ?? "—"}</td>}
+                {col.deposit && <td className="num strong" data-label={hasRent ? "임대보증금" : "전세금"}><Money v={u.deposit} /></td>}
+                {col.rent && <td className="num" data-label="월임대료"><Money v={u.rent} /></td>}
               </tr>
             ))}
             {visible.length === 0 && (
