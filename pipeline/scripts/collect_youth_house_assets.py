@@ -47,7 +47,12 @@ PUBLIC_ROOT = PIPELINE_ROOT.parent / "web" / "public" / "youth-house"
 PAREN_RE = re.compile(r"\([^)]*\)")
 STRIP_RE = re.compile(r"[\s\-_\[\]·,]")
 # 포털은 이름 앞에 역세권을 붙인다(`홍대입구역 맹그로브창천`). 우리 단지명은 `맹그로브창천`이다.
-STATION_RE = re.compile(r"^[가-힣A-Za-z0-9]{2,10}역\s*")
+# 띄어쓰기가 있어야 접두사다 — 없으면 「더원역삼」이 「삼」으로 잘려 못 붙었다(2026-10-08 전수 점검)
+STATION_RE = re.compile(r"^[가-힣A-Za-z0-9]{2,10}역\s+")
+# 괄호 안은 별칭이다(`장한평역 유니트125(UNIT125)`, `힐데스하임(U-삼진랜드)`). 우리 표기가 괄호 밖이나 안 어느 쪽과 같아도 붙인다
+PAREN_IN_RE = re.compile(r"\(([^)]*)\)")
+# 지번(`장안동 418-1번지`). 포털 주소 꼬리에 지번이 남은 단지가 있다(`불광동 302-13 Lumino 816`)
+JIBUN_RE = re.compile(r"([가-힣0-9]+[동가])\s*(\d+(?:-\d+)?)")
 # 둘 다 흔히 붙였다 뗐다 하는 꼬리. 대조 키에서만 턴다
 TAIL_WORDS = ("청년안심주택", "청년주택", "역세권청년주택", "아파트", "오피스텔")
 UNSAFE_RE = re.compile(r'[\\/:*?"<>|]')
@@ -59,10 +64,18 @@ def _name_key(name: str) -> str:
     """단지명 대조 키. 역세권 접두사와 「청년안심주택」 꼬리를 털고 공백·기호를 지운다."""
     key = PAREN_RE.sub("", name or "")
     key = STATION_RE.sub("", key)
-    key = STRIP_RE.sub("", key).upper()
+    # 포털은 영문으로 적기도 한다(`166 tower` / 우리 `166타워`)
+    key = STRIP_RE.sub("", key).upper().replace("TOWER", "타워")
     for tail in TAIL_WORDS:
         key = key.replace(STRIP_RE.sub("", tail).upper(), "")
     return key
+
+
+def _name_keys(name: str) -> set[str]:
+    """괄호 밖 이름과 괄호 안 별칭 각각의 대조 키. 너무 짧은 별칭(2자 이하)은 아무 데나 붙으니 버린다."""
+    keys = {_name_key(name)}
+    keys.update(_name_key(m) for m in PAREN_IN_RE.findall(name or ""))
+    return {k for k in keys if len(k) >= 3}
 
 
 def _addr_key(addr: str) -> str:
@@ -121,16 +134,30 @@ def cmd_houses(client: YouthHouseClient) -> Path:
 def _match_one(name: str, address: str | None, houses: list[YouthHouse]) -> tuple[YouthHouse | None, str]:
     """단지 하나를 포털 목록에 댄다. (단지, 붙인 근거). 못 붙이면 (None, '')."""
     key = _name_key(name)
+    keys = _name_keys(name)
+    if keys:
+        hits = [h for h in houses if keys & _name_keys(h.name)]
+        if len({h.home_code for h in hits}) == 1:
+            return hits[0], "이름"
     if key:
-        for h in houses:
-            if _name_key(h.name) == key:
-                return h, "이름"
         # 포털이 더 길게 적는다(`퀸즈W청량리역` ⊃ `퀸즈W`). 너무 짧은 키는 아무 데나 붙으니 막는다
         if len(key) >= 4:
             hits = [h for h in houses if key in _name_key(h.name) or _name_key(h.name) in key]
             if len(hits) == 1:
                 return hits[0], "이름(부분)"
+    # 포털 주소 꼬리에 단지 이름이 붙어 있는 경우(`… (서교동) 서교동 효성 해링턴 타워`)
+    if len(key) >= 5:
+        hits = [h for h in houses if key in _addr_key(h.address)]
+        if len(hits) == 1:
+            return hits[0], "이름(주소)"
     if address:
+        m = JIBUN_RE.search(address)
+        if m:
+            jkey = f"{m.group(1)}{m.group(2)}"
+            # 뒤에 숫자가 이어지면 다른 지번이다(418-1 ≠ 418-12)
+            hits = [h for h in houses if re.search(re.escape(jkey) + r"(?![\d-])", _addr_key(h.address))]
+            if len(hits) == 1:
+                return hits[0], "지번"
         akey = _addr_key(address)
         if len(akey) >= 8:
             hits = [h for h in houses if akey and (akey in _addr_key(h.address) or _addr_key(h.address) in akey)]

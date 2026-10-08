@@ -56,7 +56,7 @@ export function OptionSlider({ supply, hasClass }: { supply: NoticeSupply[]; has
 
       <div className="cs-now" role="status" aria-live="polite">
         <span className="col">
-          <span className="cap">보증금 {o.label}</span>
+          <span className="cap">{o.ratio != null ? `보증금 ${o.label}` : "보증금"}</span>
           <b className="v" title={wonExact(o.deposit)}>{wonKo(o.deposit)}</b>
         </span>
         <span className="col r">
@@ -65,7 +65,7 @@ export function OptionSlider({ supply, hasClass }: { supply: NoticeSupply[]; has
         </span>
       </div>
 
-      <div className="cs-track">
+      {last > 0 && <div className="cs-track">
         <div className="cs-ticks" aria-hidden="true">
           {g.opts.map((x, k) => (
             <i key={x.label} className={k === idx ? "mid" : undefined} style={{ left: `${last > 0 ? (k / last) * 100 : 0}%` }} />
@@ -100,10 +100,12 @@ export function OptionSlider({ supply, hasClass }: { supply: NoticeSupply[]; has
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       <p className="cs-rule">
-        공고문이 정한 비율 중에서만 고를 수 있습니다. 계약 때 정하고, 계약 뒤에는 바꿀 수 없는 공고가 많습니다.
+        {last > 0
+          ? "공고문이 정한 비율 중에서만 고를 수 있습니다. 계약 때 정하고, 계약 뒤에는 바꿀 수 없는 공고가 많습니다."
+          : "이 주택형은 공고문에 보증금 비율이 하나만 적혀 있어 고를 수 없습니다."}
       </p>
     </div>
   );

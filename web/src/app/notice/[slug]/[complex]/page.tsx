@@ -157,9 +157,8 @@ export default async function ComplexPage({ params }: Params) {
   // 없으면 공급현황 기준값에 calc.ts 규칙을 걸어 만든다 — 자세한 건 lib/notice-view.ts의 convertGroups
   const slideGroups = hasOptions ? [] : convertGroups(supply, units);
   // 민간임대 비율 옵션은 공고에 적힌 비율에서만 멈추는 슬라이더로 낸다(사용자 요청 2026-10-08: 표 대신 스와이프 막대).
-  // 금액이 있는 줄이 모두 옵션 둘 이상을 가질 때만 — 한 줄이라도 빠지면 그 줄 값이 사라지니 예전 표로 둔다
-  const optionSlide = hasOptions
-    && optionGroups(supply, hasClass).length === supply.filter((s) => s.deposit != null).length;
+  // 옵션이 하나뿐인 줄도 한 칸으로 들어간다(optionGroups) — 예전 표는 이제 칸이 하나도 안 생길 때만
+  const optionSlide = hasOptions && optionGroups(supply, hasClass).length > 0;
   // 오른쪽 카드는 언제나 "마감"을 센다 — 접수 시작 D-day를 섞으면 「접수 시작까지 / 오늘 / 09.11 마감」처럼 어긋난다
   const dl = deadlineChip(n);
   const ph = applyPhase(n);
@@ -439,7 +438,7 @@ export default async function ComplexPage({ params }: Params) {
                   ? "이 단지의 사진과 도면은 아직 준비 중입니다"
                   /* 매입임대는 주소로 붙인다 — 못 붙은 집은 기다린다고 생기지 않는다(「준비 중」이 아니다) */
                   : !imgSource && !isMingan && n.housing_type === "매입임대"
-                  ? "이 집의 사진은 찾지 못했습니다"
+                  ? (n.agency === "SH" ? "이 집의 사진은 찾지 못했습니다" : "이 집의 사진은 아직 싣지 못합니다")
                   : "사진과 도면은 공개 준비 중입니다"}
                 lead={imgSource && !imagesEnabled(imgSource)
                   ? <>{imgSource === "youth" ? "서울시 청년안심주택 포털" : "서울주택도시공사 SH주택정보"}의 평면도와 사진을 지면에 싣기 위한 확인 절차가 끝나면 보여 드립니다. 그때까지는 {L.originalDoc}의 안내를 따라 확인하세요.</>
@@ -451,6 +450,10 @@ export default async function ComplexPage({ params }: Params) {
                   ? <>이 단지는 청년안심주택 포털 「주택찾기」에 올라 있지 않습니다. 모집이 끝나 내려갔거나 아직 등록 전입니다. 평면도는 {L.originalDoc}과 사업자 홈페이지에서 확인하세요.</>
                   /* 매입임대는 빌라나 다가구주택 한 호실이라 SH주택정보(아파트 793단지)에 단지가 아예 없다.
                      여기에 「준공 전이라 없다」고 적으면 사실과 다르다(2026-09-21) */
+                  /* SH주택정보는 SH 집만 있다. LH와 지방공사 매입임대(전국 2,766곳)에 「SH주택정보에서 주소로 찾는다」고 쓰면
+                     사실과 다르다(사용자 지적 2026-10-08, lh-2026-21370-0-maeip 인화빌3) */
+                  : n.housing_type === "매입임대" && n.agency !== "SH"
+                  ? <>{n.agency} 매입임대 집의 사진과 도면을 모아 올 공개 출처를 아직 찾지 못했습니다. 집의 모습은 {L.originalDoc}의 첨부와 현장 방문으로 확인하세요.</>
                   : n.housing_type === "매입임대"
                   ? <>매입임대는 빌라나 다가구주택 한 호실이라 SH주택정보에서 주소로 찾습니다. 이 주소는 아직 찾지 못했습니다. 집의 모습은 {L.originalDoc}과 현장 방문으로 확인하세요.</>
                   : <>준공 전 신규 공급 단지라 SH주택정보에 단지 자료가 아직 없습니다. 전자팸플릿은 {L.originalDoc}의 안내를 따라 확인하세요.</>}

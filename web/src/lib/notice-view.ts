@@ -152,15 +152,17 @@ export function unitPriceRows(units: NoticeUnit[]): PriceRow[] {
     const v = units.map(pick).filter((x): x is number => x != null);
     return v.length ? [Math.min(...v), Math.max(...v)] : [null, null];
   };
-  const row = (id: string, label: string, d: number | null, r: number | null): PriceRow => ({
-    id, group: "base", label, note: `${units.length}호 중`, deposit: wonKo(d), rent: r != null ? wonKo(r) : "—", exact: [d, r],
+  const row = (id: string, label: string, note: string | undefined, d: number | null, r: number | null): PriceRow => ({
+    id, group: "base", label, note, deposit: wonKo(d), rent: r != null ? wonKo(r) : "—", exact: [d, r],
   });
   const [dLo, dHi] = span((u) => u.deposit);
   const [rLo, rHi] = span((u) => u.rent);
   if (dLo == null && rLo == null) return [];
-  const rows: PriceRow[] = [row("u-min", "기준 최소", dLo, rLo)];
-  if (dLo !== dHi || rLo !== rHi) rows.push(row("u-max", "기준 최대", dHi, rHi));
-  return rows;
+  // 「최소」는 값이 실제로 갈릴 때만 — 한 호실짜리 집에 「기준 최소 1호 중」은 거짓 신호다(사용자 지적 2026-10-08)
+  if (dLo === dHi && rLo === rHi) {
+    return [units.length === 1 ? row("u-one", "이 집", undefined, dLo, rLo) : row("u-all", "모든 호실", `${units.length}호`, dLo, rLo)];
+  }
+  return [row("u-min", "최소", `${units.length}호 중`, dLo, rLo), row("u-max", "최대", `${units.length}호 중`, dHi, rHi)];
 }
 
 // ── 상호전환 슬라이더 (사용자 결정 2026-09-22) ─────────────────────────────────
@@ -244,14 +246,19 @@ export type OptionGroup = { id: string; label: string; note: string; opts: Depos
 const byRatio = (a: DepositOption, b: DepositOption) =>
   (a.ratio ?? 1e9) - (b.ratio ?? 1e9) || a.label.localeCompare(b.label, "ko");
 
-/** 비율 옵션이 둘 이상인 줄만. 하나뿐인 줄은 슬라이더로 움직일 데가 없다 */
+/** 금액이 있는 줄마다 한 칸. 공고가 그 주택형에 비율 하나만 적었거나(골드타워 36㎡는 55%뿐) 옵션 없이 기준값만 준 줄도
+ *  빼지 않는다 — 빼면 그 줄 값이 사라져 예전엔 통째로 표 두 벌로 떨어졌다(2026-10-08 전수 점검, 31단지).
+ *  옵션이 하나면 슬라이더가 막대를 숨기고 값만 낸다 */
 export function optionGroups(supply: NoticeSupply[], hasClass: boolean): OptionGroup[] {
   return supply
-    .map((s) => ({
-      id: String(s.id),
-      label: hasClass ? classLabel(s) || typeLabel(s) : typeLabel(s),
-      note: hasClass && classLabel(s) ? typeLabel(s) : "",
-      opts: (s.deposit_options ?? []).filter((o) => o.deposit != null).sort(byRatio),
-    }))
-    .filter((g) => g.opts.length >= 2);
+    .filter((s) => s.deposit != null || (s.deposit_options ?? []).some((o) => o.deposit != null))
+    .map((s) => {
+      const opts = (s.deposit_options ?? []).filter((o) => o.deposit != null).sort(byRatio);
+      return {
+        id: String(s.id),
+        label: hasClass ? classLabel(s) || typeLabel(s) : typeLabel(s),
+        note: hasClass && classLabel(s) ? typeLabel(s) : "",
+        opts: opts.length ? opts : [{ label: "기준", ratio: null, deposit: s.deposit, rent: s.rent }],
+      };
+    });
 }
