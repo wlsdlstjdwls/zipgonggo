@@ -1,7 +1,8 @@
 // 민간임대(청년안심주택) 단지 상세 「단지 정보」 — 포털 「주택찾기」 값(0027)을 시각 요소로 그린다.
 //
 // 라벨/값 격자로 두니 관리비 범위, 세대 구성, 입주 시점이 글자 덩어리로만 보였다(사용자 지적 2026-10-08:
-// "단지정보 가시성 너무 별로"). 숫자가 비교되는 값은 막대로, 날짜는 경과로, 지하철은 노선 색 배지로 바꾼다.
+// "단지정보 가시성 너무 별로"). 구성비는 쌓은 막대로, 날짜는 경과로, 지하철은 노선 색 배지로 바꾼다.
+// 관리비 두 값에 막대를 달았다가 「쓸데없는 바」로 걷었다 — 두 숫자는 나란히 적는 게 낫다.
 // 글은 지어내지 않는다 — 포털이 준 문자열을 못 읽으면 그 문자열 그대로 적는다.
 import { dateK, num, wonExact, wonKo } from "@/lib/format";
 import type { YouthHouse } from "@/types/notice";
@@ -61,15 +62,10 @@ export function HouseFacts({ house }: { house: YouthHouse }) {
         <div className="hf-card full">
           <span className="hf-k">월 관리비 <small>예상</small></span>
           {hi != null && hi !== lo ? (
-            <div className="hf-bars">
-              {/* 포털이 주는 두 값은 청년 기준과 신혼부부 기준이다(0027 주석). 막대 100% = 큰 쪽 */}
-              {[["청년", lo], ["신혼부부", hi]].map(([who, v]) => (
-                <div key={who as string} className="hf-bar">
-                  <span className="who">{who}</span>
-                  <span className="track" aria-hidden="true"><i style={{ width: `${((v as number) / hi) * 100}%` }} /></span>
-                  <b title={wonExact(v as number)}>{wonKo(v as number)}</b>
-                </div>
-              ))}
+            /* 포털이 주는 두 값은 청년 기준과 신혼부부 기준이다(0027 주석). 두 값이면 막대 없이 나란히 적는다 */
+            <div className="hf-pair">
+              <span><em>청년</em><b title={wonExact(lo)}>{wonKo(lo)}</b></span>
+              <span><em>신혼부부</em><b title={wonExact(hi)}>{wonKo(hi)}</b></span>
             </div>
           ) : (
             <b className="hf-big" title={wonExact(lo)}>{wonKo(lo)}</b>

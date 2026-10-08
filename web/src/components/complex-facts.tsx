@@ -27,14 +27,6 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
   const hasVacated = facts.waitlist.some((w) => (w.vacated_cnt ?? 0) > 0);
   // 형명과 추첨단위가 같은 말이면 한 열로 족하다(「36」/「36」). 갈리는 단지만 두 열로 그린다
   const splitUnit = facts.waitlist.some((w) => w.draw_unit && w.draw_unit !== w.style_name);
-  // 막대 길이 = 이 단지 안 최댓값 대비
-  const mx = (xs: (number | null | undefined)[]) => Math.max(0, ...xs.filter((x): x is number => x != null));
-  const rat = (v: number | null | undefined, max: number) => (v != null && max > 0 ? v / max : null);
-  const maxArea = mx(facts.types.map((t) => t.exclusive_area_max ?? t.exclusive_area));
-  const maxDep = mx(facts.types.map((t) => t.base_deposit));
-  const maxRent = mx(facts.types.map((t) => t.base_rent));
-  const maxWait = mx(facts.waitlist.map((w) => w.waiting_cnt));
-  const maxVac = mx(facts.waitlist.map((w) => w.vacated_cnt));
   // 준공 연차 — 「1994.12.04」만으로는 얼마나 오래된 집인지 셈해야 안다
   const age = facts.completed_on ? new Date().getFullYear() - Number(facts.completed_on.slice(0, 4)) + 1 : null;
 
@@ -56,17 +48,17 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
       {facts.types.length > 0 && (
         <div className="dsub">
           <h3>주택형별 기본 보증금과 임대료</h3>
-          {/* 표 대신 형끼리 견주는 막대(2026-10-08, 사용자 「단지정보 가시성 너무 별로」) — components/supply-bars.tsx와 같은 모양 */}
+          {/* 표 대신 형마다 한 줄(2026-10-08) — components/supply-bars.tsx와 같은 모양 */}
           <ul className="sbars">
             {facts.types.map((t) => (
               <li key={`${t.style_name}-${t.base_deposit}-${t.base_rent}`} className="sb-row">
                 <div className="sb-title">{t.style_name}형</div>
                 <div className="sb-metrics">
-                  <Metric label="전용면적" value={area(t.exclusive_area, t.exclusive_area_max)} ratio={rat(t.exclusive_area_max ?? t.exclusive_area, maxArea)}
+                  <Metric label="전용면적" value={area(t.exclusive_area, t.exclusive_area_max)}
                     sub={t.common_area != null ? `공용 ${area(t.common_area, t.common_area_max)}` : null} />
-                  <Metric label="보증금" value={wonKo(t.base_deposit)} ratio={rat(t.base_deposit, maxDep)}
+                  <Metric label="보증금" value={wonKo(t.base_deposit)}
                     sub={t.conversion_deposit_limit ? <><Term as="전환보증금 한도">전세전환</Term> {wonKo(t.conversion_deposit_limit)}</> : null} />
-                  <Metric label="월임대료" value={t.base_rent ? wonKo(t.base_rent) : "—"} ratio={rat(t.base_rent || null, maxRent)} />
+                  <Metric label="월임대료" value={t.base_rent ? wonKo(t.base_rent) : "—"} />
                 </div>
               </li>
             ))}
@@ -86,8 +78,8 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
               <li key={`${w.style_name}-${w.draw_unit}`} className="sb-row">
                 <div className="sb-title">{w.style_name}형{splitUnit && w.draw_unit && <small className="sb-sub"> 추첨 단위 {w.draw_unit}</small>}</div>
                 <div className="sb-metrics">
-                  <Metric label="대기 인원" value={w.waiting_cnt != null ? num(w.waiting_cnt, "명") : "—"} ratio={rat(w.waiting_cnt, maxWait)} />
-                  {hasVacated && <Metric label="퇴거" value={w.vacated_cnt != null ? num(w.vacated_cnt, "건") : "—"} ratio={rat(w.vacated_cnt, maxVac)} />}
+                  <Metric label="대기 인원" value={w.waiting_cnt != null ? num(w.waiting_cnt, "명") : "—"} />
+                  {hasVacated && <Metric label="퇴거" value={w.vacated_cnt != null ? num(w.vacated_cnt, "건") : "—"} />}
                 </div>
               </li>
             ))}
