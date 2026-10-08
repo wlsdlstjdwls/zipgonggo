@@ -45,7 +45,7 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
       {facts.types.length > 0 && (
         <div className="dsub">
           <h3>주택형별 기본 보증금과 임대료</h3>
-          <div className="tbl stack">
+          <div className="tbl stack list">
             <table>
               <thead>
                 <tr>
@@ -81,7 +81,7 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
       {facts.waitlist.length > 0 && (
         <div className="dsub">
           <h3>예비 입주 대기</h3>
-          <div className="tbl">
+          <div className="tbl stack list">
             <table>
               <thead>
                 <tr>
@@ -95,9 +95,9 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
                 {facts.waitlist.map((w) => (
                   <tr key={`${w.style_name}-${w.draw_unit}`}>
                     <td>{w.style_name}형</td>
-                    {splitUnit && <td>{w.draw_unit || "—"}</td>}
-                    <td className="num">{w.waiting_cnt != null ? num(w.waiting_cnt, "명") : "—"}</td>
-                    {hasVacated && <td className="num">{w.vacated_cnt != null ? num(w.vacated_cnt, "건") : "—"}</td>}
+                    {splitUnit && <td data-label="추첨 단위">{w.draw_unit || "—"}</td>}
+                    <td className="num lead" data-label="대기 인원">{w.waiting_cnt != null ? num(w.waiting_cnt, "명") : "—"}</td>
+                    {hasVacated && <td className="num" data-label="퇴거">{w.vacated_cnt != null ? num(w.vacated_cnt, "건") : "—"}</td>}
                   </tr>
                 ))}
               </tbody>

@@ -899,6 +899,14 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 .pl-split .parts span:last-child { text-align: right; margin-left: auto; }
 .pl-split .parts b { font-weight: 800; color: var(--ink); }
 .pl-split .parts small { margin-left: 4px; font-size: 11px; color: var(--dim); }
+/* 넓은 화면은 한 줄로 — 「주택형 | 계약금/잔금 막대 | 금액」. 두 줄로 두면 막대가 1000px로 늘어 무겁다 */
+@media (min-width: 641px) {
+  .pl-row { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) auto; column-gap: 28px; align-items: center; padding: 12px 18px; }
+  .pl-top { display: contents; }
+  .pl-top .k { grid-column: 1; grid-row: 1; }
+  .pl-top .v { grid-column: 3; grid-row: 1; }
+  .pl-split { grid-column: 2; grid-row: 1; margin-top: 0; }
+}
 .d-map { position: relative; height: 460px; border-radius: var(--r-panel); overflow: hidden; border: 1px solid var(--line); background: var(--sub); }
 .d-map .map { height: 100%; border-radius: 0; }
 .d-sub { margin: -14px 0 0; font-weight: 600; font-size: 14px; color: var(--mut); }
@@ -1053,11 +1061,11 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 /* 같은 날 다시: 한 줄에 하나씩 쓰니 「컴팩트하지 않다」. 두 칸 격자(넓은 화면 네 칸)에 라벨 위 / 값 아래 —
    열이 맞아 훑어지고 행은 절반이다. 테두리도 바탕도 두지 않는다 */
 .spec { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px 16px; margin: 0; }
-@media (min-width: 720px) { .spec { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 720px) { .spec { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px 20px; } }
 .spec div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .spec dt { margin: 0; color: var(--dim); font-weight: 700; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .spec dd { margin: 0; min-width: 0; color: var(--ink); font-weight: 800; font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
-.spec .wide { grid-column: 1 / -1; }
+.spec .wide { grid-column: span 2; }
 
 .amend-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .amend-list a { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line2); border-radius: var(--r-btn); font-size: 14px; font-weight: 700; transition: transform 240ms var(--sp), border-color 200ms var(--ease), background 200ms var(--ease); }
@@ -1351,7 +1359,7 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 /* 2026-10-08 칩으로: 한 줄로 이어 붙였더니 「라벨 값 라벨 값」이 섞여 어디까지가 한 칸인지 안 보였다
    (사용자 「기본 정보 가시성이 너무 별로」). 칸마다 옅은 면을 깔아 경계만 세운다 — 격자처럼 세로를 먹지 않는다 */
 .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px 16px; list-style: none; margin: 0; padding: 0; }
-@media (min-width: 720px) { .facts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 720px) { .facts { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px 20px; } }
 /* 제목이 이미 구획을 나누므로 이 섹션은 위아래를 바짝 붙인다 — 한 줄짜리 내용에 24px 여백은 과하다 */
 .dsec-facts { padding-top: 16px; padding-bottom: 16px; }
 .dsec-facts > h2 { margin-bottom: 11px; }
@@ -1472,6 +1480,47 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   .tbl.stack.ut-box thead tr::after { content: none; }
   .tbl.stack.ut-box thead th { display: none; padding: 0; border: 0; background: none; position: static; box-shadow: none; }
   .tbl.stack.ut-box thead th:has(.ut-sort) { display: block; }
+}
+
+/* .list = 넓은 화면에서도 같은 두 줄 목록(사용자 지적 2026-10-08: 「공급 정보는 여전히 그대로」 — 데스크톱은 가로 표였다).
+   공급현황, 호실, 단지 주택형 금액, 비율표처럼 줄마다 한 집(형)을 말하는 표에 단다. 소득/가점 같은 행렬 표는 .stack만(폰에서만 펼침) */
+.tbl.list:not(.ut-box) { overflow: visible; }
+.tbl.list table, .tbl.wide.stack table { display: block; min-width: 0; width: 100%; }
+.tbl.list thead { display: none; }
+.tbl.list tbody { display: block; }
+.tbl.list tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 12px; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+.tbl.list tbody tr:last-child { border-bottom: 0; }
+.tbl.list tbody tr:hover, .tbl.list tbody tr:hover td:first-child { background: none; }
+/* 1줄과 2줄 사이 줄바꿈 — .lead 칸 다음에 끊는다 */
+.tbl.list tr::after { content: ""; order: 2; flex-basis: 100%; height: 0; }
+.tbl.list table td {
+  order: 3; display: inline-flex; align-items: baseline; gap: 4px; min-width: 0;
+  padding: 0; border: 0; text-align: left; white-space: nowrap; font-size: 13px; color: var(--mut);
+  position: static; box-shadow: none; background: none;
+}
+.tbl.list table td[data-label]::before { content: attr(data-label); font-size: 11.5px; font-weight: 700; color: var(--dim); }
+.tbl.list table td:first-child { order: 0; flex: 1 1 auto; display: block; font-size: 15px; font-weight: 800; color: var(--ink); white-space: normal; background: none; }
+.tbl.list table td:first-child::before { content: none; }
+.tbl.list table td.lead { order: 1; margin-left: auto; font-size: 15px; font-weight: 800; color: var(--ink); }
+.tbl.list table td.lead::before { content: none; }
+/* 칸 안 두 줄(굵은 값 + 작은 풀이)도 한 줄로 */
+.tbl.list table td b, .tbl.list table td small { display: inline; margin: 0; }
+.tbl.list table td small { font-size: 11.5px; color: var(--dim); }
+/* 긴 글 칸(가점 기준 문장, 신청자)은 한 줄을 다 쓰고 줄바꿈한다 */
+.tbl.list table td.wrap, .tbl.list table td.ne-req { flex-basis: 100%; white-space: normal; }
+/* 호실 표는 정렬 단추만 머리 띠로 남긴다 */
+.tbl.list.ut-box thead { display: block; position: sticky; top: 0; z-index: 2; padding: 8px 14px; background: var(--sub); border-bottom: 1px solid var(--line); }
+.tbl.list.ut-box thead tr { display: flex; gap: 16px; padding: 0; border: 0; }
+.tbl.list.ut-box thead tr::after { content: none; }
+.tbl.list.ut-box thead th { display: none; padding: 0; border: 0; background: none; position: static; box-shadow: none; }
+.tbl.list.ut-box thead th:has(.ut-sort) { display: block; }
+/* 넓은 화면에서 .list는 한 줄로 — 두 줄로 두면 줄이 960px로 늘어 주택형과 금액이 양 끝으로 갈라진다.
+   주택형(고정 폭) | 호수/면적 | 금액(오른쪽 끝) */
+@media (min-width: 641px) {
+  .tbl.list tr { flex-wrap: nowrap; gap: 4px 22px; align-items: baseline; }
+  .tbl.list tr::after { content: none; }
+  .tbl.list table td:first-child { flex: 0 0 220px; }
+  .tbl.list table td.lead { order: 9; }
 }
 
 /* ── 상세 머리글 → 헤더 리빌 (components/detail-headbar.tsx) ──

@@ -174,7 +174,7 @@ export function UnitTable({ units }: Props) {
           </em>
         )}
       </p>
-      <div className="tbl wide stack ut-box">
+      <div className="tbl wide stack list ut-box">
         <table className="supply">
           <thead>
             <tr>

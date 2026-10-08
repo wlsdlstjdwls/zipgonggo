@@ -412,7 +412,7 @@ export default async function ComplexPage({ params }: Params) {
               <div className="dsub">
                 <h3>단지 정보</h3>
                 <SpecList>
-                  {houseSpecs.map(([label, value, term]) => <Spec key={label} label={label} value={value} term={term} />)}
+                  {houseSpecs.map(([label, value, term]) => <Spec key={label} label={label} value={value} term={term} wide={label === "단지 규모" || label === "월 관리비"} />)}
                 </SpecList>
                 <p className="note">
                   {maint && <>관리비는 단지가 밝힌 <b>예상</b> 금액이라 실제 청구액과 다를 수 있고, 주택형과 사용량에 따라 달라집니다. </>}

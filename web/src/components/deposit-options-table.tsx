@@ -22,7 +22,7 @@ export function DepositOptionsTable({ supply, hasClass }: Props) {
   const rows = supply.filter((s) => (s.deposit_options?.length ?? 0) > 0);
   if (labels.length < 2 || rows.length === 0) return null;
   return (
-    <div className="tbl wide stack">
+    <div className="tbl wide stack list">
       <table className="supply options">
         <thead>
           <tr>

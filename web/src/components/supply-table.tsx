@@ -36,7 +36,7 @@ export function SupplyTable({ supply, hasReserve, hasRent: rentCol, hasClass, no
   const hasSplit = supply.some((s) => s.units_priority != null || s.units_general != null);
 
   return (
-    <div className="tbl wide stack">
+    <div className="tbl wide stack list">
       <table className="supply">
         <thead>
           <tr>
@@ -65,7 +65,8 @@ export function SupplyTable({ supply, hasReserve, hasRent: rentCol, hasClass, no
               <td className="num strong" data-label="공급호수">{s.units_total != null ? num(s.units_total, "호") : "—"}</td>
               {hasSplit && (
                 <td className="num stack" data-label={hasReserve ? "공가" : "우선/일반"}>
-                  <b>{num((s.units_priority ?? 0) + (s.units_general ?? 0), "호")}</b>
+                  {/* 공가를 따로 세지 않는 공고에선 우선+일반 합이 곧 공급호수다 — 같은 수를 두 번 쓰지 않고 내역만 */}
+                  {(hasReserve || (s.units_priority ?? 0) + (s.units_general ?? 0) !== s.units_total) && <b>{num((s.units_priority ?? 0) + (s.units_general ?? 0), "호")}</b>}
                   <small><Term as="우선">우선공급</Term> {s.units_priority ?? 0} / <Term as="일반">일반공급</Term> {s.units_general ?? 0}</small>
                 </td>
               )}
