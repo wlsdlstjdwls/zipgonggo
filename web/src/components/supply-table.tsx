@@ -8,7 +8,9 @@ import { classLabel, commonArea, m2, typeLabel } from "@/lib/notice-view";
 import { Term, TermText } from "./glossary";
 import type { NoticeSupply } from "@/types/notice";
 
-type Props = { supply: NoticeSupply[]; hasReserve: boolean; hasRent: boolean; hasClass: boolean };
+type Props = { supply: NoticeSupply[]; hasReserve: boolean; hasRent: boolean; hasClass: boolean;
+  /** 금액 칸을 뺀다 — 바로 밑 금액 목록이 같은 줄마다 같은 금액을 낼 때(같은 숫자를 두 번 쓰지 않는다, 2026-10-08) */
+  noMoney?: boolean };
 
 /** deposit·rent가 어느 비율 옵션인지 — 보증금이 가장 낮은 것(pipeline supply_rows와 같은 규칙) */
 function baseOption(s: NoticeSupply) {
@@ -28,7 +30,8 @@ function AreaCell({ s }: { s: NoticeSupply }) {
   );
 }
 
-export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
+export function SupplyTable({ supply, hasReserve, hasRent: rentCol, hasClass, noMoney = false }: Props) {
+  const hasRent = rentCol && !noMoney;
   // 우선/일반은 자체 열을 쓰지 않고 한 칸 안에 접는다. 예비자를 모집하는 공고에서는 그 합이 「공가」다
   const hasSplit = supply.some((s) => s.units_priority != null || s.units_general != null);
 
@@ -47,7 +50,7 @@ export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
               </th>
             )}
             {hasReserve && <th className="num"><Term as="예비자">예비입주자</Term></th>}
-            <th className="num">{hasRent ? "임대보증금" : "전세금"}</th>
+            {!noMoney && <th className="num">{rentCol ? "임대보증금" : "전세금"}</th>}
             {hasRent && <th className="num">월임대료</th>}
             <th className="num">면적</th>
           </tr>
@@ -67,11 +70,13 @@ export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
                 </td>
               )}
               {hasReserve && <td className="num" data-label="예비입주자">{s.units_reserve != null ? num(s.units_reserve, "호") : "—"}</td>}
-              <td className={s.deposit_options && s.deposit_options.length > 1 ? "num stack lead" : "num strong lead"} data-label={hasRent ? "임대보증금" : "전세금"} title={s.deposit != null ? wonExact(s.deposit) : undefined}>
-                {s.deposit_options && s.deposit_options.length > 1
-                  ? <><b>{wonKo(s.deposit)}</b><small>보증금 {baseOption(s)?.label} 기준</small></>
-                  : wonKo(s.deposit)}
-              </td>
+              {!noMoney && (
+                <td className={s.deposit_options && s.deposit_options.length > 1 ? "num stack lead" : "num strong lead"} data-label={rentCol ? "임대보증금" : "전세금"} title={s.deposit != null ? wonExact(s.deposit) : undefined}>
+                  {s.deposit_options && s.deposit_options.length > 1
+                    ? <><b>{wonKo(s.deposit)}</b><small>보증금 {baseOption(s)?.label} 기준</small></>
+                    : wonKo(s.deposit)}
+                </td>
+              )}
               {hasRent && <td className="num" data-label="월임대료" title={s.rent != null ? wonExact(s.rent) : undefined}>{wonKo(s.rent)}</td>}
               <td className="num stack" data-label="면적"><AreaCell s={s} /></td>
             </tr>

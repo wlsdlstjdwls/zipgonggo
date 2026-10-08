@@ -205,6 +205,8 @@ export default async function ComplexPage({ params }: Params) {
   const priceHeads = priceBreak.filter((r) => r.group !== "pay");
   const inlinePrice = slideGroups.length === 0 && !optionSlide && priceHeads.length === 1 ? priceHeads[0] : null;
   const inlinePays = inlinePrice ? priceBreak.filter((r) => r.group === "pay") : [];
+  // 금액 목록(PriceTable)이 공급현황 줄마다 같은 금액을 내면 공급현황 표에서는 금액 칸을 뺀다 — 같은 숫자를 두 번 쓰지 않는다
+  const moneyListed = slideGroups.length === 0 && !optionSlide && !inlinePrice && supply.length > 1 && priceHeads.length === supply.filter((s) => s.deposit != null || s.rent != null).length;
   const payInPriceTable = slideGroups.length === 0 && !optionSlide && !inlinePrice && priceBreak.some((r) => r.group === "pay");
   // 별첨에 동 표기가 있는 단지만 「동호수별」이다 — 다세대·빌라는 호만 실린다(사용자 지적 2026-09-09)
   const unitLabel = units.some((u) => u.building) ? "동호수별 정보" : "호실별 정보";
@@ -390,7 +392,7 @@ export default async function ComplexPage({ params }: Params) {
             {supply.length > 1 && (
               <div className="dsub">
                 <h3>공급현황 {count(supply.length, "건")}</h3>
-                <SupplyTable supply={supply} hasReserve={hasReserve} hasRent={hasRent} hasClass={hasClass} />
+                <SupplyTable supply={supply} hasReserve={hasReserve} hasRent={hasRent} hasClass={hasClass} noMoney={moneyListed} />
               </div>
             )}
             {/* 계층별 배분 표도 호실 목록도 없는 단지 — 아래 「보증금과 임대료」까지 다 빈다. 왜 비었는지 여기서 한 번만 말한다 */}
@@ -470,30 +472,33 @@ export default async function ComplexPage({ params }: Params) {
             {images.length > 0 ? (
               <ComplexGallery images={images} complexName={c.name} supplyTypes={supplyTypes} />
             ) : (
+              /* 문구는 읽는 사람 기준으로 — 우리가 뭘 못 모았는지가 아니라 사진이 어디 있고 어떻게 보면 되는지를 말한다
+                 (사용자 지적 2026-10-08: 「모아 올 공개 출처를 아직 찾지 못했습니다」는 바꿔라). 갈래마다 제목과 본문이 한 쌍이다 */
               <Pending
-                title={imgSource && imagesEnabled(imgSource)
-                  ? "이 단지의 사진과 도면은 아직 준비 중입니다"
-                  /* 매입임대는 주소로 붙인다 — 못 붙은 집은 기다린다고 생기지 않는다(「준비 중」이 아니다) */
-                  : !imgSource && !isMingan && n.housing_type === "매입임대"
-                  ? (n.agency === "SH" ? "이 집의 사진은 찾지 못했습니다" : "이 집의 사진은 아직 싣지 못합니다")
-                  : "사진과 도면은 공개 준비 중입니다"}
-                lead={imgSource && !imagesEnabled(imgSource)
-                  ? <>{imgSource === "youth" ? "서울시 청년안심주택 포털" : "서울주택도시공사 SH주택정보"}의 평면도와 사진을 지면에 싣기 위한 확인 절차가 끝나면 보여 드립니다. 그때까지는 {L.originalDoc}의 안내를 따라 확인하세요.</>
-                  : imgSource === "youth"
-                  ? <>서울시 청년안심주택 포털이 이 단지의 평면도와 사진을 아직 올리지 않았습니다.</>
-                  : imgSource === "sh"
-                  ? <>SH주택정보에 있는 단지지만 평면도와 사진을 아직 모아 오지 못했습니다. 그때까지는 {L.originalDoc}의 전자팸플릿에서 확인하세요.</>
-                  : isMingan
-                  ? <>이 단지는 청년안심주택 포털 「주택찾기」에 올라 있지 않습니다. 모집이 끝나 내려갔거나 아직 등록 전입니다. 평면도는 {L.originalDoc}과 사업자 홈페이지에서 확인하세요.</>
-                  /* 매입임대는 빌라나 다가구주택 한 호실이라 SH주택정보(아파트 793단지)에 단지가 아예 없다.
-                     여기에 「준공 전이라 없다」고 적으면 사실과 다르다(2026-09-21) */
-                  /* SH주택정보는 SH 집만 있다. LH와 지방공사 매입임대(전국 2,766곳)에 「SH주택정보에서 주소로 찾는다」고 쓰면
-                     사실과 다르다(사용자 지적 2026-10-08, lh-2026-21370-0-maeip 인화빌3) */
-                  : n.housing_type === "매입임대" && n.agency !== "SH"
-                  ? <>{n.agency} 매입임대 집의 사진과 도면을 모아 올 공개 출처를 아직 찾지 못했습니다. 집의 모습은 {L.originalDoc}의 첨부와 현장 방문으로 확인하세요.</>
-                  : n.housing_type === "매입임대"
-                  ? <>매입임대는 빌라나 다가구주택 한 호실이라 SH주택정보에서 주소로 찾습니다. 이 주소는 아직 찾지 못했습니다. 집의 모습은 {L.originalDoc}과 현장 방문으로 확인하세요.</>
-                  : <>준공 전 신규 공급 단지라 SH주택정보에 단지 자료가 아직 없습니다. 전자팸플릿은 {L.originalDoc}의 안내를 따라 확인하세요.</>}
+                {...(imgSource && !imagesEnabled(imgSource) ? {
+                  title: "사진과 도면은 공개 준비 중입니다",
+                  lead: <>{imgSource === "youth" ? "서울시 청년안심주택 포털" : "SH주택정보"}의 평면도와 사진은 게재 확인이 끝나면 여기서 보여 드립니다. 그때까지는 {L.originalDoc}에서 확인하세요.</>,
+                } : imgSource === "youth" ? {
+                  title: "아직 올라온 사진이 없습니다",
+                  lead: <>서울시 청년안심주택 포털에 이 단지의 평면도와 사진이 아직 없습니다. 올라오면 여기서 바로 보여 드립니다.</>,
+                } : imgSource === "sh" ? {
+                  title: "아직 올라온 사진이 없습니다",
+                  lead: <>평면도와 사진은 {L.originalDoc}의 전자팸플릿에서 볼 수 있습니다.</>,
+                } : isMingan ? {
+                  title: "공개된 사진이 없는 단지입니다",
+                  lead: <>서울시 청년안심주택 포털에 이 단지가 올라 있지 않습니다. 평면도는 {L.originalDoc}과 사업자 홈페이지에서 볼 수 있습니다.</>,
+                } : n.housing_type === "매입임대" && n.agency !== "SH" ? {
+                  /* LH와 지방공사 매입임대(전국 2,766곳)는 사진을 주는 곳이 없다. SH주택정보 이야기를 하면 사실과 다르다 */
+                  title: "공개된 사진이 없는 집입니다",
+                  lead: <>{n.agency} 매입임대는 기존 주택을 사들여 빌려주는 집이라 공고에 집 사진이 함께 실리지 않는 경우가 많습니다. 집 상태는 공고 첨부를 보거나 현장 방문 때 직접 확인하세요.</>,
+                } : n.housing_type === "매입임대" ? {
+                  /* SH 매입임대는 빌라나 다가구 한 호실이라 SH주택정보에서 주소로 찾는다 — 못 찾은 집은 기다린다고 생기지 않는다 */
+                  title: "공개된 사진이 없는 집입니다",
+                  lead: <>SH주택정보에서 이 집의 사진을 찾지 못했습니다. 집 상태는 {L.originalDoc}의 첨부를 보거나 현장 방문 때 직접 확인하세요.</>,
+                } : {
+                  title: "아직 사진이 없는 새 단지입니다",
+                  lead: <>준공 전이라 단지 사진이 아직 없습니다. 평면도는 {L.originalDoc}의 전자팸플릿에서 볼 수 있습니다.</>,
+                })}
                 action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
               />
             )}

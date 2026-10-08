@@ -126,20 +126,8 @@ export function complexPriceRows(supply: NoticeSupply[], c?: NoticeComplex): Pri
       exact: [c.min_deposit, c.min_rent],
     }];
   }
-  if (priced.length < 3) return rows;
-
-  const span = (pick: (s: NoticeSupply) => number | null): [number | null, number | null] => {
-    const v = priced.map(pick).filter((x): x is number => x != null);
-    return v.length ? [Math.min(...v), Math.max(...v)] : [null, null];
-  };
-  const [dLo, dHi] = span((s) => s.deposit);
-  const [rLo, rHi] = span((s) => s.rent);
-  if (dLo === dHi && rLo === rHi) return rows;   // 전부 같은 값이면 덧댈 게 없다
-
-  rows.push(
-    { id: "range-min", group: "max", label: "최소", note: "전체 유형 중", deposit: wonKo(dLo), rent: rLo != null ? wonKo(rLo) : "—", exact: [dLo, rLo] },
-    { id: "range-max", group: "max", label: "최대", note: "전체 유형 중", deposit: wonKo(dHi), rent: rHi != null ? wonKo(rHi) : "—", exact: [dHi, rHi] },
-  );
+  // 예전엔 줄이 셋 이상이면 맨 밑에 「최소/최대 전체 유형 중」 두 줄을 덧댔다(2026-09-09). 금액 목록이 줄마다 값을 다 보여 주니
+  // 바로 위 값을 또 반복할 뿐이라 뺐다(사용자 지적 2026-10-08: 보기 불편하고 같은 숫자가 여러 번)
   return rows;
 }
 
