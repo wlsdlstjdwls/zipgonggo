@@ -1,7 +1,7 @@
 // 상세 화면(공고·단지) 전용 표시 계산. 두 page.tsx가 공유한다 — 레이아웃 JSX와 분리해 여기 한 곳만 본다.
 import { convertRange } from "./calc";
 import { hoText, wonKo } from "./format";
-import type { Notice, NoticeComplex, NoticeSupply, NoticeUnit } from "@/types/notice";
+import type { DepositOption, Notice, NoticeComplex, NoticeSupply, NoticeUnit } from "@/types/notice";
 
 /** 공급유형 표기 — "39㎡", 주거약자용이면 "39㎡ 주거약자용" */
 export function typeLabel(s: NoticeSupply): string {
@@ -236,3 +236,22 @@ export function convertGroups(supply: NoticeSupply[], units: NoticeUnit[]): Conv
     });
 }
 
+
+/** 민간임대 보증금 비율 슬라이더(components/option-slider.tsx)의 칸 묶음 — 공급현황 한 줄이 한 칸 */
+export type OptionGroup = { id: string; label: string; note: string; opts: DepositOption[] };
+
+/** 비율 오름차순, 고정액은 맨 뒤 — optionLabels와 같은 순서 */
+const byRatio = (a: DepositOption, b: DepositOption) =>
+  (a.ratio ?? 1e9) - (b.ratio ?? 1e9) || a.label.localeCompare(b.label, "ko");
+
+/** 비율 옵션이 둘 이상인 줄만. 하나뿐인 줄은 슬라이더로 움직일 데가 없다 */
+export function optionGroups(supply: NoticeSupply[], hasClass: boolean): OptionGroup[] {
+  return supply
+    .map((s) => ({
+      id: String(s.id),
+      label: hasClass ? classLabel(s) || typeLabel(s) : typeLabel(s),
+      note: hasClass && classLabel(s) ? typeLabel(s) : "",
+      opts: (s.deposit_options ?? []).filter((o) => o.deposit != null).sort(byRatio),
+    }))
+    .filter((g) => g.opts.length >= 2);
+}

@@ -30,13 +30,14 @@ import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
 import { SupplyTable } from "@/components/supply-table";
 import { DepositOptionsTable, optionLabels } from "@/components/deposit-options-table";
+import { OptionSlider } from "@/components/option-slider";
 import { UnitSheet } from "@/components/unit-sheet";
 import { JsonLd } from "@/components/json-ld";
 import { agencyLabels } from "@/lib/agency";
 import { complexGraph } from "@/lib/jsonld";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
 import { applyPhase, count, dateK, deadlineChip, hoText, NO_DATE, num, wonKo } from "@/lib/format";
-import { areaText, classLabel, commonArea, complexPriceRows, convertGroups, m2, moveInLabel, typeLabel, unitPriceRows } from "@/lib/notice-view";
+import { areaText, classLabel, commonArea, complexPriceRows, convertGroups, m2, moveInLabel, optionGroups, typeLabel, unitPriceRows } from "@/lib/notice-view";
 import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getYouthHouse, isComplexIndexable } from "@/lib/queries";
 import { ComplexGallery } from "@/components/complex-gallery";
 import { imagesEnabled, shownImages } from "@/lib/complex-images";
@@ -155,6 +156,10 @@ export default async function ComplexPage({ params }: Params) {
   // 슬라이더에 걸 칸들. 별첨 호실 목록이 있으면 공고문이 적어 둔 전환 금액을 그대로 쓰고,
   // 없으면 공급현황 기준값에 calc.ts 규칙을 걸어 만든다 — 자세한 건 lib/notice-view.ts의 convertGroups
   const slideGroups = hasOptions ? [] : convertGroups(supply, units);
+  // 민간임대 비율 옵션은 공고에 적힌 비율에서만 멈추는 슬라이더로 낸다(사용자 요청 2026-10-08: 표 대신 스와이프 막대).
+  // 금액이 있는 줄이 모두 옵션 둘 이상을 가질 때만 — 한 줄이라도 빠지면 그 줄 값이 사라지니 예전 표로 둔다
+  const optionSlide = hasOptions
+    && optionGroups(supply, hasClass).length === supply.filter((s) => s.deposit != null).length;
   // 오른쪽 카드는 언제나 "마감"을 센다 — 접수 시작 D-day를 섞으면 「접수 시작까지 / 오늘 / 09.11 마감」처럼 어긋난다
   const dl = deadlineChip(n);
   const ph = applyPhase(n);
@@ -190,7 +195,7 @@ export default async function ComplexPage({ params }: Params) {
   const one = supply.length === 1 ? supply[0] : null;
   const oneSplit = one != null && (one.units_priority != null || one.units_general != null);
   // 장기전세처럼 월임대료가 없는 공고는 아래 금액 표(PriceTable)가 계약금·잔금 줄을 따로 그린다 — 그때는 여기서 뺀다
-  const payInPriceTable = slideGroups.length === 0 && priceBreak.some((r) => r.group === "pay");
+  const payInPriceTable = slideGroups.length === 0 && !optionSlide && priceBreak.some((r) => r.group === "pay");
   // 별첨에 동 표기가 있는 단지만 「동호수별」이다 — 다세대·빌라는 호만 실린다(사용자 지적 2026-09-09)
   const unitLabel = units.some((u) => u.building) ? "동호수별 정보" : "호실별 정보";
 
@@ -392,6 +397,8 @@ export default async function ComplexPage({ params }: Params) {
                     공급대상마다 값이 달라 여기서 한 줄로 적을 수 없다 */}
                 <ConvertSlider groups={slideGroups} />
               </>
+            ) : optionSlide ? (
+              <OptionSlider supply={supply} hasClass={hasClass} />
             ) : priceBreak.length > 0 ? (
               <>
                 <PriceTable rows={priceBreak} depositHead={showRent ? "보증금" : "전세금"} showRent={showRent} />

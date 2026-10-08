@@ -1193,6 +1193,18 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .cs-end:hover .n { border-bottom-color: currentColor; }
 .cs-end[aria-pressed="true"] { color: var(--acc); }
 
+/* 민간임대 비율 칸 이름(components/option-slider.tsx) — 눈금 바로 밑에 비율을 단다. 양 끝은 안쪽으로 붙인다 */
+.cs-stops { position: relative; height: 30px; margin-top: 2px; }
+.cs-stops button {
+  position: absolute; top: 0; transform: translateX(-50%);
+  font: inherit; font-size: 12.5px; font-weight: 800; letter-spacing: -0.02em;
+  border: 0; background: none; padding: 4px 2px; cursor: pointer; color: var(--mut);
+  transition: color 200ms var(--ease);
+}
+.cs-stops button.first { transform: none; }
+.cs-stops button.last { transform: translateX(-100%); }
+.cs-stops button:hover, .cs-stops button[aria-pressed="true"] { color: var(--acc); }
+
 /* 한도와 이율 — 「원문에서 확인하세요」 대신 숫자를 적는 자리(사용자 결정 2026-09-22).
    .note와 같은 톤이되 슬라이더에 붙어 있으므로 위 여백만 좁다 */
 .cs-rule { margin: 14px 0 0; font-size: 12.5px; line-height: 1.75; color: var(--mut); }
