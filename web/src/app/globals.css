@@ -1418,37 +1418,40 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .tbl.ut-box thead th:first-child { z-index: 3; }
 .supply .tc-key small { font-weight: 600; font-size: 11.5px; color: var(--dim); }
 
-/* 폰에서는 표를 줄마다 카드로 편다(사용자 지적 2026-10-08: "모바일에서 표 방식은 너무 불편, 다른 UI가 필요").
-   가로 스크롤로 열을 찾아가는 대신 한 줄 = 카드 한 장 — 첫 칸(공급유형/호실)이 카드 제목, 나머지 칸은
-   「라벨 위 / 값 아래」 작은 칸으로 격자에 흘린다. 라벨은 각 td의 data-label이다(머리 줄은 숨는다).
-   .stack을 단 표만 바뀐다. rowSpan으로 칸을 묶은 표는 펼치면 묶인 값이 첫 카드에만 남아 달지 않는다 */
+/* 폰에서는 표를 줄마다 두 줄 목록으로 편다(사용자 지적 2026-10-08: "모바일에서 표 방식은 너무 불편, 다른 UI가 필요").
+   1줄 = 첫 칸(공급유형/호실) ← → .lead 칸(보증금), 2줄 = 나머지 칸을 「라벨 값」으로 이어 쓴다.
+   처음엔 칸마다 「라벨 위 / 값 아래」 카드 격자였는데 줄 하나가 화면 반을 먹어 더 보기 힘들다는 지적(같은 날)에 바꿨다.
+   라벨은 각 td의 data-label(머리 줄은 숨는다). .stack을 단 표만 바뀐다.
+   rowSpan으로 칸을 묶은 표는 펼치면 묶인 값이 첫 줄에만 남아 달지 않는다 */
 @media (max-width: 640px) {
-  .tbl.stack { border: 0; border-radius: 0; }
   .tbl.stack:not(.ut-box) { overflow: visible; }
   .tbl.stack table, .tbl.wide.stack table { display: block; min-width: 0; width: 100%; }
   .tbl.stack thead { display: none; }
-  .tbl.stack tbody { display: grid; gap: 8px; }
-  .tbl.stack tr {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 10px 14px;
-    padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg);
-  }
-  .tbl.stack tbody tr:hover, .tbl.stack tbody tr:hover td:first-child { background: var(--bg); }
+  .tbl.stack tbody { display: block; }
+  .tbl.stack tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 12px; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  .tbl.stack tbody tr:last-child { border-bottom: 0; }
+  .tbl.stack tbody tr:hover, .tbl.stack tbody tr:hover td:first-child { background: none; }
+  /* 1줄과 2줄 사이 줄바꿈 — .lead 칸 다음에 끊는다 */
+  .tbl.stack tr::after { content: ""; order: 2; flex-basis: 100%; height: 0; }
   .tbl.stack table td {
-    display: flex; flex-direction: column; gap: 2px; min-width: 0;
-    padding: 0; border: 0; text-align: left; white-space: normal; font-size: 14px;
+    order: 3; display: inline-flex; align-items: baseline; gap: 4px; min-width: 0;
+    padding: 0; border: 0; text-align: left; white-space: nowrap; font-size: 13px; color: var(--mut);
     position: static; box-shadow: none; background: none;
   }
-  .tbl.stack table td[data-label]::before { content: attr(data-label); font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em; color: var(--dim); }
-  .tbl.stack table td:first-child { display: block; grid-column: 1 / -1; font-size: 15px; font-weight: 800; color: var(--ink); background: none; }
+  .tbl.stack table td[data-label]::before { content: attr(data-label); font-size: 11.5px; font-weight: 700; color: var(--dim); }
+  .tbl.stack table td:first-child { order: 0; flex: 1 1 auto; display: block; font-size: 15px; font-weight: 800; color: var(--ink); white-space: normal; background: none; }
   .tbl.stack table td:first-child::before { content: none; }
-  /* 금액은 「원」에서 끊기지 않게 */
-  .tbl.stack table td.num { white-space: nowrap; }
-  /* 긴 글 칸(가점 기준 문장, 신청자)은 한 줄을 다 쓴다 */
-  .tbl.stack table td.wrap, .tbl.stack table td.ne-req { grid-column: 1 / -1; }
-  /* 호실 표는 조건과 정렬이 위에 있다 — 머리 줄 가운데 정렬 단추만 띠로 남긴다 */
-  .tbl.stack.ut-box { border: 1px solid var(--line); border-radius: var(--r-card); padding: 8px; background: var(--sub); }
-  .tbl.stack.ut-box thead { display: block; position: sticky; top: -8px; z-index: 2; margin: -8px -8px 8px; padding: 8px 12px; background: var(--sub); }
-  .tbl.stack.ut-box thead tr { display: flex; gap: 16px; padding: 0; border: 0; background: none; }
+  .tbl.stack table td.lead { order: 1; margin-left: auto; font-size: 15px; font-weight: 800; color: var(--ink); }
+  .tbl.stack table td.lead::before { content: none; }
+  /* 칸 안 두 줄(굵은 값 + 작은 풀이)도 한 줄로 */
+  .tbl.stack table td b, .tbl.stack table td small { display: inline; margin: 0; }
+  .tbl.stack table td small { font-size: 11.5px; color: var(--dim); }
+  /* 긴 글 칸(가점 기준 문장, 신청자)은 한 줄을 다 쓰고 줄바꿈한다 */
+  .tbl.stack table td.wrap, .tbl.stack table td.ne-req { flex-basis: 100%; white-space: normal; }
+  /* 호실 표는 정렬 단추만 머리 띠로 남긴다 */
+  .tbl.stack.ut-box thead { display: block; position: sticky; top: 0; z-index: 2; padding: 8px 14px; background: var(--sub); border-bottom: 1px solid var(--line); }
+  .tbl.stack.ut-box thead tr { display: flex; gap: 16px; padding: 0; border: 0; }
+  .tbl.stack.ut-box thead tr::after { content: none; }
   .tbl.stack.ut-box thead th { display: none; padding: 0; border: 0; background: none; position: static; box-shadow: none; }
   .tbl.stack.ut-box thead th:has(.ut-sort) { display: block; }
 }

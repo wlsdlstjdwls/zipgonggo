@@ -63,7 +63,7 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
                     <td>{t.style_name}형</td>
                     <td className="num" data-label="전용면적">{area(t.exclusive_area, t.exclusive_area_max)}</td>
                     <td className="num" data-label="공용면적">{area(t.common_area, t.common_area_max)}</td>
-                    <td className="num" data-label="보증금">{wonKo(t.base_deposit)}</td>
+                    <td className="num lead" data-label="보증금">{wonKo(t.base_deposit)}</td>
                     <td className="num" data-label="월임대료">{t.base_rent ? wonKo(t.base_rent) : "—"}</td>
                     <td className="num" data-label="전세전환">{t.conversion_deposit_limit ? wonKo(t.conversion_deposit_limit) : "—"}</td>
                   </tr>

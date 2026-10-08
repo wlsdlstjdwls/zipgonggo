@@ -202,7 +202,7 @@ export function UnitTable({ units }: Props) {
                 {col.area && <td className="num" data-label="전용면적">{u.area_m2 != null ? `${u.area_m2}㎡` : "—"}</td>}
                 {col.layout && <td data-label="구조">{u.room_layout ?? "—"}</td>}
                 {col.elevator && <td data-label="승강기">{u.elevator ?? "—"}</td>}
-                {col.deposit && <td className="num strong" data-label={hasRent ? "임대보증금" : "전세금"}><Money v={u.deposit} /></td>}
+                {col.deposit && <td className="num strong lead" data-label={hasRent ? "임대보증금" : "전세금"}><Money v={u.deposit} /></td>}
                 {col.rent && <td className="num" data-label="월임대료"><Money v={u.rent} /></td>}
               </tr>
             ))}

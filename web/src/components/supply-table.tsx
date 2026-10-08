@@ -67,7 +67,7 @@ export function SupplyTable({ supply, hasReserve, hasRent, hasClass }: Props) {
                 </td>
               )}
               {hasReserve && <td className="num" data-label="예비입주자">{s.units_reserve != null ? num(s.units_reserve, "호") : "—"}</td>}
-              <td className={s.deposit_options && s.deposit_options.length > 1 ? "num stack" : "num strong"} data-label={hasRent ? "임대보증금" : "전세금"} title={s.deposit != null ? wonExact(s.deposit) : undefined}>
+              <td className={s.deposit_options && s.deposit_options.length > 1 ? "num stack lead" : "num strong lead"} data-label={hasRent ? "임대보증금" : "전세금"} title={s.deposit != null ? wonExact(s.deposit) : undefined}>
                 {s.deposit_options && s.deposit_options.length > 1
                   ? <><b>{wonKo(s.deposit)}</b><small>보증금 {baseOption(s)?.label} 기준</small></>
                   : wonKo(s.deposit)}
