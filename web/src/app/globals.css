@@ -904,6 +904,8 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 .d-sub { margin: -14px 0 0; font-weight: 600; font-size: 14px; color: var(--mut); }
 /* 프레임을 1,400px로 넓히면서 본문 칸이 1,070px가 됐다 — 여기 한 줄이 한글 70자를 넘으면 눈이 다음 줄을 못 찾는다.
    줄길이를 74자로 묶는다(2026-09-21). 색도 --dim에서 올린다 — 이 줄은 각주가 아니라 읽으라고 쓴 문장이다 */
+.note.photo-none { margin-top: 0; }
+.note.photo-none b { font-weight: 800; color: var(--ink); }
 .note { margin: 12px 0 0; max-width: 58em; font-weight: 500; font-size: 13px; line-height: 1.75; color: var(--mut); }
 /* 섹션 안 소제목 — 「단지 제원」 밑 공급현황 표처럼 같은 이야기의 두 번째 문단 */
 .dsub { margin-top: 20px; }
@@ -1379,6 +1381,8 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .facts li > span { font-weight: 800; font-size: 11.5px; line-height: 1; letter-spacing: 0.08em; color: var(--dim); white-space: nowrap; }
 .facts li > b { font-weight: 900; font-size: 15.5px; letter-spacing: -0.03em; color: var(--ink);
   overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+/* 금액이 한 줄뿐인 단지는 「보증금과 임대료」 섹션 대신 여기 맨 앞 칸에 금액을 싣는다 — 다른 칸보다 한 단 크게, 금액 파랑 */
+.facts li > b .fact-money { font-size: 19px; color: var(--acc); white-space: nowrap; }
 .facts li > em { font-style: normal; font-weight: 700; font-size: 11.5px; color: var(--dim); white-space: nowrap; }
 
 /* ── 동호수별 목록 (components/unit-table.tsx) ───────────── */

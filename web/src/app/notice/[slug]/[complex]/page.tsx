@@ -24,7 +24,6 @@ import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
 import { NoticeFitMingan } from "@/components/notice-fit-mingan";
 import { ConvertSlider } from "@/components/convert-slider";
-import { Pending } from "@/components/pending";
 import { PriceTable } from "@/components/price-table";
 import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
@@ -36,7 +35,7 @@ import { JsonLd } from "@/components/json-ld";
 import { agencyLabels } from "@/lib/agency";
 import { complexGraph } from "@/lib/jsonld";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
-import { applyPhase, count, dateK, deadlineChip, hoText, NO_DATE, num, wonKo } from "@/lib/format";
+import { applyPhase, count, dateK, deadlineChip, hoText, NO_DATE, num, wonExact, wonKo } from "@/lib/format";
 import { areaText, classLabel, commonArea, complexPriceRows, convertGroups, m2, moveInLabel, optionGroups, typeLabel, unitPriceRows } from "@/lib/notice-view";
 import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getYouthHouse, isComplexIndexable } from "@/lib/queries";
 import { ComplexGallery } from "@/components/complex-gallery";
@@ -96,6 +95,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * 보증금과 월임대료는 여기서 뺐다 — 바로 밑 「보증금과 임대료」가 같은 숫자를 더 크게, 끌 수 있게 낸다
  * (사용자 지적 2026-09-22: "이것도 결국 보증금과 임대료와 겹치는 거 아닌가").
  */
+/** 사진이나 금액이 없는 단지의 안내 — 상자(Pending) 대신 한 줄 문단. 왜 없는지만 말하고 지면을 먹지 않는다
+ *  (사용자 지적 2026-10-08: "공간만 많이 차지하고"). 원문 버튼은 하단 고정 바에 이미 있다 */
+function PhotoNone({ title, lead }: { title: ReactNode; lead: ReactNode }) {
+  return <p className="note photo-none"><b>{title}.</b> {lead}</p>;
+}
+
 function Fact({ label, value, sub, term }: {
   label: string;
   value: ReactNode;
@@ -194,7 +199,12 @@ export default async function ComplexPage({ params }: Params) {
   const one = supply.length === 1 ? supply[0] : null;
   const oneSplit = one != null && (one.units_priority != null || one.units_general != null);
   // 장기전세처럼 월임대료가 없는 공고는 아래 금액 표(PriceTable)가 계약금·잔금 줄을 따로 그린다 — 그때는 여기서 뺀다
-  const payInPriceTable = slideGroups.length === 0 && !optionSlide && priceBreak.some((r) => r.group === "pay");
+  // 금액이 한 줄뿐이면(호실 하나, 주택형 하나) 섹션을 따로 세우지 않고 기본 정보 맨 앞 칸에 넣는다 —
+  // 「전세금 / 이 집 / 4억 2,312만 원」에 섹션 하나를 쓰는 건 낭비다(사용자 지적 2026-10-08)
+  const priceHeads = priceBreak.filter((r) => r.group !== "pay");
+  const inlinePrice = slideGroups.length === 0 && !optionSlide && priceHeads.length === 1 ? priceHeads[0] : null;
+  const inlinePays = inlinePrice ? priceBreak.filter((r) => r.group === "pay") : [];
+  const payInPriceTable = slideGroups.length === 0 && !optionSlide && !inlinePrice && priceBreak.some((r) => r.group === "pay");
   // 별첨에 동 표기가 있는 단지만 「동호수별」이다 — 다세대·빌라는 호만 실린다(사용자 지적 2026-09-09)
   const unitLabel = units.some((u) => u.building) ? "동호수별 정보" : "호실별 정보";
 
@@ -239,7 +249,7 @@ export default async function ComplexPage({ params }: Params) {
     ["난방", c.heating],
     ["계약금", !payInPriceTable ? downPayment : null],
     ["잔금", !payInPriceTable ? balance : null],
-  ] as [string, string | null, string?][]).filter((r): r is [string, string, string?] => r[1] != null && r[1] !== "");
+  ] as [string, string | null, string?][]).filter((r): r is [string, string, string?] => r[1] != null && r[1] !== "" && r[1] !== "—");
 
   // 청년안심주택 포털이 주는 값(0027). 공고문 첨부에는 하나도 없는 것들이라 위 specs와 겹치지 않는다.
   // 관리비는 단지 전체 범위다 — 주택형마다 달라 한 값으로 못 적는다(맹그로브창천 11만~14만)
@@ -257,7 +267,7 @@ export default async function ComplexPage({ params }: Params) {
     ["시행사", house?.developer ?? null],
     ["시공사", house?.builder ?? null],
     ["문의", house?.phone ?? null],
-  ] as [string, string | null, string?][]).filter((r): r is [string, string, string?] => r[1] != null && r[1] !== "");
+  ] as [string, string | null, string?][]).filter((r): r is [string, string, string?] => r[1] != null && r[1] !== "" && r[1] !== "—");
 
   // 화면에 실제로 쓴 말만 페이지 밑에 편다. 이건 서버 렌더용 밑그림이고, 브라우저에서는 GlossaryList가
   // 실제로 걸린 링크로 목록을 다시 맞춘다 — 손으로 맞춘 목록은 어긋나기 마련이다(사용자 지적 2026-09-09)
@@ -324,6 +334,14 @@ export default async function ComplexPage({ params }: Params) {
           <h2>기본 정보{unitTableWorth && <UnitSheet units={units} label={unitLabel} />}</h2>
           <div className="facts-row">
           <ul className="facts">
+            {inlinePrice && (
+              <Fact
+                label={showRent ? "보증금" : "전세금"}
+                value={<span className="fact-money" title={inlinePrice.exact[0] != null ? wonExact(inlinePrice.exact[0]) : undefined}>{inlinePrice.deposit}</span>}
+                sub={showRent && inlinePrice.exact[1] != null ? `월 ${inlinePrice.rent}` : inlinePrice.note === "단지 요약값" ? "단지 요약값" : null}
+              />
+            )}
+            {inlinePays.map((p) => <Fact key={p.id} label={p.label} value={p.deposit} sub={p.note ?? null} />)}
             <Fact label="전용" term="전용면적" value={area} />
             <Fact label="공급" term="공급 호수" value={unitCount != null ? num(unitCount, "호") : null} sub={unitSub} />
             {/* 값이 없어도 「준비 중」이라고 쓴다 — 칸을 비워 두면 왜 없는지 알 수 없다(사용자 결정 2026-09-09) */}
@@ -358,10 +376,9 @@ export default async function ComplexPage({ params }: Params) {
             {/* 계층별 배분 표도 호실 목록도 없는 단지 — 아래 「보증금과 임대료」까지 다 빈다. 왜 비었는지 여기서 한 번만 말한다 */}
             {supply.length === 0 && units.length === 0 && (
               <div className="dsub">
-                <Pending
-                  title="이 단지의 공급현황은 아직 준비 중입니다"
+                <PhotoNone
+                  title="이 단지의 공급현황과 금액은 아직 준비 중입니다"
                   lead={<>공고문 첨부의 재공급 표는 단지명이 지구 단위로 묶여 있어 아직 단지별로 갈라 읽지 못합니다. 호수와 금액은 {L.originalDoc}의 표에 있습니다.</>}
-                  action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
                 />
               </div>
             )}
@@ -388,7 +405,8 @@ export default async function ComplexPage({ params }: Params) {
           {/* 금액이 사진보다 먼저다(2026-09-22). 전에는 요약 스트립이 보증금과 월임대료를 위에서 한 번 말했기에
               이 섹션이 사진 뒤에 있어도 됐는데, 그 두 칸을 걷어내면서(겹친다는 사용자 지적) 여기가 금액이 나오는
               유일한 자리가 됐다. 사진 갤러리 밑에 두면 들어오자마자 값을 못 본다 */}
-          <section className="dsec">
+          {/* 금액이 한 줄이면 기본 정보로 올라갔고, 공급현황도 금액도 없으면 공급 정보가 이미 한 번 말했다 — 둘 다 섹션을 안 세운다 */}
+          {!inlinePrice && !(priceBreak.length === 0 && supply.length === 0 && units.length === 0) && <section className="dsec">
             <h2>{showRent ? "보증금과 임대료" : "전세금"}</h2>
             {slideGroups.length > 0 ? (
               <>
@@ -415,13 +433,12 @@ export default async function ComplexPage({ params }: Params) {
                 )}
               </>
             ) : (
-              <Pending
+              <PhotoNone
                 title="이 단지의 금액은 아직 준비 중입니다"
                 lead={<>공고문 첨부의 금액 표를 이 단지에 아직 이어 붙이지 못했습니다. {L.originalDoc}의 표에서 확인하세요.</>}
-                action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
               />
             )}
-          </section>
+          </section>}
 
           {/* 사진·도면은 금액 뒤 — 얼마인지 본 다음 어떤 집인지 본다(2026-09-22 자리 바꿈).
               단지 코드가 안 붙은 단지와 기관이 자료를 안 올린 단지는 섹션을 감추지 않고 왜 비었는지 말한다.
@@ -433,7 +450,7 @@ export default async function ComplexPage({ params }: Params) {
             {images.length > 0 ? (
               <ComplexGallery images={images} complexName={c.name} supplyTypes={supplyTypes} />
             ) : (
-              <Pending
+              <PhotoNone
                 title={imgSource && imagesEnabled(imgSource)
                   ? "이 단지의 사진과 도면은 아직 준비 중입니다"
                   /* 매입임대는 주소로 붙인다 — 못 붙은 집은 기다린다고 생기지 않는다(「준비 중」이 아니다) */
@@ -457,7 +474,6 @@ export default async function ComplexPage({ params }: Params) {
                   : n.housing_type === "매입임대"
                   ? <>매입임대는 빌라나 다가구주택 한 호실이라 SH주택정보에서 주소로 찾습니다. 이 주소는 아직 찾지 못했습니다. 집의 모습은 {L.originalDoc}과 현장 방문으로 확인하세요.</>
                   : <>준공 전 신규 공급 단지라 SH주택정보에 단지 자료가 아직 없습니다. 전자팸플릿은 {L.originalDoc}의 안내를 따라 확인하세요.</>}
-                action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
               />
             )}
           </section>
