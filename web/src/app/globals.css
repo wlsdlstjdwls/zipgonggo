@@ -2696,3 +2696,55 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .elig-why.rt .elig-mine, .elig-why.rt li.n .elig-mine, .elig-why.rt li.q .elig-mine { color: var(--mut); font-weight: 700; }
 .rt-gauge i { background: var(--mut); }
 .elig-why.rt li > span { width: 66px; white-space: nowrap; }
+
+/* ── 공급현황 막대(components/supply-bars.tsx) ──────────────
+   주택형마다 공급호수/전용면적/금액을 단지 안 최댓값 대비 막대로. 단일 계열이라 색은 강조색 하나, 값은 글자로 같이 적는다.
+   폰: 주택형 줄 아래 지표 격자. 넓은 화면: 「주택형 | 지표들」 한 줄 */
+.sbars { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r-card); }
+.sb-row { display: grid; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.sb-row:last-child { border-bottom: 0; }
+.sb-title { font-size: 15px; font-weight: 800; color: var(--ink); line-height: 1.35; }
+.sb-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px 20px; }
+.sb-m { display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 8px; row-gap: 4px; min-width: 0; }
+.sb-m .k { font-size: 11.5px; font-weight: 700; color: var(--dim); white-space: nowrap; }
+.sb-m .v { justify-self: end; font-size: 14.5px; font-weight: 800; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sb-m .bar { grid-column: 1 / -1; height: 6px; border-radius: var(--radius-pill); background: var(--line); overflow: hidden; }
+.sb-m .bar i { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--acc); }
+.sb-m small { grid-column: 1 / -1; font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 641px) {
+  .sb-row { grid-template-columns: 200px minmax(0, 1fr); align-items: center; column-gap: 24px; }
+}
+
+/* ── 민간임대 단지 정보(components/house-facts.tsx) ──────────
+   관리비 두 기준 막대, 세대 구성 쌓은 막대, 입주 경과 칩, 지하철 노선 색 배지. 카드는 옅은 면으로만 가른다 */
+.hf { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.hf-card.full { grid-column: 1 / -1; }
+@media (min-width: 720px) { .hf { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; } .hf-card.full { grid-column: auto; } }
+.hf-card { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 13px 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
+.hf-k { font-size: 12px; font-weight: 700; color: var(--dim); }
+.hf-k small { margin-left: 4px; padding: 1px 5px; border-radius: 5px; background: var(--sub); font-size: 10.5px; font-weight: 700; color: var(--mut); }
+.hf-big { font-size: 19px; font-weight: 900; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.hf-text { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.45; }
+.hf-bars { display: grid; gap: 8px; margin-top: 2px; }
+.hf-bar { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.hf-bar .who { font-size: 12.5px; font-weight: 700; color: var(--mut); }
+.hf-bar .track { height: 8px; border-radius: var(--radius-pill); background: var(--line); overflow: hidden; }
+.hf-bar .track i { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--acc); }
+.hf-bar b { font-size: 14.5px; font-weight: 800; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hf-stack { display: flex; gap: 2px; height: 10px; margin-top: 2px; }
+.hf-stack i { flex-basis: 0; min-width: 6px; border-radius: var(--radius-pill); }
+.hf-stack i.a, .hf-legend i.a { background: var(--acc); }
+.hf-stack i.b, .hf-legend i.b { background: var(--dim); opacity: 0.45; }
+.hf-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--mut); }
+.hf-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.hf-legend i { width: 8px; height: 8px; border-radius: 2px; }
+.hf-legend b { font-weight: 800; color: var(--ink); }
+.hf-chip { align-self: flex-start; padding: 3px 9px; border-radius: var(--radius-pill); background: var(--acc-soft); color: var(--acc); font-size: 12px; font-weight: 800; }
+.hf-lines { display: flex; flex-wrap: wrap; gap: 6px; }
+.hf-line { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 6px; border-radius: var(--radius-pill); background: var(--sub); font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.hf-line i { width: 10px; height: 10px; border-radius: 50%; }
+.hf-people { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 2px 0 0; font-size: 13px; }
+.hf-people div { display: flex; gap: 6px; }
+.hf-people dt { color: var(--dim); font-weight: 700; }
+.hf-people dd { margin: 0; color: var(--ink); font-weight: 700; }
+.sb-title .sb-sub, .spec-sub { font-size: 12px; font-weight: 700; color: var(--dim); }

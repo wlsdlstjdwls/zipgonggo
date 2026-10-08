@@ -27,8 +27,8 @@ import { ConvertSlider } from "@/components/convert-slider";
 import { Pending } from "@/components/pending";
 import { PriceTable } from "@/components/price-table";
 import { ShareButton } from "@/components/share-button";
-import { Spec, SpecList } from "@/components/spec-list";
-import { SupplyTable } from "@/components/supply-table";
+import { SupplyBars } from "@/components/supply-bars";
+import { HouseFacts } from "@/components/house-facts";
 import { DepositOptionsTable, optionLabels } from "@/components/deposit-options-table";
 import { OptionSlider } from "@/components/option-slider";
 import { UnitSheet } from "@/components/unit-sheet";
@@ -367,7 +367,8 @@ export default async function ComplexPage({ params }: Params) {
             <Fact label="전용" term="전용면적" value={area} />
             <Fact label="공급" term="공급 호수" value={unitCount != null ? num(unitCount, "호") : null} sub={unitSub} />
             {/* 값이 없어도 「준비 중」이라고 쓴다 — 칸을 비워 두면 왜 없는지 알 수 없다(사용자 결정 2026-09-09) */}
-            <Fact label="입주" term="입주 시작" value={moveIn ?? "준비 중"} sub={moveIn ? "공고문 예정일" : null} />
+            {/* 공고문에 입주일이 없으면 포털 입주(예정)일을 쓴다 — 「준비 중」이라 써 놓고 밑 단지 정보에 「입주 8개월 차」가 나오면 지면이 서로 다투었다(2026-10-08) */}
+            <Fact label="입주" term="입주 시작" value={moveIn ?? (house?.movein ? dateK(house.movein) : "준비 중")} sub={moveIn ? "공고문 예정일" : house?.movein ? "포털 기준" : null} />
             <Fact label="호실" value={roomList} />
             {/* 한 줄짜리 공급의 우선/일반 배분. 위 「공급」은 합만 말한다 */}
             {one && oneSplit && (
@@ -392,7 +393,7 @@ export default async function ComplexPage({ params }: Params) {
             {supply.length > 1 && (
               <div className="dsub">
                 <h3>공급현황 {count(supply.length, "건")}</h3>
-                <SupplyTable supply={supply} hasReserve={hasReserve} hasRent={hasRent} hasClass={hasClass} noMoney={moneyListed} />
+                <SupplyBars supply={supply} hasReserve={hasReserve} hasRent={hasRent} hasClass={hasClass} noMoney={moneyListed} />
               </div>
             )}
             {/* 계층별 배분 표도 호실 목록도 없는 단지 — 아래 「보증금과 임대료」까지 다 빈다. 왜 비었는지 여기서 한 번만 말한다 */}
@@ -411,9 +412,7 @@ export default async function ComplexPage({ params }: Params) {
             {houseSpecs.length > 0 && (
               <div className="dsub">
                 <h3>단지 정보</h3>
-                <SpecList>
-                  {houseSpecs.map(([label, value, term]) => <Spec key={label} label={label} value={value} term={term} wide={label === "단지 규모" || label === "월 관리비"} />)}
-                </SpecList>
+                {house && <HouseFacts house={house} />}
                 <p className="note">
                   {maint && <>관리비는 단지가 밝힌 <b>예상</b> 금액이라 실제 청구액과 다를 수 있고, 주택형과 사용량에 따라 달라집니다. </>}
                   서울시 청년안심주택 「주택찾기」의 단지 자료입니다.

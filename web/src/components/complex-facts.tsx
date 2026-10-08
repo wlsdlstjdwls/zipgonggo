@@ -12,6 +12,7 @@
 //  3. 대기 수는 **대기 순번이 아니라 기다리는 사람 수**다(API waitCo). 「내 순번」으로 읽히지 않게 적는다.
 import { Term } from "@/components/glossary";
 import { Spec, SpecList } from "@/components/spec-list";
+import { Metric } from "@/components/supply-bars";
 import { dateK, num, wonKo } from "@/lib/format";
 import type { ComplexFacts } from "@/types/notice";
 
@@ -26,6 +27,16 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
   const hasVacated = facts.waitlist.some((w) => (w.vacated_cnt ?? 0) > 0);
   // 형명과 추첨단위가 같은 말이면 한 열로 족하다(「36」/「36」). 갈리는 단지만 두 열로 그린다
   const splitUnit = facts.waitlist.some((w) => w.draw_unit && w.draw_unit !== w.style_name);
+  // 막대 길이 = 이 단지 안 최댓값 대비
+  const mx = (xs: (number | null | undefined)[]) => Math.max(0, ...xs.filter((x): x is number => x != null));
+  const rat = (v: number | null | undefined, max: number) => (v != null && max > 0 ? v / max : null);
+  const maxArea = mx(facts.types.map((t) => t.exclusive_area_max ?? t.exclusive_area));
+  const maxDep = mx(facts.types.map((t) => t.base_deposit));
+  const maxRent = mx(facts.types.map((t) => t.base_rent));
+  const maxWait = mx(facts.waitlist.map((w) => w.waiting_cnt));
+  const maxVac = mx(facts.waitlist.map((w) => w.vacated_cnt));
+  // 준공 연차 — 「1994.12.04」만으로는 얼마나 오래된 집인지 셈해야 안다
+  const age = facts.completed_on ? new Date().getFullYear() - Number(facts.completed_on.slice(0, 4)) + 1 : null;
 
   return (
     <section className="dsec" id="complex">
@@ -33,7 +44,7 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
       <SpecList>
         <Spec label="단지명" value={facts.name} />
         <Spec label="공급 기관" value={facts.agency} />
-        <Spec label="준공" value={facts.completed_on ? dateK(facts.completed_on) : null} />
+        <Spec label="준공" value={facts.completed_on ? <>{dateK(facts.completed_on)}{age != null && age > 0 && <small className="spec-sub"> {age}년 차</small>}</> : null} />
         <Spec label="총세대수" value={facts.household_cnt != null ? num(facts.household_cnt, "세대") : null} />
         <Spec label="주차" value={facts.parking_cnt != null ? num(facts.parking_cnt, "대") : null} />
         <Spec label="구조" value={facts.building_style} />
@@ -45,32 +56,21 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
       {facts.types.length > 0 && (
         <div className="dsub">
           <h3>주택형별 기본 보증금과 임대료</h3>
-          <div className="tbl stack list">
-            <table>
-              <thead>
-                <tr>
-                  <th>주택형</th>
-                  <th className="num">전용면적</th>
-                  <th className="num">공용면적</th>
-                  <th className="num">보증금</th>
-                  <th className="num">월임대료</th>
-                  <th className="num"><Term as="전환보증금 한도">전세전환</Term></th>
-                </tr>
-              </thead>
-              <tbody>
-                {facts.types.map((t) => (
-                  <tr key={`${t.style_name}-${t.base_deposit}-${t.base_rent}`}>
-                    <td>{t.style_name}형</td>
-                    <td className="num" data-label="전용면적">{area(t.exclusive_area, t.exclusive_area_max)}</td>
-                    <td className="num" data-label="공용면적">{area(t.common_area, t.common_area_max)}</td>
-                    <td className="num lead" data-label="보증금">{wonKo(t.base_deposit)}</td>
-                    <td className="num" data-label="월임대료">{t.base_rent ? wonKo(t.base_rent) : "—"}</td>
-                    <td className="num" data-label="전세전환">{t.conversion_deposit_limit ? wonKo(t.conversion_deposit_limit) : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {/* 표 대신 형끼리 견주는 막대(2026-10-08, 사용자 「단지정보 가시성 너무 별로」) — components/supply-bars.tsx와 같은 모양 */}
+          <ul className="sbars">
+            {facts.types.map((t) => (
+              <li key={`${t.style_name}-${t.base_deposit}-${t.base_rent}`} className="sb-row">
+                <div className="sb-title">{t.style_name}형</div>
+                <div className="sb-metrics">
+                  <Metric label="전용면적" value={area(t.exclusive_area, t.exclusive_area_max)} ratio={rat(t.exclusive_area_max ?? t.exclusive_area, maxArea)}
+                    sub={t.common_area != null ? `공용 ${area(t.common_area, t.common_area_max)}` : null} />
+                  <Metric label="보증금" value={wonKo(t.base_deposit)} ratio={rat(t.base_deposit, maxDep)}
+                    sub={t.conversion_deposit_limit ? <><Term as="전환보증금 한도">전세전환</Term> {wonKo(t.conversion_deposit_limit)}</> : null} />
+                  <Metric label="월임대료" value={t.base_rent ? wonKo(t.base_rent) : "—"} ratio={rat(t.base_rent || null, maxRent)} />
+                </div>
+              </li>
+            ))}
+          </ul>
           <p className="note">
             이 단지 {housingType}의 <b>기본 금액</b>입니다. 이번 공고로 실제 계약하는 금액은 순위와 계층, 전환 비율에 따라 달라집니다.
             같은 주택형인데 면적이 범위로 적힌 것은 동과 라인마다 실측 면적이 조금씩 다르기 때문입니다.
@@ -81,28 +81,17 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
       {facts.waitlist.length > 0 && (
         <div className="dsub">
           <h3>예비 입주 대기</h3>
-          <div className="tbl stack list">
-            <table>
-              <thead>
-                <tr>
-                  <th>주택형</th>
-                  {splitUnit && <th>추첨 단위</th>}
-                  <th className="num">대기 인원</th>
-                  {hasVacated && <th className="num">퇴거</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {facts.waitlist.map((w) => (
-                  <tr key={`${w.style_name}-${w.draw_unit}`}>
-                    <td>{w.style_name}형</td>
-                    {splitUnit && <td data-label="추첨 단위">{w.draw_unit || "—"}</td>}
-                    <td className="num lead" data-label="대기 인원">{w.waiting_cnt != null ? num(w.waiting_cnt, "명") : "—"}</td>
-                    {hasVacated && <td className="num" data-label="퇴거">{w.vacated_cnt != null ? num(w.vacated_cnt, "건") : "—"}</td>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ul className="sbars">
+            {facts.waitlist.map((w) => (
+              <li key={`${w.style_name}-${w.draw_unit}`} className="sb-row">
+                <div className="sb-title">{w.style_name}형{splitUnit && w.draw_unit && <small className="sb-sub"> 추첨 단위 {w.draw_unit}</small>}</div>
+                <div className="sb-metrics">
+                  <Metric label="대기 인원" value={w.waiting_cnt != null ? num(w.waiting_cnt, "명") : "—"} ratio={rat(w.waiting_cnt, maxWait)} />
+                  {hasVacated && <Metric label="퇴거" value={w.vacated_cnt != null ? num(w.vacated_cnt, "건") : "—"} ratio={rat(w.vacated_cnt, maxVac)} />}
+                </div>
+              </li>
+            ))}
+          </ul>
           <p className="note">
             {facts.surveyed_on ? `${dateK(facts.surveyed_on)} 기준. ` : ""}
             지금 이 단지를 기다리는 사람이 모두 {num(waiting, "명")}입니다. <b>대기 순번이 아니라 인원 수</b>입니다.
