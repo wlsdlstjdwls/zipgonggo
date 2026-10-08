@@ -143,8 +143,16 @@ def cmd_match(write: bool) -> Path:
     """DB의 민간임대 단지 행에 homeCode를 붙인다. --write 없이는 결과만 적는다."""
     from zipgonggo_pipeline.db import connect
 
-    houses = _load_houses()
     with connect() as conn, conn.cursor() as cur:
+        # 수집 러너에는 data/가 없다. 그때는 load가 넣어 둔 youth_house 표로 댄다 — 사진이 적재된 단지만 붙으니
+        # 지면에 「포털에 없다」 대신 실제 사진이 뜨는 쪽만 연결된다(6684 어반허브가 이걸로 빠졌다, 2026-10-08)
+        if (OUT_ROOT / "houses.json").is_file():
+            houses = _load_houses()
+        else:
+            cur.execute("SELECT home_code, name, address FROM youth_house")
+            houses = [house_from_row({"homeCode": r["home_code"], "homeName": r["name"], "adres": r["address"]})
+                      for r in cur.fetchall()]
+            print(f"houses.json 없음 — DB youth_house {len(houses)}곳으로 대조", file=sys.stderr)
         cur.execute(
             """SELECT nc.id, nc.name, nc.road_address, nc.youth_home_code
                  FROM notice_complex nc JOIN notice n ON n.id = nc.notice_id

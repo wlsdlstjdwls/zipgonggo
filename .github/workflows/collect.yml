@@ -225,6 +225,11 @@ jobs:
           cat s3-youth.json
           jq -r '"- 청년안심주택 첨부 — 공고 \(.updated)건 / 줄 \(.inserted)건" + (if (.skipped | length) > 0 then " (건너뜀 \(.skipped))" else "" end)' s3-youth.json >> "$GITHUB_STEP_SUMMARY"
 
+      # 새 민간임대 공고 단지에 포털 단지코드를 붙인다 — 안 붙이면 사진과 관리비가 「포털에 없다」로 빠진다.
+      # 러너엔 houses.json이 없어 DB youth_house 표로 댄다. 연결 칸만 고치는 멱등 UPDATE다
+      - name: 청년안심주택 단지 사진 연결
+        run: python scripts/collect_youth_house_assets.py match --write 2>&1 | tail -1 | tee -a "$GITHUB_STEP_SUMMARY"
+
       # 같은 공고가 기관 seq 여러 개로 들어온다 — 정본을 하나 정해 목록·사이트맵에서 겹치지 않게 한다.
       # URL은 지우지 않는다(CLAUDE.md 하지 말 것 6)
       - name: S2 중복 공고 정본 묶기
