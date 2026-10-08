@@ -1050,11 +1050,13 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 /* 2026-10-08 줄 목록으로 통일: 칸마다 테두리를 두른 격자는 값이 칸 안에서 접혀(「8만 7,623원 ~ 17만 / 7,215원」) 읽기 어려웠다
    (사용자 「공급정보, 단지정보 가시성 떨어져」). 기본 정보(.facts)와 같은 모양 — 왼쪽 회색 라벨, 오른쪽 굵은 값, 줄 사이 가는 선.
    폰은 한 단, 넓은 화면은 두 단 */
-.spec { display: grid; grid-template-columns: 1fr; column-gap: 32px; margin: 0; }
-@media (min-width: 720px) { .spec { grid-template-columns: 1fr 1fr; } }
-.spec div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; min-width: 0; padding: 9px 0; border-bottom: 1px solid var(--line); }
-.spec dt { margin: 0; flex: none; color: var(--mut); font-weight: 600; font-size: 13.5px; white-space: nowrap; }
-.spec dd { margin: 0; min-width: 0; text-align: right; color: var(--ink); font-weight: 800; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+/* 같은 날 다시: 한 줄에 하나씩 쓰니 「컴팩트하지 않다」. 두 칸 격자(넓은 화면 네 칸)에 라벨 위 / 값 아래 —
+   열이 맞아 훑어지고 행은 절반이다. 테두리도 바탕도 두지 않는다 */
+.spec { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px 16px; margin: 0; }
+@media (min-width: 720px) { .spec { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.spec div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.spec dt { margin: 0; color: var(--dim); font-weight: 700; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.spec dd { margin: 0; min-width: 0; color: var(--ink); font-weight: 800; font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
 .spec .wide { grid-column: 1 / -1; }
 
 .amend-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
@@ -1348,8 +1350,8 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
    칸 사이 세로 줄은 두지 않는다: 접히는 줄의 첫 토막에 줄이 남아 군더더기로 보인다. */
 /* 2026-10-08 칩으로: 한 줄로 이어 붙였더니 「라벨 값 라벨 값」이 섞여 어디까지가 한 칸인지 안 보였다
    (사용자 「기본 정보 가시성이 너무 별로」). 칸마다 옅은 면을 깔아 경계만 세운다 — 격자처럼 세로를 먹지 않는다 */
-.facts { display: grid; grid-template-columns: 1fr; column-gap: 32px; list-style: none; margin: 0; padding: 0; }
-@media (min-width: 720px) { .facts { grid-template-columns: 1fr 1fr; } }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px 16px; list-style: none; margin: 0; padding: 0; }
+@media (min-width: 720px) { .facts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 /* 제목이 이미 구획을 나누므로 이 섹션은 위아래를 바짝 붙인다 — 한 줄짜리 내용에 24px 여백은 과하다 */
 .dsec-facts { padding-top: 16px; padding-bottom: 16px; }
 .dsec-facts > h2 { margin-bottom: 11px; }
@@ -1379,14 +1381,14 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 @media (max-width: 560px) {
   .facts-more { width: 100%; margin-left: 0; justify-content: center; }
 }
-/* 줄 하나 = 사실 하나. 라벨은 왼쪽, 값(과 작은 꼬리)은 오른쪽 끝 — .spec과 같은 모양(2026-10-08, 칩은 바탕과 구분이 안 됐다) */
-.facts li { display: flex; align-items: baseline; gap: 6px; min-width: 0; padding: 9px 0; border-bottom: 1px solid var(--line); }
-.facts li > span:first-child { margin-right: auto; padding-right: 12px; }
+/* 칸 하나 = 사실 하나. 라벨 위, 값과 작은 꼬리 아래 — .spec과 같은 모양 */
+.facts li { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 5px; row-gap: 2px; min-width: 0; }
+.facts li > span:first-child { flex-basis: 100%; }
 /* 한 줄로 누른 뒤 "이번엔 너무 안 보인다"는 지적(2026-09-22). 줄 수는 그대로 두고 값만 키운다 —
    라벨은 11.5px 회색으로 두어 값이 혼자 도드라지게 하고, 값은 15.5px/900으로 본문보다 굵게 올린다.
    칸 간격도 20 → 24px로 벌려 「전용 29.85~38.64㎡」와 옆 토막이 한 덩이로 붙어 읽히지 않게 한다 */
-.facts li > span { font-weight: 600; font-size: 13.5px; color: var(--mut); white-space: nowrap; }
-.facts li > b { text-align: right; font-weight: 800; font-size: 15px; letter-spacing: -0.03em; color: var(--ink);
+.facts li > span { font-weight: 700; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.facts li > b { font-weight: 800; font-size: 15px; letter-spacing: -0.03em; color: var(--ink);
   overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 /* 금액이 한 줄뿐인 단지는 「보증금과 임대료」 섹션 대신 칩들 위에 금액을 크게 싣는다(page.tsx inlinePrice) */
 .facts-hero { max-width: 560px; margin-bottom: 12px; }
