@@ -24,6 +24,7 @@ import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { NaverMap } from "@/components/naver-map";
 import { NoticeFitMingan } from "@/components/notice-fit-mingan";
 import { ConvertSlider } from "@/components/convert-slider";
+import { Pending } from "@/components/pending";
 import { PriceTable } from "@/components/price-table";
 import { ShareButton } from "@/components/share-button";
 import { Spec, SpecList } from "@/components/spec-list";
@@ -95,7 +96,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * 보증금과 월임대료는 여기서 뺐다 — 바로 밑 「보증금과 임대료」가 같은 숫자를 더 크게, 끌 수 있게 낸다
  * (사용자 지적 2026-09-22: "이것도 결국 보증금과 임대료와 겹치는 거 아닌가").
  */
-/** 사진이나 금액이 없는 단지의 안내 — 상자(Pending) 대신 한 줄 문단. 왜 없는지만 말하고 지면을 먹지 않는다
+/** 금액이나 공급현황이 없는 단지의 안내 — 상자(Pending) 대신 한 줄 문단. 사진 자리는 상자가 낫다는 사용자 정정(2026-10-08)으로 Pending 그대로. 왜 없는지만 말하고 지면을 먹지 않는다
  *  (사용자 지적 2026-10-08: "공간만 많이 차지하고"). 원문 버튼은 하단 고정 바에 이미 있다 */
 function PhotoNone({ title, lead }: { title: ReactNode; lead: ReactNode }) {
   return <p className="note photo-none"><b>{title}.</b> {lead}</p>;
@@ -332,16 +333,35 @@ export default async function ComplexPage({ params }: Params) {
           {/* 동호수별 목록을 여는 버튼은 제목 줄 오른쪽 끝에 붙인다(사용자 요청 2026-09-22) —
               제원 줄 끝에 있을 땐 값들 사이에 섞여 버튼인 줄 몰랐다 */}
           <h2>기본 정보{unitTableWorth && <UnitSheet units={units} label={unitLabel} />}</h2>
+          {/* 금액이 한 줄뿐인 단지는 그 금액이 맨 위다 — 칩 사이에 섞으면 제일 중요한 값이 안 보인다.
+              계약금/잔금은 그 금액을 나눈 막대로 밑에 붙인다(금액 목록 PriceTable과 같은 모양) */}
+          {inlinePrice && (
+            <div className="facts-hero">
+              <div className="fh-top">
+                <span className="k">{showRent ? "보증금" : "전세금"}{inlinePrice.note === "단지 요약값" && <small>단지 요약값</small>}</span>
+                <span className="v">
+                  <b title={inlinePrice.exact[0] != null ? wonExact(inlinePrice.exact[0]) : undefined}>{inlinePrice.deposit}</b>
+                  {showRent && inlinePrice.exact[1] != null && <em title={wonExact(inlinePrice.exact[1])}>월 {inlinePrice.rent}</em>}
+                </span>
+              </div>
+              {inlinePays.length > 0 && (
+                <div className="pl-split">
+                  <div className="bar" aria-hidden="true">
+                    {inlinePays.map((p) => <i key={p.id} style={{ flexGrow: p.exact[0] ?? 0 }} />)}
+                  </div>
+                  <div className="parts">
+                    {inlinePays.map((p) => (
+                      <span key={p.id} title={p.exact[0] != null ? wonExact(p.exact[0]) : undefined}>
+                        {p.label} <b>{p.deposit}</b>{p.note && <small>{p.note}</small>}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="facts-row">
           <ul className="facts">
-            {inlinePrice && (
-              <Fact
-                label={showRent ? "보증금" : "전세금"}
-                value={<span className="fact-money" title={inlinePrice.exact[0] != null ? wonExact(inlinePrice.exact[0]) : undefined}>{inlinePrice.deposit}</span>}
-                sub={showRent && inlinePrice.exact[1] != null ? `월 ${inlinePrice.rent}` : inlinePrice.note === "단지 요약값" ? "단지 요약값" : null}
-              />
-            )}
-            {inlinePays.map((p) => <Fact key={p.id} label={p.label} value={p.deposit} sub={p.note ?? null} />)}
             <Fact label="전용" term="전용면적" value={area} />
             <Fact label="공급" term="공급 호수" value={unitCount != null ? num(unitCount, "호") : null} sub={unitSub} />
             {/* 값이 없어도 「준비 중」이라고 쓴다 — 칸을 비워 두면 왜 없는지 알 수 없다(사용자 결정 2026-09-09) */}
@@ -450,7 +470,7 @@ export default async function ComplexPage({ params }: Params) {
             {images.length > 0 ? (
               <ComplexGallery images={images} complexName={c.name} supplyTypes={supplyTypes} />
             ) : (
-              <PhotoNone
+              <Pending
                 title={imgSource && imagesEnabled(imgSource)
                   ? "이 단지의 사진과 도면은 아직 준비 중입니다"
                   /* 매입임대는 주소로 붙인다 — 못 붙은 집은 기다린다고 생기지 않는다(「준비 중」이 아니다) */
@@ -474,6 +494,7 @@ export default async function ComplexPage({ params }: Params) {
                   : n.housing_type === "매입임대"
                   ? <>매입임대는 빌라나 다가구주택 한 호실이라 SH주택정보에서 주소로 찾습니다. 이 주소는 아직 찾지 못했습니다. 집의 모습은 {L.originalDoc}과 현장 방문으로 확인하세요.</>
                   : <>준공 전 신규 공급 단지라 SH주택정보에 단지 자료가 아직 없습니다. 전자팸플릿은 {L.originalDoc}의 안내를 따라 확인하세요.</>}
+                action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
               />
             )}
           </section>
