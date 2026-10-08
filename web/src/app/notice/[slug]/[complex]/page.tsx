@@ -27,6 +27,7 @@ import { ConvertSlider } from "@/components/convert-slider";
 import { Pending } from "@/components/pending";
 import { PriceTable } from "@/components/price-table";
 import { ShareButton } from "@/components/share-button";
+import { StreetPhoto } from "@/components/street-photo";
 import { SupplyBars } from "@/components/supply-bars";
 import { HouseFacts } from "@/components/house-facts";
 import { DepositOptionsTable, optionLabels } from "@/components/deposit-options-table";
@@ -471,8 +472,11 @@ export default async function ComplexPage({ params }: Params) {
             {images.length > 0 ? (
               <ComplexGallery images={images} complexName={c.name} supplyTypes={supplyTypes} />
             ) : (
-              /* 문구는 읽는 사람 기준으로 — 우리가 뭘 못 모았는지가 아니라 사진이 어디 있고 어떻게 보면 되는지를 말한다
-                 (사용자 지적 2026-10-08: 「모아 올 공개 출처를 아직 찾지 못했습니다」는 바꿔라). 갈래마다 제목과 본문이 한 쌍이다 */
+              /* 사진을 주는 곳이 없는 단지는 건물 앞 거리 사진(로드뷰)을 그 자리에 편다(2026-10-08). 근처에 로드뷰가 없으면 아래 안내로 물러난다 */
+              <StreetPhoto coord={c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null} name={c.name}
+                more={<>평면도와 집 안 모습은 {L.originalDoc}에서 확인하세요.</>}>
+              {/* 문구는 읽는 사람 기준으로 — 우리가 뭘 못 모았는지가 아니라 사진이 어디 있고 어떻게 보면 되는지를 말한다
+                 (사용자 지적 2026-10-08: 「모아 올 공개 출처를 아직 찾지 못했습니다」는 바꿔라). 갈래마다 제목과 본문이 한 쌍이다 */}
               <Pending
                 {...(imgSource && !imagesEnabled(imgSource) ? {
                   title: "사진과 도면은 공개 준비 중입니다",
@@ -500,6 +504,7 @@ export default async function ComplexPage({ params }: Params) {
                 })}
                 action={<ExternalLink className="btn" href={n.source_url}>{L.original}</ExternalLink>}
               />
+              </StreetPhoto>
             )}
           </section>
 

@@ -14,6 +14,7 @@ import { ExternalLink } from "@/components/external-link";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { IncomeBars } from "@/components/income-bars";
 import { NaverMap } from "@/components/naver-map";
+import { StreetPhoto } from "@/components/street-photo";
 import { NoticeEligibilitySection } from "@/components/notice-eligibility";
 import { NoticeFit } from "@/components/notice-fit";
 import { NoticeFitMingan } from "@/components/notice-fit-mingan";
@@ -213,6 +214,8 @@ export default async function NoticePage({ params }: Params) {
   // 시도가 하나뿐이면 줄마다 되풀이하지 않고 제목에서 한 번만 말한다(사용자 지적 2026-09-21)
   const oneSido = new Set(areas.map((a) => a.sido)).size === 1;
   const areaMax = areas.reduce((a, x) => Math.max(a, x.supply_count ?? 0), 0);
+  // 지역마다 호수를 하나라도 아는가. 모르면 공급 지역을 이름 칩으로만 세운다
+  const areaCounted = areas.some((x) => x.supply_count != null);
   // 지도에 찍을 시군구. 시군구를 모르는 줄(미지정)은 찍을 자리가 없다
   const areaPins = areas.filter((a) => a.sigungu).map((a) => ({ sido: a.sido, sigungu: a.sigungu as string, count: a.supply_count }));
   const region = regionLabel(n) || "전국";
@@ -406,8 +409,13 @@ export default async function NoticePage({ params }: Params) {
           {n.address && complexes.length === 0 && (
             <section className="dsec lead">
               <h2>위치</h2>
-              <div className="d-map"><NaverMap address={n.address} title={n.complex_name ?? n.title} sub={n.housing_type} /></div>
-              <p className="note">지도 위치는 주소 기준 근사치입니다. 핀이나 로드뷰 버튼을 누르면 거리뷰가 열립니다. {n.address}</p>
+              {/* 사진을 주는 곳이 없는 공고(LH 영구/국민/행복 등)라 지도 옆에 건물 앞 거리 사진을 같이 편다(2026-10-08 「사진 없으면 사진 반영」).
+                  근처에 로드뷰가 없으면 사진 칸이 사라지고 지도가 한 줄을 다 쓴다 */}
+              <div className="d-loc">
+                <div className="d-map"><NaverMap address={n.address} title={n.complex_name ?? n.title} sub={n.housing_type} /></div>
+                <StreetPhoto address={n.address} name={n.complex_name ?? n.title} />
+              </div>
+              <p className="note">지도 위치는 주소 기준 근사치입니다. {n.address}</p>
             </section>
           )}
 
@@ -549,7 +557,7 @@ export default async function NoticePage({ params }: Params) {
               </h2>
               {!n.address && (
                 <p className="note" style={{ margin: "0 0 12px" }}>
-                  주택별 주소는 공고문 첨부에만 있습니다.{areaPins.length > 0 ? " 아래는 시군구 단위로 센 호수입니다." : ""}
+                  주택별 주소는 공고문 첨부에만 있습니다.{areaPins.length > 0 ? " 아래는 시군구 단위로 센 호수입니다." : !areaCounted ? " 아래는 모집하는 지역이고, 지역별 호수는 원문에 있습니다." : ""}
                 </p>
               )}
               {/* 「주소는 있는데 왜 지도가 없냐」(사용자 지적 2026-09-21) — 단지 좌표가 없는 공고에 우리가 아는
@@ -560,12 +568,13 @@ export default async function NoticePage({ params }: Params) {
                   <p className="note" style={{ margin: "8px 0 14px" }}>핀은 시군구 중심입니다 — 주택이 실제로 있는 자리가 아닙니다.</p>
                 </>
               )}
-              <ul className="area-grid">
+              {/* 호수를 하나도 모르는 공고(전세임대 수시모집 등)는 칸마다 「—」만 19개 서 있었다(2026-10-08 가시성 검수) — 이름만 칩으로 */}
+              <ul className={areaCounted ? "area-grid" : "area-grid names"}>
                 {areas.map((a, i) => (
                   <li key={i}>
                     {/* 시군구를 모르는 줄은 시도 이름만 — 「강원 미지정」처럼 없는 말을 채우지 않는다 */}
                     <b>{a.sigungu ? (oneSido ? a.sigungu : `${sidoShort(a.sido)} ${a.sigungu}`) : sidoShort(a.sido)}</b>
-                    <span>{num(a.supply_count, "호")}</span>
+                    {areaCounted && <span>{num(a.supply_count, "호")}</span>}
                     {/* 어느 구에 몰렸는지 눈으로 — 가장 많은 곳을 100으로 잡은 비율 띠 */}
                     {a.supply_count != null && areaMax > 0 && (
                       <i style={{ "--w": `${Math.round((a.supply_count / areaMax) * 100)}%` } as React.CSSProperties} />

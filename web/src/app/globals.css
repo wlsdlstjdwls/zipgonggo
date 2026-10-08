@@ -913,6 +913,18 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 /* 프레임을 1,400px로 넓히면서 본문 칸이 1,070px가 됐다 — 여기 한 줄이 한글 70자를 넘으면 눈이 다음 줄을 못 찾는다.
    줄길이를 74자로 묶는다(2026-09-21). 색도 --dim에서 올린다 — 이 줄은 각주가 아니라 읽으라고 쓴 문장이다 */
 .note.photo-none { margin-top: 0; }
+/* 사진 없는 단지의 거리 사진(street-photo.tsx) — 갤러리 자리에 로드뷰를 펼친다. 폰에선 낮게, 끌기는 파노라마가 받는다 */
+.street { margin: 0; }
+.street-frame { position: relative; height: 340px; border-radius: var(--r-panel); overflow: hidden; border: 1px solid var(--line); background: var(--sub); }
+.street-frame .canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.street figcaption { margin-top: 9px; font-weight: 600; font-size: 13px; line-height: 1.6; color: var(--dim); }
+.street figcaption b { margin-right: 4px; font-weight: 800; color: var(--ink); }
+@media (max-width: 640px) { .street-frame { height: 240px; } }
+/* 공고 상세 위치 — 지도와 거리 사진을 나란히. 거리 사진이 없으면(로드뷰 없음) 지도가 한 줄을 다 쓴다. 좁으면 위아래로 */
+.d-loc { display: flex; flex-wrap: wrap; gap: 12px; }
+.d-loc > .d-map, .d-loc > .street { flex: 1 1 320px; min-width: 0; }
+.dsec.lead .d-loc .street-frame { height: 520px; }
+@media (max-width: 640px) { .dsec.lead .d-loc .street-frame { height: 240px; } }
 .note.photo-none b { font-weight: 800; color: var(--ink); }
 .note { margin: 12px 0 0; max-width: 58em; font-weight: 500; font-size: 13px; line-height: 1.75; color: var(--mut); }
 /* 섹션 안 소제목 — 「단지 제원」 밑 공급현황 표처럼 같은 이야기의 두 번째 문단 */
@@ -1667,7 +1679,7 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
   .hd-out > .aside .dcard-x { flex-basis: 100%; margin-top: 2px; }
   /* 제원은 두 칸으로 — 한 칸짜리로 쌓으면 이 덩어리만 400px가 된다 */
   .hd-out > .aside .specs { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; row-gap: 9px; }
-  .hd-out > .aside .specs > .t, .hd-out > .aside .specs .r.lead { grid-column: 1 / -1; }
+  .hd-out > .aside .specs > .t, .hd-out > .aside .specs .r.lead, .hd-out > .aside .specs .r.wide { grid-column: 1 / -1; }
   /* 두 칸의 길이가 다를 때 짧은 쪽 밑줄이 허공에 뜨지 않게 — 칸이 글자를 따라 줄어든다 */
   .hd-out > .aside .specs .r { align-self: start; }
   /* 원문 버튼은 하단 고정 바(.dbar)가 늘 들고 있다 — 요약 패널에서 또 크게 세우면 본문이 한 뼘 밀린다
@@ -2058,6 +2070,10 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .area-grid li b { font-weight: 800; font-size: 14px; letter-spacing: -0.02em; }
 .area-grid li span { margin-left: auto; font-weight: 800; font-size: 13.5px; font-variant-numeric: tabular-nums; color: var(--mut); }
 .area-grid li i { position: absolute; left: 0; bottom: 0; height: 3px; width: var(--w); background: var(--acc); opacity: 0.5; }
+/* 호수를 모르는 공고 — 이름만 나열하는 칩. 빈 칸 격자 대신 글자 폭대로 흐른다 */
+.area-grid.names { display: flex; flex-wrap: wrap; gap: 6px; }
+.area-grid.names li { padding: 7px 12px; border-radius: 999px; background: var(--sub); border-color: transparent; }
+.area-grid.names li b { font-size: 13.5px; }
 /* 시군구 지도는 단지 지도보다 한 뼘 낮게 — 핀이 구 중심이라 더 봐도 더 보이는 게 없다 */
 .area-map { height: 420px; }
 /* 비례기호 — 지름이 호수의 제곱근에 비례한다. 이름표는 지도가 당겨졌을 때(.near)만 편다 */

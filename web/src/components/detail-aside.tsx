@@ -32,13 +32,20 @@ type Props = {
  * "칸이 왜 비었나"를 말하려던 것이었다. 붙박이 패널에서는 「공급호수 준비 중 / 입주 시작 준비 중」이
  * 자리만 먹는 줄로 쌓인다. 첫 줄(lead, 대개 금액)만 예외 — 금액이 없는 공고도 금액 자리는 있어야 한다.
  */
+// 폰 두 칸 격자에서 반 칸에 들어가지 않는 값(주소, 지역, 문의처). 반 칸에 끼우면 「전북특별자치도 / 전주시 / 완산구」처럼
+// 세 줄로 꺾여 읽히지 않는다(2026-10-08 가시성 검수) — 이런 줄만 한 줄을 다 쓴다. 데스크톱은 원래 한 칸이라 상관없다
+const LONG_VALUE = 12;
+function isLong(v: unknown): boolean {
+  return typeof v === "string" && v.length > LONG_VALUE;
+}
+
 export function AsideSpecs({ title, rows }: { title: string; rows: SpecRow[] }) {
   const shown = rows.filter((r) => r.lead || (r.value != null && r.value !== ""));
   return (
     <div className="specs">
       <span className="t">{title}</span>
       {shown.map((r) => (
-        <div className={`r${r.value == null ? " empty" : ""}${r.lead ? " lead" : ""}`} key={r.label}>
+        <div className={`r${r.value == null ? " empty" : ""}${r.lead ? " lead" : ""}${isLong(r.value) ? " wide" : ""}`} key={r.label}>
           <span>{r.label}</span>
           <b>{r.value ?? "준비 중"}</b>
         </div>
