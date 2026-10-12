@@ -22,16 +22,19 @@ RANK_APPLY_RE = re.compile(r"(\d)\s*(?:[・·.]\s*\d\s*)?순위\s*(?:청약)?\s*
 # 재개발임대주택(310041)은 "청약신청접수" 칸 헤더와 "1순위"/"2순위" 라벨이 따로 떨어진 상자다(2026-09-09,
 # 두 상자 t간격이 STACK_PX보다 넓어 _stacked_labels가 못 붙인다). 접수 문구 없이 순위만 있는 상자도 받는다.
 RANK_BARE_RE = re.compile(r"^(\d)\s*(?:[・·.]\s*\d\s*)?순위$")
-APPLY_RE = re.compile(r"^(?:신청\s*접수|청약\s*접수|접수\s*기간|신청접수\(인터넷\))")
-ANNOUNCE_RE = re.compile(r"당첨자.{0,8}발표")
+# 신혼·신생아 매입임대 2026 하반기(310650·310653)는 「청약신청」+「(PC, 모바일)」, 「최종대상자」+「발표」다(2026-10-12)
+APPLY_RE = re.compile(r"^(?:신청\s*접수|청약\s*접수|청약\s*신청|접수\s*기간|신청접수\(인터넷\))")
+ANNOUNCE_RE = re.compile(r"당첨자.{0,8}발표|최종\s*대상자.{0,2}발표")
 HEADING_RE = re.compile(r"모집\s*(?:공고\s*)?절차\s*및\s*일정|공급\s*일정|모집\s*일정")
 
 # 흐름도에서 접수·당첨자발표 말고 더 읽는 단계. 위에서부터 먼저 맞는 하나만 쓴다(라벨이 서로 겹친다:
 # 「서류심사대상자서류제출」은 발표 패턴에도 걸리므로 제출을 먼저 본다).
 # 매칭은 공백을 지운 라벨에 한다 — 흐름도 상자는 줄바꿈으로 글자가 흩어진다.
 EXTRA_STEPS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("서류 제출", re.compile(r"(?:심사|대상자).{0,6}서류제출|서류제출")),
-    ("서류심사 대상자 발표", re.compile(r"(?:서류)?심사대상자.{0,2}발표|대상자발표")),
+    # 「서류제출대상자발표」(재개발임대 279905)는 제출이 아니라 대상자 발표다
+    ("서류 제출", re.compile(r"(?:(?:심사|대상자).{0,6}서류제출|서류제출)(?!대상자)")),
+    # 「최종대상자발표」는 당첨자 발표다 — 서류심사 단계로 잡지 않는다
+    ("서류심사 대상자 발표", re.compile(r"(?:서류)?심사대상자.{0,2}발표|(?<!최종)대상자발표")),
     ("계약 체결", re.compile(r"계약체결")),
 )
 
@@ -53,11 +56,12 @@ MAX_DATE_W = 220 # 이보다 넓은 칸은 흐름도 날짜가 아니라 본문 
 # 흐름도 아래 주석("※ 입주예정기간은 2026. 1. 16.(월) ~ 2027. 1. 15.(금)입니다") — 날짜가 있어도 접수일이 아니다
 NOTE_RE = re.compile(r"^\s*[※*·▶■□○-]")
 # 접수 시각 — 「9 28(월) 10:00 ~ 9 30(수) 17:00」. _norm이 콜론을 지우므로 원문에서 먼저 뽑는다
-TIME_RE = re.compile(r"([01]?\d|2[0-3])\s*:\s*([0-5]\d)")
+# 분이 「0」 한 글자인 건 Synap이 겹친 글자를 흘린 「00」이다(310650 「18 : 0」, 2026-10-12)
+TIME_RE = re.compile(r"([01]?\d|2[0-3])\s*:\s*([0-5]\d|0(?!\d))")
 
 
 def _times_in(text: str) -> list[str]:
-    return [f"{int(h):02d}:{m}" for h, m in TIME_RE.findall(text)]
+    return [f"{int(h):02d}:{m.zfill(2)}" for h, m in TIME_RE.findall(text)]
 
 
 @dataclass(frozen=True)
@@ -273,6 +277,12 @@ def _extra_steps(labels: list[_Box], boxes: list[_Box], ref_year: int | None, an
         prev = hits.get(name)
         if prev is None or b.l < prev[0]:
             hits[name] = (b.l, step)
+    # 서류 제출이 대상자 발표와 같은 날로 읽혔으면 「서류제출 / 대상자발표」 두 줄 라벨의 윗줄만 잡은 것이다
+    # (재개발임대 279905·295159·310041 — 실제 제출은 다음 날부터) — 틀린 날짜보다 빈칸이 낫다.
+    # 앞뒤로 비교하지 않는다: 협동조합주택(306011)은 서류를 먼저 내고 대상자를 나중에 발표한다
+    sub, ann = hits.get("서류 제출"), hits.get("서류심사 대상자 발표")
+    if sub and ann and sub[1].start == ann[1].start:
+        del hits["서류 제출"]
     return tuple(step for _, step in sorted(hits.values(), key=lambda x: (x[1].start, x[0])))
 
 

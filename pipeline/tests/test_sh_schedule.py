@@ -68,6 +68,18 @@ def test_schedule_step_drops_weekday_mismatch():
     assert ("서류 제출", date(2026, 9, 16), date(2026, 9, 18)) in [(st.label, st.start, st.end) for st in s.steps]
 
 
+def test_schedule_sinhon_cheongyak_final_announce():
+    """신혼·신생아 매입임대Ⅰ 2026 하반기 3쪽: 라벨이 「청약신청」「최종대상자 발표」다.
+    「최종대상자발표」를 서류심사 대상자 발표로 잡으면 안 되고, Synap이 흘린 「18 : 0」은 18:00이다."""
+    s = parse_schedule(pages("310650", [3]), ref_year=2026)
+    assert s is not None
+    assert (s.apply_start, s.apply_end, s.announce) == (date(2026, 10, 13), date(2026, 10, 15), date(2027, 1, 27))
+    steps = {st.label: st for st in s.steps}
+    assert steps["서류심사 대상자 발표"].start == date(2026, 10, 19)
+    assert steps["서류심사 대상자 발표"].start_time == "18:00"
+    assert (steps["서류 제출"].start, steps["서류 제출"].end) == (date(2026, 10, 20), date(2026, 10, 23))
+
+
 def test_schedule_none_without_flowchart():
     """일정 흐름도가 없는 쪽(주택 위치 안내 표)에서는 None."""
     assert parse_schedule(pages("309467", [49, 50]), ref_year=2026) is None
