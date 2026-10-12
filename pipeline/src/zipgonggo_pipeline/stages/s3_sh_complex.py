@@ -20,6 +20,7 @@ import json
 import logging
 import re
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 from ..config import PIPELINE_ROOT, settings
@@ -27,6 +28,7 @@ from ..db import connect
 from ..parsers.sh_attach import merge_teukhwa, parse_attachment, teukhwa_facts
 from ..parsers.sh_eligibility import parse_eligibility, verify_income_table
 from ..parsers.sh_house_list import HouseList, parse_house_list
+from ..parsers.sh_schedule import parse_schedule
 from ..repo import (
     income_base100, income_years, replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts,
     upsert_notice_eligibility,
@@ -58,7 +60,7 @@ SEQ_RE = re.compile(r"[?&]seq=(\d+)")
 # 자동으로 파싱하면 남의 서버를 며칠 두드리게 된다. 다만 slug을 콕 집어 주면 그건 사람이
 # 고른 것이므로 source를 가리지 않는다 — 순찰이 m_241에서 주워 온 신규분이 여기로 온다.
 SELECT_SQL = """
-SELECT id, slug, title, source_url, posted_at FROM notice
+SELECT id, slug, title, source_url, posted_at, housing_type::text AS housing_type FROM notice
 WHERE source_url LIKE '%%i-sh.co.kr%%'
   AND (%(slug)s::text IS NOT NULL OR source IN ('sh_scrape', 'ish_247'))
   AND (%(slug)s::text IS NULL OR slug = %(slug)s)
@@ -69,6 +71,28 @@ LIMIT %(limit)s
 
 # 주소가 공고문이 아니라 별도 첨부에만 있는 양식(신혼·신생아, 청년 매입임대). 요약판은 주소가 없어 상세판을 고른다
 HOUSE_LIST_RE = re.compile(r"주택목록|주택안내")
+
+
+# 공급현황 파서(sh_supply, 장기전세 표용)를 믿지 않는 유형. 공고문에서 단지를 못 찾은 공고에만 해당한다
+SUPPLY_TABLE_UNTRUSTED = {"공공기숙사"}
+
+
+def _sane_schedule(sch, pages, posted, slug):
+    """접수일이 공고일보다 앞서면 연도를 잘못 푼 것이다 — 연도 없는 날짜(「115(목)」)를 공고 연도로 읽어서다.
+    연말 공고(299475, 2025-12-30)는 접수가 이듬해 1월이라 한 해 뒤로 다시 읽는다. 그래도 앞서면 일정을 버린다
+    (310258은 2026-09-17 공고에 접수 2026-01-01이 들어가 있었다). 틀린 날짜보다 빈칸이 낫다."""
+    if sch is None or posted is None:
+        return sch
+    first = sch.apply_start or sch.apply_end
+    if first is None or first >= posted - timedelta(days=3):
+        return sch
+    again = parse_schedule(pages, posted.year + 1)
+    again_first = again and (again.apply_start or again.apply_end)
+    if again_first and again_first >= posted - timedelta(days=3):
+        log.info("%s 일정 연도를 한 해 뒤로 다시 읽음: %s → %s", slug, first, again_first)
+        return again
+    log.warning("%s 접수일 %s가 공고일 %s보다 앞서 일정을 버린다", slug, first, posted)
+    return None
 
 
 def pick_house_list(atts):
@@ -418,6 +442,14 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                     continue
                 stats.groups += 1
                 sch, sup = facts.schedule, facts.supply
+                if facts.kind == "none" and sup is not None and n["housing_type"] in SUPPLY_TABLE_UNTRUSTED:
+                    # 공급현황 파서(장기전세 표용)가 기숙사 호실 별첨을 읽으면 109만 원을 1억 900만 원, 31호를 5,938호로 낸다
+                    # (310258, 2026-10-12). 이 유형에선 공고 단위 금액과 호수를 싣지 않는다
+                    log.warning("%s %s 공급현황 요약을 버린다(%s~%s, %s호)", n["slug"], n["housing_type"],
+                                sup.min_deposit, sup.max_deposit, sup.unit_total)
+                    sup = facts.supply = None
+                    facts.totals = {}
+                sch = _sane_schedule(sch, pages, n["posted_at"], n["slug"]) if facts.kind != "teukhwa" else sch
                 log.info(
                     "%s: %d쪽 · %s · 단지 %d건 · 호실 %d건 · 공급 %d건 · 자격 %s · 일정 %s · 전세금 %s (%s)",
                     n["slug"], len(pages), kind, len(rows), len(house.units) if house else len(units), len(supply_rows),

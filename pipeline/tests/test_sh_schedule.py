@@ -80,6 +80,17 @@ def test_schedule_sinhon_cheongyak_final_announce():
     assert (steps["서류 제출"].start, steps["서류 제출"].end) == (date(2026, 10, 20), date(2026, 10, 23))
 
 
+def test_schedule_cheongnyeon_late_page_two_digit_dates():
+    """청년 매입임대 2026-1차: 일정 흐름도가 30쪽에 있다(앞 12쪽 밖). 계약 「127(월)~1210(목)」은
+    1.27이 아니라 접수 뒤의 12.7이다. 「3 공급일정」 쪽 하나로 접수, 발표, 단계를 다 읽는다."""
+    s = parse_schedule(pages("306214", [22, 23, 24, 25, 26, 27, 28, 30]), ref_year=2026)
+    assert s is not None
+    assert (s.apply_start, s.apply_end, s.announce) == (date(2026, 7, 13), date(2026, 7, 15), date(2026, 11, 20))
+    steps = {st.label: (st.start, st.end) for st in s.steps}
+    assert steps["서류 제출"] == (date(2026, 7, 21), date(2026, 7, 27))
+    assert steps["계약 체결"] == (date(2026, 12, 7), date(2026, 12, 10))
+
+
 def test_schedule_none_without_flowchart():
     """일정 흐름도가 없는 쪽(주택 위치 안내 표)에서는 None."""
     assert parse_schedule(pages("309467", [49, 50]), ref_year=2026) is None

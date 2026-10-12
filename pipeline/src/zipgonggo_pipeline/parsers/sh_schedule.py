@@ -42,7 +42,8 @@ WEEKDAY = "월화수목금토일"
 # 띄어쓰기 날짜: ‘26 9 9(수) · 2026 8 28(금) · 09 15 (화)
 SPACED_RE = re.compile(rf"(?:(\d{{2}}|\d{{4}})\s+)?(\d{{1,2}})\s+(\d{{1,2}})\s*\(([{WEEKDAY}])\)")
 # 붙은 날짜: 260914(월) · 20260914(월) · 2026928(월) · 0915(화) · 928(월)
-COMPACT_RE = re.compile(rf"(\d{{3,8}})\s*\(([{WEEKDAY}])\)")
+# 두 자리(「69(화)」 = 6.9, 「81(금)」 = 8.1, 청년 매입 304699·290219)는 요일이 맞을 때만 받는다 — 뜻이 하나뿐이라 요일 말고 검증할 게 없다
+COMPACT_RE = re.compile(rf"(?<!\d)(\d{{2,8}})\s*\(([{WEEKDAY}])\)")
 # 요일이 아예 다른 칸으로 떨어져 나온 날짜(재개발임대주택 310041 「당첨자발표」 '27330 다음 줄에 (화)만,
 # 2026-09-09) — 칸 전체가 숫자뿐일 때만 받는다. 문장 속에 섞인 숫자(모집세대의 200% 등)까지 날짜로
 # 오인하지 않도록 텍스트 전체가 매치되는 경우로 좁힌다.
@@ -144,6 +145,8 @@ def _compact_candidates(digits: str, ref_year: int | None) -> list[date]:
         out += [_mk(y, int(digits[2:3]), int(digits[3:])), _mk(y, int(digits[2:4]), int(digits[4:]))]
     elif n == 4:
         out.append(_mk(ref_year, int(digits[:2]), int(digits[2:])))
+    elif n == 2:
+        out.append(_mk(ref_year, int(digits[:1]), int(digits[1:])))
     elif n == 3:
         out += [_mk(ref_year, int(digits[:1]), int(digits[1:])), _mk(ref_year, int(digits[:2]), int(digits[2:]))]
     return [d for d in out if d]
@@ -171,6 +174,8 @@ def _dates_in(text: str, ref_year: int | None, ref: date | None) -> list[tuple[d
         return out
     for m in COMPACT_RE.finditer(t):
         d = _pick(_compact_candidates(m.group(1), ref_year), ref)
+        if d and len(m.group(1)) == 2 and WEEKDAY[d.weekday()] != m.group(2):
+            continue
         if d:
             out.append((d, m.group(2)))
             ref, ref_year = d, d.year
@@ -215,7 +220,7 @@ def _stacked_labels(boxes: list[_Box]) -> list[_Box]:
     return out
 
 
-def _dates_below(label: _Box, boxes: list[_Box], ref_year: int | None) -> list[Hit]:
+def _dates_below(label: _Box, boxes: list[_Box], ref_year: int | None, ref: date | None = None) -> list[Hit]:
     """라벨 아래(같은 열)에 붙은 날짜들. 위에서 아래 순. 연도만 있는 줄(2026)은 다음 날짜의 연도로 쓴다.
     ※로 시작하는 주석과 라벨보다 훨씬 넓은 칸(본문 문장)은 건너뛴다 — 「입주예정기간」을 접수기간으로 읽던 회귀."""
     below = sorted(
@@ -227,7 +232,6 @@ def _dates_below(label: _Box, boxes: list[_Box], ref_year: int | None) -> list[H
         key=lambda b: (b.t, b.l),
     )
     found: list[Hit] = []
-    ref: date | None = None
     limit = label.t + BELOW_PX
     for b in below:
         if b.t > limit:
@@ -266,11 +270,15 @@ def _extra_steps(labels: list[_Box], boxes: list[_Box], ref_year: int | None, an
         name = next((n for n, rx in EXTRA_STEPS if rx.search(flat)), None)
         if name is None:
             continue
-        found = [h for h in _dates_below(b, boxes, ref_year)
+        # 접수일을 기준으로 붙은 날짜를 푼다 — 「127(월)」은 1.27이 아니라 접수(7월) 뒤의 12.7이다(306214 30쪽)
+        found = [h for h in _dates_below(b, boxes, ref_year, anchor)
                  if (anchor is None or h.date >= anchor) and WEEKDAY[h.date.weekday()] == h.weekday]
         if not found:
             continue
         lo, hi = min(found, key=lambda h: h.date), max(found, key=lambda h: h.date)
+        if name.endswith("발표"):
+            # 발표는 하루다. 칸 밑으로 이어 읽다 옆 단계(서류 제출) 마감일까지 끌어오면 기간처럼 보인다(299479)
+            hi = lo
         step = Step(name, lo.date, hi.date if hi.date > lo.date else None,
                     lo.time, hi.time if hi.date > lo.date else None)
         # 같은 단계가 여러 번 잡히면 가장 왼쪽(= 흐름도에서 먼저 오는) 상자를 쓴다
@@ -342,12 +350,17 @@ def parse_schedule_page(xml: str, ref_year: int | None = None) -> Schedule | Non
 
 def parse_schedule(pages: list[tuple[int, str]], ref_year: int | None = None) -> Schedule | None:
     """앞쪽 12쪽 안에서 일정 흐름도를 찾는다. 표지(1쪽)에도 같은 그림이 있어 먼저 잡히면 그걸 쓴다.
+    거기서 접수일을 못 찾으면 40쪽까지 더 본다 — 청년 매입임대(306214)는 30쪽 「3 공급일정」에 있다(2026-10-12).
 
     표지 요약판엔 접수 시작·마감만 있고 당첨자 발표·단계는 본문 흐름도(예: 8쪽)에만 있는 양식이 있다
     (재개발임대주택 310041, 2026-09-09). 그런 경우 접수일은 먼저 찾은 쪽 값을 그대로 쓰고,
     발표일만 없으면 뒤쪽 쪽에서 마저 찾는다 — 접수일 자체가 이미 있으면 더 뒤져도 안 바꾼다."""
+    return _scan(pages[:12], ref_year) or _scan(pages[12:40], ref_year)
+
+
+def _scan(pages: list[tuple[int, str]], ref_year: int | None) -> Schedule | None:
     result: Schedule | None = None
-    for page, xml in pages[:12]:
+    for page, xml in pages:
         s = parse_schedule_page(xml, ref_year)
         if not s:
             continue
