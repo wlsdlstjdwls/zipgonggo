@@ -27,14 +27,14 @@ from ..config import PIPELINE_ROOT, settings
 from ..db import connect
 from ..parsers.sh_attach import merge_teukhwa, parse_attachment, teukhwa_facts
 from ..parsers.sh_eligibility import parse_eligibility, verify_income_table
-from ..parsers.sh_house_list import HouseList, parse_house_list
-from ..parsers.sh_location import parse_locations
+from ..parsers.sh_house_list import HouseList, parse_house_list, parse_house_xlsx
+from ..parsers.sh_location import HOUSE_DOC_RE, parse_filename_jibun, parse_house_docs, parse_locations
 from ..parsers.sh_schedule import parse_schedule
 from ..repo import (
     income_base100, income_years, replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts,
     upsert_notice_eligibility,
 )
-from ..sources.ish import IshClient, find_attachments, is_missing_page
+from ..sources.ish import IshClient, find_attachments, find_downloads, is_missing_page
 from ..sources.ish_board import BOARDS, IshBoardClient, find_seq_by_title
 from .common import Stats, finish_ingest, stage_main, utc_now
 
@@ -94,6 +94,52 @@ def _sane_schedule(sch, pages, posted, slug):
         return again
     log.warning("%s 접수일 %s가 공고일 %s보다 앞서 일정을 버린다", slug, first, posted)
     return None
+
+
+def _xlsx_house_list(client, html: str, seq: str, cached: bool) -> HouseList | None:
+    """엑셀 주택목록. 받은 파일은 data/ish/{seq}/list.xlsx.bin — 사내 DRM이 .xlsx를 몇 분 뒤 암호화해서 확장자를 바꿔 둔다."""
+    path = CACHE_ROOT / seq / "list.xlsx.bin"
+    if cached:
+        return parse_house_xlsx(path.read_bytes()) if path.is_file() else None
+    dl = next(((n, u) for n, u in find_downloads(html)
+               if HOUSE_LIST_RE.search(n) and n.lower().endswith((".xlsx", ".xls"))), None)
+    if dl is None:
+        return None
+    data = client.download(dl[1])
+    if not data.startswith(b"PK"):
+        log.warning("%s 엑셀 목록이 zip이 아니다(%d바이트) — 건너뛴다", seq, len(data))
+        return None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return parse_house_xlsx(data)
+
+
+def _house_docs(client, atts, seq: str, cached: bool) -> list[tuple[str, list]]:
+    """집별 첨부를 받아 (첨부 이름, 쪽들)로. 이름은 다시 읽을 때(--cached) 쓰도록 docs.json에 남긴다."""
+    root = CACHE_ROOT / seq
+    index_file = root / "docs.json"
+    if cached:
+        index = json.loads(index_file.read_text(encoding="utf-8")) if index_file.is_file() else {}
+        return [(name, list(iter_cached_pages(root / d))) for d, name in index.items() if (root / d).is_dir()]
+    out, index = [], {}
+    for k, att in enumerate(atts):
+        if not HOUSE_DOC_RE.search(att.name) or not att.name.lower().endswith(".pdf"):
+            continue
+        doc = client.resolve_preview(att.preview_url)
+        if doc is None:
+            continue
+        d = f"doc{k}"
+        out.append((att.name, list(client.iter_pages(doc, cache_dir=root / d))))
+        index[d] = att.name
+    if index:
+        root.mkdir(parents=True, exist_ok=True)
+        index_file.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
+    return out
+
+
+def _cached_doc_names(seq: str) -> list[str]:
+    f = CACHE_ROOT / seq / "attachments.json"
+    return json.loads(f.read_text(encoding="utf-8")) if f.is_file() else []
 
 
 def pick_house_list(atts):
@@ -381,6 +427,10 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                             url, seq = found
                             html = client.fetch_notice_html(url)
                         atts = rank_attachments(find_attachments(html))
+                        if atts:
+                            (CACHE_ROOT / seq).mkdir(parents=True, exist_ok=True)
+                            (CACHE_ROOT / seq / "attachments.json").write_text(
+                                json.dumps([a.name for a in atts], ensure_ascii=False), encoding="utf-8")
                         if not atts:
                             stats.skip("no_attachment")
                             log.info("%s 첨부 없음", n["slug"])
@@ -427,6 +477,12 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                             if doc is not None:
                                 list_pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq / "list"))
                         house = parse_house_list(list_pages) if list_pages else None
+                        # PDF 목록이 없으면 엑셀 목록(미리보기가 안 돼 원본을 받는다, 290219)
+                        if not (house and house.complexes):
+                            house = _xlsx_house_list(client, html if not cached else "", seq, cached) or house
+                        # 목록 첨부가 없으면 공고문 본문의 호실 목록(미리내집 293061 48쪽~)을 같은 파서로 읽는다
+                        if not (house and house.complexes) and n["housing_type"] == "매입임대":
+                            house = parse_house_list(pages)
                         if house and house.complexes:
                             facts.kind = "house_list"
                             facts.complexes = house.complexes
@@ -439,6 +495,14 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                         # 검증한 건 매입임대 공고 34건뿐이라 다른 유형엔 걸지 않는다
                         if not facts.complexes and n["housing_type"] == "매입임대":
                             locs = parse_locations(pages, n["title"])
+                            if not locs:
+                                # 집마다 따로 붙은 첨부(공공한옥 주택현황, 위국헌신 팸플릿, 다자녀 주택안내)
+                                docs = _house_docs(client, atts if not cached else [], seq, cached)
+                                locs = parse_house_docs(docs, n["title"])
+                            if not locs:
+                                # 두레주택: 주소가 평면도 첨부 이름에만 지번으로 있다
+                                names = [a.name for a in atts] if not cached else _cached_doc_names(seq)
+                                locs = parse_filename_jibun(names, pages, n["title"])
                             if locs:
                                 facts.kind = "location"
                                 facts.complexes = locs

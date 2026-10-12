@@ -108,3 +108,38 @@ def test_name_dong():
     assert _name_dong("주건축물제1동", None, road) == ("인수봉로64길 15", "1동")
     # 지역 동 이름은 동 표기가 아니다
     assert _name_dong("블루밍하우스 수유동", None, road) == ("블루밍하우스 수유동", None)
+
+
+def test_sections_merge_into_tiers():
+    """미리내집 주택목록: 같은 호실이 「시세의 60%」(3쪽)와 「시세의 70%」(20쪽) 구간에 한 번씩 나온다.
+    한 호실로 합치고 구간을 계층으로 싣는다. 20쪽은 칸이 밀리고 머리글이 다시 나온다."""
+    h = parse_house_list(pages("ish_299476_list", [3, 20]))
+    assert h.tiers == ["시세의60%", "시세의70%"]
+    u = by_key(h)["세교예지안-0201"]
+    assert u["road_address"] == "금천구 가산로 75"
+    assert u["price_tiers"] == [
+        {"label": "시세의60%", "deposit": 6_226_000, "rent": 64_170},
+        {"label": "시세의70%", "deposit": 7_264_000, "rent": 74_860},
+    ]
+
+
+def test_dong_column_keeps_buildings_apart():
+    """308644 본문 호실 목록: 「동」 칸이 「A동」. 빠뜨리면 A동과 B동의 같은 호가 한 호실로 합쳐진다.
+    보증금은 「(만원)」 단위다 — 6516 = 6,516만 원."""
+    h = parse_house_list(pages("ish_308644", [57]))
+    sw = [x for x in h.units if x["complex_name"] == "새울센스빌"]
+    assert {x["building"] for x in sw} >= {"A동"}
+    assert len({x["unit_key"] for x in sw}) == len(sw)
+    a0201 = next(x for x in sw if x["building"] == "A동" and x["room"] == "0201")
+    assert a0201["deposit"] == 65_160_000
+
+
+def test_xlsx_house_list():
+    """청년 매입임대 2025-1차 주택목록은 엑셀이다(미리보기 없음). 공고문 「총 751호」와 맞아야 한다."""
+    from zipgonggo_pipeline.parsers.sh_house_list import parse_house_xlsx
+
+    h = parse_house_xlsx((FIX / "ish_290219_xlsx" / "list.xlsx.bin").read_bytes())
+    assert len(h.units) == 751
+    u = h.units[0]
+    assert (u["complex_name"], u["road_address"], u["room"]) == ("희망", "강동구 풍성로42길 12", "0201")
+    assert u["price_tiers"][0] == {"label": "1순위(시세 30% 적용) 청년", "deposit": 23_640_000, "rent": 243_600}

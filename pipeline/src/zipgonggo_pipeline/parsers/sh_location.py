@@ -25,11 +25,13 @@ SIDO_RE = re.compile(r"^(?:서울특별시|서울시|서울)")
 # 구 이름은 서울 25개 구만 — 「1인가구」의 「인가구」를 구로 읽은 적이 있다
 SEOUL_GU = ("종로구|중구|용산구|성동구|광진구|동대문구|중랑구|성북구|강북구|도봉구|노원구|은평구|서대문구|마포구|양천구|"
             "강서구|구로구|금천구|영등포구|동작구|관악구|서초구|강남구|송파구|강동구")
-ROAD_RE = re.compile(rf"(?P<gu>{SEOUL_GU})(?P<road>[가-힣0-9]+?(?:로|길)(?:\d+[가-힣]?(?:로|길))?)(?P<no>\d+(?:-\d+)?)(?![가-힣\d])")
+ROAD_RE = re.compile(rf"(?P<gu>{SEOUL_GU})(?P<road>[가-힣0-9]+?(?:로|길)(?:\d+[가-힣]?(?:로|길))?)(?P<no>\d+(?:-\d+)?)(?!\d|-\d|[가-힣]?(?:로|길)(?:\d|$))")
+DONG_AFTER_GU_RE = re.compile(rf"^({SEOUL_GU})[가-힣]{{1,4}}동(?:\d{{1,2}}가)?(?=[가-힣])(?![로길])")
+JIBUN_RE = re.compile(r"([가-힣]{1,4}동(?:\d{1,2}가)?)\s*(\d{1,4}(?:-\d{1,4})?)")
 EXCLUDE_RE = re.compile(r"센터|구청|본사|공사|발송|제출|접수|우편|담당|개포로621|청사|주민센터|사무소")
 LABEL_NAME = {"주택명", "단지명"}
 # 「□ 위 치: 서울특별시 …」는 칸이 「□ 위」 / 「치: …」로 쪼개져 온다 — 줄 전체로 본다(301406)
-LABEL_LINE_RE = re.compile(r"^[□○·▣■\s]*(?:주\s*소\s*지?|소\s*재\s*지|위\s*치)\s*[:：]?\s*(?P<value>.+)$")
+LABEL_LINE_RE = re.compile(r"^[□○◯❍·▣■\s]*(?:주\s*소\s*지?|소\s*재\s*지|위\s*치)\s*[:：]?\s*(?P<value>.+)$")
 # 이름 자리에 동 표기(「A동」)·지번(「(송파동18-5)」, 「천호동38-8)」)·시군구·대상 설명(「1~2인」)만 있으면 이름이 아니다
 BAD_NAME_RE = re.compile(r"^(?:\(.*|[^(]*\)|[A-Za-z0-9가-힣]{1,3}동|[가-힣]{1,3}구|.*~.*|\d.*)$")
 UNITS_RE = re.compile(r"^(\d{1,4})호$")
@@ -47,6 +49,8 @@ def _mid(s: Segment) -> float:
 def road_address(text: str) -> tuple[str, str] | None:
     """「서울특별시 중랑구 신내로 16길 3」·「중구만리재로27길69(만리동…)」 → ("중랑구", "중랑구 신내로16길 3")."""
     t = SIDO_RE.sub("", _flat(text).lstrip("(□:·"))
+    # 구와 도로명 사이의 동 이름(「서대문구홍은동명지대길98」, 305221)은 뗀다 — 도로명은 「…로/길」로 끝나 동과 안 겹친다
+    t = DONG_AFTER_GU_RE.sub(r"\1", t)
     m = ROAD_RE.search(t)
     if not m or m.start() > 2:
         return None
@@ -199,6 +203,127 @@ def _labels(page: int, rows: list[list[Segment]], title: str) -> list[dict[str, 
     return out
 
 
+def _complex_table(page: int, rows: list[list[Segment]], seen_sections: dict) -> list[dict[str, Any]]:
+    """단지 단위 주택목록(308644 본문 52쪽): 자치구 | 주택단지(「삼양로 581-11 <HJ포레스트>」) | 주택형 | … | 공급호수.
+    주택형마다 줄이 따로라 같은 주소의 호수를 더한다. 「시세의 60% / 70%」 구간마다 표가 되풀이되므로 첫 구간만 센다."""
+    head_i = next((i for i, r in enumerate(rows) if any(_flat(s.text) == "주택단지" for s in r)), None)
+    if head_i is None:
+        return []
+    head = {_flat(s.text): _mid(s) for r in rows[max(0, head_i - 1):head_i + 3] for s in r}
+    name_x = head["주택단지"]
+    units_x = head.get("호수") or head.get("공급호수") or head.get("공급")
+    gu_x = head.get("자치구")
+    title = " ".join(s.text for r in rows[:head_i] for s in r)
+    sec = re.search(r"시세의\s*\d+\s*%", title)
+    sec = sec.group(0) if sec else None
+    if sec in seen_sections and seen_sections[sec] != page:
+        return []
+    out: dict[str, dict[str, Any]] = {}
+    for r in rows[head_i + 1:]:
+        cell = [s for s in r if abs(_mid(s) - name_x) < 160 or (gu_x is not None and abs(_mid(s) - gu_x) < 40)]
+        text = " ".join(s.text for s in sorted(cell, key=lambda s: s.l))
+        m = re.search(r"<([^>]+)>", text)
+        if not m:
+            continue
+        gu = next((g for g in re.findall(SEOUL_GU, text)), None)
+        addr = text[: m.start()]
+        if gu and not _flat(addr).startswith(gu):
+            addr = gu + " " + addr
+        ra = road_address(addr)
+        if not ra:
+            continue
+        units = None
+        if units_x is not None:
+            near = [s for s in r if re.fullmatch(r"\d{1,4}", s.text.strip()) and abs(_mid(s) - units_x) < 30]
+            units = int(near[0].text) if near else None
+        name = re.sub(r"\s+\d{3}동(\s+\d{3}동)*$", "", m.group(1)).strip()
+        c = out.get(ra[1])
+        if c is None:
+            out[ra[1]] = c = _complex(name, ra[0], ra[1], page, None)
+        if units:
+            c["unit_count"] = (c["unit_count"] or 0) + units
+    if out and sec:
+        seen_sections.setdefault(sec, page)
+    # 「구로구구로동로205」를 「구로구 로동로 205」로 끊은 줄처럼, 같은 이름에 호수 있는 줄이 따로 있으면 호수 없는 줄은 버린다
+    with_units = {c["name"] for c in out.values() if c["unit_count"]}
+    return [c for c in out.values() if c["unit_count"] or c["name"] not in with_units]
+
+
+# 집마다 따로 붙는 첨부 — 공공한옥 「[주택현황] 가회동 35-2 외1」, 위국헌신 「팸플릿」, 다자녀 「주택안내」
+HOUSE_DOC_RE = re.compile(r"주택현황|팸플릿|팜플렛|주택안내|주택개요")
+
+
+def parse_house_docs(docs: list[tuple[str, list[tuple[int, str]]]], title: str) -> list[dict[str, Any]]:
+    """집별 첨부들 → 단지. 쪽마다 도로명이 처음 나오는 줄을 그 집으로 본다.
+    「종로구가회동35-2외1(북촌로11나길1-6)」처럼 지번 뒤 괄호에 도로명이 오면 괄호 쪽을 쓴다(공공한옥)."""
+    out: dict[str, dict[str, Any]] = {}
+    for name, pages in docs:
+        if not HOUSE_DOC_RE.search(name):
+            continue
+        for page, rows in _rows(pages):
+            for r in rows:
+                if _excluded(r):
+                    continue
+                text = " ".join(s.text for s in r)
+                g = re.search(SEOUL_GU, text)
+                if g and g.start() > 0 and not SIDO_RE.match(_flat(text)):
+                    text = text[g.start():]
+                ra = road_address(text)
+                building = ""
+                if ra:
+                    # 번지 뒤의 건물명(「7-20 이로카운티 천호1 (천호동 191-25)」)
+                    no = ra[1].rsplit(" ", 1)[1]
+                    bm = re.search(rf"(?<![\d-]){re.escape(no)}(?![\d-])\s*([^(]*)", text)
+                    building = bm.group(1).strip() if bm else ""
+                else:
+                    gm = re.match(rf"^\s*({SEOUL_GU})", _flat(text))
+                    pm = re.search(r"\(([^)]*(?:로|길)\s*\d[^)]*)\)", text)
+                    if not (gm and pm):
+                        continue
+                    ra = road_address(gm.group(1) + pm.group(1))
+                    if not ra:
+                        continue
+                    head = re.sub(rf"^({SEOUL_GU})", "", _flat(text[: pm.start()]))
+                    jm = JIBUN_RE.search(head)
+                    kind = "공공한옥" if "공공한옥" in title else (title_name(title) or "")
+                    building = f"{kind} {jm.group(1)} {jm.group(2)}".strip() if jm else ""
+                building = re.sub(r"\s*(다자녀|신혼|청년)?\s*매입임대주택.*$", "", building).strip(" ,")
+                if ra[1] not in out:
+                    out[ra[1]] = _complex(building or title_name(title), ra[0], ra[1], page)
+                break   # 한 쪽에 한 집
+    return list(out.values())
+
+
+# 두레주택: 주소가 평면도 첨부 이름에만 지번으로 있다 — 「(첨부2) 4호점 (충신동1-136) 평면도.PDF」
+FILE_JIBUN_RE = re.compile(r"(\d+)\s*호점\s*\(\s*([가-힣]{1,4}\d?가?동)\s*(\d{1,4}(?:-\d{1,4})?)\s*\)")
+
+
+def parse_filename_jibun(names: list[str], pages: list[tuple[int, str]], title: str) -> list[dict[str, Any]]:
+    """첨부 이름의 「n호점 (동 번지)」 → 지번 단지. 구는 공고문 공급대상 표에서 그 동과 같은 줄·이웃 줄의 구 이름을 쓴다.
+    좌표는 S6이 지번을 검색 API로 도로명으로 바꾼 뒤 요약DB에서 찾는다(--juso-api)."""
+    found = {(m.group(1), m.group(2), m.group(3)) for n in names for m in [FILE_JIBUN_RE.search(n)] if m}
+    if not found:
+        return []
+    out = []
+    for no_store, dong, num in sorted(found, key=lambda x: int(x[0])):
+        gu = None
+        for _, rows in _rows(pages[:12]):
+            for i, r in enumerate(rows):
+                if dong in _flat(" ".join(s.text for s in r)):
+                    near = " ".join(s.text for k in (i - 1, i, i + 1) if 0 <= k < len(rows) for s in rows[k])
+                    g = re.search(SEOUL_GU, near)
+                    if g:
+                        gu = g.group(0)
+                        break
+            if gu:
+                break
+        if not gu:
+            continue
+        base = title_name(title) or "두레주택"
+        out.append(_complex(f"{base} {no_store}호점", gu, f"{gu} {dong} {num}", pages[0][0] if pages else 1))
+    return out
+
+
 def parse_locations(pages: list[tuple[int, str]], title: str) -> list[dict[str, Any]]:
     """앞쪽 25쪽에서 주택 위치를 찾는다. 표가 있으면 표, 없으면 라벨 줄. 같은 주소는 한 번만."""
     found: list[dict[str, Any]] = []
@@ -207,6 +332,11 @@ def parse_locations(pages: list[tuple[int, str]], title: str) -> list[dict[str, 
             found += kind(page, rows)
         if found:
             break
+    if not found:
+        # 단지 단위 주택목록은 공고문 뒤쪽(308644 52쪽~)에 있다 — 쪽 제한 없이 본다
+        seen: dict = {}
+        for page, rows in _rows(pages):
+            found += _complex_table(page, rows, seen)
     if not found:
         for page, rows in _rows(pages[:25]):
             found += _labels(page, rows, title)

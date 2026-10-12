@@ -25,6 +25,9 @@ from statistics import median
 from typing import Any
 
 from ..sources.ish import Segment, group_rows, parse_chars, row_segments
+from .sh_location import SEOUL_GU, ROAD_RE as LOC_ROAD_RE
+
+_re_gu = re.compile(rf"^(?:{SEOUL_GU})")
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +45,8 @@ HEADER_FIELDS = {
     "주택구조": "layout",
     "신규/재공급": "new", "구분": "new",
     "승강기": "elevator",
+    # 미리내집 주택목록(299476)·공고문 본문 목록(293061): 「지역구 | 주택형 | 주택명(주택단지) | 주소 | 동 | 호 | 방개수 | 면적」
+    "지역구": "gu", "주택단지": "name", "주소": "addr", "동": "dong_col", "개수": "rooms", "면적": "area",
 }
 DEPOSIT_HEADS = {"임대보증금(원)", "임대보증금", "보증금"}
 RENT_HEADS = {"임대료(원)", "임대료", "월임대료"}
@@ -52,6 +57,8 @@ MONEY_RE = re.compile(r"^\d[\d,]*$")
 AREA_RE = re.compile(r"^(\d{2,6})(?:\.(\d{1,4}))?$")
 SIDO_RE = re.compile(r"^(서울특별시|서울시|경기도|인천광역시)\s*")
 ROAD_RE = re.compile(r"^(.+(?:로|길)\s*\d+(?:-\d+)?)(.*)$")
+# 공백 없는 꼬리 끝의 동·호: 「…제101동302호」·「…가동501호」·「…B동」
+FLAT_DONG_RE = re.compile(r"제?((?:\d{1,3}|[A-Za-z]|에이|비|씨|디|[가나다라마바사])동)(?:\d{1,4}호)?$")
 DONG_HO_RE = re.compile(r"(?:^|\s)([가-힣A-Za-z0-9]+동)\s*(?:제?\d+호)?\s*$")
 ROOMS = {"1": "원룸", "2": "투룸", "3": "쓰리룸"}
 MERGE_PX = 30     # 두 머리글 중심이 이만큼 안이면 한 칸(「전용면적」 / 「(㎡)」 두 줄)
@@ -94,21 +101,46 @@ def _field(t: str) -> str | None:
         return HEADER_FIELDS[t]
     if "소재지주소" in t or "도로명" in t:
         return "addr"
+    if t.startswith(("전용면적", "면적(")):
+        return "area"
     return None
 
 
-def _header(rows: list[list[Segment]]) -> tuple[list[_Col], list[str], int] | None:
-    """「연번」 줄이 있는 쪽의 머리글 블록 → (칸들, 계층 이름들, 첫 자료 줄 번호)."""
-    head_i = next((i for i, r in enumerate(rows) if any(_flat(s.text) == "연번" for s in r)), None)
+# 「시세의 60%」 / 「시세의 70%」처럼 표가 구간별로 되풀이되는 목록(미리내집). 구간이 곧 신청 계층이다
+SECTION_RE = re.compile(r"시세의\s*\d+\s*%")
+
+
+@dataclass
+class _Pair:
+    label: str
+    conversion: bool   # 「전세형 상호전환 상한선」 — 계층이 아니라 같은 신청자의 전환 금액이다. 싣지 않는다
+    scale: int         # 보증금 단위(「(만원)」이면 10000)
+
+
+_re_punct = re.compile(r"[.,\s()]+")
+
+
+def _numeric(s: Segment) -> bool:
+    return bool(re.fullmatch(r"[\d.,~\s-]+", s.text))
+
+
+def _header(rows: list[list[Segment]]) -> tuple[list[_Col], list[_Pair], int] | None:
+    """주소 머리글이 있는 쪽의 머리글 블록 → (칸들, 금액 짝들, 첫 자료 줄 번호).
+
+    「연번」은 없을 수도 있고(299476) 「연 / 번」 두 줄로 쪼개질 수도 있다(293061) — 주소 머리글로 찾는다."""
+    head_i = next((i for i, r in enumerate(rows)
+                   if any(_field(_flat(s.text)) == "addr" and len(_flat(s.text)) <= 20 for s in r)), None)
     if head_i is None:
         return None
-    data_i = next((i for i in range(head_i + 1, len(rows)) if rows[i] and SEQ_RE.match(rows[i][0].text)), None)
+    # 첫 자료 줄: 칸이 다섯 개 이상이고 숫자 칸이 셋 이상(호·면적·금액)
+    data_i = next((i for i in range(head_i + 1, min(len(rows), head_i + 12))
+                   if len(rows[i]) >= 5 and sum(_numeric(x) for x in rows[i]) >= 3), None)
     if data_i is None:
         return None
-    # 머리글 블록: 연번 줄 위로 다섯 줄, 아래로 첫 자료 줄 전까지. 주석(※)과 제목은 칸이 될 수 없다
-    # 신혼Ⅰ은 계층 이름 첫 줄이 연번 줄 여섯 줄 위에 있다
+    # 머리글 블록: 주소 줄 위로 여덟 줄(신혼Ⅰ은 계층 이름 첫 줄이 여섯 줄 위), 아래로 첫 자료 줄 전까지
     block = rows[max(0, head_i - 8):data_i]
-    money = sorted((s for r in block for s in r if _flat(s.text) in DEPOSIT_HEADS | RENT_HEADS), key=lambda s: s.l)
+    block = [r for r in block if not SECTION_RE.search(" ".join(x.text for x in r))]
+    money = sorted((x for r in block for x in r if _flat(x.text) in DEPOSIT_HEADS | RENT_HEADS), key=lambda x: x.l)
     pairs: list[tuple[Segment, Segment]] = []
     for a, b in zip(money, money[1:]):
         if _flat(a.text) in DEPOSIT_HEADS and _flat(b.text) in RENT_HEADS:
@@ -118,15 +150,15 @@ def _header(rows: list[list[Segment]]) -> tuple[list[_Col], list[str], int] | No
 
     cols: list[_Col] = []
     for r in block:
-        for s in r:
-            t = _flat(s.text)
+        for x in r:
+            t = _flat(x.text)
             if t in DEPOSIT_HEADS or t in RENT_HEADS:
                 continue
-            if lo <= _mid(s) <= hi:
+            if lo <= _mid(x) <= hi:
                 continue  # 금액 칸 위의 계층 이름 — 칸이 아니다
             if len(t) > COLUMN_MAX_CH and _field(t) is None:
                 continue
-            cols.append(_Col(_mid(s), _field(t), t))
+            cols.append(_Col(_mid(x), _field(t), t))
     merged: list[_Col] = []
     for c in sorted(cols, key=lambda c: c.center):
         if merged and c.center - merged[-1].center <= MERGE_PX:
@@ -141,18 +173,29 @@ def _header(rows: list[list[Segment]]) -> tuple[list[_Col], list[str], int] | No
     # 계층 이름: 금액 영역 안의 머리글 조각을 줄마다 가장 가까운 짝에 붙인다(위 줄부터 이어 쓴다)
     names: list[list[str]] = [[] for _ in pairs]
     centers = [(_mid(a) + _mid(b)) / 2 for a, b in pairs]
+    manwon = [x for r in block for x in r if "만원" in x.text]
     for r in block:
-        cands = [s for s in r if lo <= _mid(s) <= hi and _flat(s.text) not in DEPOSIT_HEADS | RENT_HEADS
-                 and "보증금" not in s.text]
+        cands = [x for x in r if lo <= _mid(x) <= hi and _flat(x.text) not in DEPOSIT_HEADS | RENT_HEADS
+                 and "보증금" not in x.text and "만원" not in x.text and not re.fullmatch(r"\(?원\)?", _flat(x.text))]
         if not cands:
             continue
         for k, c in enumerate(centers):
-            best = min(cands, key=lambda s: abs(_mid(s) - c))
+            best = min(cands, key=lambda x: abs(_mid(x) - c))
             names[k].append(best.text.strip())
-    tiers = [" ".join(n) or f"계층{k + 1}" for k, n in enumerate(names)]
-    if not any(c.field == "addr" for c in merged):
+    # 「전세형 상호전환 상한선」은 그 짝의 칸 범위 위에 있을 때만 그 짝의 것이다 — 이름 붙이기는 가장 가까운 조각을
+    # 짝마다 고르므로 옆 짝(기본형)에도 같은 말이 붙는다(299476)
+    conv_segs = [x for r in block for x in r if "전환" in _flat(x.text)]
+    out_pairs = []
+    for k, (a, b) in enumerate(pairs):
+        label = re.sub(r"\s*,\s*", " ", " ".join(names[k])).strip()
+        conversion = any(x.l < b.r and x.r > a.l for x in conv_segs)
+        # 「(만원)」 표기가 이 짝의 보증금 칸 가까이에 있으면 만 원 단위다(293061·308644 본문 목록)
+        scale = 10000 if any(abs(_mid(m) - _mid(a)) < abs(_mid(m) - _mid(b)) and abs(_mid(m) - _mid(a)) < 60
+                             for m in manwon) else 1
+        out_pairs.append(_Pair(label, conversion, scale))
+    if not any(c.field == "addr" for c in merged) or not any(c.field == "ho" for c in merged):
         return None
-    return merged, tiers, data_i
+    return merged, out_pairs, data_i
 
 
 # 글자 칸은 한 칸이 조각 둘로 올 수 있다(304699 「서울특별시 서초구 논현로5길 23-7」 / 「(양재동 400-11)」) — 이어 붙인다
@@ -211,6 +254,31 @@ def _addr(addr: str, gu: str | None) -> tuple[str, str, str, str | None, str | N
         t = t[m.end():]
     head, _, rest = t.partition("(")
     paren, _, tail = rest.partition(")")
+    # 띄어쓰기 없는 표기(「강북구삼양로173가길18」·「광진구면목로192다베로102」)는 공백을 지운 글자에서 도로명과 번지를 끊는다
+    fh = _flat(head)
+    if gu and not fh.startswith(gu) and not _re_gu.match(fh):
+        fh = gu + fh
+    lm = LOC_ROAD_RE.search(fh) if sido == "서울특별시" else None
+    if lm and lm.start() <= 2:
+        no, end = lm.group("no"), lm.end()
+        # 원문에 공백이 있으면 그 공백이 번지의 끝이다 — 「장월로1마길 23 101동」을 지운 채 읽으면 번지가 「23101」이 된다(304699)
+        tokens = re.findall(r"\d+(?:-\d+)?", head)
+        if no not in tokens:
+            cut = next((t for t in tokens if no.startswith(t) and len(t) < len(no)), None)
+            if cut:
+                end -= len(no) - len(cut)
+                no = cut
+        road = f"{lm.group('gu')} {lm.group('road')} {no}"
+        # 건물명은 원문 공백을 살려 뗀다(「다드림 10차」가 「다드림10차」가 되면 이전 적재와 다른 단지가 된다)
+        bm = re.search(rf"(?<![\d-]){re.escape(no)}(?![\d-])\s*(.*)$", head)
+        building = bm.group(1).strip() if bm else fh[end:]
+        dm = FLAT_DONG_RE.search(_flat(f"{building}{tail}"))
+        dong = dm.group(1) if dm else None
+        jm = re.match(r"^([가-힣0-9]+(?:동|가|리))\s*(\d+(?:-\d+)?)$", paren.strip())
+        jibun = f"{lm.group('gu')} {jm.group(1)} {jm.group(2)}" if jm else None
+        if dm and dm.start() <= len(building):
+            building = building[: dm.start()]
+        return sido, lm.group("gu"), road, dong, jibun, building
     # 괄호 없이 건물명과 동호가 이어지는 주소(「경인로15나길 65-4 궁동에스하임 제101동 302호」)는 번지에서 끊는다
     rm = ROAD_RE.match(head.strip())
     building = ""
@@ -236,7 +304,7 @@ def _addr(addr: str, gu: str | None) -> tuple[str, str, str, str | None, str | N
 # 건축물대장 기본 건물명(「주건축물제1동」)과 「제B동」은 이름이 아니라 동이다
 DONG = r"(?:주건축물제?|제)?(?:\d+|[A-Za-z]|[가나다라마바사]|에이|비|씨|디)동"
 DONG_ONLY_RE = re.compile(rf"^\(?({DONG})\)?$")
-NAME_DONG_RE = re.compile(rf"^(?P<name>.+?)(?:\s+\(?|\()(?P<dong>{DONG})\)?$")
+NAME_DONG_RE = re.compile(rf"^(?P<name>.+?)(?:\s+\(?|\(|(?<=[^\d\s])(?=\d{{2,3}}동\)?$))(?P<dong>{DONG})\)?$")
 
 
 # 같은 동을 주소는 「에이동/비동」, 이름은 「A동/B동」으로 적는다(포엠빌 중화동, 2026-10-12) — 영문으로 맞춘다
@@ -278,6 +346,16 @@ def _floor(ho: str) -> int | None:
 def _disambiguate(parsed: list[dict[str, Any]]) -> None:
     """같은 이름의 다른 건물(「삼화에코빌」 송파·동대문·양천)에 구를, 같은 구면 도로명을 붙인다.
     단지 URL이 /notice/{공고}/{단지명}이라 이름이 겹치면 둘째 단지로 들어갈 길이 없다(2026-10-12)."""
+    by_name: dict[str, set[str]] = {}
+    for p in parsed:
+        by_name.setdefault(p["name"], set()).add(p["road"])
+    fix: dict[tuple[str, str], str] = {}
+    for name, rs in by_name.items():
+        for r in rs:
+            if "-" in r:
+                fix[(name, r.replace("-", ""))] = r
+    for p in parsed:
+        p["road"] = fix.get((p["name"], p["road"]), p["road"])
     roads: dict[str, set[str]] = {}
     for p in parsed:
         roads.setdefault(p["name"], set()).add(p["road"])
@@ -291,52 +369,155 @@ def _disambiguate(parsed: list[dict[str, Any]]) -> None:
 
 
 def parse_house_list(pages: list[tuple[int, str]]) -> HouseList | None:
-    """주택목록 PDF 쪽들 → HouseList. 머리글을 못 찾으면 None(이 양식이 아니다)."""
+    """주택목록 쪽들 → HouseList. 머리글을 못 찾으면 None(이 양식이 아니다).
+
+    같은 호실이 구간(시세의 60% / 70%)마다 한 번씩 나오면 한 호실로 합치고 구간을 계층으로 싣는다.
+    연번은 구간마다 1부터 다시 시작한다(293061) — 연번으로 중복을 거르면 둘째 구간이 통째로 사라진다."""
     cols: list[_Col] | None = None
-    tiers: list[str] = []
-    raw: list[tuple[int, dict[str, str]]] = []
+    pairs: list[_Pair] = []
+    raw: list[tuple[int, str | None, dict[str, str]]] = []
+    section: str | None = None
     for page, xml in pages:
         rows = [row_segments(r) for r in group_rows(parse_chars(xml))]
-        start = 0
         h = _header(rows)
         if h is not None:
-            if cols is None:
-                cols, tiers, _ = h
-            start = h[2]
+            cols, pairs, _ = h
         if cols is None:
+            # 머리글보다 앞 쪽의 구간 제목도 놓치지 않는다
+            for r in rows:
+                sm = SECTION_RE.search(" ".join(x.text for x in r))
+                if sm:
+                    section = sm.group(0).replace(" ", "")
             continue
-        for r in rows[start:]:
-            if not r or not SEQ_RE.match(r[0].text):
+        pending: str | None = None   # 주택단지 이름이 자료 줄 윗줄에 따로 오는 목록(293061 「북한산 에버아트」)
+        for ri, r in enumerate(rows):
+            text = " ".join(x.text for x in r)
+            sm = SECTION_RE.search(text)
+            if sm and len(r) <= 3:
+                section = sm.group(0).replace(" ", "")
                 continue
-            raw.append((page, _assign(r, cols)))
+            r = [x for x in r if not _re_punct.fullmatch(x.text)]
+            if not r:
+                continue
+            nxt = [x for x in rows[ri + 1] if not _re_punct.fullmatch(x.text)] if ri + 1 < len(rows) else []
+            if nxt and all(_numeric(x) for x in nxt) and len(nxt) >= 2 and any(HO_RE.match(_flat(x.text)) for x in r):
+                r = r + nxt
+            v = _assign(r, cols)
+            if v.get("addr") and v.get("ho") and HO_RE.match(_flat(v["ho"])) and re.search(r"(?:로|길)\s*\d", v["addr"]):
+                if not v.get("name") and pending:
+                    v["name"] = pending
+                raw.append((page, section, v))
+                pending = None
+            elif v.get("name") and not v["name"].lstrip().startswith("(") and not _numeric(r[0]):
+                pending = v["name"]
     if cols is None or not raw:
         return None
+    return _build(raw, pairs)
+
+
+def parse_house_xlsx(data: bytes) -> HouseList | None:
+    """엑셀 주택목록(청년 매입임대 290219 「[주택목록] … .xlsx」) → HouseList. PDF와 칸 구성이 같아 뒷부분(_build)을 같이 쓴다.
+
+    머리글은 여러 줄이다: 「연번 | … | 소재지 주소 | … | 보증금 및 임대료(원)」 / 「1순위(시세 30% 적용)」 / 「청년」 / 「보증금 | 임대료」.
+    병합 칸은 첫 칸에만 값이 있어 계층 이름 줄은 오른쪽으로 채워 읽는다."""
+    import io
+
+    import openpyxl
+
+    wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True, read_only=True)
+    ws = wb.worksheets[0]
+    grid = [["" if v is None else str(v).strip() for v in row] for row in ws.iter_rows(values_only=True)]
+    head_i = next((i for i, r in enumerate(grid) if any(_field(_flat(c)) == "addr" for c in r)), None)
+    if head_i is None:
+        return None
+    fields: dict[int, str] = {}
+    for j, c in enumerate(grid[head_i]):
+        f = _field(_flat(c))
+        if f:
+            fields[j] = f
+    money_i = next((i for i in range(head_i, min(len(grid), head_i + 6))
+                    if any(_flat(c) in DEPOSIT_HEADS for c in grid[i])), None)
+    pairs: list[_Pair] = []
+    if money_i is not None:
+        filled = []
+        for i in range(head_i + 1, money_i):
+            row, last = [], ""
+            for c in grid[i]:
+                last = c or last
+                row.append(last)
+            filled.append(row)
+        heads = grid[money_i]
+        for j, c in enumerate(heads):
+            if _flat(c) in DEPOSIT_HEADS and j + 1 < len(heads) and _flat(heads[j + 1]) in RENT_HEADS:
+                label = " ".join(r[j] for r in filled if j < len(r) and r[j]).strip()
+                k = len(pairs)
+                fields[j], fields[j + 1] = f"dep{k}", f"rent{k}"
+                pairs.append(_Pair(label, "전환" in _flat(label), 1))
+    raw: list[tuple[int, str | None, dict[str, str]]] = []
+    for i in range((money_i or head_i) + 1, len(grid)):
+        v = {f: grid[i][j] for j, f in fields.items() if j < len(grid[i]) and grid[i][j]}
+        if v.get("addr") and v.get("ho") and HO_RE.match(_flat(v["ho"])):
+            raw.append((1, None, v))
+    return _build(raw, pairs) if raw else None
+
+
+def _build(raw: list[tuple[int, str | None, dict[str, str]]], pairs: list["_Pair"]) -> HouseList:
+    real = [k for k, pr in enumerate(pairs) if not pr.conversion]
+
+    def tier_label(sec: str | None, k: int) -> str:
+        own = pairs[k].label
+        parts = ([sec] if sec else []) + ([own] if own and (len(real) > 1 or not sec) else [])
+        return " ".join(parts) or f"계층{k + 1}"
+
+    # 한 호실 = (단지, 도로명, 동, 호). 구간마다 다시 나오면 금액만 보탠다
+    tiers: list[str] = []
+    units: dict[tuple, dict[str, Any]] = {}
+    order = 0
+    # 하이픈이 빠진 번지(299476 융성그린빌 「17-9」 / 「179」가 줄마다 섞인다)는 호실을 합치기 전에 맞춘다 —
+    # 합친 뒤에 고치면 같은 호가 두 번 센다
+    addrs = [_addr(v["addr"], v.get("gu")) for _, _, v in raw]
+    hyphen = {(a[2].replace("-", "")): a[2] for a in addrs if "-" in a[2].rsplit(" ", 1)[-1]}
+    for (page, sec, v), a in zip(raw, addrs):
+        sido, sigungu, road, dong, jibun, building = a
+        road = hyphen.get(road, road)
+        dcol = _flat(v.get("dong_col") or "")
+        # 동 칸: 「102」·「A동」·「101동」(308644 새울센스빌 A동/B동 — 빠뜨리면 두 동의 0201호가 한 호실로 합쳐진다)
+        if dcol and not dong:
+            if re.fullmatch(r"\d{1,3}", dcol):
+                dong = f"{dcol}동"
+            elif re.fullmatch(r"(?:\d{1,3}|[A-Za-z]|[가-힣]{1,2})동", dcol):
+                dong = dcol
+        name, dong = _name_dong(v.get("name") or building, dong, road)
+        raw_ho = _flat(v["ho"])
+        ho = raw_ho.zfill(4)
+        key = (name, road, dong, ho)
+        p = units.get(key)
+        if p is None:
+            order += 1
+            layout = v.get("layout")
+            if not layout and _flat(v.get("rooms") or "") in ROOMS:
+                layout = ROOMS[_flat(v["rooms"])]
+            elev = v.get("elevator")
+            p = units[key] = {
+                "seq": int(v["seq"]) if v.get("seq") and SEQ_RE.match(v["seq"]) else order, "page": page,
+                "name": name, "sido": sido, "sigungu": sigungu, "road": road, "dong": dong,
+                "jibun": jibun or (v.get("jibun") or None), "ho": ho, "area": _area(v.get("area")),
+                "prices": {}, "layout": re.sub(r"\s+", "", layout) if layout else None,
+                "elevator": {"O": "설치", "X": "미설치"}.get((elev or "").strip().upper()),
+                "is_new": "신규" in (v.get("new") or ""),
+                "short_ho": len(raw_ho) == 3,
+            }
+        for k in real:
+            label = tier_label(sec, k)
+            if label not in tiers:
+                tiers.append(label)
+            d, r = _money(v.get(f"dep{k}")), _money(v.get(f"rent{k}"))
+            p["prices"].setdefault(label, (d * pairs[k].scale if d is not None else None, r))
+    parsed = list(units.values())
+    for p in parsed:
+        p["prices"] = [p["prices"].get(t, (None, None)) for t in tiers]
 
     out = HouseList(tiers=tiers)
-    parsed: list[dict[str, Any]] = []
-    seen: set[int] = set()
-    for page, v in raw:
-        if not v.get("seq") or not v.get("addr") or not v.get("ho") or not HO_RE.match(v["ho"]):
-            continue
-        seq = int(v["seq"])
-        if seq in seen:
-            continue
-        seen.add(seq)
-        sido, sigungu, road, dong, jibun, building = _addr(v["addr"], v.get("gu"))
-        name, dong = _name_dong(v.get("name") or building, dong, road)
-        prices = [(_money(v.get(f"dep{k}")), _money(v.get(f"rent{k}"))) for k in range(len(tiers))]
-        layout = v.get("layout")
-        if not layout and v.get("rooms") in ROOMS:
-            layout = ROOMS[v["rooms"]]
-        elev = v.get("elevator")
-        elevator = {"O": "설치", "X": "미설치"}.get((elev or "").strip().upper())
-        parsed.append({
-            "seq": seq, "page": page, "name": name, "sido": sido, "sigungu": sigungu, "road": road,
-            "dong": dong, "jibun": jibun or (v.get("jibun") or None), "ho": v["ho"],
-            "area": _area(v.get("area")), "prices": prices,
-            "layout": re.sub(r"\s+", "", layout) if layout else None,
-            "elevator": elevator, "is_new": "신규" in (v.get("new") or ""),
-        })
 
     # 계층마다 보증금과 임대료를 따로 중앙값에 대 자릿수 유실을 걸러낸다
     mids = []
@@ -352,14 +533,26 @@ def parse_house_list(pages: list[tuple[int, str]]) -> HouseList | None:
         for k, (d, r) in enumerate(p["prices"]):
             ok = near(d, mids[k][0]) and near(r, mids[k][1])
             if not ok and (d or r):
-                log.warning("주택목록 연번 %d 계층 %s 금액 검산 실패(%s / %s) — 비운다", p["seq"], tiers[k], d, r)
+                log.warning("주택목록 %s %s호 계층 %s 금액 검산 실패(%s / %s) — 비운다", p["name"], p["ho"], tiers[k], d, r)
             if not ok:
                 p["prices"][k] = (None, None)
 
+    # 4자리 호(「0201」)로 적힌 단지에 3자리 호가 섞이면 Synap이 겹친 숫자를 흘린 것이다(299476 「1102」→「102」).
+    # 「1001」도 「101」이 되므로 되살릴 수 없다 — 틀린 호수를 보이느니 그 호실 행은 만들지 않는다(단지 호수에는 센다)
+    four = {}
+    for p in parsed:
+        if not p.get("short_ho"):
+            four[(p["name"], p["road"])] = four.get((p["name"], p["road"]), 0) + 1
+    for p in parsed:
+        p["lossy_ho"] = bool(p.get("short_ho")) and four.get((p["name"], p["road"]), 0) >= 3
     _disambiguate(parsed)
     keys: dict[str, int] = {}
     for p in parsed:
-        base = p["prices"][0] if p["prices"] else (None, None)
+        base = next((t for t in p["prices"] if t[0] is not None and t[1] is not None), (None, None))
+        if p["lossy_ho"]:
+            out.dropped += 1
+            log.warning("주택목록 %s %s호: 호수 숫자가 빠진 줄로 보여 호실 행을 만들지 않는다", p["name"], p["ho"])
+            continue
         if p["area"] is None or base[0] is None:
             # 금액 칸이 없는 목록(장기미임대)은 원래 호실 행을 못 만든다 — 그때는 조용히 단지만 낸다
             if tiers:
@@ -411,7 +604,7 @@ def parse_house_list(pages: list[tuple[int, str]]) -> HouseList | None:
             c = by[k] = {"name": k[0], "sido": p["sido"], "sigungu": p["sigungu"], "road_address": k[1],
                          "is_new": False, "source_page": p["page"], "complex_code": None, "heating": None,
                          "unit_count": 0, "min_deposit": None, "min_rent": None, "area_min": None, "area_max": None}
-        base = p["prices"][0] if p["prices"] else (None, None)
+        base = next((t for t in p["prices"] if t[0] is not None and t[1] is not None), (None, None))
         c["unit_count"] += 1
         c["is_new"] = c["is_new"] or p["is_new"]
         c["min_deposit"] = low(c["min_deposit"], base[0])

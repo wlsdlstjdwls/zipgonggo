@@ -14,12 +14,13 @@
 from __future__ import annotations
 
 import html
+import json
 import logging
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
 import httpx
 
@@ -115,6 +116,26 @@ def find_attachments(page_html: str) -> list[Attachment]:
         out.append(Attachment(name=html.unescape(m.group("name")).strip(), preview_url=urljoin(BASE_URL, html.unescape(m.group("preview")))))
     if not out:  # 파일명 마크업이 달라져도 미리보기 링크만은 건진다
         out = [Attachment(name="", preview_url=urljoin(BASE_URL, html.unescape(u))) for u in PREVIEW_RE.findall(page_html)]
+    return out
+
+
+DOWNLIST_RE = re.compile(r"initParam\.downList\s*=\s*(\[.*?\]);", re.S)
+
+
+def find_downloads(page_html: str) -> list[tuple[str, str]]:
+    """첨부 원본 내려받기 (파일명, URL). 미리보기가 안 되는 엑셀(청년 매입임대 290219 주택목록)은 이것밖에 길이 없다.
+    공고 화면의 이노릭스 설정(initParam.downList)과 innorix.config.js의 URL 규칙 그대로다."""
+    m = DOWNLIST_RE.search(page_html)
+    if not m:
+        return []
+    try:
+        items = json.loads(m.group(1))
+    except ValueError:
+        return []
+    out = []
+    for it in items:
+        q = urlencode({"brdId": it.get("brdId"), "seq": it.get("seq"), "fileTp": it.get("fileTp"), "fileSeq": it.get("fileSeq")})
+        out.append((str(it.get("oriFileNm") or ""), urljoin(BASE_URL, f"/main/com/file/innoFD.do?{q}")))
     return out
 
 
@@ -227,6 +248,9 @@ class IshClient:
 
     def fetch_notice_html(self, url: str) -> str:
         return self._http.get(short_view_url(url), label="i-sh 공고", accept_redirect=False).text
+
+    def download(self, url: str) -> bytes:
+        return self._http.get(url, label="i-sh 첨부 원본", accept_redirect=False).content
 
     def resolve_preview(self, preview_url: str) -> SynapDoc | None:
         """미리보기 링크 → 뷰어 302 Location에서 rs·fn. 변환이 안 된 첨부면 None."""

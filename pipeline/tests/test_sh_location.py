@@ -63,3 +63,32 @@ def test_road_address_and_title():
     assert road_address("강남구 밤고개로21길") is None
     assert road_address("1인가구 무주택세대구성원") is None
     assert title_name("2026-2차 사당동원룸 잔여세대 입주자모집공고(26. 6. 26.)") == "사당동원룸"
+
+
+def test_house_docs():
+    """집마다 붙은 첨부: 위국헌신 팸플릿(「서울시 강동구 진황도로27나길 7-20 이로카운티 천호1 (천호동 191-25)」 —
+    번지 뒤 「이로…」를 길 이름으로 읽으면 안 된다), 공공한옥 주택현황(「종로구가회동35-2외1(북촌로11나길1-6)」)."""
+    from zipgonggo_pipeline.parsers.sh_location import parse_house_docs
+
+    got = parse_house_docs([("[첨부] 공급 주택 팸플릿.pdf", pages("305517_doc", [2]))], "위국헌신청년주택")
+    assert table(got) == [("이로카운티 천호1", "강동구 진황도로27나길 7-20", None)]
+    got = parse_house_docs([("[주택현황] 가회동 35-2 외1.pdf", pages("308971_doc", [1]))],
+                           "2026년 일반주택형 미리내집(공공한옥) 잔여세대 입주자 모집공고")
+    assert table(got) == [("공공한옥 가회동 35-2", "종로구 북촌로11나길 1-6", None)]
+
+
+def test_label_with_dong_between_gu_and_road():
+    """「◯ 소재지 : 서대문구 홍은동 명지대길 98 및 94」 — 머리 기호 ◯, 구와 도로명 사이의 동 이름."""
+    locs = table(parse_locations(pages("305221", [1]), "홍은동 청년협동조합[이웃기웃] 잔여세대 입주자 모집공고"))
+    assert locs == [("홍은동 청년협동조합", "서대문구 명지대길 98", None)]
+    assert road_address("구로구 구로동로 205") == ("구로구", "구로구 구로동로 205")
+
+
+def test_filename_jibun():
+    """두레주택: 주소는 평면도 첨부 이름의 지번뿐이다. 구는 공고문 공급대상 표에서 딴다."""
+    from zipgonggo_pipeline.parsers.sh_location import parse_filename_jibun
+
+    names = ["(첨부2) 4호점 (충신동1-136) 평면도.PDF", "(첨부3) 5호점 (충신동1-139) 평면도.PDF"]
+    got = table(parse_filename_jibun(names, pages("308887", [4]), "2026-3차 충신동 연극인 두레주택 잔여세대 입주자 모집공고"))
+    assert got == [("충신동 연극인 두레주택 4호점", "종로구 충신동 1-136", None),
+                   ("충신동 연극인 두레주택 5호점", "종로구 충신동 1-139", None)]
