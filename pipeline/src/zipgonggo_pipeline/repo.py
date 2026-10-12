@@ -178,7 +178,7 @@ def replace_units(cur, notice_id: int, rows: list[dict[str, Any]]) -> int:
         INSERT INTO unit
           (notice_id, notice_complex_id, unit_key, road_address, complex_name, building, room, floor,
            sido, sigungu, area_m2, deposit, rent, deposit_jeonse, rent_jeonse, deposit_wolse, rent_wolse,
-           room_layout, elevator, has_elevator, seq, source_page)
+           room_layout, elevator, has_elevator, seq, source_page, price_tiers)
         VALUES (%(notice_id)s,
                 COALESCE(
                   (SELECT id FROM notice_complex
@@ -188,10 +188,13 @@ def replace_units(cur, notice_id: int, rows: list[dict[str, Any]]) -> int:
                 %(unit_key)s, %(road_address)s, %(complex_name)s, %(building)s, %(room)s, %(floor)s,
                 %(sido)s, %(sigungu)s, %(area_m2)s, %(deposit)s, %(rent)s,
                 %(deposit_jeonse)s, %(rent_jeonse)s, %(deposit_wolse)s, %(rent_wolse)s,
-                %(room_layout)s, %(elevator)s, %(has_elevator)s, %(seq)s, %(source_page)s)
+                %(room_layout)s, %(elevator)s, %(has_elevator)s, %(seq)s, %(source_page)s, %(price_tiers)s::jsonb)
         ON CONFLICT (notice_id, unit_key) DO NOTHING
         """,
-        [{"notice_id": notice_id, "nc_name": None, "nc_road": None, **r} for r in rows],
+        # price_tiers(0040)는 SH 주택목록(sh_house_list)만 채운다 — 계층별 금액이 여럿인 양식
+        [{"notice_id": notice_id, "nc_name": None, "nc_road": None, **r,
+          "price_tiers": json.dumps(r["price_tiers"], ensure_ascii=False) if r.get("price_tiers") else None}
+         for r in rows],
     )
     return len(rows)
 

@@ -26,6 +26,7 @@ from ..config import PIPELINE_ROOT, settings
 from ..db import connect
 from ..parsers.sh_attach import merge_teukhwa, parse_attachment, teukhwa_facts
 from ..parsers.sh_eligibility import parse_eligibility, verify_income_table
+from ..parsers.sh_house_list import HouseList, parse_house_list
 from ..repo import (
     income_base100, income_years, replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts,
     upsert_notice_eligibility,
@@ -64,6 +65,16 @@ WHERE source_url LIKE '%%i-sh.co.kr%%'
 ORDER BY posted_at DESC, id DESC
 LIMIT %(limit)s
 """
+
+
+# 주소가 공고문이 아니라 별도 첨부에만 있는 양식(신혼·신생아, 청년 매입임대). 요약판은 주소가 없어 상세판을 고른다
+HOUSE_LIST_RE = re.compile(r"주택목록|주택안내")
+
+
+def pick_house_list(atts):
+    cands = [a for a in atts if HOUSE_LIST_RE.search(a.name) and a.name.lower().endswith(".pdf") and "요약" not in a.name]
+    cands.sort(key=lambda a: "상세" not in a.name)
+    return cands[0] if cands else None
 
 
 def rank_attachments(atts) -> list:
@@ -377,6 +388,26 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                             more = teukhwa_facts(extra)
                             if more is not None:
                                 facts = merge_teukhwa(facts, more)
+                    # 공고문에 단지가 없으면 별도 첨부 「주택목록」을 읽는다(신혼·신생아 매입임대 310650, 2026-10-12).
+                    # 공고문에 이미 단지 표가 있는 양식은 요청을 늘리지 않는다
+                    house: HouseList | None = None
+                    if not facts.complexes and facts.kind != "teukhwa":
+                        list_pages: list = []
+                        if cached:
+                            list_dir = CACHE_ROOT / seq / "list"
+                            list_pages = list(iter_cached_pages(list_dir)) if list_dir.is_dir() else []
+                        else:
+                            att = pick_house_list(atts)
+                            doc = client.resolve_preview(att.preview_url) if att else None
+                            if doc is not None:
+                                list_pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq / "list"))
+                        house = parse_house_list(list_pages) if list_pages else None
+                        if house and house.units:
+                            facts.kind = "house_list"
+                            facts.complexes = house.complexes
+                            facts.totals = house.totals
+                        else:
+                            house = None
                     kind, rows, units = facts.kind, facts.complexes, facts.units
                     supply_rows = [_supply_row(l) for l in facts.supply_lines] + [_jeonse_row(l) for l in facts.jeonse_lines]
                     if facts.kind == "teukhwa":
@@ -389,7 +420,7 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                 sch, sup = facts.schedule, facts.supply
                 log.info(
                     "%s: %d쪽 · %s · 단지 %d건 · 호실 %d건 · 공급 %d건 · 자격 %s · 일정 %s · 전세금 %s (%s)",
-                    n["slug"], len(pages), kind, len(rows), len(units), len(supply_rows),
+                    n["slug"], len(pages), kind, len(rows), len(house.units) if house else len(units), len(supply_rows),
                     (f"{elig.kind} {len(elig.class_blocks)}계층" if elig.class_blocks
                      else f"{elig.kind} {len(elig.rank_tables)}표/{len(elig.selection)}선정/{len(elig.score_tables)}배점") if elig else "없음",
                     f"{sch.apply_start}~{sch.apply_end}" if sch else "없음",
@@ -422,6 +453,8 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                         replace_units(cur, n["id"], _unit_rows(units))
                     elif facts.kind == "teukhwa":
                         replace_units(cur, n["id"], _teukhwa_unit_rows(facts.teukhwa_houses))
+                    elif house is not None:
+                        replace_units(cur, n["id"], house.units)
                     # 공급현황 줄은 단지 행 다음에 넣는다 — complex_id를 같은 공고의 단지에서 이름으로 찾는다
                     replace_notice_supply(cur, n["id"], supply_rows)
                     update_notice_attach_facts(

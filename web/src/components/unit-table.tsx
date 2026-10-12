@@ -8,6 +8,8 @@
 // 별첨에 동이 없어도 주소가 갈리면 같은 「404호」가 건물마다 따로 있다 — 그때는 주소 칸을 세운다.
 // 동도 주소도 하나뿐이면 한 건물이라 호만으로 유일하다.
 // 금액은 계약 때 고를 수 있는 폭 그대로 — 최대(전세전환) / 기준 / 최소(월세전환).
+// 신청 계층마다 금액이 다른 공고(신혼·신생아 「소득50% 이하 / 70% 이하」, 청년 「1순위 / 2~3순위」)는
+// 계층 셀렉트로 금액 열을 바꿔 보인다(price_tiers, 2026-10-12). 열을 계층 수만큼 늘리면 청년은 금액 열이 여덟 개다.
 //
 // **자리를 못 박았다(사용자 지적 2026-09-21: "여전히 너무 많은 영역을 차지해").**
 // 실측(2026-09-21): 단지 471곳 중 462곳이 15호 이하인데 엘클루(3동 17층) 172호처럼 백 줄이 넘는 단지가 있다.
@@ -63,6 +65,12 @@ export function UnitTable({ units }: Props) {
   const [layout, setLayout] = useState(ALL);
   const [floor, setFloor] = useState(ALL);
   const [sort, setSort] = useState<Sort>({ key: "room", desc: false });
+  // 계층 이름은 금액이 여러 벌인 첫 호실에서 읽는다 — 한 단지 안에서는 계층 구성이 같다
+  const tiers = useMemo(() => units.find((u) => (u.price_tiers?.length ?? 0) > 1)?.price_tiers?.map((t) => t.label) ?? [], [units]);
+  const [tier, setTier] = useState("0");
+  const ti = Number(tier) || 0;
+  const depositOf = useCallback((u: NoticeUnit) => (tiers.length ? (u.price_tiers?.[ti]?.deposit ?? null) : u.deposit), [tiers.length, ti]);
+  const rentOf = useCallback((u: NoticeUnit) => (tiers.length ? (u.price_tiers?.[ti]?.rent ?? null) : u.rent), [tiers.length, ti]);
 
   // 동이 하나라도 있으면 동으로, 없으면 주소가 갈릴 때만 주소로 가른다
   const byDong = units.some((u) => u.building);
@@ -92,7 +100,7 @@ export function UnitTable({ units }: Props) {
     [units, dong, layout, floor, groupOf],
   );
 
-  const hasRent = units.some((u) => u.rent != null);
+  const hasRent = units.some((u) => rentOf(u) != null);
 
   // 열은 **호실마다 값이 갈릴 때만** 세운다(사용자 결정 2026-09-22:
   // "호실별 정보가 좀 중복정보가 많은데 중복 정보는 상단에 표기하고 서로 다른 것만 표기하면 어떤가").
@@ -105,8 +113,9 @@ export function UnitTable({ units }: Props) {
     area: many((u) => u.area_m2),
     layout: many((u) => u.room_layout),
     elevator: many((u) => u.elevator),
-    deposit: many((u) => u.deposit),
-    rent: hasRent && many((u) => u.rent),
+    // 계층을 고를 수 있으면 금액 열은 늘 세운다 — 계층을 바꿨는데 금액이 안 보이면 셀렉트가 헛돈다
+    deposit: tiers.length > 0 || many(depositOf),
+    rent: hasRent && (tiers.length > 0 || many(rentOf)),
   };
   // colSpan은 실제로 그리는 열 수와 맞춰야 한다 — 호 열 하나에 켜진 열을 더한다
   const colCount = 1 + Object.values(col).filter(Boolean).length;
@@ -116,17 +125,17 @@ export function UnitTable({ units }: Props) {
   const visible = useMemo(() => {
     if (sort.key === "room") return filtered;
     if ((sort.key === "area" && !col.area) || (sort.key === "deposit" && !col.deposit)) return filtered;
-    const pick = sort.key === "area" ? (u: NoticeUnit) => u.area_m2 : (u: NoticeUnit) => u.deposit;
+    const pick = sort.key === "area" ? (u: NoticeUnit) => u.area_m2 : depositOf;
     return [...filtered].sort((a, b) => {
       const [x, y] = [pick(a), pick(b)];
       if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
       return sort.desc ? y - x : x - y;
     });
-  }, [filtered, sort, col.area, col.deposit]);
+  }, [filtered, sort, col.area, col.deposit, depositOf]);
 
   // 지금 거른 조건의 폭. 스크롤해 내려가 보지 않아도 이 조건이 어떤 값들인지 안다
   const areaSpan = span(visible.map((u) => u.area_m2));
-  const depositSpan = span(visible.map((u) => u.deposit));
+  const depositSpan = span(visible.map(depositOf));
 
 
   /** 조건 하나. 고를 게 하나뿐이면 세우지 않는다 — 누를 것도 없는 셀렉트는 자리만 먹는다 */
@@ -160,6 +169,11 @@ export function UnitTable({ units }: Props) {
         <Picker label={groupLabel} list={dongs} value={dong} set={setDong} labelize={byDong ? undefined : addrShort} />
         <Picker label="층" list={floors} value={floor} set={setFloor} labelize={(v) => `${v}층`} />
         <Picker label="구조" list={layouts} value={layout} set={setLayout} />
+        {/* 계층은 「전체」가 없다 — 한 번에 한 계층의 금액만 보인다 */}
+        {tiers.length > 1 && (
+          <Select value={tier} options={tiers.map((t, i) => ({ value: String(i), label: t }))} onChange={setTier}
+            placeholder={tiers[0]} ariaLabel="신청 계층" allowAll={false} />
+        )}
         {(dong || floor || layout) && (
           <button type="button" className="ut-clear" onClick={() => { setDong(ALL); setFloor(ALL); setLayout(ALL); }}>조건 초기화</button>
         )}
@@ -202,8 +216,8 @@ export function UnitTable({ units }: Props) {
                 {col.area && <td className="num" data-label="전용면적">{u.area_m2 != null ? `${u.area_m2}㎡` : "—"}</td>}
                 {col.layout && <td data-label="구조">{u.room_layout ?? "—"}</td>}
                 {col.elevator && <td data-label="승강기">{u.elevator ?? "—"}</td>}
-                {col.deposit && <td className="num strong lead" data-label={hasRent ? "임대보증금" : "전세금"}><Money v={u.deposit} /></td>}
-                {col.rent && <td className="num" data-label="월임대료"><Money v={u.rent} /></td>}
+                {col.deposit && <td className="num strong lead" data-label={hasRent ? "임대보증금" : "전세금"}><Money v={depositOf(u)} /></td>}
+                {col.rent && <td className="num" data-label="월임대료"><Money v={rentOf(u)} /></td>}
               </tr>
             ))}
             {visible.length === 0 && (

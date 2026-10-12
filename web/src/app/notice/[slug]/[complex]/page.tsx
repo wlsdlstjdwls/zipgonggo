@@ -225,10 +225,12 @@ export default async function ComplexPage({ params }: Params) {
   // 어느 열이 살아남는지는 UnitTable이 같은 기준으로 다시 판단한다
   const unitVaries = (pick: (u: NoticeUnit) => string | number | null) =>
     new Set(units.map(pick).filter((v) => v != null)).size > 1;
-  const unitTableWorth = units.length > 0 && ([
+  // 신청 계층마다 금액이 다른 호실(price_tiers)은 한 호실짜리 단지라도 표를 세운다 — 제원 줄은 첫 계층 금액뿐이라
+  // 표를 안 열면 다른 계층(소득 70% 이하 등) 신청자는 자기 금액을 볼 길이 없다
+  const unitTableWorth = units.length > 0 && (units.some((u) => (u.price_tiers?.length ?? 0) > 1) || ([
     (u: NoticeUnit) => u.area_m2, (u: NoticeUnit) => u.room_layout, (u: NoticeUnit) => u.elevator,
     (u: NoticeUnit) => u.deposit, (u: NoticeUnit) => u.rent,
-  ]).some(unitVaries);
+  ]).some(unitVaries));
   // 표를 안 세우는 단지의 호실 번호. 여덟 호까지 적고 그 뒤는 「외 n호」 — 위 「공급」이 전체 수를 이미 말한다
   const roomList = !unitTableWorth && units.length > 0
     ? units.slice(0, 8).map((u) => `${hoText(u.room)}${u.floor != null ? ` ${u.floor}층` : ""}`).join(" | ")

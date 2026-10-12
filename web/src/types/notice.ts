@@ -136,6 +136,9 @@ export type NoticeUnit = {
   /** 월세전환(보증금 최소) */
   deposit_wolse: number | null;
   rent_wolse: number | null;
+  /** 신청 계층별 금액(0040). 「소득50% 이하 / 70% 이하」처럼 한 호실에 금액이 여러 벌인 SH 주택목록만 있다.
+   *  첫 원소가 deposit·rent와 같다. 못 읽은 계층은 금액이 null */
+  price_tiers: { label: string; deposit: number | null; rent: number | null }[] | null;
 };
 
 export type NoticeArea = { sido: string; sigungu: string | null; supply_count: number | null };

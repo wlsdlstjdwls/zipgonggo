@@ -481,7 +481,7 @@ export async function getComplexImages(biznsCd: string | null, homeCode: string 
 export async function getComplexUnits(noticeComplexId: number): Promise<NoticeUnit[]> {
   return query<NoticeUnit>(
     `SELECT id, unit_key, building, road_address, room, floor, area_m2, room_layout, elevator,
-            deposit, rent, deposit_jeonse, rent_jeonse, deposit_wolse, rent_wolse
+            deposit, rent, deposit_jeonse, rent_jeonse, deposit_wolse, rent_wolse, price_tiers
        FROM unit WHERE notice_complex_id = $1
       ORDER BY building NULLS FIRST, road_address NULLS FIRST, floor NULLS LAST, room`,
     [noticeComplexId],

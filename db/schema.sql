@@ -243,6 +243,7 @@ CREATE TABLE unit (
   rent_jeonse     bigint,
   deposit_wolse   bigint,                 -- 월세전환 보증금
   rent_wolse      bigint,
+  price_tiers     jsonb,                  -- 신청 계층별 (label, deposit, rent). 첫 원소 = deposit·rent (0040)
 
   room_layout     text,                   -- 투룸 등
   has_elevator    boolean,
