@@ -1126,12 +1126,14 @@ export type SupplyGroup = { key: string; sector?: string; notices: number; units
 export type SupplyStats = {
   since: string; notices: number; units: number; unknown: number;
   byAgency: SupplyGroup[]; byType: SupplyGroup[]; bySido: SupplyGroup[];
+  /** 유형 × 기관. 공고 상세의 「같은 유형, 기관별 공급」 그래프가 쓴다 */
+  byTypeAgency: (SupplyGroup & { housing_type: string })[];
 };
 
 export const getSupplyStats = unstable_cache(
   async (): Promise<SupplyStats> => {
     const agg = `count(*)::int AS notices, COALESCE(sum(units), 0)::int AS units, count(*) FILTER (WHERE units IS NULL)::int AS unknown`;
-    const [tot, byAgency, byType, bySido] = await Promise.all([
+    const [tot, byAgency, byType, bySido, byTypeAgency] = await Promise.all([
       query<{ since: string; notices: number; units: number; unknown: number }>(
         `SELECT to_char(${TODAY} - ${STATS_WINDOW_DAYS}, 'YYYY-MM-DD') AS since, ${agg} FROM (${STATS_BASE}) b`,
       ),
@@ -1142,10 +1144,13 @@ export const getSupplyStats = unstable_cache(
       ),
       query<SupplyGroup>(`SELECT housing_type AS key, ${agg} FROM (${STATS_BASE}) b GROUP BY 1 ORDER BY units DESC, notices DESC`),
       query<SupplyGroup>(`SELECT sido AS key, ${agg} FROM (${STATS_BASE}) b GROUP BY 1 ORDER BY units DESC, notices DESC`),
+      query<SupplyGroup & { housing_type: string }>(
+        `SELECT housing_type, agency AS key, ${agg} FROM (${STATS_BASE}) b GROUP BY 1, 2 ORDER BY units DESC, notices DESC`,
+      ),
     ]);
-    return { ...tot[0], byAgency, byType, bySido };
+    return { ...tot[0], byAgency, byType, bySido, byTypeAgency };
   },
-  ["stats-supply-v1"],
+  ["stats-supply-v2"],
   CACHE_OPTS,
 );
 

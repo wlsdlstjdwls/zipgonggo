@@ -25,7 +25,7 @@ export const revalidate = 3600;
 // DB(us-east-1)와 리전을 맞춘다 — layout.tsx와 같은 값 유지
 export const preferredRegion = "iad1";
 
-const TITLE = "숫자로 보는 공공임대 — 기관별, 유형별, 지역별 공급 호수와 경쟁률";
+const TITLE = "공공임대 공급과 경쟁률 — 기관별, 유형별, 지역별 공급 호수";
 const DESCRIPTION =
   `최근 ${STATS_WINDOW_DAYS}일 동안 나온 공공임대와 민간임대 모집공고의 공급 호수를 LH, SH, 서울시와 지방 공사별로, 유형별로, 시도별로 견준다. SH 결과 공고에서 읽은 지난 회차 경쟁률도 함께.`;
 
@@ -60,7 +60,7 @@ export default async function StatsPage() {
     },
     breadcrumb(crumbId, [
       { name: "공고 목록", path: ROUTES.home },
-      { name: "숫자로 보기", path: ROUTES.stats },
+      { name: "공급과 경쟁률", path: ROUTES.stats },
     ]),
   ];
 
@@ -71,7 +71,7 @@ export default async function StatsPage() {
         <Link href={ROUTES.home} className="back">← 목록</Link>
       </div>
       <div className="legal-in">
-        <h1>숫자로 보는 공공임대</h1>
+        <h1>공공임대 공급과 경쟁률</h1>
         <HubStats items={[
           { label: `최근 ${STATS_WINDOW_DAYS}일 공고`, value: num(s.notices, "건") },
           { label: "공급 호수", value: num(s.units, "호"), hot: true },

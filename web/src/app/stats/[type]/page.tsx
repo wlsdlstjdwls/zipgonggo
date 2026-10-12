@@ -76,7 +76,7 @@ export default async function StatsTypePage({ params }: Params) {
     },
     breadcrumb(crumbId, [
       { name: "공고 목록", path: ROUTES.home },
-      { name: "숫자로 보기", path: ROUTES.stats },
+      { name: "공급과 경쟁률", path: ROUTES.stats },
       { name: title, path: statsTypePath(type) },
     ]),
   ];
@@ -98,7 +98,7 @@ export default async function StatsTypePage({ params }: Params) {
     <article className="stage legal">
       <JsonLd graph={graph} />
       <div className="crumb">
-        <Link href={ROUTES.stats} className="back">← 숫자로 보기</Link>
+        <Link href={ROUTES.stats} className="back">← 공급과 경쟁률</Link>
       </div>
       <div className="legal-in">
         <h1>{title}</h1>

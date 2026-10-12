@@ -11,6 +11,7 @@ import { DetailHeadBar } from "@/components/detail-headbar";
 import { DetailNav } from "@/components/detail-nav";
 import { EligRuleCards, type RuleCardView } from "@/components/elig-rule-cards";
 import { ExternalLink } from "@/components/external-link";
+import { NoticeNumbers } from "@/components/notice-numbers";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { IncomeBars } from "@/components/income-bars";
 import { NaverMap } from "@/components/naver-map";
@@ -29,11 +30,11 @@ import { MINGAN_INCOME_PCTS, minganRuleCards } from "@/lib/mingan-fit";
 import { recruitedTypeCodes } from "@/lib/notice-supply-type";
 import { moveInLabel } from "@/lib/notice-view";
 import {
-  getAmendChain, getComplexFacts, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition, getSupplyStats, listCompetitionTypes, STATS_WINDOW_DAYS,
+  getAmendChain, getComplexFacts, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition, getSupplyStats, getTypeCompetition, STATS_WINDOW_DAYS,
   isNoticeIndexable, listFilterOptions,
 } from "@/lib/queries";
 import { programDoc } from "@/lib/programs";
-import { areaPath, noticePath, programPath, ROUTES, statsTypePath } from "@/lib/routes";
+import { areaPath, noticePath, programPath, ROUTES } from "@/lib/routes";
 import { regionLabel, sidoShort } from "@/lib/sido";
 import type { Notice, NoticeListItem } from "@/types/notice";
 
@@ -131,7 +132,7 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
 export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
-  const [areas, chain, complexes, supply, eligRules, noticeElig, prior, options, facts, supplyStats, compTypes] = await Promise.all([
+  const [areas, chain, complexes, supply, eligRules, noticeElig, prior, options, facts, supplyStats, compAny] = await Promise.all([
     getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id), getNoticeSupply(n.id), getEligibilityRules(),
     getNoticeEligibility(n.id),
     // 「내 조건」에 붙일 직전 같은 계열 공고의 경쟁률(사용자 요청 2026-09-14). 결과 표가 없는 계열은 null
@@ -144,11 +145,11 @@ export default async function NoticePage({ params }: Params) {
     getComplexFacts(n.complex_code, n.housing_type),
     // 「숫자로 보기」 줄 — 같은 유형의 최근 공급과 경쟁률 지면 여부(2026-10-12). 둘 다 지면 전체가 공유하는 캐시다
     getSupplyStats(),
-    listCompetitionTypes(),
+    // 경쟁률 지면이 서는 유형만 값이 온다. 기관이 다르면(LH 행복주택에 SH 결과) 안 붙인다 — 아래에서 거른다
+    getTypeCompetition(n.housing_type),
   ]);
-  const typeSupply = supplyStats.byType.find((t) => t.key === n.housing_type) ?? null;
-  const priorRatio = prior?.summary.ratio ?? null;
-  const compHub = compTypes.find((c) => c.housing_type === n.housing_type && c.agency === n.agency) ?? null;
+  const typeSupply = supplyStats.byTypeAgency.filter((t) => t.housing_type === n.housing_type);
+  const typeComp = compAny && compAny.agency === n.agency ? compAny : null;
   // 빵부스러기(JSON-LD BreadcrumbList) — 화면의 「← 목록」·지역 태그와 같은 길이어야 한다
   const areaLink = (options.sido.find((o) => o.value === n.sido)?.count ?? 0) >= AREA_MIN_COUNT ? areaPath(n.sido) : null;
   const crumbs = [
@@ -588,31 +589,12 @@ export default async function NoticePage({ params }: Params) {
             </section>
           )}
 
-          {/* 숫자로 보기(사용자 요청 2026-10-12: 「각 공고 화면에서 볼 수 있게」) — 이 공고를 같은 유형 옆에 놓는다.
-              「내 조건에 맞는 단지」의 경쟁률은 단지 줄마다 붙고 조건을 넣어야 보인다. 여기는 공고 단위 한 줄이라 누구에게나 보인다 */}
-          {((typeSupply?.units ?? 0) > 0 || priorRatio != null || compHub) && (
-            <section className="dsec" id="numbers">
-              <h2>숫자로 보기</h2>
-              <ul className="num-lines">
-                {typeSupply && typeSupply.units > 0 && (
-                  <li>
-                    최근 {STATS_WINDOW_DAYS}일 동안 나온 {n.housing_type} 공고 <b>{num(typeSupply.notices, "건")}</b>, 공급 <b>{num(typeSupply.units, "호")}</b>
-                    {n.supply_count != null && n.supply_count > 0 && <> — 이 공고는 그중 {num(n.supply_count, "호")}</>}
-                  </li>
-                )}
-                {prior && priorRatio != null && (
-                  <li>
-                    지난 회차 <Link href={noticePath(prior.notice.slug)}>{prior.notice.title}</Link> <small>{dateK(prior.notice.posted_at)} 공고</small>{" "}
-                    단지 {num(prior.summary.complexes, "곳")} 평균 경쟁률 <b>{priorRatio} : 1</b>
-                  </li>
-                )}
-              </ul>
-              <p className="num-links">
-                {compHub && <Link href={statsTypePath(n.housing_type)}>{compHub.agency} {n.housing_type} 경쟁률 계층별, 단지별로 보기 →</Link>}
-                <Link href={ROUTES.stats}>기관별, 지역별 공급 견주기 →</Link>
-              </p>
-            </section>
-          )}
+          {/* 지난 경쟁률과 공급(사용자 요청 2026-10-12: 메뉴 대신 공고 상세에서, 그래프로). 「내 조건에 맞는 단지」의 경쟁률은
+              단지 줄마다 붙고 조건을 넣어야 보인다. 여기는 유형 단위 그래프라 누구에게나 보인다 */}
+          <NoticeNumbers
+            housingType={n.housing_type} agency={n.agency} slug={n.canonical_slug ?? n.slug} supplyCount={n.supply_count}
+            windowDays={STATS_WINDOW_DAYS} supply={typeSupply} comp={typeComp}
+          />
 
           <GlossaryList terms={terms} />
         </div>
