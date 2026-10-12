@@ -30,7 +30,7 @@ import { recruitedTypeCodes } from "@/lib/notice-supply-type";
 import { moveInLabel } from "@/lib/notice-view";
 import {
   getAmendChain, getComplexFacts, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition,
-  listFilterOptions,
+  isNoticeIndexable, listFilterOptions,
 } from "@/lib/queries";
 import { programDoc } from "@/lib/programs";
 import { areaPath, noticePath, programPath, ROUTES } from "@/lib/routes";
@@ -63,11 +63,14 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const n = await load(params);
   if (!n) return { title: "공고를 찾을 수 없습니다" };
   const supply = n.supply_count != null ? num(n.supply_count, "호") : "";
+  // 제목과 공고일만 있는 공고(게시판 아카이브)는 색인하지 않는다 — URL은 살린다(docs/url-structure.md 공고 상세)
+  const indexable = n.canonical_id != null || (await isNoticeIndexable(n.id));
   return {
     title: `${n.title} — ${n.housing_type} ${supply} 보증금/임대료/접수일정`.replace(/\s+/g, " "),
     description: noticeDescription(n),
     // 같은 공고가 기관 seq 여러 개로 들어온 경우 정본을 가리킨다. URL은 살려 두고 색인만 하나로 모은다
     alternates: { canonical: noticePath(n.canonical_slug ?? n.slug) },
+    ...(indexable ? {} : { robots: { index: false, follow: true } }),
   };
 }
 

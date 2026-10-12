@@ -787,18 +787,46 @@ export const listSitemapComplexes = unstable_cache(
   CACHE_OPTS,
 );
 
+/* ── 공고 페이지 색인 기준 (docs/url-structure.md 얇은 페이지 방지, 2026-10-12) ──────────────
+   애드센스 1차 탈락(「가치가 별로 없는 콘텐츠」) 뒤에 세웠다. i-sh 게시판 아카이브처럼 제목과 공고일만 있는 공고는
+   본문이 유형 일반 자격 카드뿐이라 공고끼리 똑같다. 그 공고에만 있는 표가 하나라도 있거나, 공고끼리 다른 칸이
+   넷 이상이면 색인한다. 실측: 정본 1,251건 중 268건 미달. URL은 살리고 noindex와 사이트맵 제외만 한다 */
+const NOTICE_FIELDS = `
+  (n.min_deposit IS NOT NULL)::int + (n.min_rent IS NOT NULL)::int + (n.apply_start_at IS NOT NULL)::int
+  + (n.apply_end_at IS NOT NULL)::int + (n.announce_at IS NOT NULL)::int + (n.supply_count IS NOT NULL)::int
+  + (n.address IS NOT NULL)::int + (n.total_household IS NOT NULL)::int`;
+const NOTICE_MIN_FIELDS = 4;
+const NOTICE_INDEXABLE = `(
+  EXISTS (SELECT 1 FROM notice_complex x WHERE x.notice_id = n.id)
+  OR EXISTS (SELECT 1 FROM notice_supply x WHERE x.notice_id = n.id)
+  OR EXISTS (SELECT 1 FROM unit x WHERE x.notice_id = n.id)
+  OR EXISTS (SELECT 1 FROM notice_result x WHERE x.notice_id = n.id)
+  OR EXISTS (SELECT 1 FROM notice_eligibility x WHERE x.notice_id = n.id AND x.verified)
+  OR EXISTS (SELECT 1 FROM notice_area x WHERE x.notice_id = n.id AND x.supply_count IS NOT NULL)
+  OR (${NOTICE_FIELDS}) >= ${NOTICE_MIN_FIELDS})`;
+
+/** 공고 한 건을 색인해도 되나. generateMetadata가 부른다 */
+export const isNoticeIndexable = unstable_cache(
+  async (noticeId: number): Promise<boolean> => {
+    const rows = await query<{ ok: boolean }>(`SELECT ${NOTICE_INDEXABLE} AS ok FROM notice n WHERE n.id = $1`, [noticeId]);
+    return rows[0]?.ok ?? false;
+  },
+  ["notice-indexable-v1"],
+  CACHE_OPTS,
+);
+
 export type SitemapNotice = { slug: string; updated_at: string; closed: boolean };
 
-/** 사이트맵용 전 공고. 마감 여부로 priority를 가른다. */
+/** 사이트맵용 공고. 정본이고 색인 기준을 넘긴 것만. 마감 여부로 priority를 가른다. */
 export const listSitemapNotices = unstable_cache(
   async (limit: number): Promise<SitemapNotice[]> =>
     query<SitemapNotice>(
-      `SELECT slug, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
+      `SELECT n.slug, to_char(n.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
               ${CLOSED} AS closed
-       FROM notice WHERE canonical_id IS NULL ORDER BY posted_at DESC, id DESC LIMIT $1`,
+       FROM notice n WHERE n.canonical_id IS NULL AND ${NOTICE_INDEXABLE} ORDER BY n.posted_at DESC, n.id DESC LIMIT $1`,
       [limit],
     ),
-  ["notice-sitemap-v2"],
+  ["notice-sitemap-v3"],
   CACHE_OPTS,
 );
 
