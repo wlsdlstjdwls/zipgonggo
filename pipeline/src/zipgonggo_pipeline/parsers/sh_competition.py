@@ -155,6 +155,16 @@ def _close(a: float | None, b: float | None) -> bool:
     return a is not None and b is not None and abs(a - b) <= 0.15
 
 
+def _dot_dropped(ratio: float | None, derived: float | None) -> bool:
+    """인쇄된 경쟁률이 산술값에서 소수점만 빠진 꼴인가 — 「6.3」이 「63」, 「24.7」이 「247」로 온다(291431).
+    숫자열이 같으면 따로 인쇄된 두 값(신청자 수 ÷ 호수, 경쟁률)이 서로 맞는 것이라 믿는다. 끝자리 0은 안 찍히기도 해 뗀다."""
+    if ratio is None or derived is None or derived <= 0 or ratio == derived:
+        return False
+    a = f"{ratio:.1f}".replace(".", "").rstrip("0")
+    b = f"{derived:.1f}".replace(".", "").rstrip("0")
+    return a == b
+
+
 def _rows(xml: str) -> list[tuple[float, list[Segment], list[Char]]]:
     """글자 줄. 표 밑 「총계」 행은 뺀다 — 마지막 띠가 삼키면 신청자수가 이어 붙어
     「4576」+「75432」=754453726 같은 값이 된다."""
@@ -376,6 +386,16 @@ def parse_competition_page(xml: str, page: int) -> list[CompetitionRow]:
     if {"인터넷", "방문"} <= set(_labels_of(rows, LAYOUT_A_SUB)):
         return _parse_layout_a(rows, page)
     cols_c = _labels_of(rows, LAYOUT_C_COLS, prefix=True)
+    # 청년 매입임대 「경쟁률 공지」(2020~2025)는 「계」 대신 「신청자 수」 머리글이다
+    if "계" not in cols_c:
+        alias = _labels_of(rows, ("신청자",), prefix=True)
+        if alias:
+            cols_c["계"] = alias["신청자"]
+    # 같은 양식은 「주택형」과 「성별」이 따로 찍힌다. 안 잡으면 주택명 칸이 「백년빌-」 「미아에스하임32B」처럼 옆 칸을 먹는다
+    if "주택형성별" not in cols_c:
+        alias = _labels_of(rows, ("주택형",), prefix=True)
+        if alias:
+            cols_c["주택형성별"] = alias["주택형"]
     if {"주택명", "주소지", "대상", "경쟁률"} <= set(cols_c):
         return _parse_layout_c(rows, page, cols_c)
     cols = _labels_of(rows, LAYOUT_B_COLS, prefix=True)
@@ -391,6 +411,13 @@ def _parse_layout_a(rows: list[tuple[float, list[Segment], list[Char]]], page: i
         alias = _labels_of(rows, ("공급구분",))
         if alias:
             header["구분"] = alias["공급구분"]
+    # 2024년 1차(seq=276345)는 「자치」/「구」 두 줄로 접혀 있다. 「자치」를 별칭으로 받아 봤더니 열 경계가 어긋나
+    # 「합계」가 「공가」 숫자까지 삼켰다(50 + 50 → 5050). 그 양식은 아직 안 읽는다 — 틀린 값이 산술을 통과하는 것보다 빈 게 낫다
+    # 2025년 3차(seq=299618)는 「공급유형」도 한 조각이다 — 「유형」이 안 잡혀 표 전체를 놓쳤다
+    if "유형" not in header:
+        alias = _labels_of(rows, ("공급유형",))
+        if alias:
+            header["유형"] = alias["공급유형"]
     if not {"자치구", "단지명", "유형", "일반", "인터넷", "계"} <= set(header):
         return []
     hb = _header_bottom(header)
@@ -435,8 +462,10 @@ def _parse_layout_a(rows: list[tuple[float, list[Segment], list[Char]]], page: i
             sum_ok = not (internet.hole or visit.hole or total_cell.hole) and total == parts
             ratio_ok = _close(ratio, round(total / units, 1)) if (ratio is not None and units and total) else False
             repaired = False
-            if not ratio_ok and sum_ok and units and total and (ratio is None or ratio_cell.hole):
-                ratio, ratio_ok, repaired = round(total / units, 1), True, True   # 경쟁률 칸에 구멍 → 산술로 되메움
+            # 경쟁률 칸에 구멍 → 산술로 되메움. 구멍이 안 보여도 계와 합계가 성한데 경쟁률만 안 맞으면 경쟁률 쪽이 틀린 것이다 —
+            # 소수점만 흘리면 자간 틈이 안 생긴다(299618 「260.2」→「2602」, 291114 「1,111」→ 경쟁률 1111.0이지만 합계 1이라 맞음)
+            if not ratio_ok and sum_ok and units and total:
+                ratio, ratio_ok, repaired = round(total / units, 1), True, True
             elif not sum_ok and total_cell.hole and not ratio_cell.hole and ratio and units:
                 total, repaired = round(ratio * units), True                      # 계 칸에만 구멍 → 경쟁률로 되메움
                 sum_ok = True
@@ -531,6 +560,8 @@ def _parse_layout_c(
         # 이 양식은 경쟁률을 정수로 반올림해 찍는다 — 105호에 2호면 52.5가 아니라 53으로 나온다
         ok = _close(ratio, derived) or (ratio is not None and derived is not None and ratio == math.floor(derived + 0.5))
         repaired = False
+        if not ok and _dot_dropped(ratio, derived):
+            ratio, ok, repaired = derived, True, True
         if not ok and derived is not None and not app_cell.hole and (ratio is None or ratio_cell.hole):
             ratio, ok, repaired = derived, True, True
         out.append(CompetitionRow(name, gu, addr, kind, m.group(1).replace(" ", "") if m else "", "",

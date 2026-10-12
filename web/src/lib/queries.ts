@@ -925,6 +925,13 @@ export const listOpenSoon = unstable_cache(
 // 괄호 없는 이름은 전부 빈 문자열로 깎여 모든 단지가 서로 맞았다(2026-10-12 발견). lib/notice-fit priorNameKey와 같은 규칙
 const NAME_KEY = String.raw`regexp_replace(lower(regexp_replace(%s, '\([^)]*\)', '', 'g')), '[]_.,·・[[:space:]-]', '', 'g')`;
 
+/** 공고 하나에 결과 글이 여럿 붙는다 — 「1순위 청약접수 결과」(중간) 뒤에 「최종 청약접수 결과」. 줄을 다 합치면 두 번 센다.
+ *  pipeline은 글마다 다 적재하고(원장), 읽는 쪽이 **표가 읽힌 가장 늦은 글 하나**만 센다(2026-10-12, 85차) */
+export const latestResult = (a: string) => `${a}.post_seq = (
+  SELECT p.seq FROM result_post p
+   WHERE p.notice_id = ${a}.notice_id AND p.result_kind = ${a}.result_kind AND p.row_count > 0
+   ORDER BY p.posted_at DESC, p.seq DESC LIMIT 1)`;
+
 /** 결과 계열 열쇠. 같은 housing_type 안에서 신청자 풀이 다른 프로그램을 가른다. 화면 문자열이 아니라 비교 열쇠다 */
 export function noticeFamily(title: string, housingType: string): string {
   const t = title.replace(/\s+/g, "");
@@ -956,7 +963,7 @@ export async function getPriorCompetition(n: Pick<Notice, "id" | "agency" | "hou
     query<PriorResultRow>(
       `SELECT r.complex_name, r.supply_type, r.tenant_class, r.bracket, r.units, r.applicants, r.ratio::float AS ratio
          FROM notice_result r
-        WHERE r.notice_id = $1 AND r.reconciled
+        WHERE r.notice_id = $1 AND r.reconciled AND ${latestResult("r")}
           AND ${NAME_KEY.replace("%s", "r.complex_name")} IN (
                 SELECT ${NAME_KEY.replace("%s", "c.name")} FROM notice_complex c WHERE c.notice_id = $2)
         ORDER BY r.row_no`,
@@ -964,7 +971,7 @@ export async function getPriorCompetition(n: Pick<Notice, "id" | "agency" | "hou
     ),
     query<{ complexes: number; units: number | null; applicants: number | null }>(
       `SELECT count(DISTINCT complex_name)::int AS complexes, sum(units)::int AS units, sum(applicants)::int AS applicants
-         FROM notice_result WHERE notice_id = $1 AND reconciled AND bracket = '소계'`,
+         FROM notice_result r WHERE r.notice_id = $1 AND r.reconciled AND r.bracket = '소계' AND ${latestResult("r")}`,
       [prior.id],
     ),
   ]);
@@ -1049,10 +1056,10 @@ export const getCompetitionStats = unstable_cache(
               round(percentile_cont(0.9) WITHIN GROUP (ORDER BY r.ratio)::numeric, 1)::float AS p90,
               max(r.ratio)::float AS max
          FROM notice_result r JOIN notice n ON n.id = r.notice_id
-        WHERE r.result_kind = 'competition' AND r.reconciled AND r.units BETWEEN 1 AND 2000 AND r.ratio IS NOT NULL
+        WHERE r.result_kind = 'competition' AND r.reconciled AND r.units BETWEEN 1 AND 2000 AND r.ratio IS NOT NULL AND ${latestResult("r")}
         GROUP BY 1, 2 HAVING count(*) >= 30 ORDER BY 2 DESC, 1`,
     ),
-  ["guide-competition-v1"],
+  ["guide-competition-v2"],
   CACHE_OPTS,
 );
 
@@ -1146,7 +1153,8 @@ export const getSupplyStats = unstable_cache(
 export const COMPETITION_MIN_ROUNDS = 5;
 
 // 산술로 맞춘 소계 줄만. 결과 표는 단지 × 면적 × 계층마다 우선, 일반, 소계 줄이 따로 있다
-const RESULT_OK = `r.result_kind = 'competition' AND r.reconciled AND r.units BETWEEN 1 AND 2000 AND r.applicants IS NOT NULL`;
+const RESULT_OK = `r.result_kind = 'competition' AND r.reconciled AND r.units BETWEEN 1 AND 2000 AND r.applicants IS NOT NULL
+  AND ${latestResult("r")}`;
 
 export type CompetitionTypeHub = { housing_type: string; agency: string; rounds: number };
 
@@ -1159,7 +1167,7 @@ export const listCompetitionTypes = unstable_cache(
         WHERE ${RESULT_OK} AND r.bracket = '소계'
         GROUP BY 1, 2 HAVING count(DISTINCT r.notice_id) >= ${COMPETITION_MIN_ROUNDS} ORDER BY 3 DESC`,
     ),
-  ["stats-competition-types-v1"],
+  ["stats-competition-types-v2"],
   CACHE_OPTS,
 );
 
@@ -1206,7 +1214,7 @@ export const getTypeCompetition = unstable_cache(
     if (!hub) return null;
     const p = [housingType, hub.agency];
     const scope = `FROM notice_result r JOIN notice n ON n.id = r.notice_id
-       WHERE n.housing_type::text = $1 AND n.agency = $2`;
+       WHERE n.housing_type::text = $1 AND n.agency = $2 AND ${latestResult("r")}`;
     const ratio = `round(sum(r.applicants)::numeric / NULLIF(sum(r.units), 0), 1)::float AS ratio`;
     const sums = `sum(r.units)::int AS units, sum(r.applicants)::int AS applicants, ${ratio}, count(*)::int AS rows`;
     // 결과 표에 자치구가 빠진 양식이 있다 — 같은 공고의 단지 목록에서 이름으로 찾아 메운다(getPriorCompetition과 같은 열쇠)
@@ -1230,8 +1238,8 @@ export const getTypeCompetition = unstable_cache(
       query<CompetitionRound>(
         `SELECT n.slug, ${titleCol("n.")}, n.posted_at::text AS posted_at, count(DISTINCT r.complex_name)::int AS complexes,
                 sum(r.units)::int AS units, sum(r.applicants)::int AS applicants, ${ratio},
-                (SELECT count(*) FROM notice_result x WHERE x.notice_id = n.id)::int AS rows_all,
-                (SELECT count(*) FROM notice_result x WHERE x.notice_id = n.id AND NOT x.reconciled)::int AS rows_bad
+                (SELECT count(*) FROM notice_result x WHERE x.notice_id = n.id AND ${latestResult("x")})::int AS rows_all,
+                (SELECT count(*) FROM notice_result x WHERE x.notice_id = n.id AND NOT x.reconciled AND ${latestResult("x")})::int AS rows_bad
            ${scope} AND ${RESULT_OK} AND r.bracket = '소계'
           GROUP BY n.id ORDER BY n.posted_at DESC`,
         p,
@@ -1264,6 +1272,6 @@ export const getTypeCompetition = unstable_cache(
       skipped: health[0]?.skipped ?? 0, all: health[0]?.all ?? 0,
     };
   },
-  ["stats-competition-v3"],
+  ["stats-competition-v4"],
   CACHE_OPTS,
 );

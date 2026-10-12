@@ -191,3 +191,39 @@ def test_a26_ratio_corroborates_total(rows_a26):
     """인터넷 칸이 한 글자를 흘려(「8」+52 ≠ 140) 합이 안 맞아도, 계 140 ÷ 합계 18 = 7.8이 인쇄 경쟁률과 맞으면 믿는다."""
     r = _find(rows_a26, "강일리버파크1단지", "29", "우선")
     assert (r.units, r.applicants, r.ratio, r.reconciled) == (18, 140, 7.8, True)
+
+
+# ── 행복주택 2025년 3차 — 「공급유형」 한 조각 헤더(seq=299618) ──────────────────
+
+PAGES_A25_3 = [(n, (FIX / "ish_299618" / f"p{n}.xml").read_text(encoding="utf-8")) for n in (1, 2)]
+
+
+@pytest.fixture(scope="module")
+def rows_a25_3():
+    return parse_competition(PAGES_A25_3)
+
+
+def test_a25_3_merged_supply_type_header(rows_a25_3):
+    """「공급유형」이 한 조각이라 「유형」 헤더가 안 잡혀 표 전체를 놓쳤다(85차 이전 0줄)."""
+    assert len(rows_a25_3) == 239
+    assert sum(r.reconciled for r in rows_a25_3) >= 230
+    r = _find(rows_a25_3, "원에디션 강남", "22", "우선")
+    assert (r.sigungu, r.tenant_class, r.units, r.applicants, r.ratio) == ("강남구", "청년", 6, 2895, 482.5)
+
+
+def test_a25_3_dropped_decimal_point_is_repaired(rows_a25_3):
+    """소수점만 흘리면 자간 틈이 안 생겨 구멍으로 안 잡힌다 — 계와 합계가 성하면 경쟁률을 산술로 고친다."""
+    for r in rows_a25_3:
+        if r.reconciled and r.units and r.applicants and r.ratio is not None:
+            assert abs(r.ratio - r.applicants / r.units) < 0.11, r
+
+
+# ── 청년 매입임대 「경쟁률 공지」 — 「신청자 수」 머리글, 주택형/성별 따로, 소수점 유실(seq=291431) ──────────
+
+def test_c_notice_layout_with_dropped_decimal():
+    rows = parse_competition([(1, (FIX / "ish_291431" / "p1.xml").read_text(encoding="utf-8"))])
+    assert len(rows) == 74 and all(r.reconciled for r in rows)
+    r = next(x for x in rows if x.complex_name == "백년빌" and x.bracket == "일반1순위")
+    # 원문 「63」 + 다음 줄 「.」 — 25 ÷ 4 = 6.25. 소수점을 흘린 경쟁률을 산술과 숫자열로 맞춰 받는다
+    assert (r.sigungu, r.units, r.applicants, r.ratio) == ("강남구", 4, 25, 6.3)
+    assert not any(x.complex_name.endswith("-") for x in rows)

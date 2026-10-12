@@ -21,7 +21,12 @@ from datetime import date
 # 사람을 뽑는 글. 「발표」·「합격자」가 들어가도 주택 공급과 무관하다.
 HIRING = re.compile(r"채용|인턴|직원|사원|경력\s*직|전형|임용|대체인력|인사|면접|필기|공무직|기간제")
 # 경쟁률이 실린 글. 「청약경쟁률 게시」·「1순위 청약경쟁률 및 2순위 청약안내」
-COMPETITION = re.compile(r"청약\s*경쟁률|경쟁률\s*(?:게시|공개|안내|발표)")
+# 2026-10-12 넓힘(85차 조사, 게시판 제목 검색 364건): 청년 매입임대는 「최종 결과 및 경쟁률 공지」, 장기전세·국민임대·재개발임대는
+# 「(최종) 청약접수 결과」로 낸다. 1순위만 센 중간 발표도 같은 꼴로 오는데 원장엔 다 넣는다 — 화면은 공고마다 표가 읽힌
+# 가장 늦은 글 하나만 센다(web lib/queries.ts LATEST_RESULT). 「신청현황」 「접수현황」(2010년 이전 양식)은 아직 안 받는다
+COMPETITION = re.compile(r"청약\s*경쟁률|경쟁률\s*(?:게시|공개|안내|발표|공지)|청약\s*접수\s*결과|접수\s*결과\s*(?:안내|알림|게시)")
+# 같은 게시판의 임대 아닌 결과 글 — 분양주택 청약, 설계공모, 용지 공급, 질의 접수
+NOT_RENTAL = re.compile(r"분양|설계|공모|용지|질의")
 # 합격선(커트라인)이 실린 글. **누가 발표되는가**로 가른다 — 「당첨자」만 보면
 # 「당첨자 사전방문 행사 안내」까지 딸려 오고, 「발표」만 보면 채용·행정 글이 섞인다.
 # 장기전세·국민임대는 「입주대상자 발표」, 매입임대는 「서류심사대상자 발표」로 낸다(실측 2026-09-09).
@@ -72,12 +77,16 @@ def classify(title: str) -> ResultPost | None:
     from .ish_title import derive_housing_type
 
     body = CATEGORY_TAG.sub("", title)
-    if HIRING.search(body):
+    if HIRING.search(body) or NOT_RENTAL.search(body):
         return None
     kind = "competition" if COMPETITION.search(body) else ("winner" if WINNER.search(body) else None)
     if kind is None:
         return None
     if kind == "winner" and FOLLOW_UP.search(body):
         return None
+    housing_type = derive_housing_type(title)
+    # 「청약접수 결과」는 분양주택 특별공급 글도 같은 꼴이다(「위례지구 … 특별공급 청약접수 결과」). 임대 유형이 안 읽히면 버린다
+    if kind == "competition" and housing_type is None:
+        return None
     m = RESERVE_ROUND.search(title)
-    return ResultPost(kind, notice_date(title), int(m.group(1)) if m else None, derive_housing_type(title))
+    return ResultPost(kind, notice_date(title), int(m.group(1)) if m else None, housing_type)
