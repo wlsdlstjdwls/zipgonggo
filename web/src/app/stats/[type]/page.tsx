@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!c) return { title: "찾을 수 없는 지면", robots: { index: false, follow: false } };
   return {
     title: `${c.agency} ${type} 경쟁률 — 지난 ${c.rounds.length}회차 계층별, 자치구별, 단지별`,
-    description: `${c.agency} ${type} 결과 공고 ${c.rounds.length}회차에서 읽은 경쟁률. 단지 ${num(c.total.complexes, "곳")}, 모집 ${num(c.total.units, "호")}에 ${num(c.total.applicants, "명")} 신청, 평균 ${ratioText(c.total.ratio)}. 청년, 신혼부부, 고령자 계층별과 자치구별, 가장 몰린 단지와 한산했던 단지.`,
+    description: `${c.agency} ${type} 결과 공고 ${c.rounds.length}회차에서 읽은 경쟁률. 단지 ${num(c.total.complexes, "곳")}, 모집 ${num(c.total.units, "호")}에 ${num(c.total.applicants, "명")} 신청, 평균 ${ratioText(c.total.ratio)}. 계층별과 자치구별, 가장 몰린 단지와 한산했던 단지.`,
     alternates: { canonical: statsTypePath(type) },
   };
 }
@@ -90,6 +90,7 @@ export default async function StatsTypePage({ params }: Params) {
     })
     .filter((r) => r.sum)
     .sort((a, b) => (b.sum!.units ?? 0) - (a.sum!.units ?? 0));
+  const hasSplit = c.byClass.some((r) => r.bracket === "우선" || r.bracket === "일반");
   const first = c.rounds[c.rounds.length - 1];
   const last = c.rounds[0];
 
@@ -130,16 +131,19 @@ export default async function StatsTypePage({ params }: Params) {
           </LegalSection>
 
           {classRows.length > 0 && (
-            <LegalSection title="계층별">
-              <p>같은 단지라도 청년, 신혼부부, 고령자 몫이 따로 뽑힌다. 우선공급은 해당 구에 살거나 일하는 사람이 먼저 다투는 몫이다.</p>
+            <LegalSection title={hasSplit ? "계층별" : "구분별"}>
+              {/* 행복주택은 계층마다 우선/일반 띠가 있고, 장기전세 같은 양식은 구분(예비자, 일반, 우선, 주거약자)이 곧 한 줄이다 */}
+              {hasSplit
+                ? <p>같은 단지라도 청년, 신혼부부, 고령자 몫이 따로 뽑힌다. 우선공급은 해당 구에 살거나 일하는 사람이 먼저 다투는 몫이다.</p>
+                : <p>공고가 나누어 뽑는 구분별로 더했다. 예비자는 입주자가 나갈 때를 기다리는 예비입주자 몫이다.</p>}
               <Table
-                head={["계층", "모집", "신청", "경쟁률", "우선공급", "일반공급"]}
-                num={[1, 2, 3, 4, 5]}
+                head={hasSplit ? ["계층", "모집", "신청", "경쟁률", "우선공급", "일반공급"] : ["구분", "모집", "신청", "경쟁률"]}
+                num={hasSplit ? [1, 2, 3, 4, 5] : [1, 2, 3]}
                 rows={classRows.map((r) => [
-                  r.k, ...cellRow(r.sum!), ratioText(r.pri?.ratio), ratioText(r.gen?.ratio),
+                  r.k, ...cellRow(r.sum!), ...(hasSplit ? [ratioText(r.pri?.ratio), ratioText(r.gen?.ratio)] : []),
                 ])}
               />
-              <Caption>모집 10호 미만인 계층은 뺐다.</Caption>
+              <Caption>모집 10호 미만인 {hasSplit ? "계층" : "구분"}은 뺐다.</Caption>
             </LegalSection>
           )}
 

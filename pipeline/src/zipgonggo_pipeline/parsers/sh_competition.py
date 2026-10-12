@@ -49,6 +49,11 @@ LAYOUT_B_COLS = ("단지명", "공급유형", "신청자격", "대상", "공급�
 # 「주택형」과 「성별」은 붙어 찍혀 한 칸("주택형성별")으로 온다 — 형만 앞에서 떼어 쓴다.
 LAYOUT_C_COLS = ("구분", "자치구", "주소지", "주택명", "주택형성별", "대상", "공급호수", "계", "경쟁률")
 
+# 장기전세·국민임대 「최종 접수결과」 양식(seq=310466, 2026-10-12). 한 줄에 값이 다 있다.
+# 단지명 | 신청유형(면적) | 구분(예비자/일반/우선/주거약자) | 대상(예비자1순위, 국가유공자 …) | 모집세대수 총계(A)/입주자/예비입주자 | 신청자수(B) | 경쟁률 | 비고
+LAYOUT_D_COLS = ("단지명", "신청유형", "구분", "대상", "총계", "신청자수", "경쟁률", "비고")
+CLASS_D = re.compile(r"^[가-힣]{2,6}$")
+
 # 2026년 1차(seq=305877)부터 우선·일반 띠 없이 「예비자」 한 줄만 있는 블록이 생겼다(예비입주자만 뽑는 단지)
 BRACKET_A = re.compile(r"^(우선|일반|예비자)$")
 BRACKET_B = re.compile(r"^(?:(?:우선|일반)\s*)?\d+\s*순위$|^소계$")   # 「3순위」와 「일반1순위」 둘 다
@@ -385,6 +390,14 @@ def parse_competition_page(xml: str, page: int) -> list[CompetitionRow]:
         return []
     if {"인터넷", "방문"} <= set(_labels_of(rows, LAYOUT_A_SUB)):
         return _parse_layout_a(rows, page)
+    cols_d = _labels_of(rows, LAYOUT_D_COLS, prefix=True)
+    # 둘째 쪽부터는 머리글 「총계」가 줄 맨 앞이라 _rows가 표 밑 총계 행으로 알고 걸러 낸다. 위 「모집세대수」로 숫자 구간의 왼쪽 끝을 잡는다
+    if "총계" not in cols_d and {"대상", "신청자수"} <= set(cols_d):
+        alias = _labels_of(rows, ("모집세대수",), prefix=True)
+        if alias:
+            cols_d["총계"] = alias["모집세대수"]
+    if {"단지명", "신청유형", "구분", "대상", "총계", "신청자수", "경쟁률"} <= set(cols_d):
+        return _parse_layout_d(rows, page, cols_d)
     cols_c = _labels_of(rows, LAYOUT_C_COLS, prefix=True)
     # 청년 매입임대 「경쟁률 공지」(2020~2025)는 「계」 대신 「신청자 수」 머리글이다
     if "계" not in cols_c:
@@ -566,6 +579,66 @@ def _parse_layout_c(
             ratio, ok, repaired = derived, True, True
         out.append(CompetitionRow(name, gu, addr, kind, m.group(1).replace(" ", "") if m else "", "",
                                   b.label.replace(" ", ""), units, applicants, ratio, ok, repaired, page))
+    return out
+
+
+def _number_runs(chars: list[Char], pitch: float) -> list[int]:
+    """같은 줄 글자를 x 순으로 숫자 덩어리로 끊는다. 「-」는 덩어리를 끊기만 하고 값이 아니다. 쉼표는 숫자 사이에 낀다."""
+    line = sorted((c for c in chars if c.ch.strip()), key=lambda c: (c.l, c.r - c.l))
+    runs: list[str] = []
+    prev_r: float | None = None
+    for c in line:
+        if c.ch.isdigit() or c.ch == ",":
+            if prev_r is None or c.l - prev_r > pitch * 0.9 or not runs:
+                runs.append("")
+            runs[-1] += c.ch
+            prev_r = c.r
+        else:
+            prev_r = None
+    return [int(r.replace(",", "")) for r in runs if r.replace(",", "").isdigit()]
+
+
+def _parse_layout_d(
+    rows: list[tuple[float, list[Segment], list[Char]]], page: int, header: dict[str, tuple[float, Segment]]
+) -> list[CompetitionRow]:
+    """장기전세 「최종 접수결과」 양식. 줄 하나가 단지 × 면적 × 구분 한 칸이라 그 줄이 곧 소계다.
+
+    화면(web)은 소계 줄로 회차와 단지를 더한다. 이 양식은 우선/일반을 따로 띠로 묶지 않으므로 줄마다
+    대상 이름(예비자1순위 …)을 단 줄과 같은 값의 소계 줄을 함께 낸다 — 계층별 표는 구분(tenant_class)으로 묶인다.
+    「입주자」 「예비입주자」 칸은 쓰지 않는다 — 총계(A)가 모집세대수다.
+    """
+    # 「입주자」 「예비입주자」는 머리글이 「입」 「주」 「자」로 쪼개져 열 경계를 흐린다. 총계 바로 오른쪽 칸들은 버린다
+    hb = _header_bottom(header)
+    bounds = _bounds(header, [c for _t, _s, chars in rows for c in chars if c.t >= hb])
+    bands = _bands(rows, bounds, "구분", CLASS_D, hb)
+    if not bands:
+        return []
+    pitch = _pitch([c for _t, _s, chars in rows for c in chars])
+    out: list[CompetitionRow] = []
+    for b in bands:
+        name = _clean_complex(_cell(b.chars, *_span(bounds, "단지명"), pitch).text)
+        if not NAME_OK.search(name):
+            continue
+        supply_type = _supply_type(_cell(b.chars, *_span(bounds, "신청유형"), pitch))
+        target = _cell(b.chars, *_span(bounds, "대상"), pitch).text.replace(" ", "")
+        # 총계(A)부터 경쟁률 앞까지에 숫자 칸이 넷 있다 — 총계, 입주자, 예비입주자, 신청자수. 가운데 둘은 머리글이 「입」 「주」 「자」로
+        # 쪼개져 열 경계가 안 선다. 그래서 그 구간을 숫자 덩어리로 끊어 첫 덩어리를 모집세대수, 마지막을 신청자수로 쓴다
+        lo, _hi = _span(bounds, "총계")
+        hi, _ = _span(bounds, "경쟁률")
+        nums = _number_runs([c for c in b.chars if lo <= _cx(c) < hi], pitch)
+        units = nums[0] if len(nums) >= 2 else None
+        applicants = nums[-1] if len(nums) >= 2 else None
+        ratio_cell = _cell(b.chars, *_span(bounds, "경쟁률"), pitch)
+        ratio = _ratio(ratio_cell)
+        derived = round(applicants / units, 1) if (units and applicants is not None) else None
+        # 정수로 떨어지면 「.0」 없이 찍는다(110 ÷ 10 → 「11」). 소수점만 흘린 「293」(29.3)도 숫자열로 맞춘다
+        ok = _close(ratio, derived) or (applicants == 0 and units is not None and ratio == 0)
+        repaired = False
+        if not ok and _dot_dropped(ratio, derived):
+            ratio, ok, repaired = derived, True, True
+        for bracket in (target or b.label, "소계"):
+            out.append(CompetitionRow(name, "", "", "", supply_type, b.label, bracket,
+                                      units, applicants, ratio, ok, repaired, page))
     return out
 
 

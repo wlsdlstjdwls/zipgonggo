@@ -227,3 +227,20 @@ def test_c_notice_layout_with_dropped_decimal():
     # 원문 「63」 + 다음 줄 「.」 — 25 ÷ 4 = 6.25. 소수점을 흘린 경쟁률을 산술과 숫자열로 맞춰 받는다
     assert (r.sigungu, r.units, r.applicants, r.ratio) == ("강남구", 4, 25, 6.3)
     assert not any(x.complex_name.endswith("-") for x in rows)
+
+
+# ── 장기전세 「최종 접수결과」 양식 D(seq=310466 제51차) ─────────────────────────
+
+def test_d_janggi_flat_table():
+    pages = [(n, (FIX / "ish_310466" / f"p{n}.xml").read_text(encoding="utf-8")) for n in (1, 2)]
+    rows = parse_competition(pages)
+    subs = [r for r in rows if r.bracket == "소계"]
+    # 줄마다 대상 줄 + 같은 값의 소계 줄. 둘째 쪽은 머리글 「총계」가 걸러져 「모집세대수」로 구간을 잡는다
+    assert len(subs) == 77 and all(r.reconciled for r in subs)
+    r = next(x for x in rows if x.complex_name.startswith("강일2지구") and x.supply_type == "84" and x.bracket == "예비자1순위")
+    assert (r.tenant_class, r.units, r.applicants, r.ratio) == ("예비자", 37, 722, 19.5)
+    # 「88 | 293」 + 다음 줄 「.」 — 띠가 아래 줄 구두점까지 품어 29.3으로 읽는다
+    r = next(x for x in rows if x.supply_type == "114" and x.units == 3 and x.applicants == 88 and x.bracket == "소계")
+    assert r.ratio == 29.3
+    # 신청 0명 줄(래미안 레벤투스 국가유공자)은 경쟁률 0으로 맞다
+    assert any(x.applicants == 0 and x.ratio == 0 and x.reconciled for x in rows)
