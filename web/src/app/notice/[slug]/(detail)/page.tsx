@@ -14,7 +14,6 @@ import { ExternalLink } from "@/components/external-link";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { IncomeBars } from "@/components/income-bars";
 import { NaverMap } from "@/components/naver-map";
-import { StreetPhoto } from "@/components/street-photo";
 import { NoticeEligibilitySection } from "@/components/notice-eligibility";
 import { NoticeFit } from "@/components/notice-fit";
 import { NoticeFitMingan } from "@/components/notice-fit-mingan";
@@ -409,13 +408,8 @@ export default async function NoticePage({ params }: Params) {
           {n.address && complexes.length === 0 && (
             <section className="dsec lead">
               <h2>위치</h2>
-              {/* 사진을 주는 곳이 없는 공고(LH 영구/국민/행복 등)라 지도 옆에 건물 앞 거리 사진을 같이 편다(2026-10-08 「사진 없으면 사진 반영」).
-                  근처에 로드뷰가 없으면 사진 칸이 사라지고 지도가 한 줄을 다 쓴다 */}
-              <div className="d-loc">
-                <div className="d-map"><NaverMap address={n.address} title={n.complex_name ?? n.title} sub={n.housing_type} /></div>
-                <StreetPhoto address={n.address} name={n.complex_name ?? n.title} />
-              </div>
-              <p className="note">지도 위치는 주소 기준 근사치입니다. {n.address}</p>
+              <div className="d-map"><NaverMap address={n.address} title={n.complex_name ?? n.title} sub={n.housing_type} /></div>
+              <p className="note">지도 위치는 주소 기준 근사치입니다. 핀이나 로드뷰 버튼을 누르면 거리뷰가 열립니다. {n.address}</p>
             </section>
           )}
 

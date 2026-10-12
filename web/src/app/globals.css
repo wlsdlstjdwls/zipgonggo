@@ -913,18 +913,6 @@ html[data-booting] .list-stage { visibility: hidden; }   /* 레일까지 함께 
 /* 프레임을 1,400px로 넓히면서 본문 칸이 1,070px가 됐다 — 여기 한 줄이 한글 70자를 넘으면 눈이 다음 줄을 못 찾는다.
    줄길이를 74자로 묶는다(2026-09-21). 색도 --dim에서 올린다 — 이 줄은 각주가 아니라 읽으라고 쓴 문장이다 */
 .note.photo-none { margin-top: 0; }
-/* 사진 없는 단지의 거리 사진(street-photo.tsx) — 갤러리 자리에 로드뷰를 펼친다. 폰에선 낮게, 끌기는 파노라마가 받는다 */
-.street { margin: 0; }
-.street-frame { position: relative; height: 340px; border-radius: var(--r-panel); overflow: hidden; border: 1px solid var(--line); background: var(--sub); }
-.street-frame .canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.street figcaption { margin-top: 9px; font-weight: 600; font-size: 13px; line-height: 1.6; color: var(--dim); }
-.street figcaption b { margin-right: 4px; font-weight: 800; color: var(--ink); }
-@media (max-width: 640px) { .street-frame { height: 240px; } }
-/* 공고 상세 위치 — 지도와 거리 사진을 나란히. 거리 사진이 없으면(로드뷰 없음) 지도가 한 줄을 다 쓴다. 좁으면 위아래로 */
-.d-loc { display: flex; flex-wrap: wrap; gap: 12px; }
-.d-loc > .d-map, .d-loc > .street { flex: 1 1 320px; min-width: 0; }
-.dsec.lead .d-loc .street-frame { height: 520px; }
-@media (max-width: 640px) { .dsec.lead .d-loc .street-frame { height: 240px; } }
 .note.photo-none b { font-weight: 800; color: var(--ink); }
 .note { margin: 12px 0 0; max-width: 58em; font-weight: 500; font-size: 13px; line-height: 1.75; color: var(--mut); }
 /* 섹션 안 소제목 — 「단지 제원」 밑 공급현황 표처럼 같은 이야기의 두 번째 문단 */
