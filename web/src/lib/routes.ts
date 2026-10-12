@@ -35,6 +35,10 @@ export const ROUTES = {
   apiSaved: "/api/saved",
   terms: "/terms",
   privacy: "/privacy",
+  // 운영 주체와 출처, 직접 계산하는 값을 밝히는 소개(2026-10-12, 애드센스 1차 탈락 뒤)
+  about: "/about",
+  // 직접 쓴 안내 글 목록. 글은 lib/guides.ts
+  guide: "/guide",
   rss: "/rss.xml",
   // 운영자 콘솔. 색인 대상이 아니다 — robots.ts가 막고 페이지도 noindex를 단다
   admin: "/admin",
@@ -42,6 +46,11 @@ export const ROUTES = {
   adminVisitors: "/admin/visitors",
   adminMembers: "/admin/members",
 } as const;
+
+/** /guide/{글}. 식별자가 한글이라 인코딩한다 */
+export function guidePath(slug: string): string {
+  return `${ROUTES.guide}/${encodeURIComponent(slug)}`;
+}
 
 /** /notice/{slug}. slug에 한글·콜론이 들어가므로 항상 인코딩한다. */
 export function noticePath(slug: string): string {

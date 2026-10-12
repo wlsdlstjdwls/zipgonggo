@@ -975,3 +975,120 @@ export async function getPriorCompetition(n: Pick<Notice, "id" | "agency" | "hou
     summary: { complexes: s?.complexes ?? 0, units, applicants, ratio: units > 0 ? Math.round((applicants / units) * 10) / 10 : null },
   };
 }
+
+
+/* ── 안내 글(/guide)과 소개(/about)가 싣는 집계 ────────────────────────────────
+   글에 숫자를 박지 않고 렌더 때 읽는다(docs/url-structure.md 안내 글). 전부 공고 캐시 태그를 따른다 —
+   대기현황과 단지 기본 금액은 S5가, 결과 공고는 S7이 갱신하고 그때 웹훅이 이 태그를 비운다 */
+
+export type WaitlistTypeStat = {
+  housing_type: string; rows: number; complexes: number; waiting: number; vacated: number;
+  zero_pct: number; median: number; surveyed_on: string;
+};
+export type WaitlistSidoStat = { sido: string; rows: number; waiting: number; vacated: number; zero_pct: number };
+
+/** 예비입주자 대기현황(마이홈 15108378)을 유형별, 시도별로. 단지마다 가장 최근 조사분만 센다 */
+export const getWaitlistStats = unstable_cache(
+  async (): Promise<{ byType: WaitlistTypeStat[]; bySido: WaitlistSidoStat[] }> => {
+    const latest = `(SELECT w.* FROM waitlist w
+       WHERE w.surveyed_on = (SELECT max(x.surveyed_on) FROM waitlist x WHERE x.complex_code = w.complex_code))`;
+    const [byType, bySido] = await Promise.all([
+      query<WaitlistTypeStat>(
+        `SELECT housing_type::text AS housing_type, count(*)::int AS rows, count(DISTINCT complex_code)::int AS complexes,
+                sum(waiting_cnt)::int AS waiting, sum(vacated_cnt)::int AS vacated,
+                round(100.0 * avg((waiting_cnt = 0)::int))::int AS zero_pct,
+                percentile_cont(0.5) WITHIN GROUP (ORDER BY waiting_cnt)::int AS median,
+                to_char(max(surveyed_on), 'YYYY-MM-DD') AS surveyed_on
+           FROM ${latest} t GROUP BY 1 HAVING count(DISTINCT complex_code) >= 5 ORDER BY 2 DESC`,
+      ),
+      query<WaitlistSidoStat>(
+        `SELECT sido, count(*)::int AS rows, sum(waiting_cnt)::int AS waiting, sum(vacated_cnt)::int AS vacated,
+                round(100.0 * avg((waiting_cnt = 0)::int))::int AS zero_pct
+           FROM ${latest} t WHERE sido IS NOT NULL GROUP BY 1 HAVING count(*) >= 20 ORDER BY 3 DESC`,
+      ),
+    ]);
+    return { byType, bySido };
+  },
+  ["guide-waitlist-v1"],
+  CACHE_OPTS,
+);
+
+export type RentTypeStat = {
+  housing_type: string; types: number; area: number; deposit: number; rent: number; rent_per_m2: number; conv_share: number | null;
+};
+
+/** 단지 형별 기본 보증금과 월임대료(마이홈 15110581) 중앙값. 전환보증금 한도는 기본 보증금 대비 비율의 중앙값 */
+export const getRentStats = unstable_cache(
+  async (): Promise<RentTypeStat[]> =>
+    query<RentTypeStat>(
+      `SELECT housing_type::text AS housing_type, count(*)::int AS types,
+              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY exclusive_area)::numeric, 1)::float AS area,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY base_deposit)::bigint::float AS deposit,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY base_rent)::bigint::float AS rent,
+              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY base_rent::numeric / exclusive_area))::float AS rent_per_m2,
+              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY conversion_deposit_limit::numeric / base_deposit)
+                    FILTER (WHERE conversion_deposit_limit > 0)::numeric, 2)::float AS conv_share
+         FROM complex_type WHERE base_deposit > 0 AND base_rent > 0 AND exclusive_area > 0
+        GROUP BY 1 HAVING count(*) >= 20 ORDER BY 2 DESC`,
+    ),
+  ["guide-rent-v1"],
+  CACHE_OPTS,
+);
+
+export type CompetitionStat = { housing_type: string; year: number; notices: number; rows: number; median: number; p90: number; max: number };
+
+/** SH 결과 공고에서 읽은 경쟁률. 표를 산술로 맞춰 본(reconciled) 줄만 — 글자 유실로 틀린 줄을 섞지 않는다 */
+export const getCompetitionStats = unstable_cache(
+  async (): Promise<CompetitionStat[]> =>
+    query<CompetitionStat>(
+      `SELECT n.housing_type::text AS housing_type, extract(year FROM n.posted_at)::int AS year,
+              count(DISTINCT r.notice_id)::int AS notices, count(*)::int AS rows,
+              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY r.ratio)::numeric, 1)::float AS median,
+              round(percentile_cont(0.9) WITHIN GROUP (ORDER BY r.ratio)::numeric, 1)::float AS p90,
+              max(r.ratio)::float AS max
+         FROM notice_result r JOIN notice n ON n.id = r.notice_id
+        WHERE r.result_kind = 'competition' AND r.reconciled AND r.units BETWEEN 1 AND 2000 AND r.ratio IS NOT NULL
+        GROUP BY 1, 2 HAVING count(*) >= 30 ORDER BY 2 DESC, 1`,
+    ),
+  ["guide-competition-v1"],
+  CACHE_OPTS,
+);
+
+export type ScheduleStat = { agency: string; notices: number; to_start: number; open_days: number; to_announce: number | null };
+
+/** 최근 2년 공고의 일정 간격 중앙값(일). 접수 기간은 시작일과 마감일을 모두 센다 */
+export const getScheduleStats = unstable_cache(
+  async (): Promise<ScheduleStat[]> =>
+    query<ScheduleStat>(
+      `SELECT agency, count(*)::int AS notices,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY apply_start_at - posted_at)::int AS to_start,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY apply_end_at - apply_start_at + 1)::int AS open_days,
+              (percentile_cont(0.5) WITHIN GROUP (ORDER BY announce_at - apply_end_at)
+                 FILTER (WHERE announce_at > apply_end_at))::int AS to_announce
+         FROM notice
+        WHERE canonical_id IS NULL AND posted_at >= CURRENT_DATE - 730
+          AND apply_start_at IS NOT NULL AND apply_end_at >= apply_start_at AND apply_start_at >= posted_at
+        GROUP BY 1 HAVING count(*) >= 30 ORDER BY 2 DESC`,
+    ),
+  ["guide-schedule-v1"],
+  CACHE_OPTS,
+);
+
+export type SiteStats = { notices: number; open: number; complexes: number; waitlist: number; oldest: string; updated: string };
+
+/** 소개(/about)의 숫자들 */
+export const getSiteStats = unstable_cache(
+  async (): Promise<SiteStats> => {
+    const rows = await query<SiteStats>(
+      `SELECT (SELECT count(*) FROM notice WHERE canonical_id IS NULL)::int AS notices,
+              (SELECT count(*) FROM notice WHERE canonical_id IS NULL AND ${NOT_CLOSED})::int AS open,
+              (SELECT count(*) FROM notice_complex)::int AS complexes,
+              (SELECT count(DISTINCT complex_code) FROM waitlist)::int AS waitlist,
+              (SELECT to_char(min(posted_at), 'YYYY') FROM notice WHERE canonical_id IS NULL) AS oldest,
+              (SELECT to_char(max(updated_at) AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') FROM notice) AS updated`,
+    );
+    return rows[0];
+  },
+  ["site-stats-v1"],
+  CACHE_OPTS,
+);

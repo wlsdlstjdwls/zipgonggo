@@ -169,6 +169,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {/* 개인정보처리방침은 다른 링크보다 굵게 — 개인정보보호법 시행령이 "글자 크기나 색상으로 구분해
                   쉽게 확인할 수 있게" 하라고 정한다 */}
               <nav className="foot-legal" aria-label="약관과 방침">
+                <Link href={ROUTES.about}>소개</Link>
+                <span aria-hidden="true" />
+                <Link href={ROUTES.guide}>안내 글</Link>
+                <span aria-hidden="true" />
                 <Link href={ROUTES.terms}>이용약관</Link>
                 <span aria-hidden="true" />
                 <Link href={ROUTES.privacy} className="strong">개인정보처리방침</Link>

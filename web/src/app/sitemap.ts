@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
 import { AREA_MIN_COUNT, SITEMAP_MAX_URLS, SITEMAP_PRIORITY_CLOSED, SITEMAP_PRIORITY_OPEN } from "@/lib/constants";
 import { AREA_TYPE_MIN_COUNT, listAreaTypePairs, listFilterOptions, listProgramHubs, listSitemapComplexes, listSitemapNotices, listTypeHubs } from "@/lib/queries";
-import { areaPath, areaTypePath, noticeComplexPath, noticePath, programPath, ROUTES, typePath } from "@/lib/routes";
+import { areaPath, areaTypePath, guidePath, noticeComplexPath, noticePath, programPath, ROUTES, typePath } from "@/lib/routes";
 import { PROGRAM_MIN_COUNT, programDoc } from "@/lib/programs";
 import { housingTypeDoc } from "@/lib/housing-types";
+import { GUIDE_DOCS } from "@/lib/guides";
 import { absoluteUrl } from "@/lib/site-url";
 
 // 색인 대상 URL의 단일 원천. 홈 + 정책 문서 + 지역(/area) + 공고 상세 + 기준을 채운 단지.
@@ -30,6 +31,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 정책 문서 — 내용이 거의 안 바뀌지만 색인은 시켜 둔다(신뢰 신호)
     { url: absoluteUrl(ROUTES.terms), lastModified: latest, changeFrequency: "yearly", priority: 0.2 },
     { url: absoluteUrl(ROUTES.privacy), lastModified: latest, changeFrequency: "yearly", priority: 0.2 },
+    // 소개와 안내 글(2026-10-12) — 직접 쓴 글. 표의 숫자가 DB에서 오므로 주 단위로 둔다
+    { url: absoluteUrl(ROUTES.about), lastModified: latest, changeFrequency: "monthly", priority: 0.5 },
+    { url: absoluteUrl(ROUTES.guide), lastModified: latest, changeFrequency: "weekly", priority: 0.7 },
+    ...Object.entries(GUIDE_DOCS).map(([slug, d]) => ({
+      url: absoluteUrl(guidePath(slug)),
+      lastModified: new Date(d.updated ?? d.published),
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    })),
     // 유형 허브 — 직접 쓴 제도 설명이 있는 유형만. 페이지 자체가 그 기준으로 404를 낸다
     ...hubs.filter((h) => housingTypeDoc(h.housing_type)).map((h) => ({
       url: absoluteUrl(typePath(h.housing_type)),

@@ -114,6 +114,8 @@ Fluid Compute라 함수별 리전 지정이 안 먹기 때문이다 — 자세�
 /area/{시군구}/{유형}
 /type/{유형}
 /program/{사업}        든든전세, 미리내집처럼 유형 아래 정부 사업(notice.programs)
+/guide/{글}            직접 쓴 안내 글(lib/guides.ts). 글마다 DB 데이터 블록 하나 이상
+/about                 운영 주체, 출처, 갱신 주기, 직접 계산하는 값
 ```
 
 전체 규칙과 title/meta 템플릿은 [`docs/url-structure.md`](docs/url-structure.md).

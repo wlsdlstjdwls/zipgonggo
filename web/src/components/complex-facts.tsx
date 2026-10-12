@@ -87,7 +87,7 @@ export function ComplexFactsSection({ facts, housingType }: { facts: ComplexFact
           <p className="note">
             {facts.surveyed_on ? `${dateK(facts.surveyed_on)} 기준. ` : ""}
             지금 이 단지를 기다리는 사람이 모두 {num(waiting, "명")}입니다. <b>대기 순번이 아니라 인원 수</b>입니다.
-            {hasVacated && " 퇴거는 예비 명부에서 빠져나간 건수라, 이 숫자가 클수록 차례가 빨리 돌아옵니다."}
+            {hasVacated && " 퇴거는 살던 입주자가 집을 비운 건수입니다. 빈 집이 예비입주자에게 차례로 돌아가니, 이 숫자가 클수록 차례가 빨리 옵니다."}
           </p>
         </div>
       )}

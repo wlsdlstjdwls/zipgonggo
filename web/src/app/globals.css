@@ -2748,3 +2748,29 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .hf-people dt { color: var(--dim); font-weight: 700; }
 .hf-people dd { margin: 0; color: var(--ink); font-weight: 700; }
 .sb-title .sb-sub, .spec-sub { font-size: 12px; font-weight: 700; color: var(--dim); }
+
+/* 안내 글(/guide) — 데이터 블록과 글 목록(2026-10-12). 표는 좁은 화면에서 표 안에서만 가로로 밀린다 */
+.g-block { margin-top: 16px; }
+.g-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-card); }
+.g-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.g-table th, .g-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; white-space: nowrap; }
+.g-table th { background: var(--sub); font-weight: 800; font-size: 12.5px; color: var(--dim); }
+.g-table td { font-weight: 600; color: var(--ink); }
+.g-table tr:last-child td { border-bottom: 0; }
+.g-table .n { text-align: right; font-variant-numeric: tabular-nums; }
+.g-table small { margin-left: 4px; font-weight: 600; font-size: 12px; color: var(--dim); }
+.g-table a { font-weight: 800; }
+.g-ratio { display: inline-flex; align-items: center; gap: 8px; }
+.g-ratio i { display: inline-block; width: 60px; height: 8px; border-radius: 4px; background: var(--acc); opacity: 0.7; }
+.g-ratio i.ok { background: var(--ok, #1a9b5a); }
+.g-ratio b { font-weight: 800; min-width: 52px; }
+.legal-sec .g-cap, .g-cap { margin: 8px 0 0; font-weight: 500; font-size: 12.5px; line-height: 1.7; color: var(--dim); }
+.legal-sec .g-note { margin-top: 10px; font-size: 13.5px; color: var(--dim); }
+.g-tool { margin: 0; }
+.g-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.legal-sec .g-list { padding-left: 0; }
+.g-list li { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
+.g-list a { font-weight: 900; font-size: 16px; letter-spacing: -0.03em; color: var(--ink); text-decoration: none; }
+.g-list a:hover { color: var(--acc); }
+.g-list span { font-weight: 500; font-size: 13.5px; line-height: 1.7; color: var(--mut); }
+.g-list.big a { font-size: 17px; }
