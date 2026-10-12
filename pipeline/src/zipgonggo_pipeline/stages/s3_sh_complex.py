@@ -28,6 +28,7 @@ from ..db import connect
 from ..parsers.sh_attach import merge_teukhwa, parse_attachment, teukhwa_facts
 from ..parsers.sh_eligibility import parse_eligibility, verify_income_table
 from ..parsers.sh_house_list import HouseList, parse_house_list
+from ..parsers.sh_location import parse_locations
 from ..parsers.sh_schedule import parse_schedule
 from ..repo import (
     income_base100, income_years, replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts,
@@ -426,12 +427,21 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                             if doc is not None:
                                 list_pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq / "list"))
                         house = parse_house_list(list_pages) if list_pages else None
-                        if house and house.units:
+                        if house and house.complexes:
                             facts.kind = "house_list"
                             facts.complexes = house.complexes
-                            facts.totals = house.totals
+                            # 금액 칸 없는 목록(장기미임대)은 호수만 준다 — 공고문에서 읽은 금액은 살린다
+                            facts.totals = {**facts.totals, **{k: v for k, v in house.totals.items() if v is not None}}
                         else:
                             house = None
+                        # 그래도 단지가 없으면 공고문 본문의 위치(대상주택 표, 단지/소재지 표, 「위치」 줄)를 읽는다.
+                        # 잔여세대·협동조합·자립준비청년 공고의 지도가 여기서 생긴다(2026-10-12)
+                        # 검증한 건 매입임대 공고 34건뿐이라 다른 유형엔 걸지 않는다
+                        if not facts.complexes and n["housing_type"] == "매입임대":
+                            locs = parse_locations(pages, n["title"])
+                            if locs:
+                                facts.kind = "location"
+                                facts.complexes = locs
                     kind, rows, units = facts.kind, facts.complexes, facts.units
                     supply_rows = [_supply_row(l) for l in facts.supply_lines] + [_jeonse_row(l) for l in facts.jeonse_lines]
                     if facts.kind == "teukhwa":

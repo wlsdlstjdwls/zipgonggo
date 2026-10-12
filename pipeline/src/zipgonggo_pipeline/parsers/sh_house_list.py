@@ -88,6 +88,15 @@ def _mid(s: Segment) -> float:
     return (s.l + s.r) / 2
 
 
+def _field(t: str) -> str | None:
+    """머리글 → 필드. 장기미임대 목록은 주소 머리글이 「서울특별시 소재지주소(지번주소)」처럼 길다(301759)."""
+    if t in HEADER_FIELDS:
+        return HEADER_FIELDS[t]
+    if "소재지주소" in t or "도로명" in t:
+        return "addr"
+    return None
+
+
 def _header(rows: list[list[Segment]]) -> tuple[list[_Col], list[str], int] | None:
     """「연번」 줄이 있는 쪽의 머리글 블록 → (칸들, 계층 이름들, 첫 자료 줄 번호)."""
     head_i = next((i for i, r in enumerate(rows) if any(_flat(s.text) == "연번" for s in r)), None)
@@ -100,15 +109,12 @@ def _header(rows: list[list[Segment]]) -> tuple[list[_Col], list[str], int] | No
     # 신혼Ⅰ은 계층 이름 첫 줄이 연번 줄 여섯 줄 위에 있다
     block = rows[max(0, head_i - 8):data_i]
     money = sorted((s for r in block for s in r if _flat(s.text) in DEPOSIT_HEADS | RENT_HEADS), key=lambda s: s.l)
-    if len(money) < 2:
-        return None
-    lo, hi = money[0].l - 20, money[-1].r + 20
     pairs: list[tuple[Segment, Segment]] = []
     for a, b in zip(money, money[1:]):
         if _flat(a.text) in DEPOSIT_HEADS and _flat(b.text) in RENT_HEADS:
             pairs.append((a, b))
-    if not pairs:
-        return None
+    # 금액 칸이 없는 목록(장기미임대 301759)도 받는다 — 호실 행은 못 만들어도 단지와 지도는 만든다
+    lo, hi = (money[0].l - 20, money[-1].r + 20) if pairs else (float("inf"), float("-inf"))
 
     cols: list[_Col] = []
     for r in block:
@@ -118,9 +124,9 @@ def _header(rows: list[list[Segment]]) -> tuple[list[_Col], list[str], int] | No
                 continue
             if lo <= _mid(s) <= hi:
                 continue  # 금액 칸 위의 계층 이름 — 칸이 아니다
-            if len(t) > COLUMN_MAX_CH and t not in HEADER_FIELDS:
+            if len(t) > COLUMN_MAX_CH and _field(t) is None:
                 continue
-            cols.append(_Col(_mid(s), HEADER_FIELDS.get(t), t))
+            cols.append(_Col(_mid(s), _field(t), t))
     merged: list[_Col] = []
     for c in sorted(cols, key=lambda c: c.center):
         if merged and c.center - merged[-1].center <= MERGE_PX:
@@ -144,19 +150,33 @@ def _header(rows: list[list[Segment]]) -> tuple[list[_Col], list[str], int] | No
             best = min(cands, key=lambda s: abs(_mid(s) - c))
             names[k].append(best.text.strip())
     tiers = [" ".join(n) or f"계층{k + 1}" for k, n in enumerate(names)]
+    if not any(c.field == "addr" for c in merged):
+        return None
     return merged, tiers, data_i
 
 
+# 글자 칸은 한 칸이 조각 둘로 올 수 있다(304699 「서울특별시 서초구 논현로5길 23-7」 / 「(양재동 400-11)」) — 이어 붙인다
+JOIN_FIELDS = {"addr", "name", "jibun"}
+
+
 def _assign(row: list[Segment], cols: list[_Col]) -> dict[str, str]:
-    """자료 줄의 칸을 가장 가까운 머리글에 붙인다. 한 머리글에 둘이 오면 더 가까운 쪽만."""
+    """자료 줄의 칸을 가장 가까운 머리글에 붙인다. 한 머리글에 둘이 오면 숫자 칸은 더 가까운 쪽만, 글자 칸은 이어 붙인다."""
     best: dict[int, tuple[float, Segment]] = {}
+    joined: dict[int, list[Segment]] = {}
     for s in row:
         m = _mid(s)
         k = min(range(len(cols)), key=lambda i: abs(cols[i].center - m))
         d = abs(cols[k].center - m)
+        joined.setdefault(k, []).append(s)
         if k not in best or d < best[k][0]:
             best[k] = (d, s)
-    return {cols[k].field: s.text for k, (_, s) in best.items() if cols[k].field}
+    out = {}
+    for k, (_, s) in best.items():
+        f = cols[k].field
+        if not f:
+            continue
+        out[f] = " ".join(x.text for x in sorted(joined[k], key=lambda x: x.l)) if f in JOIN_FIELDS else s.text
+    return out
 
 
 def _area(v: str | None) -> float | None:
@@ -179,8 +199,10 @@ def _money(v: str | None) -> int | None:
     return int(re.sub(r"\D", "", v))
 
 
-def _addr(addr: str, gu: str | None) -> tuple[str, str, str, str | None, str | None]:
-    """주소 칸 → (시도, 시군구, 도로명주소(시군구부터, 서울 밖은 시도부터), 동, 괄호 속 지번)."""
+def _addr(addr: str, gu: str | None) -> tuple[str, str, str, str | None, str | None, str]:
+    """주소 칸 → (시도, 시군구, 도로명주소(시군구부터, 서울 밖은 시도부터), 동, 괄호 속 지번, 번지 뒤 건물명).
+
+    건물명은 이름 칸이 없는 목록(장기미임대 301759 「강남구 논현로12길 3-8 동영빌 (개포동 1195-10)」)에서 이름으로 쓴다."""
     t = re.sub(r"\s+", " ", addr).strip()
     sido = "서울특별시"
     m = SIDO_RE.match(t)
@@ -191,8 +213,10 @@ def _addr(addr: str, gu: str | None) -> tuple[str, str, str, str | None, str | N
     paren, _, tail = rest.partition(")")
     # 괄호 없이 건물명과 동호가 이어지는 주소(「경인로15나길 65-4 궁동에스하임 제101동 302호」)는 번지에서 끊는다
     rm = ROAD_RE.match(head.strip())
+    building = ""
     if rm and rm.group(2).strip():
         head, tail = rm.group(1), f"{rm.group(2)} {tail}"
+        building = rm.group(2).strip()
     road = re.sub(r"\s*-\s*", "-", head.strip().rstrip(","))
     first = road.split(" ", 1)[0]
     if not re.search(r"(구|시|군)$", first) and gu:
@@ -206,7 +230,7 @@ def _addr(addr: str, gu: str | None) -> tuple[str, str, str, str | None, str | N
     # 괄호 안 「(성내동 404-10)」은 지번, 「(성내동, 서도휴빌)」은 건물명이다
     jm = re.match(r"^([가-힣0-9]+(?:동|가|리))\s*(\d+(?:-\d+)?)$", paren.strip())
     jibun = f"{sigungu} {jm.group(1)} {jm.group(2)}" if jm else None
-    return sido, sigungu, road, dong, jibun
+    return sido, sigungu, road, dong, jibun, building
 
 
 # 건축물대장 기본 건물명(「주건축물제1동」)과 「제B동」은 이름이 아니라 동이다
@@ -240,7 +264,7 @@ def _name_dong(name: str, dong: str | None, road: str) -> tuple[str, str | None]
     elif only:
         dong = dong or _dong(only.group(1))
         n = ""
-    if not n.strip("- "):
+    if not n.strip("- ") or n in ("명칭없음", "미정"):
         n = road.split(" ", 1)[1] if " " in road else road
     return n, dong
 
@@ -298,8 +322,8 @@ def parse_house_list(pages: list[tuple[int, str]]) -> HouseList | None:
         if seq in seen:
             continue
         seen.add(seq)
-        sido, sigungu, road, dong, jibun = _addr(v["addr"], v.get("gu"))
-        name, dong = _name_dong(v.get("name") or "", dong, road)
+        sido, sigungu, road, dong, jibun, building = _addr(v["addr"], v.get("gu"))
+        name, dong = _name_dong(v.get("name") or building, dong, road)
         prices = [(_money(v.get(f"dep{k}")), _money(v.get(f"rent{k}"))) for k in range(len(tiers))]
         layout = v.get("layout")
         if not layout and v.get("rooms") in ROOMS:
@@ -334,14 +358,14 @@ def parse_house_list(pages: list[tuple[int, str]]) -> HouseList | None:
 
     _disambiguate(parsed)
     keys: dict[str, int] = {}
-    kept: list[dict[str, Any]] = []
     for p in parsed:
         base = p["prices"][0] if p["prices"] else (None, None)
         if p["area"] is None or base[0] is None:
-            out.dropped += 1
-            log.warning("주택목록 연번 %d: 면적이나 첫 계층 금액이 비어 호실 행을 만들지 않는다", p["seq"])
+            # 금액 칸이 없는 목록(장기미임대)은 원래 호실 행을 못 만든다 — 그때는 조용히 단지만 낸다
+            if tiers:
+                out.dropped += 1
+                log.warning("주택목록 연번 %d: 면적이나 첫 계층 금액이 비어 호실 행을 만들지 않는다", p["seq"])
             continue
-        kept.append(p)
         key = "-".join(_flat(x) for x in (p["name"], p["dong"], p["ho"]) if x)
         keys[key] = keys.get(key, 0) + 1
         out.units.append({
@@ -372,20 +396,28 @@ def parse_house_list(pages: list[tuple[int, str]]) -> HouseList | None:
         if keys[u["unit_key"]] > 1:
             u["unit_key"] = f"{u['unit_key']}-{u['seq']}"
 
+    # 단지는 호실 행이 못 선 줄까지 포함해 목록 전체에서 낸다 — 호수와 면적은 목록에 적힌 그대로
+    def low(a, b):
+        return min(x for x in (a, b) if x is not None) if a is not None or b is not None else None
+
+    def high(a, b):
+        return max(x for x in (a, b) if x is not None) if a is not None or b is not None else None
+
     by: dict[tuple[str, str], dict[str, Any]] = {}
-    for u, p in zip(out.units, kept):
-        k = (u["complex_name"], u["road_address"])
+    for p in parsed:
+        k = (p["name"], p["road"])
         c = by.get(k)
         if c is None:
-            c = by[k] = {"name": k[0], "sido": u["sido"], "sigungu": u["sigungu"], "road_address": k[1],
-                         "is_new": False, "source_page": u["source_page"], "complex_code": None, "heating": None,
+            c = by[k] = {"name": k[0], "sido": p["sido"], "sigungu": p["sigungu"], "road_address": k[1],
+                         "is_new": False, "source_page": p["page"], "complex_code": None, "heating": None,
                          "unit_count": 0, "min_deposit": None, "min_rent": None, "area_min": None, "area_max": None}
+        base = p["prices"][0] if p["prices"] else (None, None)
         c["unit_count"] += 1
         c["is_new"] = c["is_new"] or p["is_new"]
-        c["min_deposit"] = min(x for x in (c["min_deposit"], u["deposit"]) if x is not None)
-        c["min_rent"] = min(x for x in (c["min_rent"], u["rent"]) if x is not None) if u["rent"] is not None or c["min_rent"] is not None else None
-        c["area_min"] = min(x for x in (c["area_min"], u["area_m2"]) if x is not None)
-        c["area_max"] = max(x for x in (c["area_max"], u["area_m2"]) if x is not None)
+        c["min_deposit"] = low(c["min_deposit"], base[0])
+        c["min_rent"] = low(c["min_rent"], base[1])
+        c["area_min"] = low(c["area_min"], p["area"])
+        c["area_max"] = high(c["area_max"], p["area"])
     out.complexes = list(by.values())
 
     deps = [t["deposit"] for u in out.units for t in u["price_tiers"] if t["deposit"]]
@@ -393,6 +425,6 @@ def parse_house_list(pages: list[tuple[int, str]]) -> HouseList | None:
     out.totals = {
         "min_deposit": min(deps, default=None), "max_deposit": max(deps, default=None),
         "min_rent": min(rents, default=None), "max_rent": max(rents, default=None),
-        "supply_count": len(out.units) or None,
+        "supply_count": len(parsed) or None,
     }
     return out

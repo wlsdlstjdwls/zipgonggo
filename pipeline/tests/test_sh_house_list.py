@@ -71,6 +71,24 @@ def test_cheongnyeon_four_tiers():
     assert all(t["deposit"] for x in h.units for t in x["price_tiers"])
 
 
+def test_jangimiimdae_list_without_prices():
+    """장기미임대 주택목록: 금액 칸이 없다. 호실 행은 못 만들어도 단지(이름은 주소 뒤 건물명)는 낸다."""
+    h = parse_house_list(pages("ish_301759_list", [1]))
+    assert h is not None and h.units == [] and h.tiers == []
+    c = {x["road_address"]: x for x in h.complexes}
+    assert c["강남구 논현로12길 3-8"]["name"] == "동영빌"
+    assert c["강동구 천중로18길 29"]["name"] == "천호에스하임Ⅲ"
+
+
+def test_split_address_cell_is_joined():
+    """주소 칸이 「서울특별시 서초구 논현로5길 23-7」 / 「(양재동 400-11)」 두 조각으로 온다(304699 4쪽).
+    뒤 조각만 붙으면 도로명이 「서초구 」로 빈다."""
+    h = parse_house_list(pages("ish_304699_list", [1, 4]))
+    roads = {x["name"]: x["road_address"] for x in h.complexes}
+    assert roads["예미담"] == "서초구 논현로5길 23-7"
+    assert all(" " in r and r.split(" ", 1)[1] for r in roads.values())
+
+
 def test_area_restore():
     assert _area("44.42") == 44.42
     assert _area("4575") == 45.75
