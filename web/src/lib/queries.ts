@@ -921,7 +921,9 @@ export const listOpenSoon = unstable_cache(
 
 // 대괄호 표현 안에서 「]」는 맨 앞, 「-」는 맨 뒤여야 글자 그대로다(Postgres ARE)
 // 괄호 주석(「꿈의숲 롯데캐슬(미아4)」·「푸르내(서울리츠1호)」)은 먼저 통째로 걷는다 — 회차마다 붙었다 떨어진다
-const NAME_KEY = `regexp_replace(lower(regexp_replace(%s, '\([^)]*\)', '', 'g')), '[]_.,·・[[:space:]-]', '', 'g')`;
+// String.raw — 그냥 템플릿 문자열이면 「\(」가 「(」로 풀려 정규식이 「([^)]*)」(닫는 괄호 앞까지 통째로)가 되고,
+// 괄호 없는 이름은 전부 빈 문자열로 깎여 모든 단지가 서로 맞았다(2026-10-12 발견). lib/notice-fit priorNameKey와 같은 규칙
+const NAME_KEY = String.raw`regexp_replace(lower(regexp_replace(%s, '\([^)]*\)', '', 'g')), '[]_.,·・[[:space:]-]', '', 'g')`;
 
 /** 결과 계열 열쇠. 같은 housing_type 안에서 신청자 풀이 다른 프로그램을 가른다. 화면 문자열이 아니라 비교 열쇠다 */
 export function noticeFamily(title: string, housingType: string): string {
@@ -1090,5 +1092,178 @@ export const getSiteStats = unstable_cache(
     return rows[0];
   },
   ["site-stats-v1"],
+  CACHE_OPTS,
+);
+
+
+/* ── 숫자로 보기(/stats) ──────────────────────────────────────────────────────
+   공급 호수와 경쟁률을 기관, 유형, 지역으로 견준다(사용자 요청 2026-10-12, 이름은 「데이터랩」을 피했다).
+
+   **창은 최근 STATS_WINDOW_DAYS일로 잡는다.** 기관마다 모은 기간이 달라서다 — 마이홈 API는 지금 게시 중인
+   공고만 주므로 LH는 2026-08부터 사실상 전량이고, SH와 서울시는 게시판 아카이브라 몇 년 전까지 있다.
+   연도별로 합치면 「LH 공급이 올해 폭증」처럼 수집 시점이 만든 가짜 추이가 그려진다. 창을 넓히는 건
+   LH가 그만큼 쌓인 뒤에(handoff.md 참고).
+
+   공급 호수는 공고 대표값(supply_count)을 먼저 쓰고, 비었으면 공급 표(notice_supply)를 합친다.
+   둘 다 없는 공고는 호수를 세지 않고 「호수 미상」으로 따로 센다 — 0으로 섞지 않는다. */
+
+export const STATS_WINDOW_DAYS = 60;
+
+const STATS_BASE = `
+  SELECT n.id, n.agency, n.sector::text AS sector, n.housing_type::text AS housing_type, n.sido,
+         COALESCE(n.supply_count, (SELECT sum(s.units_total) FROM notice_supply s WHERE s.notice_id = n.id))::int AS units
+    FROM notice n
+   WHERE n.${CANONICAL_ONLY} AND n.publish <> 'rejected' AND n.posted_at >= ${TODAY} - ${STATS_WINDOW_DAYS}`;
+
+export type SupplyGroup = { key: string; sector?: string; notices: number; units: number; unknown: number };
+export type SupplyStats = {
+  since: string; notices: number; units: number; unknown: number;
+  byAgency: SupplyGroup[]; byType: SupplyGroup[]; bySido: SupplyGroup[];
+};
+
+export const getSupplyStats = unstable_cache(
+  async (): Promise<SupplyStats> => {
+    const agg = `count(*)::int AS notices, COALESCE(sum(units), 0)::int AS units, count(*) FILTER (WHERE units IS NULL)::int AS unknown`;
+    const [tot, byAgency, byType, bySido] = await Promise.all([
+      query<{ since: string; notices: number; units: number; unknown: number }>(
+        `SELECT to_char(${TODAY} - ${STATS_WINDOW_DAYS}, 'YYYY-MM-DD') AS since, ${agg} FROM (${STATS_BASE}) b`,
+      ),
+      // 기관 이름은 같아도 부문이 다를 수 있다(서울시 = 민간임대 게시판). 많은 쪽 부문을 붙인다
+      query<SupplyGroup>(
+        `SELECT agency AS key, mode() WITHIN GROUP (ORDER BY sector) AS sector, ${agg}
+           FROM (${STATS_BASE}) b GROUP BY 1 ORDER BY units DESC, notices DESC`,
+      ),
+      query<SupplyGroup>(`SELECT housing_type AS key, ${agg} FROM (${STATS_BASE}) b GROUP BY 1 ORDER BY units DESC, notices DESC`),
+      query<SupplyGroup>(`SELECT sido AS key, ${agg} FROM (${STATS_BASE}) b GROUP BY 1 ORDER BY units DESC, notices DESC`),
+    ]);
+    return { ...tot[0], byAgency, byType, bySido };
+  },
+  ["stats-supply-v1"],
+  CACHE_OPTS,
+);
+
+/** 경쟁률 지면을 여는 기준 — 결과 표를 읽은 공고(회차) 수. 한두 회차로 「이 유형의 경쟁률」이라 부르지 않는다 */
+export const COMPETITION_MIN_ROUNDS = 5;
+
+// 산술로 맞춘 소계 줄만. 결과 표는 단지 × 면적 × 계층마다 우선, 일반, 소계 줄이 따로 있다
+const RESULT_OK = `r.result_kind = 'competition' AND r.reconciled AND r.units BETWEEN 1 AND 2000 AND r.applicants IS NOT NULL`;
+
+export type CompetitionTypeHub = { housing_type: string; agency: string; rounds: number };
+
+/** 경쟁률 지면이 서는 유형. 지금은 SH 결과 공고뿐이라 기관도 같이 돌려준다 */
+export const listCompetitionTypes = unstable_cache(
+  async (): Promise<CompetitionTypeHub[]> =>
+    query<CompetitionTypeHub>(
+      `SELECT n.housing_type::text AS housing_type, n.agency, count(DISTINCT r.notice_id)::int AS rounds
+         FROM notice_result r JOIN notice n ON n.id = r.notice_id
+        WHERE ${RESULT_OK} AND r.bracket = '소계'
+        GROUP BY 1, 2 HAVING count(DISTINCT r.notice_id) >= ${COMPETITION_MIN_ROUNDS} ORDER BY 3 DESC`,
+    ),
+  ["stats-competition-types-v1"],
+  CACHE_OPTS,
+);
+
+export type CompetitionRound = {
+  slug: string; title: string; posted_at: string; complexes: number; units: number; applicants: number; ratio: number;
+  rows_all: number; rows_bad: number;
+};
+export type CompetitionCell = { key: string; units: number; applicants: number; ratio: number; rows: number };
+export type CompetitionComplex = { name: string; sigungu: string; slug: string; posted_at: string; units: number; applicants: number; ratio: number };
+export type TypeCompetition = {
+  agency: string; rounds: CompetitionRound[]; total: CompetitionCell & { complexes: number };
+  byClass: (CompetitionCell & { bracket: string })[]; byGu: CompetitionCell[];
+  hottest: CompetitionComplex[]; calmest: CompetitionComplex[]; skipped: number; all: number;
+};
+
+const SEOUL_GU = [
+  "종로구", "중구", "용산구", "성동구", "광진구", "동대문구", "중랑구", "성북구", "강북구", "도봉구", "노원구", "은평구", "서대문구",
+  "마포구", "양천구", "강서구", "구로구", "금천구", "영등포구", "동작구", "관악구", "서초구", "강남구", "송파구", "강동구",
+];
+
+/** 결과 표의 구 이름은 글자 유실로 「영등」 「포구」 「동대문」처럼 잘려 온다. 서울 25개 구 가운데 하나로만 맞으면 그 구로 합치고,
+ *  「문구」(동대문구? 서대문구?)처럼 둘 이상에 맞거나 하나에도 안 맞으면 버린다 — 추측으로 채우지 않는다 */
+function mergeSeoulGu(rows: CompetitionCell[]): CompetitionCell[] {
+  const acc = new Map<string, CompetitionCell>();
+  for (const r of rows) {
+    const raw = r.key.replace(/\s+/g, "");
+    const hit = SEOUL_GU.includes(raw) ? [raw] : raw.length >= 2 ? SEOUL_GU.filter((g) => g.startsWith(raw) || g.endsWith(raw)) : [];
+    if (hit.length !== 1) continue;
+    const k = hit[0];
+    const a = acc.get(k) ?? { key: k, units: 0, applicants: 0, ratio: 0, rows: 0 };
+    a.units += r.units; a.applicants += r.applicants; a.rows += r.rows;
+    acc.set(k, a);
+  }
+  return [...acc.values()]
+    .map((a) => ({ ...a, ratio: a.units > 0 ? Math.round((a.applicants / a.units) * 10) / 10 : 0 }))
+    .sort((a, b) => b.ratio - a.ratio);
+}
+
+/** 한 유형의 결과 공고를 회차, 계층, 자치구, 단지로. 경쟁률은 줄 비율의 평균이 아니라 합계끼리 나눈 값이다 */
+export const getTypeCompetition = unstable_cache(
+  async (housingType: string): Promise<TypeCompetition | null> => {
+    const hubs = await listCompetitionTypes();
+    const hub = hubs.find((h) => h.housing_type === housingType);
+    if (!hub) return null;
+    const p = [housingType, hub.agency];
+    const scope = `FROM notice_result r JOIN notice n ON n.id = r.notice_id
+       WHERE n.housing_type::text = $1 AND n.agency = $2`;
+    const ratio = `round(sum(r.applicants)::numeric / NULLIF(sum(r.units), 0), 1)::float AS ratio`;
+    const sums = `sum(r.units)::int AS units, sum(r.applicants)::int AS applicants, ${ratio}, count(*)::int AS rows`;
+    // 결과 표에 자치구가 빠진 양식이 있다 — 같은 공고의 단지 목록에서 이름으로 찾아 메운다(getPriorCompetition과 같은 열쇠)
+    const gu = `COALESCE(NULLIF(r.sigungu, ''), (
+        SELECT c.sigungu FROM notice_complex c
+         WHERE c.notice_id = r.notice_id AND ${NAME_KEY.replace("%s", "c.name")} = ${NAME_KEY.replace("%s", "r.complex_name")} LIMIT 1), '')`;
+    // 단지 순위표는 같은 공고의 단지 목록(notice_complex)과 이름이 맞는 줄만 — 결과 표의 단지명은 Synap 글자 유실로
+    // 「데캐슬더퍼」처럼 깨진 채 오는 일이 있다. 맞으면 이름과 구도 단지 목록 쪽 표기를 쓴다
+    const complexSql = (dir: "DESC" | "ASC") =>
+      `SELECT c.name, c.sigungu, n.slug, n.posted_at::text AS posted_at,
+              sum(r.units)::int AS units, sum(r.applicants)::int AS applicants, ${ratio}
+         FROM notice_result r JOIN notice n ON n.id = r.notice_id
+        CROSS JOIN LATERAL (
+          SELECT c.name, c.sigungu FROM notice_complex c
+           WHERE c.notice_id = r.notice_id AND ${NAME_KEY.replace("%s", "c.name")} = ${NAME_KEY.replace("%s", "r.complex_name")} LIMIT 1) c
+        WHERE n.housing_type::text = $1 AND n.agency = $2 AND ${RESULT_OK} AND r.bracket = '소계'
+        GROUP BY c.name, c.sigungu, r.notice_id, n.slug, n.posted_at
+       HAVING sum(r.units) >= 3
+        ORDER BY ratio ${dir}, units DESC LIMIT 10`;
+    const [rounds, total, byClass, byGu, hottest, calmest, health] = await Promise.all([
+      query<CompetitionRound>(
+        `SELECT n.slug, ${titleCol("n.")}, n.posted_at::text AS posted_at, count(DISTINCT r.complex_name)::int AS complexes,
+                sum(r.units)::int AS units, sum(r.applicants)::int AS applicants, ${ratio},
+                (SELECT count(*) FROM notice_result x WHERE x.notice_id = n.id)::int AS rows_all,
+                (SELECT count(*) FROM notice_result x WHERE x.notice_id = n.id AND NOT x.reconciled)::int AS rows_bad
+           ${scope} AND ${RESULT_OK} AND r.bracket = '소계'
+          GROUP BY n.id ORDER BY n.posted_at DESC`,
+        p,
+      ),
+      query<CompetitionCell & { complexes: number }>(
+        `SELECT '' AS key, ${sums}, count(DISTINCT r.complex_name)::int AS complexes ${scope} AND ${RESULT_OK} AND r.bracket = '소계'`,
+        p,
+      ),
+      query<CompetitionCell & { bracket: string }>(
+        `SELECT r.tenant_class AS key, r.bracket, ${sums}
+           ${scope} AND ${RESULT_OK} AND r.tenant_class <> '' AND r.bracket IN ('우선', '일반', '소계')
+          GROUP BY 1, 2 HAVING sum(r.units) >= 10 ORDER BY 1, 2`,
+        p,
+      ),
+      query<CompetitionCell>(
+        `SELECT r.gu AS key, ${sums}
+           FROM (SELECT ${gu} AS gu, r.units, r.applicants ${scope} AND ${RESULT_OK} AND r.bracket = '소계') r
+          WHERE r.gu <> '' GROUP BY 1`,
+        p,
+      ),
+      query<CompetitionComplex>(complexSql("DESC"), p),
+      query<CompetitionComplex>(complexSql("ASC"), p),
+      query<{ all: number; skipped: number }>(
+        `SELECT count(*)::int AS all, count(*) FILTER (WHERE NOT r.reconciled)::int AS skipped ${scope}`,
+        p,
+      ),
+    ]);
+    return {
+      agency: hub.agency, rounds, total: total[0], byClass, byGu: mergeSeoulGu(byGu).filter((g) => g.units >= 10), hottest, calmest,
+      skipped: health[0]?.skipped ?? 0, all: health[0]?.all ?? 0,
+    };
+  },
+  ["stats-competition-v3"],
   CACHE_OPTS,
 );

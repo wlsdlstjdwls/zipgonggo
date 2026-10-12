@@ -39,13 +39,22 @@ export const ROUTES = {
   about: "/about",
   // 직접 쓴 안내 글 목록. 글은 lib/guides.ts
   guide: "/guide",
+  // 숫자로 보기 — 기관, 유형, 지역별 공급 호수와 유형별 경쟁률(2026-10-12). 「데이터랩」이라는 이름은 피했다(사용자 요청)
+  stats: "/stats",
   rss: "/rss.xml",
   // 운영자 콘솔. 색인 대상이 아니다 — robots.ts가 막고 페이지도 noindex를 단다
   admin: "/admin",
   adminIngest: "/admin/ingest",
   adminVisitors: "/admin/visitors",
   adminMembers: "/admin/members",
+  // 빈 칸 점검 — 파서가 오류 없이 끝났는데 일정이나 단지가 빈 공고(2026-10-12)
+  adminGaps: "/admin/gaps",
 } as const;
+
+/** /stats/{유형} — 유형별 경쟁률. 결과 공고가 COMPETITION_MIN_ROUNDS회차 이상 쌓인 유형만 선다 */
+export function statsTypePath(type: string): string {
+  return `${ROUTES.stats}/${encodeURIComponent(type)}`;
+}
 
 /** /guide/{글}. 식별자가 한글이라 인코딩한다 */
 export function guidePath(slug: string): string {

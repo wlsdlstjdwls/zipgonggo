@@ -164,6 +164,26 @@ export function HubAreaBars({ items }: { items: { href: string; label: string; c
   );
 }
 
+/** 숫자로 보기(/stats)의 막대 — HubAreaBars와 같은 모양이되 값 글자를 그대로 받고, 갈 곳이 없는 줄은 링크를 안 단다 */
+export function StatBars({ items }: { items: { label: string; value: number; text: string; sub?: string; href?: string | null }[] }) {
+  if (items.length === 0) return null;
+  const max = Math.max(...items.map((i) => i.value), 1);
+  return (
+    <ul className="hub-bars stat-bars">
+      {items.map((i) => {
+        const inner = (
+          <>
+            <span className="hub-bars-l">{i.label}{i.sub && <small>{i.sub}</small>}</span>
+            <span className="hub-bars-t" aria-hidden="true"><i style={{ width: `${Math.max(i.value > 0 ? 4 : 0, Math.round((i.value / max) * 100))}%` }} /></span>
+            <span className="hub-bars-v">{i.text}</span>
+          </>
+        );
+        return <li key={i.label}>{i.href ? <Link href={i.href}>{inner}</Link> : <div className="stat-bars-row">{inner}</div>}</li>;
+      })}
+    </ul>
+  );
+}
+
 /** 다른 유형, 다른 사업 — 건수 붙은 칩 */
 export function HubChips({ items }: { items: { href: string; label: string; count?: number | null }[] }) {
   return (

@@ -299,6 +299,38 @@ export async function ingestPageData(f: IngestFilter = {}): Promise<IngestPage> 
   return { ...row, stages: [...row.stages].sort(), sources: [...row.sources].sort() };
 }
 
+// ── 빈 칸 점검 ──────────────────────────────────────────────────
+//
+// 파서가 「실패」하면 ingest_log와 GitHub 이슈로 바로 보인다. 정작 무서운 건 **오류 없이 0건으로 끝나는 것**이다 —
+// 기관이 공고문 조판을 바꾸면 파서는 표를 못 찾고 조용히 넘어간다(2026-10 SH 매입임대 「주택목록」 별첨, 일정 라벨 「청약신청」).
+// 그래서 결과 쪽에서 본다: 최근 공고 중 일정, 단지, 공급 호수가 빈 것. 원래 비는 공고(전세임대, 일정 연기 안내)도
+// 섞이니 고칠지는 사람이 본다 — 여기는 목록만 보이고 아무것도 고치지 않는다.
+
+export const GAP_DAYS = 120;
+
+export type GapRow = {
+  slug: string; title: string; agency: string; housing_type: string; posted_at: string;
+  no_schedule: boolean; no_complex: boolean; no_supply: boolean; no_geo: boolean;
+};
+
+/** 첨부를 읽어 채우는 기관(SH, 서울시)의 최근 공고 중 빈 칸이 있는 것. 마이홈 API 공고는 API가 준 만큼이라 뺀다 */
+export async function gapRows(): Promise<GapRow[]> {
+  return query<GapRow>(
+    `WITH n AS (
+       SELECT n.slug, n.title, n.agency, n.housing_type::text AS housing_type, n.posted_at::text AS posted_at,
+              (n.apply_start_at IS NULL AND n.apply_end_at IS NULL) AS no_schedule,
+              (NOT EXISTS (SELECT 1 FROM notice_complex c WHERE c.notice_id = n.id) AND n.complex_code IS NULL) AS no_complex,
+              (n.supply_count IS NULL AND NOT EXISTS (SELECT 1 FROM notice_supply s WHERE s.notice_id = n.id)) AS no_supply,
+              (EXISTS (SELECT 1 FROM notice_complex c WHERE c.notice_id = n.id)
+                 AND NOT EXISTS (SELECT 1 FROM notice_complex c WHERE c.notice_id = n.id AND c.geom IS NOT NULL)) AS no_geo
+         FROM notice n
+        WHERE n.${CANONICAL_ONLY} AND n.publish <> 'rejected' AND n.agency IN ('SH', '서울시')
+          AND n.posted_at >= ${TODAY} - ${GAP_DAYS})
+     SELECT * FROM n WHERE no_schedule OR no_complex OR no_supply OR no_geo
+      ORDER BY posted_at DESC`,
+  );
+}
+
 /** 탭 뱃지용 실패 수. 레이아웃이 페이지와 **나란히** 도는 유일한 질의라 작게 유지한다 */
 export async function recentFailCount(): Promise<number> {
   const [r] = await query<{ n: number }>(

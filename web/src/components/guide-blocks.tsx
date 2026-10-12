@@ -17,11 +17,11 @@ import type { SupplyType } from "@/types/eligibility";
 
 const MAN = 10_000;
 
-function Caption({ children }: { children: React.ReactNode }) {
+export function Caption({ children }: { children: React.ReactNode }) {
   return <p className="g-cap">{children}</p>;
 }
 
-function Table({ head, rows, num: numCols = [] }: { head: string[]; rows: React.ReactNode[][]; num?: number[] }) {
+export function Table({ head, rows, num: numCols = [] }: { head: string[]; rows: React.ReactNode[][]; num?: number[] }) {
   return (
     <div className="g-table-wrap">
       <table className="g-table">

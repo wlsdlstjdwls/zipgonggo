@@ -99,6 +99,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href={ROUTES.eligibility}>자격진단</Link>
                   {/* 유형과 그 아래 정부 사업(든든전세, 미리내집 …) 안내. 메뉴 이름은 사용자 결정(2026-10-06) */}
                   <Link href={ROUTES.program}>임대 종류</Link>
+                  {/* 공급 호수와 경쟁률 견주기(2026-10-12). 「데이터랩」 대신 이 이름(사용자 요청) */}
+                  <Link href={ROUTES.stats}>숫자로 보기</Link>
                   {/* ★로 담아 둔 공고를 다시 찾아가는 유일한 길. 담기만 되고 볼 자리가 없었다(2026-09-18) */}
                   <SavedLink />
                 </nav>

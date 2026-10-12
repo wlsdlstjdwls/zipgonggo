@@ -189,7 +189,7 @@ jobs:
             if python -m zipgonggo_pipeline.stages.s3_sh_complex --slug "$slug" > "s3-$slug.json"; then
               cat "s3-$slug.json"
               jq -r --arg s "$slug" \
-                '"- `\($s)` 단지 \(.inserted + .updated)건" + (if (.skipped | length) > 0 then " (건너뜀 \(.skipped))" else "" end)' \
+                '"- `\($s)` 단지 \(.inserted + .updated)건" + (if (.inserted + .updated) == 0 then " **— 0건: 조판이 바뀌었는지 콘솔 「빈 칸」에서 확인**" else "" end) + (if (.skipped | length) > 0 then " (건너뜀 \(.skipped))" else "" end)' \
                 "s3-$slug.json" >> "$GITHUB_STEP_SUMMARY"
             else
               cat "s3-$slug.json" || true
