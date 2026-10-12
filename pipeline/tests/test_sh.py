@@ -80,3 +80,12 @@ def test_purchase_subtypes_normalize_to_maeip():
 )
 def test_status_sh(state, title, announce, expected):
     assert derive_status_sh(state, title, announce, TODAY) == expected
+
+
+def test_redevelopment_listed_under_national_category_follows_title():
+    """포털은 재개발임대 공고를 「국민공공임대주택」 분류에 올린다 — 제목이 재개발임대면 제목을 따른다(2026-10-12)."""
+    r = rows()[0]
+    r2 = r.__class__(**{**r.__dict__, "type_name": "국민공공임대주택", "title": "2026년 재개발임대주택 일반모집 공고(2026. 9. 9.)"})
+    assert map_sh(r2, TODAY)["housing_type"] == "재개발임대"
+    r3 = r.__class__(**{**r.__dict__, "type_name": "국민공공임대주택", "title": "2026년 국민임대주택 입주자 모집(2026.8.20.공고)"})
+    assert map_sh(r3, TODAY)["housing_type"] == "국민임대"

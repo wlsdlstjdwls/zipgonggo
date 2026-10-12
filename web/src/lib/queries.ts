@@ -1163,18 +1163,23 @@ const RESULT_OK = `r.result_kind = 'competition' AND r.reconciled AND r.units BE
 
 export type CompetitionTypeHub = { housing_type: string; agency: string; rounds: number };
 
-/** 경쟁률 지면이 서는 유형. 지금은 SH 결과 공고뿐이라 기관도 같이 돌려준다 */
-export const listCompetitionTypes = unstable_cache(
+/** 결과 표가 있는 유형과 회차 수. 지면(/stats/{유형})은 COMPETITION_MIN_ROUNDS 이상만, 공고 상세 그래프는 2회차부터 쓴다 */
+const listCompetitionRounds = unstable_cache(
   async (): Promise<CompetitionTypeHub[]> =>
     query<CompetitionTypeHub>(
       `SELECT n.housing_type::text AS housing_type, n.agency, count(DISTINCT r.notice_id)::int AS rounds
          FROM notice_result r JOIN notice n ON n.id = r.notice_id
         WHERE ${RESULT_OK} AND r.bracket = '소계'
-        GROUP BY 1, 2 HAVING count(DISTINCT r.notice_id) >= ${COMPETITION_MIN_ROUNDS} ORDER BY 3 DESC`,
+        GROUP BY 1, 2 ORDER BY 3 DESC`,
     ),
-  ["stats-competition-types-v2"],
+  ["stats-competition-rounds-v1"],
   CACHE_OPTS,
 );
+
+/** 경쟁률 지면이 서는 유형. 지금은 SH 결과 공고뿐이라 기관도 같이 돌려준다 */
+export async function listCompetitionTypes(): Promise<CompetitionTypeHub[]> {
+  return (await listCompetitionRounds()).filter((h) => h.rounds >= COMPETITION_MIN_ROUNDS);
+}
 
 export type CompetitionRound = {
   slug: string; title: string; posted_at: string; complexes: number; units: number; applicants: number; ratio: number;
@@ -1213,9 +1218,9 @@ function mergeSeoulGu(rows: CompetitionCell[]): CompetitionCell[] {
 
 /** 한 유형의 결과 공고를 회차, 계층, 자치구, 단지로. 경쟁률은 줄 비율의 평균이 아니라 합계끼리 나눈 값이다 */
 export const getTypeCompetition = unstable_cache(
-  async (housingType: string): Promise<TypeCompetition | null> => {
-    const hubs = await listCompetitionTypes();
-    const hub = hubs.find((h) => h.housing_type === housingType);
+  async (housingType: string, minRounds: number = COMPETITION_MIN_ROUNDS): Promise<TypeCompetition | null> => {
+    const hubs = await listCompetitionRounds();
+    const hub = hubs.find((h) => h.housing_type === housingType && h.rounds >= minRounds);
     if (!hub) return null;
     const p = [housingType, hub.agency];
     const scope = `FROM notice_result r JOIN notice n ON n.id = r.notice_id
@@ -1277,6 +1282,6 @@ export const getTypeCompetition = unstable_cache(
       skipped: health[0]?.skipped ?? 0, all: health[0]?.all ?? 0,
     };
   },
-  ["stats-competition-v4"],
+  ["stats-competition-v5"],
   CACHE_OPTS,
 );

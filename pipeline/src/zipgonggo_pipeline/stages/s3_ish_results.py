@@ -125,9 +125,9 @@ def run(*, dry_run: bool, max_pages: int | None, since_year: int | None, limit: 
                 stats.error("no_posted_at", row.seq, ValueError(row.title))
                 continue
             notice_id = None
-            if cur and got.notice_date:
+            if cur:
                 notice_id = find_notice_for_result(cur, agency=AGENCY, notice_date=got.notice_date,
-                                                   housing_type=got.housing_type, title=row.title)
+                                                   housing_type=got.housing_type, title=row.title, posted_at=posted)
             note = None if notice_id else ("공고일 인용 없음" if not got.notice_date else "원 공고 못 찾음")
             if cur:
                 upsert_result_post(cur, {

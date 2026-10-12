@@ -6,7 +6,7 @@
 // 회차 그래프는 숫자를 다 찍지 않는다(가장 높은 회차와 가장 최근 회차만). 대신 「표로 보기」에 전부 있다.
 import Link from "next/link";
 import { dateK, num } from "@/lib/format";
-import type { SupplyGroup, TypeCompetition } from "@/lib/queries";
+import { COMPETITION_MIN_ROUNDS, type SupplyGroup, type TypeCompetition } from "@/lib/queries";
 import { noticePath, statsTypePath, ROUTES } from "@/lib/routes";
 
 type Props = {
@@ -126,7 +126,9 @@ export function NoticeNumbers({ housingType, agency, slug, supplyCount, windowDa
       )}
 
       <p className="num-links">
-        {comp && <Link href={statsTypePath(housingType)}>자치구별, 단지별 경쟁률까지 보기 →</Link>}
+        {comp && comp.rounds.length >= COMPETITION_MIN_ROUNDS && (
+          <Link href={statsTypePath(housingType)}>자치구별, 단지별 경쟁률까지 보기 →</Link>
+        )}
         <Link href={ROUTES.stats}>다른 유형과 지역 공급 보기 →</Link>
       </p>
     </section>

@@ -23,7 +23,7 @@ from ..config import settings
 from ..db import connect
 from ..housing import derive_sector, slug_code
 from ..normalize import fingerprint, parse_ymd, today_kst
-from ..parsers.ish_title import amendment_base, is_notice
+from ..parsers.ish_title import amendment_base, derive_housing_type, is_notice
 from ..repo import link_related_post, queue_unmapped
 from ..sources.sh import SHClient, SHRow
 from .common import Stats, finish_ingest, stage_main, upsert_guarded, utc_now
@@ -77,6 +77,10 @@ def map_sh(row: SHRow, today: date, source_rank: int | None = None) -> dict[str,
     if row.type_name in NOT_HOUSING:
         return None
     housing_type = SH_TYPE_MAP[row.type_name]  # KeyError → 호출부가 review_queue
+    # 포털은 재개발임대 공고를 「국민공공임대주택」 분류에 올린다(2024~2026 실측). 제목이 재개발임대라고 하면 제목을 따른다 —
+    # 안 그러면 재개발임대 경쟁률과 자격이 국민임대 지면에 섞인다(2026-10-12)
+    if housing_type == "국민임대" and derive_housing_type(row.title) == "재개발임대":
+        housing_type = "재개발임대"
     posted = parse_ymd(row.posted)
     if posted is None:
         raise ValueError(f"공고게시일 없음: {row.title}")

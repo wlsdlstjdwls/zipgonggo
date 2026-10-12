@@ -328,33 +328,88 @@ def _norm_title(t: str) -> str:
     return re.sub(r"[\s.·]", "", t)
 
 
-def find_notice_for_result(
-    cur, *, agency: str, notice_date: date, housing_type: str | None, title: str | None = None
-) -> int | None:
-    """결과 글이 인용한 공고일로 원 공고를 찾는다. 제목 문자열끼리 맞추는 것보다 튼튼하다.
+# 결과 글 제목과 원 공고 제목을 맞댈 때 앞머리만 본다. 결과 글은 원 제목 뒤에 「(공고일) 최종 청약경쟁률 게시」가 붙고,
+# 원 공고는 「입주자 모집공고(공고일)」로 끝난다 — 둘 다 이 표지들 앞까지가 회차 이름이다(「2023년1차청년매입임대주택」)
+_TITLE_CUT = re.compile(r"\(|최종|청약|인터넷|경쟁률|접수|입주자\s*모집|입주자모집|모집\s*공고|일반\s*모집")
+_TITLE_TAG = re.compile(r"^\s*(?:\[[^\]]*\]|\((?:정정|수정|재공고)[^)]*\))\s*")
 
-    같은 날 같은 유형 공고가 여럿이면(2026-06-26 매입임대 3건) 날짜만으로는 못 가른다.
-    그때는 제목으로 가른다 — 결과 글 제목은 원 공고 제목을 통째로 인용하고 뒤에 「… 최종 청약경쟁률 게시」를
-    붙인 꼴이라, 원 공고 제목이 결과 글 제목의 앞부분이 된다. 그래도 하나로 안 좁혀지면 잇지 않는다.
-    잘못 이으면 남의 공고에 남의 경쟁률이 붙는다.
+
+def _round_key(t: str) -> str:
+    """제목에서 회차 이름만. 「(수정)2023년 1차 청년 매입임대주택 입주자모집공고(2023.06.30.)」 → 「2023년1차청년매입임대주택」"""
+    t = _TITLE_TAG.sub("", t)
+    m = _TITLE_CUT.search(t)
+    return _norm_title(t[: m.start()] if m else t)
+
+
+def pick_notice_for_result(
+    cands: list[dict[str, Any]], *, notice_date: date | None, housing_type: str | None, title: str | None,
+) -> int | None:
+    """후보 공고(id, title, posted_at, housing_type) 가운데 결과 글의 원 공고를 하나 고른다. **하나로 좁혀질 때만** 고른다.
+
+    1. 인용한 공고일과 같은 날 → 유형까지 같은 것 → 그래도 여럿이면 제목. 유형이 다르게 저장된 공고도 있다
+       (SH 재개발임대가 「국민임대」로 들어와 있다) — 같은 날 공고가 하나뿐이면 유형이 달라도 잇는다.
+    2. 같은 날이 없으면 ±3일(게시일이 하루 이틀 밀린 공고) — 이때는 유형이 같아야 하고, 여럿이면 제목.
+    3. 공고일 인용이 없으면 제목의 회차 이름이 같고 유형이 같은 것 하나일 때만. 날짜만으로는 절대 잇지 않는다.
+    결과 글이 공고로 잘못 들어간 행(제목에 「경쟁률」 「접수결과」)은 후보에서 뺀다.
     """
-    cur.execute(
-        """
-        SELECT id, title FROM notice
-        WHERE agency = %(agency)s AND posted_at = %(day)s
-          AND (%(ht)s::text IS NULL OR housing_type::text = %(ht)s)
-        """,
-        {"agency": agency, "day": notice_date, "ht": housing_type},
-    )
-    rows = cur.fetchall()
-    if len(rows) == 1:
-        return rows[0]["id"]
-    if len(rows) > 1 and title:
-        want = _norm_title(title)
-        hit = [r for r in rows if _norm_title(r["title"]) and want.startswith(_norm_title(r["title"]))]
-        if len(hit) == 1:
-            return hit[0]["id"]
-    return None
+    pool = [c for c in cands if not re.search(r"경쟁률|접수\s*결과|결과\s*안내|청약\s*신청\s*안내", c["title"])]
+    key = _round_key(title) if title else ""
+
+    def by_title(rows: list[dict[str, Any]]) -> int | None:
+        if not key or len(key) < 5:
+            return None
+        hit = [r for r in rows if _round_key(r["title"]) == key]
+        return hit[0]["id"] if len(hit) == 1 else None
+
+    def narrow(rows: list[dict[str, Any]], *, need_type: bool) -> int | None:
+        typed = [r for r in rows if housing_type and r["housing_type"] == housing_type]
+        if len(typed) == 1:
+            return typed[0]["id"]
+        if len(typed) > 1:
+            return by_title(typed)
+        if need_type:
+            return None
+        # 유형이 다르게 저장된 공고는 제목에 그 유형 이름이 있을 때만(「재개발임대주택 일반모집」이 「국민임대」로 저장) —
+        # 같은 날 민간임대 공고 하나를 청년안심주택 결과에 붙이면 안 된다
+        stem = re.sub(r"주택$", "", housing_type or "")
+        named = [r for r in rows if stem and stem in _norm_title(r["title"])]
+        return named[0]["id"] if len(named) == 1 else by_title(named)
+
+    if notice_date is not None:
+        same = [c for c in pool if c["posted_at"] == notice_date]
+        got = narrow(same, need_type=False) if same else None
+        if got is not None:
+            return got
+        near = [c for c in pool if 0 < abs((c["posted_at"] - notice_date).days) <= 3]
+        return narrow(near, need_type=True) if near else None
+    typed = [c for c in pool if not housing_type or c["housing_type"] == housing_type]
+    return by_title(typed)
+
+
+def find_notice_for_result(
+    cur, *, agency: str, notice_date: date | None, housing_type: str | None, title: str | None = None,
+    posted_at: date | None = None,
+) -> int | None:
+    """결과 글의 원 공고를 찾는다. 규칙은 pick_notice_for_result(순수 함수, 회귀 테스트가 지킨다).
+
+    공고일을 인용했으면 그 앞뒤 3일, 안 했으면 결과 글 게시일 앞 150일 안에서 후보를 받는다.
+    잘못 이으면 남의 공고에 남의 경쟁률이 붙는다 — 하나로 안 좁혀지면 잇지 않는다.
+    """
+    if notice_date is not None:
+        cur.execute(
+            """SELECT id, title, posted_at, housing_type::text AS housing_type FROM notice
+               WHERE agency = %(agency)s AND posted_at BETWEEN %(day)s::date - 3 AND %(day)s::date + 3""",
+            {"agency": agency, "day": notice_date},
+        )
+    elif posted_at is not None and title:
+        cur.execute(
+            """SELECT id, title, posted_at, housing_type::text AS housing_type FROM notice
+               WHERE agency = %(agency)s AND posted_at BETWEEN %(day)s::date - 150 AND %(day)s""",
+            {"agency": agency, "day": posted_at},
+        )
+    else:
+        return None
+    return pick_notice_for_result(list(cur.fetchall()), notice_date=notice_date, housing_type=housing_type, title=title)
 
 
 def replace_notice_results(cur, *, notice_id: int, post_seq: str, result_kind: str, rows: list[dict[str, Any]]) -> int:
@@ -385,15 +440,19 @@ def relink_result_posts(cur, *, agency: str = "SH") -> int:
 
     적재 때와 **같은 규칙**(find_notice_for_result)을 쓴다 — 여기만 느슨하면 그때 안 이은 걸 지금 잘못 잇는다.
     """
+    from .parsers.ish_result_title import classify
+
     cur.execute(
-        "SELECT seq, title, notice_date FROM result_post WHERE notice_id IS NULL AND notice_date IS NOT NULL AND agency = %s",
+        "SELECT seq, title, notice_date, posted_at FROM result_post WHERE notice_id IS NULL AND agency = %s",
         (agency,),
     )
     pending = cur.fetchall()
     linked = 0
     for p in pending:
+        got = classify(p["title"])
         notice_id = find_notice_for_result(cur, agency=agency, notice_date=p["notice_date"],
-                                           housing_type=None, title=p["title"])
+                                           housing_type=got.housing_type if got else None, title=p["title"],
+                                           posted_at=p["posted_at"])
         if notice_id is None:
             continue
         cur.execute("UPDATE result_post SET notice_id = %s, note = NULL WHERE seq = %s", (notice_id, p["seq"]))

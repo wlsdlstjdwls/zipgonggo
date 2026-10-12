@@ -54,6 +54,9 @@ LAYOUT_C_COLS = ("구분", "자치구", "주소지", "주택명", "주택형성�
 LAYOUT_D_COLS = ("단지명", "신청유형", "구분", "대상", "총계", "신청자수", "경쟁률", "비고")
 CLASS_D = re.compile(r"^[가-힣]{2,6}$")
 
+# 재개발임대 「청약 접수결과」 양식(seq=295917, 311200). 자치구 | (연번) | 단지명 | 면적 | 모집세대 합계/공가/예비 | 신청자 | 경쟁률 | (비고)
+GU_E = re.compile(r"^[가-힣]{1,4}구$")
+
 # 2026년 1차(seq=305877)부터 우선·일반 띠 없이 「예비자」 한 줄만 있는 블록이 생겼다(예비입주자만 뽑는 단지)
 BRACKET_A = re.compile(r"^(우선|일반|예비자)$")
 BRACKET_B = re.compile(r"^(?:(?:우선|일반)\s*)?\d+\s*순위$|^소계$")   # 「3순위」와 「일반1순위」 둘 다
@@ -390,6 +393,20 @@ def parse_competition_page(xml: str, page: int) -> list[CompetitionRow]:
         return []
     if {"인터넷", "방문"} <= set(_labels_of(rows, LAYOUT_A_SUB)):
         return _parse_layout_a(rows, page)
+    cols_e = _labels_of(rows, ("자치구", "단지명", "경쟁률", "유형", "전용면적", "대상", "인터넷"), prefix=True)
+    cols_f = _labels_of(rows, ("자치구", "단지", "면적", "공급유형", "모집", "경쟁률", "비고"), prefix=True)
+    # 2022~2025년은 「지구 및 단지」 머리글이다
+    if "단지" not in cols_f:
+        alias = _labels_of(rows, ("지구및단지",))
+        if alias:
+            cols_f["단지"] = alias["지구및단지"]
+    if {"자치구", "단지", "면적", "공급유형", "경쟁률", "비고"} <= set(cols_f) and "단지명" not in cols_e:
+        return _parse_layout_f(rows, page, cols_f)
+    # 311200은 「경쟁률」 머리글이 「총계」로 시작하는 줄에 있어 _rows가 걸러 낸다 — 「청약신청자」 「공급세대」로도 알아본다
+    has_count = "경쟁률" in cols_e or bool(_labels_of(rows, ("청약신청자", "공급세대"), prefix=True))
+    if ({"자치구", "단지명"} <= set(cols_e) and ("유형" in cols_e or "전용면적" in cols_e) and has_count
+            and "대상" not in cols_e and "인터넷" not in cols_e):
+        return _parse_layout_e(rows, page, cols_e)
     cols_d = _labels_of(rows, LAYOUT_D_COLS, prefix=True)
     # 둘째 쪽부터는 머리글 「총계」가 줄 맨 앞이라 _rows가 표 밑 총계 행으로 알고 걸러 낸다. 위 「모집세대수」로 숫자 구간의 왼쪽 끝을 잡는다
     if "총계" not in cols_d and {"대상", "신청자수"} <= set(cols_d):
@@ -596,6 +613,126 @@ def _number_runs(chars: list[Char], pitch: float) -> list[int]:
         else:
             prev_r = None
     return [int(r.replace(",", "")) for r in runs if r.replace(",", "").isdigit()]
+
+
+def _value_tokens(chars: list[Char], pitch: float) -> list[str]:
+    """x 순으로 숫자 덩어리(쉼표, 소수점 포함)와 「-」를 끊어 낸다. 구두점이 아래 줄에 찍혀도 x로 제자리를 찾는다."""
+    line = sorted((c for c in chars if c.ch.strip()), key=lambda c: (c.l, c.r - c.l))
+    out: list[str] = []
+    prev_r: float | None = None
+    for c in line:
+        if c.ch.isdigit() or c.ch in ",.":
+            if prev_r is None or c.l - prev_r > pitch * 0.9 or not out or out[-1] == "-":
+                out.append("")
+            out[-1] += c.ch
+            prev_r = c.r
+        elif c.ch == "-":
+            out.append("-")
+            prev_r = None
+        else:
+            prev_r = None
+    return [t for t in out if t == "-" or re.search(r"\d", t)]
+
+
+def _parse_layout_e(
+    rows: list[tuple[float, list[Segment], list[Char]]], page: int, header: dict[str, tuple[float, Segment]]
+) -> list[CompetitionRow]:
+    """재개발임대 「청약 접수결과」. 줄 하나가 단지 × 면적이고 그 줄이 곧 소계다. 계층 구분이 없다.
+
+    단지명 오른쪽 값은 머리글이 여러 줄로 쪼개져(「합」/「계」, 「공가」/「입주자」) 열 경계가 안 선다 —
+    숫자 덩어리 순서로 읽는다: 면적, 합계, 공가, 예비(없으면 「-」), 신청자, 경쟁률.
+    """
+    hb = _header_bottom(header)
+    # 단지명 칸의 오른쪽 끝은 「유형」(또는 「전용면적」) 머리글이 막는다. 안 막으면 숫자 칸까지 단지명이 된다
+    cols = {k: v for k, v in header.items() if k in ("자치구", "단지명")}
+    cols["유형"] = header.get("유형") or header["전용면적"]
+    bounds = _bounds(cols, [c for _t, _s, chars in rows for c in chars if c.t >= hb])
+    bands = _bands(rows, bounds, "자치구", GU_E, hb)
+    if not bands:
+        return []
+    pitch = _pitch([c for _t, _s, chars in rows for c in chars])
+    name_hi, _hi = _span(bounds, "유형")
+    out: list[CompetitionRow] = []
+    for b in bands:
+        name = _clean_complex(_cell(b.chars, *_span(bounds, "단지명"), pitch).text)
+        # 연번이 단지명 칸 앞에 붙어 오면 뗀다
+        name = re.sub(r"^\d+\s*", "", name)
+        if not NAME_OK.search(name):
+            continue
+        toks = _value_tokens([c for c in b.chars if _cx(c) >= name_hi - 1], pitch)
+        if len(toks) < 6:
+            continue
+        def as_int(t: str) -> int | None:
+            return int(t.replace(",", "")) if re.fullmatch(r"[\d,]+", t) else None
+        supply_type = re.sub(r"[^\dA-Z]", "", toks[0])
+        units, applicants = as_int(toks[1]), as_int(toks[4])
+        # 옛 조판(2021, seq=243934)은 덩어리 순서가 달라 「3416」 같은 이어 붙은 값이 온다 — 있을 수 없는 크기면 그 줄을 버린다
+        if units is None or units > 5000 or (applicants or 0) > 500_000:
+            continue
+        try:
+            ratio = float(toks[5].replace(",", ""))
+        except ValueError:
+            ratio = None
+        vacant, reserve = as_int(toks[2]), as_int(toks[3])
+        derived = round(applicants / units, 1) if (units and applicants is not None) else None
+        # 합계 = 공가 + 예비가 맞아야 숫자 덩어리 순서가 제대로 잡힌 줄이다(「-」는 0)
+        parts_ok = units is not None and units == (vacant or 0) + (reserve or 0)
+        ok = parts_ok and (_close(ratio, derived) or (applicants == 0 and ratio == 0))
+        repaired = False
+        if parts_ok and not ok and _dot_dropped(ratio, derived):
+            ratio, ok, repaired = derived, True, True
+        out.append(CompetitionRow(name, b.label, "", "", supply_type, "", "소계",
+                                  units, applicants, ratio, ok, repaired, page))
+    return out
+
+
+def _parse_layout_f(
+    rows: list[tuple[float, list[Segment], list[Char]]], page: int, header: dict[str, tuple[float, Segment]]
+) -> list[CompetitionRow]:
+    """국민임대 「청약 접수결과」(seq=310309 2026년). 자치구 | 단지 | 면적 | 공급유형 | 모집세대수 | 신청자 계 | 경쟁률 | 비고.
+
+    「공급유형」에 「국민임대(주거약자50㎡이하)」처럼 숫자가 섞여 있어 그 칸 오른쪽부터 비고 앞까지만 숫자 덩어리 셋
+    (모집세대수, 신청자, 경쟁률)으로 읽는다. 계층은 비고 첫 낱말(일반/주거약자)이다.
+    """
+    # 「모집세대수신청자 계」 머리글이 공급유형 칸의 오른쪽 끝을 막는다. 없으면 공급유형이 숫자 칸까지 먹는다
+    if "모집" not in header:
+        return []
+    hb = _header_bottom(header)
+    bounds = _bounds(header, [c for _t, _s, chars in rows for c in chars if c.t >= hb])
+    bands = _bands(rows, bounds, "자치구", GU_E, hb)
+    if not bands:
+        return []
+    pitch = _pitch([c for _t, _s, chars in rows for c in chars])
+    _l, kind_hi = _span(bounds, "공급유형")
+    note_lo, _h = _span(bounds, "비고")
+    out: list[CompetitionRow] = []
+    for b in bands:
+        name = _clean_complex(_cell(b.chars, *_span(bounds, "단지"), pitch).text)
+        if not NAME_OK.search(name):
+            continue
+        supply_type = _supply_type(_cell(b.chars, *_span(bounds, "면적"), pitch))
+        note = _cell(b.chars, note_lo, float("inf"), pitch).text
+        tenant = "주거약자" if "주거약자" in note else ("일반" if "일반" in note else "")
+        toks = [t for t in _value_tokens([c for c in b.chars if kind_hi <= _cx(c) < note_lo], pitch) if t != "-"]
+        if len(toks) != 3:
+            continue
+        units = int(toks[0].replace(",", "")) if re.fullmatch(r"[\d,]+", toks[0]) else None
+        applicants = int(toks[1].replace(",", "")) if re.fullmatch(r"[\d,]+", toks[1]) else None
+        try:
+            ratio = float(toks[2].replace(",", ""))
+        except ValueError:
+            ratio = None
+        if units is None or units > 5000:
+            continue
+        derived = round(applicants / units, 1) if (units and applicants is not None) else None
+        ok = _close(ratio, derived) or (applicants == 0 and ratio == 0)
+        repaired = False
+        if not ok and _dot_dropped(ratio, derived):
+            ratio, ok, repaired = derived, True, True
+        for bracket in ((tenant or "일반"), "소계"):
+            out.append(CompetitionRow(name, b.label, "", "", supply_type, tenant, bracket,
+                                      units, applicants, ratio, ok, repaired, page))
+    return out
 
 
 def _parse_layout_d(

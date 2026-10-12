@@ -146,7 +146,7 @@ export default async function NoticePage({ params }: Params) {
     // 「숫자로 보기」 줄 — 같은 유형의 최근 공급과 경쟁률 지면 여부(2026-10-12). 둘 다 지면 전체가 공유하는 캐시다
     getSupplyStats(),
     // 경쟁률 지면이 서는 유형만 값이 온다. 기관이 다르면(LH 행복주택에 SH 결과) 안 붙인다 — 아래에서 거른다
-    getTypeCompetition(n.housing_type),
+    getTypeCompetition(n.housing_type, 2),
   ]);
   const typeSupply = supplyStats.byTypeAgency.filter((t) => t.housing_type === n.housing_type);
   const typeComp = compAny && compAny.agency === n.agency ? compAny : null;

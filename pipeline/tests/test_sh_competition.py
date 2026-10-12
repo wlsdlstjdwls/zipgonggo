@@ -244,3 +244,28 @@ def test_d_janggi_flat_table():
     assert r.ratio == 29.3
     # 신청 0명 줄(래미안 레벤투스 국가유공자)은 경쟁률 0으로 맞다
     assert any(x.applicants == 0 and x.ratio == 0 and x.reconciled for x in rows)
+
+
+# ── 재개발임대 「청약 접수결과」 양식 E(seq=311200 2026년, 1순위 접수결과) ─────────────────
+
+def test_e_redevelopment_flat_table():
+    rows = parse_competition([(1, (FIX / "ish_311200" / "p1.xml").read_text(encoding="utf-8"))])
+    assert len(rows) >= 50 and sum(r.reconciled for r in rows) >= len(rows) - 2
+    r = next(x for x in rows if x.complex_name == "천호동아코아")
+    assert (r.sigungu, r.supply_type, r.bracket, r.units, r.applicants, r.ratio) == ("강동구", "29", "소계", 7, 254, 36.3)
+    # 예비입주자 칸이 「-」인 줄도 덩어리 순서가 밀리지 않는다(미아벽산: 29 | - | 29 | 31 | 1.1)
+    r = next(x for x in rows if x.complex_name == "미아벽산")
+    assert (r.units, r.applicants, r.ratio, r.reconciled) == (29, 31, 1.1, True)
+
+
+# ── 국민임대 「청약 접수결과」 양식 F(seq=310309 2026년) ─────────────────────────────
+
+def test_f_national_rental_flat_table():
+    rows = parse_competition([(1, (FIX / "ish_310309" / "p1.xml").read_text(encoding="utf-8"))])
+    subs = [r for r in rows if r.bracket == "소계"]
+    assert len(subs) == 46 and sum(r.reconciled for r in subs) >= 38
+    # 공급유형 「국민임대(50㎡이상)」의 숫자가 값으로 새지 않는다. 원문 「908 | 129.7」
+    r = next(x for x in subs if x.supply_type == "59" and x.units == 7 and x.tenant_class == "일반" and x.complex_name.startswith("세곡2지구4단지"))
+    assert (r.sigungu, r.applicants, r.ratio, r.reconciled) == ("강남구", 908, 129.7, True)
+    # 「2 | 3 | 16.5」 — 신청자 칸 글자 유실(33 → 3). 믿지 않는다
+    assert any(x.units == 2 and x.applicants == 3 and not x.reconciled for x in subs)

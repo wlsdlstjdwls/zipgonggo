@@ -27,11 +27,15 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 from collections import defaultdict
 from typing import Any
 
 from ..db import connect
 from ..normalize import is_amendment, title_key
+from ..parsers.ish_result_title import notice_date
+from ..parsers.ish_title import derive_housing_type
+from ..repo import find_notice_for_result
 from .common import Stats, finish_ingest, stage_main, utc_now
 
 log = logging.getLogger("s2")
@@ -90,6 +94,7 @@ def run(args: argparse.Namespace) -> Stats:
                     cur.execute("UPDATE notice SET canonical_id = NULL WHERE id = %s", (main["id"],))
                 # 화면의 정정 체인은 amends_source_key로 그린다 — 이미 있는 배선을 그대로 쓴다
                 _link_amend_chain(cur, main, rest)
+            _point_result_rows(cur, rows, stats, dry_run=args.dry_run)
         if not args.dry_run:
             with conn.cursor() as cur:
                 finish_ingest(cur, stage=STAGE, source=SOURCE, stats=stats, started=started)
@@ -97,6 +102,33 @@ def run(args: argparse.Namespace) -> Stats:
     finally:
         conn.close()
     return stats
+
+
+# 공고가 아니라 결과·안내 글인데 공고 행으로 들어온 것(2023~2025 적재분, 지금은 ish_title이 거른다).
+# 「… 최종 청약경쟁률 게시」 「… 최종 접수결과 및 접수마감 공지」 「… 2순위 청약신청 안내」
+RESULT_ROW = re.compile(r"경쟁률|접수\s*결과|청약\s*신청\s*안내|결과\s*안내")
+
+
+def _point_result_rows(cur, rows: list[dict[str, Any]], stats: Stats, *, dry_run: bool) -> None:
+    """결과 글이 공고 행으로 들어온 것은 같은 회차 원 공고를 정본으로 가리킨다(2026-10-12).
+
+    URL은 살리고(CLAUDE.md 6) 목록과 통계에서만 빠진다. 원 공고 찾기는 결과 글 원장과 **같은 규칙**
+    (repo.find_notice_for_result) — 하나로 안 좁혀지면 그대로 둔다. --reset 뒤에도 매번 다시 매기도록 S2에 둔다.
+    """
+    for r in rows:
+        if r["source"] not in BOARD_SOURCES or r["canonical_id"] is not None or not RESULT_ROW.search(r["title"]):
+            continue
+        target = find_notice_for_result(cur, agency=r["agency"], notice_date=notice_date(r["title"]),
+                                        housing_type=derive_housing_type(r["title"]), title=r["title"],
+                                        posted_at=r["posted_at"])
+        if target is None or target == r["id"]:
+            stats.skip("result_row_unmatched")
+            continue
+        log.info("결과 글 행 %s → 원 공고 %s", r["slug"], target)
+        if dry_run:
+            continue
+        cur.execute("UPDATE notice SET canonical_id = %s, updated_at = now() WHERE id = %s", (target, r["id"]))
+        stats.updated += 1
 
 
 def _groups(rows: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
