@@ -173,11 +173,24 @@ def _dot_dropped(ratio: float | None, derived: float | None) -> bool:
     return a == b
 
 
+def _dedupe(chars: list[Char]) -> list[Char]:
+    """같은 글자를 같은 자리에 두 번 그린 것(굵게 찍은 단지 이름, 46차 「신신정정44지지구구」)을 하나로."""
+    seen: set[tuple[str, int, int]] = set()
+    out: list[Char] = []
+    for c in chars:
+        k = (c.ch, round(c.l), round(c.t))
+        if c.ch.strip() and k in seen:
+            continue
+        seen.add(k)
+        out.append(c)
+    return out
+
+
 def _rows(xml: str) -> list[tuple[float, list[Segment], list[Char]]]:
     """글자 줄. 표 밑 「총계」 행은 뺀다 — 마지막 띠가 삼키면 신청자수가 이어 붙어
     「4576」+「75432」=754453726 같은 값이 된다."""
     out: list[tuple[float, list[Segment], list[Char]]] = []
-    for row in group_rows(parse_chars(xml)):
+    for row in group_rows(_dedupe(parse_chars(xml))):
         segs = row_segments(row)
         if segs and not TOTAL_ROW.fullmatch(segs[0].text.replace(" ", "")):
             out.append((min(c.t for c in row), segs, row))
@@ -364,7 +377,7 @@ def _sigungu_from(text: str) -> str:
 
 def _supply_type(cell: _Cell) -> str:
     """면적 칸. 왼쪽 단지명이 넘어와 붙는 일이 잦아 끝의 숫자(+영문 한 자)만 남긴다."""
-    m = SUPPLY_TYPE_RE.search(cell.text)
+    m = SUPPLY_TYPE_RE.search(cell.text.replace("㎡", ""))
     return m.group(1).replace(" ", "") if m else cell.text
 
 
@@ -387,10 +400,31 @@ def _block_cell(bands: list[_Band], span: tuple[float, float], pitch: float, *, 
     return _cell([c for b in bands for c in b.chars], *span, pitch, lines=lines)
 
 
+def _row_has_digits(rows: list[tuple[float, list[Segment], list[Char]]], t: float) -> bool:
+    return any(abs(rt - t) < 0.5 and any(ch.isdigit() for s in segs for ch in s.text) for rt, segs, _c in rows)
+
+
 def parse_competition_page(xml: str, page: int) -> list[CompetitionRow]:
-    rows = _rows(xml)
+    # 2019년 문서는 Synap이 「일」을 「읷」으로 찍는다(37차 「읷반」)
+    rows = _rows(xml.replace("읷", "일"))
     if not rows:
         return []
+    # 아는 양식(A~F)이 못 읽으면 머리글 이름으로 칸을 정하는 범용 파서가 받는다 — 옛 행복주택, 역세권청년주택 등(2026-10-13)
+    return _known_layouts(rows, page) or _flat(xml.replace("읷", "일"), page)
+
+
+def _flat(xml: str, page: int) -> list[CompetitionRow]:
+    from .sh_competition_flat import parse_flat_page
+
+    rows = []
+    for row in group_rows(_dedupe(parse_chars(xml))):
+        segs = row_segments(row)
+        if segs:
+            rows.append((min(c.t for c in row), segs, row))
+    return parse_flat_page(rows, page)
+
+
+def _known_layouts(rows: list[tuple[float, list[Segment], list[Char]]], page: int) -> list[CompetitionRow]:
     if {"인터넷", "방문"} <= set(_labels_of(rows, LAYOUT_A_SUB)):
         return _parse_layout_a(rows, page)
     cols_e = _labels_of(rows, ("자치구", "단지명", "경쟁률", "유형", "전용면적", "대상", "인터넷"), prefix=True)
@@ -408,13 +442,33 @@ def parse_competition_page(xml: str, page: int) -> list[CompetitionRow]:
             and "대상" not in cols_e and "인터넷" not in cols_e):
         return _parse_layout_e(rows, page, cols_e)
     cols_d = _labels_of(rows, LAYOUT_D_COLS, prefix=True)
+    # 장기전세 37~48차와 국민임대 2021년(2026-10-13)은 같은 뼈대에 머리글만 다르다 —
+    # 면적(신청유형), 모집세대수/공급호수/모집호수(총계), 「계」 「신청자 계」(신청자수), 「지구 및 단지」(단지명), 공급유형(구분)
+    if "총계" in cols_d and _row_has_digits(rows, cols_d["총계"][0]):
+        del cols_d["총계"]      # 표 밑 「총 계 | 293 | 11,873」 데이터 행을 머리글로 잡았다
+    if "단지명" not in cols_d:
+        cols_d.update({"단지명": v for v in _labels_of(rows, ("지구및단지",), prefix=True).values()})
+    if "신청유형" not in cols_d:
+        cols_d.update({"신청유형": v for v in _labels_of(rows, ("면적",), prefix=True).values()})
+        # 「면적」이 따로 있는 양식에서만 「공급유형」이 구분 칸이다(청년안심 B 양식의 공급유형은 면적이다)
+        if "신청유형" in cols_d and "구분" not in cols_d:
+            cols_d.update({"구분": v for v in _labels_of(rows, ("공급유형",), prefix=True).values()})
     # 둘째 쪽부터는 머리글 「총계」가 줄 맨 앞이라 _rows가 표 밑 총계 행으로 알고 걸러 낸다. 위 「모집세대수」로 숫자 구간의 왼쪽 끝을 잡는다
-    if "총계" not in cols_d and {"대상", "신청자수"} <= set(cols_d):
-        alias = _labels_of(rows, ("모집세대수",), prefix=True)
+    if "총계" not in cols_d:
+        for alias_name in ("모집세대수", "공급호수", "모집호수"):
+            alias = _labels_of(rows, (alias_name,), prefix=True)
+            if alias:
+                cols_d["총계"] = alias[alias_name]
+                break
+    # 신청자 칸은 값을 머리글로 읽지 않는다 — 총계부터 경쟁률 앞까지 숫자 덩어리의 마지막이 신청자수다(_parse_layout_d).
+    # 다만 머리글이 있어야 경쟁률 칸 왼쪽 경계가 선다. 46차 둘째 쪽은 「신」 「청자수」로 쪼개져 경계가 총계 바로 옆에 섰다
+    if "신청자수" not in cols_d:
+        alias = (_labels_of(rows, ("신청자",), prefix=True).get("신청자")
+                 or _labels_of(rows, ("(B)", "계")).get("(B)") or _labels_of(rows, ("계",)).get("계"))
         if alias:
-            cols_d["총계"] = alias["모집세대수"]
-    if {"단지명", "신청유형", "구분", "대상", "총계", "신청자수", "경쟁률"} <= set(cols_d):
-        return _parse_layout_d(rows, page, cols_d)
+            cols_d["신청자수"] = alias
+    if {"단지명", "신청유형", "구분", "대상", "총계", "경쟁률"} <= set(cols_d):
+        return _parse_layout_d(rows, page, {k: v for k, v in cols_d.items() if k in LAYOUT_D_COLS})
     cols_c = _labels_of(rows, LAYOUT_C_COLS, prefix=True)
     # 청년 매입임대 「경쟁률 공지」(2020~2025)는 「계」 대신 「신청자 수」 머리글이다
     if "계" not in cols_c:
