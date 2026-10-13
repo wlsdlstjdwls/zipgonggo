@@ -366,3 +366,31 @@ export type SearchResult = {
   notices: SearchNoticeHit[];
   complexes: SearchComplexHit[];
 };
+
+/** 커트라인 표 한 줄(notice_cutline, 0041). 단지 × 면적 × 대상. 커트라인은 원문 글 그대로, 순위/점수는 비교용 */
+export type CutlineRow = {
+  complex_name: string;
+  sigungu: string;
+  supply_type: string;
+  bracket: string;
+  tenant_class: string;
+  winner_cut: string;
+  reserve_cut: string;
+  winner_rank: number | null;
+  winner_score: number | null;
+  reserve_rank: number | null;
+  reserve_score: number | null;
+};
+
+/** 공고 하나의 커트라인. 최종(당첨자 발표)이 있으면 그것, 없으면 서류심사대상자 커트라인 */
+export type NoticeCutlines = {
+  stage: "final" | "document";
+  posted_at: string;
+  rows: CutlineRow[];
+};
+
+/** 「내 조건에 맞는 단지」가 쓰는 직전 같은 계열 공고의 최종 커트라인. 이 공고 단지와 이름이 맞는 줄만 */
+export type PriorCutlines = {
+  notice: { id: number; slug: string; title: string; posted_at: string };
+  rows: CutlineRow[];
+};

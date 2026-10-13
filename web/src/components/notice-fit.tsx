@@ -14,18 +14,21 @@
 // 보증금 예산 필터는 뺐다 — 대출을 끼면 예산이 뜻을 잃고, 금액은 단지 줄에 다 적혀 있다(사용자 지적 2026-09-14).
 // 지난 회차 경쟁률(prior, notice_result)은 단지 줄마다 「내 구분」과 「전체」로 붙이고 낮은 순으로 앞세운다(사용자 요청 2026-09-14).
 // 직전 같은 계열 공고의 결과라 이번 결과를 보장하지 않는다 — 목록 머리와 안내문이 그 말을 한다. 결과 표가 없는 계열은 줄이 없다.
+// 지난 회차 커트라인(priorCut, notice_cutline)은 장기전세 단지 줄에 붙는다. 내 가점을 넣으면 선 위인지 아래인지 견주고
+// 그 순서로 앞세운다(ayounghome 「노려볼 만한 단지」의 핵심, 2026-10-13). 가점은 공고문 배점표로 본인이 센 값이다 — 우리가 계산하지 않는다.
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FIT_STORAGE_KEY } from "@/lib/constants";
 import { dateK, num, wonShort } from "@/lib/format";
 import {
-  areaBand, classKey, complexFacts, fitCheongnyeon, fitHaengbok, fitJanggi, fitMaeip, isSeoul, janggiAreas, MAN, priorForComplex, priorLabel, priorNameKey, seoulGus,
+  areaBand, classKey, complexFacts, CUT_STANDING_LABEL, cutForComplex, cutOrder, fitCheongnyeon, fitHaengbok, fitJanggi, fitMaeip, isSeoul, janggiAreas, MAN,
+  priorForComplex, priorLabel, priorNameKey, seoulGus,
   type ComplexPick, type FitProfile, type FitVerdict,
 } from "@/lib/notice-fit";
 import { fromFit, reconcileRegion, toFit } from "@/lib/profile";
 import { noticeComplexPath, noticePath } from "@/lib/routes";
 import type { EligKind, IncomeStandard, NoticeEligibilityData, RegionTier } from "@/types/eligibility";
-import type { NoticeComplex, NoticeSupply, PriorCompetition, PriorResultRow } from "@/types/notice";
+import type { CutlineRow, NoticeComplex, NoticeSupply, PriorCompetition, PriorCutlines, PriorResultRow } from "@/types/notice";
 import { useProfile } from "./profile-context";
 import { Select } from "./select";
 
@@ -40,12 +43,14 @@ type Props = {
   currentId?: number;
   /** 직전 같은 계열 공고의 경쟁률(getPriorCompetition). 없으면 경쟁률 줄을 그리지 않는다 */
   prior?: PriorCompetition | null;
+  /** 직전 같은 계열 공고의 최종 커트라인(getPriorCutlines). 장기전세 단지 줄에만 붙는다 */
+  priorCut?: PriorCutlines | null;
 };
 
 /** 이 공고에서만 뜻이 있는 값 — 다음 공고에 들고 가 봐야 없는 항목이라 공통 프로필에 넣지 않는다.
  *  키 이름(p)은 그대로 둔다: 예전 판이 써 둔 저장분을 ProfileProvider가 한 번 읽어 옮긴다 */
 type Selection = Pick<FitProfile, "group" | "area" | "cls" | "applicantType" | "priorityClass">;
-type Stored = { p: Partial<FitProfile>; open: boolean };
+type Stored = { p: Partial<FitProfile>; open: boolean; score?: number | null };
 
 function readStored(): Stored | null {
   try {
@@ -57,6 +62,7 @@ function readStored(): Stored | null {
     return {
       p: o.p && typeof o.p === "object" ? (o.p as Partial<FitProfile>) : {},
       open: o.open === true,
+      score: typeof o.score === "number" && Number.isFinite(o.score) ? o.score : null,
     };
   } catch {
     return null;
@@ -75,7 +81,7 @@ const DEFAULT: FitProfile = {
 
 const LIST_STEP = 12;
 
-export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, currentId, prior }: Props) {
+export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, currentId, prior, priorCut }: Props) {
   const kind: EligKind = data.kind ?? "janggi";
   const { profile, ready: profileReady, patch } = useProfile();
   const [open, setOpen] = useState(false);
@@ -87,6 +93,8 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
     applicantType: data.applicant_types?.[0]?.name ?? null,
   }));
   const [shown, setShown] = useState(LIST_STEP);
+  // 내 가점(공고문 배점표로 센 값). 비우면 null — 커트라인 줄만 보이고 견주지 않는다
+  const [score, setScore] = useState<number | null>(null);
   const onComplexPage = currentId != null;
   // 공통 칸을 고치면 프로필에도 올린다(다른 화면이 같은 값을 쓴다). 이 공고 전용 값은 위 저장소에만 남는다.
   // setP의 갱신 함수 안에서 patch를 부르지 않는다 — 렌더 중에 남의 컴포넌트를 고치는 짓이 된다
@@ -121,6 +129,7 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
         return next;
       });
       if (!onComplexPage) setOpen(s.open);
+      if (s.score != null) setScore(s.score);
     }
     // 마운트 때 한 번만 — data·firstClasses·currentId는 서버가 준 값이라 안 바뀐다
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,8 +154,8 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
     // 첫 커밋의 쓰기는 건너뛴다 — 위 읽기 effect와 같은 커밋에 돌아 기본값으로 저장소를 덮어썼다(setState는 다음 렌더에야 반영)
     if (!loaded.current) { loaded.current = true; return; }
     const sel: Selection = { group: p.group, area: p.area, cls: p.cls, applicantType: p.applicantType, priorityClass: p.priorityClass };
-    writeStored({ p: sel, open: onComplexPage ? storedOpen.current : open });
-  }, [p.group, p.area, p.cls, p.applicantType, p.priorityClass, open, onComplexPage]);
+    writeStored({ p: sel, open: onComplexPage ? storedOpen.current : open, score });
+  }, [p.group, p.area, p.cls, p.applicantType, p.priorityClass, open, onComplexPage, score]);
 
   const gus = useMemo(() => seoulGus(tiers), [tiers]);
   const guOptions = useMemo(() => [
@@ -167,6 +176,16 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
     }
     return m;
   }, [prior]);
+  const cutRows = useMemo(() => {
+    const m = new Map<string, CutlineRow[]>();
+    if (kind !== "janggi") return m;
+    for (const r of priorCut?.rows ?? []) {
+      const k = priorNameKey(r.complex_name);
+      m.set(k, [...(m.get(k) ?? []), r]);
+    }
+    return m;
+  }, [priorCut, kind]);
+  const hasCut = cutRows.size > 0;
 
   const verdict: FitVerdict | null = useMemo(() => {
     if (kind === "haengbok") return fitHaengbok(data, p, income);
@@ -227,11 +246,14 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
       const pr = priorForComplex(priorRows.get(priorNameKey(c.name)) ?? [], { kind, cls: p.cls, rank: verdict?.rank ?? null, priority: kind === "haengbok" && isSeoul(p.gu) });
       const ratio = pr?.mine?.ratio ?? pr?.total?.ratio ?? null;
       order += ratio != null ? Math.min(ratio, 999) / 1e6 : 1e-3;
-      out.push({ c, tags, order, sub: [areaTxt, money, c.unit_count != null ? num(c.unit_count, "호") : ""].filter(Boolean).join(" | "), prior: pr });
+      // 지난 회차 커트라인. 내 가점을 넣었으면 선 위인 단지부터(순위 태그 다음, 금액과 경쟁률 앞)
+      const cut = hasCut ? cutForComplex(cutRows.get(priorNameKey(c.name)) ?? [], band, { rank: verdict?.rank ?? null, score }) : null;
+      if (score != null && hasCut) order += cutOrder(cut?.standing) / 100;
+      out.push({ c, tags, order, sub: [areaTxt, money, c.unit_count != null ? num(c.unit_count, "호") : ""].filter(Boolean).join(" | "), prior: pr, cut });
     }
     // 단지 상세에서는 보고 있는 단지를 맨 위에
     return out.sort((a, b) => Number(b.c.id === currentId) - Number(a.c.id === currentId) || a.order - b.order || a.c.name.localeCompare(b.c.name, "ko"));
-  }, [kind, complexes, facts, p, data, income, table, verdict, currentId, priorRows]);
+  }, [kind, complexes, facts, p, data, income, table, verdict, currentId, priorRows, cutRows, hasCut, score]);
 
   // 행복주택 경쟁 순서(공고문 선정기준 절). 배점이 순위를 바꾸는 게 아니라 같은 순위 안 순서라는 걸 이 줄로 보인다
   const haengbokSteps = useMemo(() => {
@@ -316,6 +338,16 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
               {kind !== "maeip" && <Num label="자동차가액" value={p.carMan} unit="만 원" onChange={(v) => set("carMan", v)} max={100_000} />}
               {kind !== "maeip" && <Num label="청약 납입 회차" value={p.deposits} unit="회" onChange={(v) => set("deposits", v)} max={600} />}
               {kind !== "maeip" && kind !== "cheongnyeon" && <Num label="2023.3.28. 이후 출생 자녀" value={p.newborns} unit="명" onChange={(v) => set("newborns", v)} max={10} />}
+              {hasCut && (
+                <label className="elig-f">
+                  <span>내 가점 (공고문 배점표)</span>
+                  <span className="elig-in">
+                    <input type="number" inputMode="numeric" min={0} max={99} placeholder="모르면 비움" value={score ?? ""}
+                      onChange={(e) => setScore(e.target.value === "" ? null : Math.min(99, Math.max(0, Math.round(Number(e.target.value) || 0))))} />
+                    <em>점</em>
+                  </span>
+                </label>
+              )}
             </div>
             {kind === "cheongnyeon" && (
               <div className="elig-checks">
@@ -372,6 +404,7 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
                   : "이 단지는 지금 조건(면적이나 계층)에 들지 않습니다"}
               </span>
               {currentPick?.prior && <PriorLine prior={currentPick.prior} />}
+              {currentPick?.cut && <CutLine cut={currentPick.cut} />}
             </p>
           )}
 
@@ -388,11 +421,23 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
                 이번 결과를 보장하지 않습니다.
               </p>
             )}
+            {hasCut && priorCut && (
+              <p className="fit-prior-head">
+                커트라인은 지난 회차 <Link href={noticePath(priorCut.notice.slug)}>{priorLabel(priorCut.notice.title)}</Link>
+                <small>{dateK(priorCut.notice.posted_at)} 공고</small> 당첨자 발표의 일반공급 선입니다(고른 면적 중 가장 낮은 선).
+                {score != null
+                  ? verdict?.rank != null
+                    ? ` ${verdict.rank}순위 ${score}점으로 견줘 선 위인 단지부터 보입니다.`
+                    : " 내 순위가 정해지지 않아 순위로 갈리는 선은 견주지 못합니다."
+                  : " 내 가점을 넣으면 그 선과 견줍니다."}
+                {" "}같은 점수 안의 순서(미성년 자녀 수, 추첨)는 견주지 않습니다.
+              </p>
+            )}
             {picks.length === 0 ? (
               <p className="elig-none">조건에 드는 단지가 없습니다. 면적이나 계층을 바꿔 보세요.</p>
             ) : (
               <ul className="fit-rows">
-                {picks.slice(0, shown).map(({ c, tags, sub, prior: pr }) => (
+                {picks.slice(0, shown).map(({ c, tags, sub, prior: pr, cut }) => (
                   <li key={c.id} className={c.id === currentId ? "me" : undefined}>
                     <Link href={noticeComplexPath(noticeSlug, c)} aria-current={c.id === currentId ? "page" : undefined}>
                       <span className="fit-row-main">
@@ -401,6 +446,7 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
                       </span>
                       <span className="fit-row-sub">{sub}</span>
                       {pr && <PriorLine prior={pr} />}
+                      {cut && <CutLine cut={cut} />}
                       {tags.length > 0 && (
                         <span className="fit-tags">
                           {tags.map((t) => <em key={t.text} className={`tag ${t.tone}`}>{t.text}</em>)}
@@ -418,8 +464,8 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
             )}
             <p className="elig-note">
               공고문의 기준을 내 조건에 대 본 안내입니다. 심사 결과가 아닙니다.
-              {prior
-                ? " 경쟁률은 지난 회차의 접수 결과이며 이번 공고의 경쟁률과 당첨선은 이 공고의 결과가 나와야 알 수 있습니다."
+              {prior || hasCut
+                ? " 경쟁률과 커트라인은 지난 회차의 결과이며 이번 공고의 경쟁률과 당첨선은 이 공고의 결과가 나와야 알 수 있습니다."
                 : " 경쟁률과 당첨선은 이 공고의 결과가 나와야 알 수 있습니다."}
               {" "}넣은 값은 자격진단 화면과 같은 한 벌이며, 내 계정에서 저장을 켜지 않는 한 서버로 보내지 않습니다.
             </p>
@@ -427,6 +473,20 @@ export function NoticeFit({ data, complexes, supply, income, tiers, noticeSlug, 
         </div>
       )}
     </div>
+  );
+}
+
+/** 단지 한 줄의 지난 회차 커트라인. 원문 글 그대로, 내 가점을 넣었으면 그 자리 */
+function CutLine({ cut }: { cut: NonNullable<ComplexPick["cut"]> }) {
+  const r = cut.row;
+  const area = r.supply_type ? `${r.supply_type}㎡ ` : "";
+  return (
+    <span className="fit-row-prior fit-row-cut" title={`${area}${r.tenant_class}: 당첨 ${r.winner_cut || "없음"} / 예비 ${r.reserve_cut || "없음"}`}>
+      <small>지난 커트라인</small>
+      {r.winner_cut && <span>{area}당첨 <b>{r.winner_cut}</b></span>}
+      {r.reserve_cut && <span>예비 <b>{r.reserve_cut}</b></span>}
+      {cut.standing && <em className={`tag ${cut.standing === "win" ? "acc" : "soft"}`}>{CUT_STANDING_LABEL[cut.standing]}</em>}
+    </span>
   );
 }
 

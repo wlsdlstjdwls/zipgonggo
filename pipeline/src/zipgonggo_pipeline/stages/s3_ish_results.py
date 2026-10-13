@@ -3,7 +3,8 @@
     python -m zipgonggo_pipeline.stages.s3_ish_results [--dry-run] [--max-pages N] [--since-year 2022] [--limit N]
 
 게시판에서 결과 글(경쟁률 게시·당첨자 발표)을 골라 원장에 넣고, 첨부 미리보기의 표를 읽어
-회차별 경쟁률을 적재한다. 과거 실적은 SH 원문에서 직접 뽑는다 — 제3자 집계를 옮겨오지 않는다.
+회차별 경쟁률(notice_result)과 커트라인(notice_cutline)을 적재한다. 당첨자 발표 글은 첨부 가운데
+이름에 「커트라인」 「합격선」이 든 것만 읽는다 — 나머지는 수십 쪽짜리 명단이다. 과거 실적은 SH 원문에서 직접 뽑는다 — 제3자 집계를 옮겨오지 않는다.
 
 두 가지를 기존 스테이지와 다르게 한다.
 
@@ -20,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import sys
 
 from ..config import PIPELINE_ROOT, settings
@@ -27,7 +29,9 @@ from ..db import connect
 from ..normalize import parse_ymd
 from ..parsers.ish_result_title import classify
 from ..parsers.sh_competition import parse_competition
-from ..repo import find_notice_for_result, relink_result_posts, replace_notice_results, upsert_result_post
+from ..parsers.sh_cutline import parse_cutline
+from ..repo import (find_notice_for_result, relink_result_posts, replace_notice_cutlines, replace_notice_results,
+                    upsert_result_post)
 from ..sources.ish import IshClient, find_attachments
 from ..sources.ish_board import IshBoardClient
 from .common import Stats, finish_ingest, stage_main, utc_now
@@ -76,6 +80,39 @@ def _parse_post(client: IshClient, seq: str, url: str) -> tuple[list[dict], str 
             return [_row_dict(r, i) for i, r in enumerate(rows, 1)], None
         reason = "아는 표 양식이 없음"
     return [], reason
+
+
+CUTLINE_ATTACH = re.compile(r"커트라인|컷트라인|합격선")
+DOCUMENT_STAGE = re.compile(r"서류\s*심사")
+
+
+def _cut_dict(r, row_no: int, stage: str) -> dict:
+    return {
+        "row_no": row_no, "stage": stage,
+        "complex_name": r.complex_name, "sigungu": r.sigungu, "supply_type": r.supply_type,
+        "bracket": r.bracket, "tenant_class": r.tenant_class,
+        "winner_cut": r.winner_cut, "reserve_cut": r.reserve_cut,
+        "winner_rank": r.winner_rank, "winner_score": r.winner_score,
+        "reserve_rank": r.reserve_rank, "reserve_score": r.reserve_score,
+        "source_page": r.page,
+    }
+
+
+def _parse_cutline_post(client: IshClient, seq: str, url: str, title: str) -> tuple[list[dict], str | None]:
+    """당첨자 발표 글의 커트라인 첨부를 읽는다. 한 글에 표가 둘(재공급 · 신규공급)이면 이어 붙인다. (줄, 사유)."""
+    atts = [a for a in find_attachments(client.fetch_notice_html(url)) if CUTLINE_ATTACH.search(a.name)]
+    if not atts:
+        return [], "커트라인 첨부 없음"
+    rows: list[dict] = []
+    for att in atts:
+        doc = client.resolve_preview(att.preview_url)
+        if doc is None:
+            continue
+        stage = "document" if DOCUMENT_STAGE.search(att.name) or DOCUMENT_STAGE.search(title) else "final"
+        pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq / "cut", max_pages=MAX_PAGES_PER_DOC))
+        for r in parse_cutline(pages):
+            rows.append(_cut_dict(r, len(rows) + 1, stage))
+    return rows, None if rows else "커트라인 양식 미지원(행복주택 합격선, 공공·주거환경 납입회차 등)"
 
 
 def _parsed_seqs(cur) -> set[str]:
@@ -138,7 +175,7 @@ def run(*, dry_run: bool, max_pages: int | None, since_year: int | None, limit: 
             if notice_id is None:
                 stats.skip("unlinked")
                 continue
-            # 원장엔 다 넣되 첨부는 고른 종류만 읽는다 — 당첨자 명단은 수십 쪽이라 경쟁률만 채울 땐 건너뛴다
+            # 원장엔 다 넣되 첨부는 고른 종류만 읽는다
             if kinds and got.kind not in kinds:
                 stats.skip("kind_filtered")
                 continue
@@ -147,6 +184,19 @@ def run(*, dry_run: bool, max_pages: int | None, since_year: int | None, limit: 
                 continue
             if limit is not None and done >= limit:
                 stats.skip("limit_reached")
+                continue
+            if got.kind == "winner":
+                try:
+                    cut_rows, reason = _parse_cutline_post(client, row.seq, row.url, row.title)
+                except Exception as exc:  # noqa: BLE001
+                    stats.error("attach_error", row.seq, exc)
+                    continue
+                done += 1
+                if cur:
+                    stats.inserted += replace_notice_cutlines(cur, notice_id=notice_id, post_seq=row.seq,
+                                                              rows=cut_rows, note=reason)
+                if not cut_rows:
+                    stats.skip("no_cutline")
                 continue
             try:
                 rows, reason = _parse_post(client, row.seq, row.url)

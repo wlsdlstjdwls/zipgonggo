@@ -435,6 +435,29 @@ def replace_notice_results(cur, *, notice_id: int, post_seq: str, result_kind: s
     return len(rows)
 
 
+def replace_notice_cutlines(cur, *, notice_id: int, post_seq: str, rows: list[dict[str, Any]], note: str | None = None) -> int:
+    """한 당첨자 발표 글이 준 커트라인 표를 통째로 교체한다. 다시 돌려도 같은 결과가 되게."""
+    cur.execute("DELETE FROM notice_cutline WHERE post_seq = %s", (post_seq,))
+    for r in rows:
+        cur.execute(
+            """
+            INSERT INTO notice_cutline
+              (notice_id, post_seq, row_no, stage, complex_name, sigungu, supply_type, bracket, tenant_class,
+               winner_cut, reserve_cut, winner_rank, winner_score, reserve_rank, reserve_score, source_page)
+            VALUES (%(notice_id)s, %(post_seq)s, %(row_no)s, %(stage)s, %(complex_name)s, %(sigungu)s, %(supply_type)s,
+                    %(bracket)s, %(tenant_class)s, %(winner_cut)s, %(reserve_cut)s, %(winner_rank)s, %(winner_score)s,
+                    %(reserve_rank)s, %(reserve_score)s, %(source_page)s)
+            ON CONFLICT (post_seq, row_no) DO NOTHING
+            """,
+            {"notice_id": notice_id, "post_seq": post_seq, **r},
+        )
+    cur.execute(
+        "UPDATE result_post SET row_count = %s, parsed_at = now(), note = %s WHERE seq = %s",
+        (len(rows), note if note else (None if rows else "커트라인 표 없음(양식 미지원)"), post_seq),
+    )
+    return len(rows)
+
+
 def relink_result_posts(cur, *, agency: str = "SH") -> int:
     """아직 원 공고를 못 찾은 결과 글을 다시 이어 본다. 공고 백필이 뒤늦게 들어오는 순서를 감당한다.
 

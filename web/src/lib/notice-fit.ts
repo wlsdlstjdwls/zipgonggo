@@ -13,7 +13,7 @@
 // 사용자가 공고문에서 제 자리를 찾는다. 배점표의 점수 규칙(3년 이상 3점 등)은 공고문 표를 읽어 들이지 않고 행복주택 제도의
 // 고정 규칙으로 두되, 화면은 공고문 배점표를 같이 그린다.
 import type { EligAsset, EligClassBlock, EligIncomeTable, EligKind, EligRankRow, EligRankTable, IncomeStandard, NoticeEligibilityData, RegionTier } from "@/types/eligibility";
-import type { NoticeComplex, NoticeSupply, PriorResultRow } from "@/types/notice";
+import type { CutlineRow, NoticeComplex, NoticeSupply, PriorResultRow } from "@/types/notice";
 
 export type FitProfile = {
   /** 가구원 수(태아 포함) */
@@ -504,6 +504,8 @@ export type ComplexPick = {
   sub: string;
   /** 지난 회차 경쟁률(내 구분·전체). 결과 줄이 없는 단지는 null */
   prior: ComplexPrior | null;
+  /** 지난 회차 커트라인과 내 가점의 자리. 커트라인 줄이 없는 단지는 null */
+  cut: ComplexCut | null;
 };
 
 /** 면적 라벨(「60㎡ 이하」「60㎡ 초과 85㎡ 이하」「50㎡ 미만」)을 구간으로 */
@@ -598,3 +600,63 @@ export function priorLabel(title: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/* ── 지난 회차 커트라인 (notice_cutline, 0041) ──────────────────────────────
+   장기전세 단지 줄에 지난 회차 당첨선을 붙이고, 내 가점을 넣으면 그 선 위인지 아래인지 견준다(ayounghome 「노려볼 만한 단지」,
+   사용자 제안 2026-09-14). 견주는 값은 (순위, 점수) 둘뿐이다 — 「미성년자녀2명」 「전산추첨」 같은 동점 처리 조건은 원문 글로만 보인다.
+   지난 회차 선이라 이번 결과를 보장하지 않는다. 화면이 그 말을 붙인다. */
+
+export type CutStanding = "win" | "tie" | "reserve" | "below";
+export type ComplexCut = { row: CutlineRow; standing: CutStanding | null };
+
+const CUT_ORDER: Record<CutStanding | "none", number> = { win: 0, tie: 1, reserve: 2, below: 3, none: 4 };
+export const cutOrder = (s: CutStanding | null | undefined) => CUT_ORDER[s ?? "none"];
+
+/** (내 순위, 내 점수)를 커트라인 (순위, 점수)에 견준다. 1 = 위, 0 = 같은 점수, -1 = 아래, null = 못 견줌 */
+function compareCut(rank: number | null, score: number, cutRank: number | null, cutScore: number | null): 1 | 0 | -1 | null {
+  if (cutRank == null && cutScore == null) return null;
+  if (cutRank != null) {
+    if (rank == null) return null;              // 순위로 갈리는 선인데 내 순위를 모른다
+    if (rank !== cutRank) return rank < cutRank ? 1 : -1;
+  }
+  if (cutScore == null) return 1;               // 「2순위」만 적힌 선 — 같은 순위면 다 붙었다
+  return score > cutScore ? 1 : score === cutScore ? 0 : -1;
+}
+
+export function cutStanding(row: CutlineRow, me: { rank: number | null; score: number | null }): CutStanding | null {
+  if (me.score == null) return null;
+  const w = row.winner_cut ? compareCut(me.rank, me.score, row.winner_rank, row.winner_score) : null;
+  if (w === 1) return "win";
+  if (w === 0) return "tie";
+  const r = row.reserve_cut ? compareCut(me.rank, me.score, row.reserve_rank, row.reserve_score) : null;
+  if (r === 1 || r === 0) return "reserve";
+  if (w === null && r === null) return null;
+  return "below";
+}
+
+/** 이 단지의 지난 회차 일반공급 줄 가운데 고른 면적 구간에 드는 것. 여럿이면 선이 가장 낮은 줄(노려볼 만한 쪽)을 고른다 */
+export function cutForComplex(rows: CutlineRow[], band: { lo: number; hi: number } | null, me: { rank: number | null; score: number | null }): ComplexCut | null {
+  const general = rows.filter((r) => /일반/.test(r.tenant_class) || /일반/.test(r.bracket) || (!r.tenant_class && !r.bracket));
+  const inBand = general.filter((r) => {
+    const a = Number.parseFloat(r.supply_type);
+    if (!band || !Number.isFinite(a)) return true;
+    return (a > band.lo && a <= band.hi) || (band.lo === 0 && a <= band.hi);
+  });
+  const usable = inBand.filter((r) => r.winner_cut || r.reserve_cut);
+  if (!usable.length) return null;
+  // 낮은 선: 순위 숫자가 클수록(2순위 선이 1순위 선보다 낮다), 같은 순위면 점수가 낮을수록
+  const bar = (r: CutlineRow) => [-(r.winner_rank ?? r.reserve_rank ?? 0), r.winner_score ?? r.reserve_score ?? 99];
+  const row = [...usable].sort((a, b) => {
+    const [ar, as] = bar(a);
+    const [br, bs] = bar(b);
+    return ar - br || as - bs;
+  })[0];
+  return { row, standing: cutStanding(row, me) };
+}
+
+export const CUT_STANDING_LABEL: Record<CutStanding, string> = {
+  win: "지난 당첨선 위",
+  tie: "지난 당첨선과 같은 점수",
+  reserve: "지난 예비선 안",
+  below: "지난 선 아래",
+};

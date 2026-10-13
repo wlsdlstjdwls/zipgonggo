@@ -7,7 +7,7 @@ import { cache } from "react";
 import { query } from "./db";
 import { CACHE_TAG_ELIGIBILITY, CACHE_TAG_NOTICE, PAGE_SIZE, REVALIDATE_SEC } from "./constants";
 import { isClosed, todayKST } from "./format";
-import type { ComplexFacts, ComplexImage, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorResultRow, SearchComplexHit, SearchNoticeHit, Sector, YouthHouse } from "@/types/notice";
+import type { ComplexFacts, ComplexImage, CutlineRow, Facets, FilterOption, Notice, NoticeArea, NoticeComplex, NoticeCutlines, NoticeFilters, NoticeListItem, NoticePage, NoticeSort, NoticeSupply, NoticeUnit, PriorCompetition, PriorCutlines, PriorResultRow, SearchComplexHit, SearchNoticeHit, Sector, YouthHouse } from "@/types/notice";
 
 const CACHE_OPTS = { revalidate: REVALIDATE_SEC, tags: [CACHE_TAG_NOTICE] };
 
@@ -801,6 +801,7 @@ const NOTICE_INDEXABLE = `(
   OR EXISTS (SELECT 1 FROM notice_supply x WHERE x.notice_id = n.id)
   OR EXISTS (SELECT 1 FROM unit x WHERE x.notice_id = n.id)
   OR EXISTS (SELECT 1 FROM notice_result x WHERE x.notice_id = n.id)
+  OR EXISTS (SELECT 1 FROM notice_cutline x WHERE x.notice_id = n.id)
   OR EXISTS (SELECT 1 FROM notice_eligibility x WHERE x.notice_id = n.id AND x.verified)
   OR EXISTS (SELECT 1 FROM notice_area x WHERE x.notice_id = n.id AND x.supply_count IS NOT NULL)
   OR (${NOTICE_FIELDS}) >= ${NOTICE_MIN_FIELDS})`;
@@ -983,6 +984,76 @@ export async function getPriorCompetition(n: Pick<Notice, "id" | "agency" | "hou
     rows,
     summary: { complexes: s?.complexes ?? 0, units, applicants, ratio: units > 0 ? Math.round((applicants / units) * 10) / 10 : null },
   };
+}
+
+
+/* ── 커트라인 (0041 notice_cutline) ────────────────────────
+   당첨자 발표 글 첨부의 단지 × 면적 × 대상별 커트라인. 경쟁률이 「몇 명이 몰렸나」라면 이건 「몇 점이면 붙었나」다.
+   한 공고에 서류심사대상자 커트라인과 최종 커트라인이 둘 다 온다 — 최종이 있으면 최종만, 없으면 서류심사를 보인다.
+   같은 단계 글이 여럿이면(정정 재게시) 표가 읽힌 가장 늦은 글 하나만 센다(latestResult와 같은 원칙). */
+
+const CUT_COLS = `c.complex_name, c.sigungu, c.supply_type, c.bracket, c.tenant_class, c.winner_cut, c.reserve_cut,
+                  c.winner_rank, c.winner_score, c.reserve_rank, c.reserve_score`;
+
+/** 이 공고 단계(stage)의 가장 늦은 커트라인 글. 별칭 a의 줄에 붙인다 */
+const latestCutPost = (a: string) => `${a}.post_seq = (
+  SELECT x.post_seq FROM notice_cutline x JOIN result_post p ON p.seq = x.post_seq
+   WHERE x.notice_id = ${a}.notice_id AND x.stage = ${a}.stage
+   ORDER BY p.posted_at DESC, p.seq DESC LIMIT 1)`;
+
+export async function getNoticeCutlines(noticeId: number): Promise<NoticeCutlines | null> {
+  const rows = await query<CutlineRow & { stage: "final" | "document"; posted_at: string }>(
+    `WITH s AS (
+       SELECT CASE WHEN bool_or(stage = 'final') THEN 'final' ELSE 'document' END AS stage
+         FROM notice_cutline WHERE notice_id = $1
+     )
+     SELECT ${CUT_COLS}, c.stage, p.posted_at::text AS posted_at
+       FROM notice_cutline c JOIN s ON s.stage = c.stage JOIN result_post p ON p.seq = c.post_seq
+      WHERE c.notice_id = $1 AND ${latestCutPost("c")}
+      ORDER BY c.row_no`,
+    [noticeId],
+  );
+  if (!rows.length) return null;
+  return { stage: rows[0].stage, posted_at: rows[0].posted_at, rows };
+}
+
+/** 직전 같은 계열 공고의 **최종** 커트라인 가운데 이 공고 단지와 이름이 맞는 줄. 계열 고르기는 getPriorCompetition과 같다 */
+export async function getPriorCutlines(n: Pick<Notice, "id" | "agency" | "housing_type" | "title" | "posted_at">): Promise<PriorCutlines | null> {
+  const cands = await query<{ id: number; slug: string; title: string; posted_at: string }>(
+    `SELECT n.id, n.slug, ${titleCol("n.")}, n.posted_at::text AS posted_at
+       FROM notice n
+      WHERE n.agency = $1 AND n.housing_type::text = $2 AND n.posted_at < $3::date AND n.id <> $4
+        AND EXISTS (SELECT 1 FROM notice_cutline c WHERE c.notice_id = n.id AND c.stage = 'final')
+      ORDER BY n.posted_at DESC, n.id DESC LIMIT 12`,
+    [n.agency, n.housing_type, n.posted_at, n.id],
+  );
+  const family = noticeFamily(n.title, n.housing_type);
+  const prior = cands.find((c) => noticeFamily(c.title, n.housing_type) === family);
+  if (!prior) return null;
+  const rows = await query<CutlineRow>(
+    `SELECT ${CUT_COLS}
+       FROM notice_cutline c
+      WHERE c.notice_id = $1 AND c.stage = 'final' AND ${latestCutPost("c")}
+        AND ${NAME_KEY.replace("%s", "c.complex_name")} IN (
+              SELECT ${NAME_KEY.replace("%s", "k.name")} FROM notice_complex k WHERE k.notice_id = $2)
+      ORDER BY c.row_no`,
+    [prior.id, n.id],
+  );
+  return { notice: prior, rows };
+}
+
+/** 단지 하나가 지난 회차들에서 받은 최종 커트라인. 단지 상세 「지난 커트라인」 — 이름 열쇠로 맞춘다 */
+export async function getComplexCutlines(name: string, housingType: string, agency: string): Promise<(CutlineRow & { slug: string; title: string; posted_at: string })[]> {
+  return query(
+    `SELECT ${CUT_COLS}, n.slug, ${titleCol("n.")}, n.posted_at::text AS posted_at
+       FROM notice_cutline c JOIN notice n ON n.id = c.notice_id
+      WHERE c.stage = 'final' AND ${latestCutPost("c")}
+        AND n.agency = $3 AND n.housing_type::text = $2
+        AND ${NAME_KEY.replace("%s", "c.complex_name")} = ${NAME_KEY.replace("%s", "$1")}
+      ORDER BY n.posted_at DESC, c.row_no
+      LIMIT 60`,
+    [name, housingType, agency],
+  );
 }
 
 

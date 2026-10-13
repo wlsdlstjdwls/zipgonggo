@@ -2823,3 +2823,16 @@ body:has(.notice-bar.foot) .site-footer { margin-top: 18px; }
 .nn-table th, .nn-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
 .nn-table th.n, .nn-table td.n { text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) { .nn-bars li { grid-template-columns: 84px minmax(0, 1fr) 68px; gap: 8px; } .nn-col-v { font-size: 11px; } }
+
+/* 공고 상세 「커트라인」(notice-cutlines.tsx). 칸이 다섯이라 폰에서는 표 안에서만 가로로 민다 — 지면은 밀리지 않는다 */
+.cl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.cl-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.cl-table th, .cl-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.cl-table thead th { color: var(--dim); font-weight: 700; font-size: 12.5px; white-space: nowrap; }
+.cl-table tbody th { font-weight: 800; color: var(--ink); min-width: 9em; max-width: 14em; }
+.cl-table tbody th small { display: block; margin-top: 2px; font-weight: 500; color: var(--dim); font-size: 12px; }
+.cl-table td { white-space: nowrap; }
+.cl-table .n { text-align: right; font-variant-numeric: tabular-nums; }
+.cl-table tr.cl-first > * { border-top: 1px solid var(--line); }
+.cl-more { margin-top: 10px; }
+.cl-more summary { cursor: pointer; color: var(--dim); font-weight: 700; font-size: 13.5px; padding: 4px 0; }

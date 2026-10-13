@@ -11,6 +11,7 @@ import { DetailHeadBar } from "@/components/detail-headbar";
 import { DetailNav } from "@/components/detail-nav";
 import { EligRuleCards, type RuleCardView } from "@/components/elig-rule-cards";
 import { ExternalLink } from "@/components/external-link";
+import { NoticeCutlines } from "@/components/notice-cutlines";
 import { NoticeNumbers } from "@/components/notice-numbers";
 import { GlossaryList, Term, TermText } from "@/components/glossary";
 import { IncomeBars } from "@/components/income-bars";
@@ -30,7 +31,7 @@ import { MINGAN_INCOME_PCTS, minganRuleCards } from "@/lib/mingan-fit";
 import { recruitedTypeCodes } from "@/lib/notice-supply-type";
 import { moveInLabel } from "@/lib/notice-view";
 import {
-  getAmendChain, getComplexFacts, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getNoticeSupply, getPriorCompetition, getSupplyStats, getTypeCompetition, STATS_WINDOW_DAYS,
+  getAmendChain, getComplexFacts, getEligibilityRules, getNoticeAreas, getNoticeBySlug, getNoticeComplexes, getNoticeCutlines, getNoticeEligibility, getNoticeSupply, getPriorCompetition, getPriorCutlines, getSupplyStats, getTypeCompetition, STATS_WINDOW_DAYS,
   isNoticeIndexable, listFilterOptions,
 } from "@/lib/queries";
 import { programDoc } from "@/lib/programs";
@@ -132,7 +133,7 @@ function AmendLink({ n, label }: { n: NoticeListItem; label: string }) {
 export default async function NoticePage({ params }: Params) {
   const n = await load(params);
   if (!n) notFound();
-  const [areas, chain, complexes, supply, eligRules, noticeElig, prior, options, facts, supplyStats, compAny] = await Promise.all([
+  const [areas, chain, complexes, supply, eligRules, noticeElig, prior, options, facts, supplyStats, compAny, cutlines, priorCut] = await Promise.all([
     getNoticeAreas(n.id), getAmendChain(n), getNoticeComplexes(n.id), getNoticeSupply(n.id), getEligibilityRules(),
     getNoticeEligibility(n.id),
     // 「내 조건」에 붙일 직전 같은 계열 공고의 경쟁률(사용자 요청 2026-09-14). 결과 표가 없는 계열은 null
@@ -147,6 +148,10 @@ export default async function NoticePage({ params }: Params) {
     getSupplyStats(),
     // 경쟁률 지면이 서는 유형만 값이 온다. 기관이 다르면(LH 행복주택에 SH 결과) 안 붙인다 — 아래에서 거른다
     getTypeCompetition(n.housing_type, 2),
+    // 이 공고의 커트라인(당첨자/서류심사대상자 발표 첨부, 0041). 결과가 나온 공고만 값이 온다
+    getNoticeCutlines(n.id),
+    // 「내 조건」 단지 줄에 붙일 직전 같은 계열 공고의 최종 커트라인
+    getPriorCutlines(n),
   ]);
   const typeSupply = supplyStats.byTypeAgency.filter((t) => t.housing_type === n.housing_type);
   const typeComp = compAny && compAny.agency === n.agency ? compAny : null;
@@ -486,7 +491,7 @@ export default async function NoticePage({ params }: Params) {
           {noticeElig && (
             <section className="dsec lead" id="fit">
               <h2>내 조건에 맞는 단지</h2>
-              <NoticeFit data={noticeElig.data} complexes={complexes} supply={supply} income={eligRules.income} tiers={eligRules.tiers} noticeSlug={n.slug} prior={prior} />
+              <NoticeFit data={noticeElig.data} complexes={complexes} supply={supply} income={eligRules.income} tiers={eligRules.tiers} noticeSlug={n.slug} prior={prior} priorCut={priorCut} />
             </section>
           )}
 
@@ -588,6 +593,8 @@ export default async function NoticePage({ params }: Params) {
               </ul>
             </section>
           )}
+
+          {cutlines && <NoticeCutlines data={cutlines} />}
 
           {/* 지난 경쟁률과 공급(사용자 요청 2026-10-12: 메뉴 대신 공고 상세에서, 그래프로). 「내 조건에 맞는 단지」의 경쟁률은
               단지 줄마다 붙고 조건을 넣어야 보인다. 여기는 유형 단위 그래프라 누구에게나 보인다 */}

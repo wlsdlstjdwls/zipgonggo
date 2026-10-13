@@ -38,7 +38,8 @@ import { complexGraph } from "@/lib/jsonld";
 import { NAVER_MAP_COMPLEX_ZOOM } from "@/lib/constants";
 import { applyPhase, count, dateK, deadlineChip, hoText, NO_DATE, num, wonExact, wonKo } from "@/lib/format";
 import { areaText, classLabel, commonArea, complexPriceRows, convertGroups, m2, moveInLabel, optionGroups, typeLabel, unitPriceRows } from "@/lib/notice-view";
-import { getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getYouthHouse, isComplexIndexable } from "@/lib/queries";
+import { getComplexCutlines, getComplexImages, getComplexSupply, getComplexUnits, getEligibilityRules, getNoticeBySlug, getNoticeComplexes, getNoticeEligibility, getYouthHouse, isComplexIndexable } from "@/lib/queries";
+import { ComplexCutlines } from "@/components/complex-cutlines";
 import { ComplexGallery } from "@/components/complex-gallery";
 import { imagesEnabled, shownImages } from "@/lib/complex-images";
 import { complexSegment, noticeComplexPath, noticePath, ROUTES } from "@/lib/routes";
@@ -128,7 +129,7 @@ export default async function ComplexPage({ params }: Params) {
   const isMingan = n.housing_type === "공공지원민간임대";
   // 이 단지의 사진을 누가 주는가. 한 단지가 두 출처에 다 붙지는 않는다(SH 공고 단지 / 청년안심주택 포털 단지)
   const imgSource: ImageSource | null = c.sh_bizns_cd ? "sh" : c.youth_home_code ? "youth" : null;
-  const [supply, units, images, noticeElig, minganRules, house] = await Promise.all([
+  const [supply, units, images, noticeElig, minganRules, house, cutHistory] = await Promise.all([
     getComplexSupply(n.id, c.id, c.name),
     getComplexUnits(c.id),
     // 파일 자리가 안 정해진 배포에서는 질의도 하지 않는다 — 행만 있으면 액박이 된다(lib/complex-images 머리글)
@@ -137,6 +138,8 @@ export default async function ComplexPage({ params }: Params) {
     isMingan ? getEligibilityRules() : Promise.resolve(null),
     // 포털 단지 사실(0027) — 관리비가 여기 있다. 이미지와 달리 파일이 없어 배포 스위치와 무관하게 늘 읽는다
     getYouthHouse(c.youth_home_code),
+    // 이 단지의 지난 회차 최종 커트라인(0041). 같은 기관, 같은 유형 공고만
+    getComplexCutlines(c.name, n.housing_type, n.agency),
   ]);
   // 「내 조건에 맞는 단지」를 단지 상세에도(사용자 요청 2026-09-14) — 공고 상세와 같은 자격 묶음·공급현황으로 판정하고
   // 이 단지가 드는지 먼저 말한다. 자격 묶음이 있는 공고만 질의한다
@@ -520,6 +523,8 @@ export default async function ComplexPage({ params }: Params) {
               같은 공고의 **다른** 단지를 추리는 자리라 공고 상세가 맡는다. 여기 놓으면 지금 보는 단지를
               제쳐 두고 옆 단지를 훑게 된다. 공고 상세(/notice/{공고})에는 그대로 있다.
               바로 위 「내 조건에 맞는 주택형」은 남긴다 — 그건 이 단지 안에서 갈리는 값이다 */}
+
+          {cutHistory.length > 0 && <ComplexCutlines rows={cutHistory} currentSlug={n.slug} />}
 
           <section className="dsec">
             <h2>위치</h2>

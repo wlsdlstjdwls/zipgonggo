@@ -67,3 +67,4 @@ python db\migrate.py --status   # 적용 현황
 | `0038_supply_type_audit.sql` | `supply_type.income_pct_dual` · `income_small_bonus` · `basis` — 공고문 대조(docs/eligibility-audit.md)로 드러난 맞벌이 기준, 1~2인 가구 가산, 근거 공고 | Neon 2026-10-06 |
 | `0039_notice_programs.sql` | `notice.programs` text[] + GIN — 정부 사업 이름(든든전세, 미리내집 …). pipeline `programs.py`가 매기고 `/program/{사업}`이 읽는다 | Neon 2026-10-06 |
 | `0040_unit_price_tiers.sql` | `unit.price_tiers` jsonb — 호실의 신청 계층별 금액(소득 50%/70%, 청년 1순위/2~3순위…). SH 주택목록 별첨에서 `sh_house_list.py`가 채운다 | Neon 2026-10-12 |
+| `0041_notice_cutline.sql` | `notice_cutline` — 당첨자/서류심사대상자 발표 첨부의 커트라인 표 한 줄(단지 × 면적 × 대상, 원문 글 + 순위/점수). `sh_cutline.py`가 채운다 | Neon 2026-10-13 |
