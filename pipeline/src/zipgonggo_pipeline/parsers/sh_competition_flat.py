@@ -23,20 +23,20 @@ ROLES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("gu", re.compile(r"^자치구?$")),
     ("name", re.compile(r"^(?:단지명?|지명|지구및단지명?|주택명)$")),
     ("type", re.compile(r"^(?:신청유형|공급유형|주택형|유형|면적|전용면적)$")),
-    ("class", re.compile(r"^(?:신청자격|공급대상|대상)$")),
+    ("class", re.compile(r"^(?:신청자격|공급대상|대상|자격)$")),      # 「신청 / 자격」 두 줄이면 아랫줄만 온다
     # 「공급구분」은 대상 칸이 따로 있으면 구분(일반/주거약자/우선), 없으면 계층(행복주택 청년/신혼부부) — _header가 가른다
     ("class2", re.compile(r"^공급구분$")),
     ("bracket", re.compile(r"^(?:구분|분류)$")),
-    ("units", re.compile(r"^(?:공급호수|모집호수|호수|호|합계|공급세대수?|모집세대수?)$")),
-    ("applicants", re.compile(r"^(?:신청자수?|신청자계|계|청약자수?|신청인원)$")),
+    ("units", re.compile(r"^(?:공급호수|모집호수|호수|호|합계|공급세대수?|모집세대수?|모집호수계)$")),
+    ("applicants", re.compile(r"^(?:신청자수?|신청자계|계|청약자수?|신청인원|접수합계|접수계)$")),
 )
 RATIO_HEAD = re.compile(r"^경쟁률")
 # 쓰지 않는 칸. 머리글을 칸으로 세워 두지 않으면 그 칸 숫자가 이웃 칸으로 샌다(합계 4 + 공가 4 → 「44」)
-SKIP = re.compile(r"^(?:단지|우선|번호|단지번호|연번)$|공가|예비|인터넷|방문|우편|비고|입주자|금회공급")   # 「할 공가 입」처럼 쪼개져도 잡는다
+SKIP = re.compile(r"^(?:단지|우선|번호|단지번호|연번)$|공가|예비|인터넷|방문|우편|비고|입주자|금회공급|성별|주소지|소재지")   # 「할 공가 입」처럼 쪼개져도 잡는다
 UMBRELLA = re.compile(r"^(?:신청현황|접수누계|접수현황)$")
 HEADER_WINDOW = 45.0
 BRACKET_VALUE = re.compile(r"^(?:우선|일반|특별|예비자?|신규|재공급|신규공급)$")
-NOTE_LINE = re.compile(r"^[※*○◦·]")
+NOTE_LINE = re.compile(r"^[※*○◦]")
 LABEL_ROLES = ("gu", "name", "type", "class", "bracket", "units")
 SUBTOTAL = re.compile(r"소계|합계|총계")
 # 청년 매입임대 2025-2차는 한 칸에 「<재공급> 강동구 [해담빌] (29A) - 서울특별시 강동구 …」를 통째로 싣는다
@@ -51,19 +51,46 @@ def _key(s: str) -> str:
     return re.sub(r"\([^)]*\)", "", re.sub(r"\s+", "", s))
 
 
+MERGED_TOKENS: tuple[tuple[str, str], ...] = (
+    ("신청유형", "type"), ("공급구분", "bracket"), ("모집세대수", "units"), ("공급호수", "units"), ("공가입주자", "skip"),
+    ("예비입주자", "skip"), ("신청자수", "applicants"), ("경쟁률", "ratio"),
+    ("청약자", "applicants"),
+    ("신청", "skip"),            # 2019 서울리츠 「신청 구분」의 윗줄 「신청」과 「공급호수」가 붙었다      # 미리내집 8차 「인터넷 청약자(수) / 총 청약자(수)」가 붙었다 — 뒤(총)가 덮는다
+)
+
+
+def _split_merged(k: str) -> list[tuple[str, str]] | None:
+    """붙은 머리글을 아는 낱말로 끝까지 쪼갤 수 있으면 [(낱말, 역할)]. 낱말 둘 이상일 때만."""
+    out: list[tuple[str, str]] = []
+    i = 0
+    while i < len(k):
+        hit = next(((w, r) for w, r in MERGED_TOKENS if k.startswith(w, i)), None)
+        if not hit:
+            return None
+        out.append(hit)
+        i += len(hit[0])
+    return out if len(out) >= 2 else None
+
+
 def _cx(s: Segment) -> float:
     return (s.l + s.r) / 2
 
 
 def _header(rows: list[tuple[float, list[Segment], list[Char]]]) -> tuple[dict[str, float], float] | None:
     """칸 역할 → 칸 중심 x, 머리글 바닥 y. 경쟁률 머리글이 없거나 숫자 칸 셋을 못 갖추면 None."""
-    anchor = next((t for t, segs, _c in rows if any("경쟁률" in (k := _key(s.text)) and len(k) <= 10 for s in segs)), None)
+    heads = [t for t, segs, _c in rows if any("경쟁률" in (k := _key(s.text)) and len(k) <= 10 for s in segs)]
+    # 표 위 총계 줄에 「모집호수 | 신청자수 | 경쟁률」만 따로 찍는 문서가 있다(2022-2 서울리츠) — 단지명 머리글이 곁에 있는 줄을 먼저 고른다
+    named = [t for t in heads if any(abs(rt - t) <= HEADER_WINDOW and any(_key(x.text) in ("단지명", "단지") for x in segs)
+                                     for rt, segs, _c in rows)]
+    anchor = (named or heads or [None])[0]
     if anchor is None:
         return None
     cols: dict[str, float] = {}
     bottom = anchor
     brk_x: float | None = None
     umbrella: float | None = None
+    gye: list[float] = []
+    name_from = ""
     ratio_heads: list[tuple[float, float]] = []
     for t, segs, _c in rows:
         if abs(t - anchor) > HEADER_WINDOW:
@@ -78,11 +105,21 @@ def _header(rows: list[tuple[float, list[Segment], list[Char]]]) -> tuple[dict[s
                 ratio_heads.append((t, _cx(s)))
                 hit = True
                 continue
-            if k == "신청자수경쟁률":
-                # 두 머리글이 한 조각으로 붙었다(장기전세 39차) — 조각 왼쪽 절반이 신청자, 오른쪽 절반이 경쟁률
-                quarter = (s.r - s.l) / 4
-                cols.setdefault("applicants", _cx(s) - quarter)
-                ratio_heads.append((t, _cx(s) + quarter))
+            parts = _split_merged(k)
+            if parts:
+                # 머리글 여럿이 한 조각으로 붙었다(39차 「신청자수경쟁률」, 국민임대 2023 「신청유형공급구분」
+                # 「모집세대수공가입주자예비입주자」). 글자 수 비율로 조각 안 자리를 나눠 각자 칸을 세운다
+                total = sum(len(w) for w, _r in parts)
+                acc = 0
+                for w, r in parts:
+                    x = s.l + (s.r - s.l) * (acc + len(w) / 2) / total
+                    acc += len(w)
+                    if r == "ratio":
+                        ratio_heads.append((t, x))
+                    elif r == "skip":
+                        cols[f"skip@{x:.0f}"] = x
+                    else:
+                        cols[r] = x      # 붙은 머리글 쪽 자리가 더 정확하다 — 윗줄 묶음 머리글(「공급 세대」)로 잡은 자리를 덮는다
                 hit = True
                 continue
             if UMBRELLA.fullmatch(k):
@@ -94,7 +131,18 @@ def _header(rows: list[tuple[float, list[Segment], list[Char]]]) -> tuple[dict[s
                 role = "bracket"
             if k == "일반":
                 brk_x = _cx(s)      # 「우선 / 일반」 두 줄 머리글 — 구분 칸이다(행복주택 2024)
-            if role and role not in cols:
+            if k == "계":
+                gye.append(_cx(s))
+            if k == "단지명" and name_from == "단지" and "name" in cols:
+                # 「단지 / 번호」 두 줄 머리글의 「단지」를 이름 칸으로 먼저 잡았다(재개발 2021) — 「단지명」이 진짜다
+                old = cols.pop("name")
+                cols[f"skip@{old:.0f}"] = old
+            if role == "name" and "name" not in cols:
+                name_from = k
+            if k == "계" and "applicants" in cols and _cx(s) < cols["applicants"] - 30:
+                cols["units"] = _cx(s)     # 신청자 칸이 따로 있으면 왼쪽 「계」는 모집호수 합계다(2022-2 서울리츠 재공급 표)
+                hit = True
+            elif role and role not in cols:
                 cols[role] = _cx(s)
                 hit = True
             elif role and abs(cols[role] - _cx(s)) > 30:
@@ -133,9 +181,15 @@ def _header(rows: list[tuple[float, list[Segment], list[Char]]]) -> tuple[dict[s
     for k in [k for k in cols if k.startswith("skip@")]:
         if any(abs(cols[k] - cols[r]) < 15 for r in cols if not r.startswith("skip@")):
             del cols[k]
+    # 「계」가 둘이면(모집 계 | 신청 계, 재개발 2021) 왼쪽이 모집호수, 오른쪽이 신청자다
+    if "units" not in cols and len(gye) >= 2:
+        cols["units"], cols["applicants"] = min(gye), max(gye)
+        for k in [k for k in cols if k.startswith("skip@") and abs(cols[k] - max(gye)) < 3]:
+            del cols[k]
     if "applicants" not in cols and umbrella is not None:
         cols["applicants"] = umbrella
-    if not {"name", "units", "applicants", "ratio"} <= set(cols):
+    # 단지가 하나뿐인 공고(행복주택 상아2차)는 단지명 칸이 없다 — 이름 없이 회차 숫자만 싣는다
+    if not {"units", "applicants", "ratio"} <= set(cols):
         return None
     return cols, bottom + 1.0
 
@@ -158,6 +212,19 @@ def _ratio_text(t: str) -> str:
 
 
 def parse_flat_page(rows: list[tuple[float, list[Segment], list[Char]]], page: int) -> list:
+    """한 쪽에 머리글이 다른 표가 여럿이면(2022-2 서울리츠 <신규>/<재공급>) 「단지명」 머리글마다 잘라 따로 읽는다."""
+    heads = [t for t, segs, _c in rows if any(_key(x.text) in ("단지명", "단지") for x in segs)]
+    cuts = [h - HEADER_WINDOW for h in heads[1:] if h - heads[0] > 2 * HEADER_WINDOW]
+    if not cuts:
+        return _parse_table(rows, page)
+    out: list = []
+    edges = [float("-inf"), *cuts, float("inf")]
+    for lo, hi in zip(edges, edges[1:]):
+        out.extend(_parse_table([r for r in rows if lo <= r[0] < hi], page))
+    return out
+
+
+def _parse_table(rows: list[tuple[float, list[Segment], list[Char]]], page: int) -> list:
     """rows는 총계 줄을 거르지 않은 글자 줄이다 — 「계 | 경쟁률」처럼 「계」로 시작하는 머리글 줄이 있어서다(2020 행복주택)."""
     from .sh_competition import CompetitionRow, _Cell, _cell, _clean_complex, _close, _dot_dropped, _int, _pitch, _ratio
 
@@ -205,9 +272,23 @@ def parse_flat_page(rows: list[tuple[float, list[Segment], list[Char]]], page: i
         out: list[tuple[float, str, bool]] = []      # (y, 글, 데이터 줄인가)
         for t, c in lines:
             v = c[role].text.strip() if role in c else ""
+            if role == "gu" and v in ("·", "ㆍ"):
+                continue
+            if role == "name" and re.fullmatch(r"<[^>]*>", v.replace(" ", "")):
+                continue          # 「<신규>」 「<재공급>」 표 제목(2022-2 서울리츠)
             if not v:
                 continue
             own = is_data(c)
+            # 「·」가 단지명 칸 왼쪽 경계를 넘어 자치구 칸으로 떨어지기도 한다
+            if role == "name" and "gu" in c and c["gu"].text.strip() in ("·", "ㆍ"):
+                v = "·" + v
+            if role == "name" and out and v.startswith("·"):
+                # 지구 이름 밑 「· 강남한양수자인」 — 단지 이름이다. 지구에 괄호로 붙인다(국민임대 2023)
+                prev = out[-1][1]
+                sub = v.lstrip("·").strip()
+                joined = f"{prev[:-1]}, {sub})" if prev.endswith(")") and "·" not in prev else f"{prev}({sub})"
+                out[-1] = ((out[-1][0] + t) / 2, joined, out[-1][2])
+                continue
             if role == "name" and out and v.startswith("("):
                 out[-1] = ((out[-1][0] + t) / 2, f"{out[-1][1]} {v}", out[-1][2])   # 단지명 밑 소재지 줄
                 continue
@@ -237,6 +318,15 @@ def parse_flat_page(rows: list[tuple[float, list[Segment], list[Char]]], page: i
         idx = _split_blocks([t for t, _c in data], [y for y, _v in labs])
         filled[role] = [labs[k][1] if k >= 0 else "" for k in idx]
 
+    # 병합 자치구는 DP가 어긋나도 산술이 못 잡는다. 한 단지에 자치구가 둘 이상 붙으면 이 쪽의 자치구는 못 믿는다 — 비운다
+    # (국민임대 2023: 「발산지구」가 강서구와 구로구로 갈렸다). 빈 자치구는 화면이 단지 목록에서 이름으로 채운다
+    if "gu" in cols and not all(c["gu"].text.strip() for _t, c in data):
+        seen: dict[str, set[str]] = {}
+        for nm, g in zip(filled["name"], filled["gu"]):
+            seen.setdefault(nm, set()).add(g)
+        if any(len(v) > 1 for v in seen.values()):
+            filled["gu"] = [""] * len(data)
+
     out: list = []
     group: list = []
 
@@ -261,7 +351,8 @@ def parse_flat_page(rows: list[tuple[float, list[Segment], list[Char]]], page: i
         gu = filled["gu"][i] or (m.group(1) if (m := GU_IN_ADDR.search(raw_name)) else "")
         # 소재지 괄호(「(광진구 구의동 587-64)」)를 뗀다. 줄을 이으며 하이픈과 밑줄이 괄호 뒤로 밀리기도 한다
         name = _clean_complex(re.sub(r"\s*\([^)]*구[^)]*\)[\s_\-]*$", "", raw_name).strip(" _-")).strip(" _-")
-        if not re.search(r"[가-힣A-Za-z]{2,}", name):
+        name = re.sub(r"\s*\[[^\]]*\]$", "", name)      # 「백년빌 [26B]」 — 주택형은 면적 칸에 따로 있다
+        if "name" in cols and not re.search(r"[가-힣A-Za-z]{2,}", name):
             continue
         units_cell = c["units"] if c["units"].text else _Cell(filled["units"][i], False)
         units = _int(units_cell)
