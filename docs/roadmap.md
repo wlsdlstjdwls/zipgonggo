@@ -13,7 +13,7 @@
 - [x] 공고문 첨부 재가공·재배포 허용 범위 확인 (LH·SH 이용약관, robots.txt) — [판정](data-sources.md#6-약관저작권-판정)
 - [x] 도메인 등록 — **`zipgonggo.com` 등록 완료 (2026-09-08)**. `.kr`은 안 잡음(하나만 쓰기로 결정, 방어 등록 불필요). **2026-09-08 Vercel 프로덕션 배포·도메인 연결 완료** (`zipgonggo.com`, www→apex 301, Root Directory `web`). CLI 배포는 저장소 루트에서 `vercel --prod`
 - [x] 네이버 Cloud 콘솔에서 월 무료 한도 확인 — **Geocoding 3,000,000회/월 (2026-09-08 사용자 확인)**. 단지 지도의 브라우저 실시간 지오코딩(공고당 ~140회)은 이 안에서 충분. Web Dynamic Map 로드 한도는 별도 미기록
-- [x] Neon 프로젝트 생성 + PostGIS 활성화 — 2026-09-08. Vercel 프로젝트 `zipgonggo` + Marketplace Neon(`zipgonggo-db`, ap-southeast-1, free_v3). PG 18.6 / PostGIS 3.6
+- [x] Neon 프로젝트 생성 + PostGIS 활성화 — 2026-09-08. Vercel 프로젝트 `zipgonggo` + Marketplace Neon(`zipgonggo-db`, ap-southeast-1, free_v3). PG 18.6 / PostGIS 3.6. 09-09 us-east-1(`neon-champagne-ball`)로 옮기고, 옛 `zipgonggo-db`는 2026-10-13 삭제
 - [x] LH에 첨부파일 수집 허용 — **완료 (2026-09-08, 서울시 협의와 함께. 사용자 확인 2026-10-02)**. LH 호실 파서 착수 가능
 - [x] 서울시 공공저작물 관리책임관에게 사전 협의 — **완료 (2026-09-08, 사용자 확인)**
 

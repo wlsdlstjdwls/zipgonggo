@@ -154,4 +154,5 @@ API 필드 ↔ 컬럼 대응은 각 컬럼 주석에 `(API xxx)`로 적어 뒀�
 
 | 환경 | 상태 |
 |---|---|
-| Neon `zipgonggo-db` (ap-southeast-1, PG 18.6, PostGIS 3.6) | `0001`~`0003` 적용 완료 2026-09-08. S1 첫 적재 176건 |
+| Neon `neon-champagne-ball` (us-east-1, PG 18.6, PostGIS 3.6) | 운영 DB. 2026-09-09 싱가포르에서 옮겨 왔다 |
+| ~~Neon `zipgonggo-db` (ap-southeast-1)~~ | 첫 DB. 09-08 이후 안 씀, **2026-10-13 삭제** |
