@@ -169,7 +169,11 @@ export default async function NoticePage({ params }: Params) {
   // 민간임대(청년안심주택)는 사업자마다 조판이 달라 공고문 자격 묶음을 못 읽는다. 자격은 단지가 달라도 같은 제도 고정 규칙이라
   // 시드 카드(ppmh_*, 일반공급을 「자산·자동차 기준 없음」으로 적는다) 대신 공고문에서 확인한 규칙을 직접 그린다(lib/mingan-fit.ts)
   const isMingan = !noticeElig && n.housing_type === "공공지원민간임대";
-  const allTypes = noticeElig || isMingan ? [] : eligRules.types.filter((t) => t.housing_type === n.housing_type);
+  // 구청이 낸 수요자 맞춤형 매입임대(도전숙, 은빛주택, 청년창업가/예술인주택)는 대상과 소득/자산 기준을 공고마다 따로 정한다 —
+  // 강동구 청년창업가 주택은 소득 50/70%, 은평구 은빛주택은 65세 이상 수급자. 매입임대 6종 카드를 세우면 맞지 않는 기준이
+  // 이 공고의 자격처럼 보였다(사용자 지적 2026-10-15). 카드 대신 원문을 보라는 한 줄만 둔다
+  const isCustomBuy = !noticeElig && n.housing_type === "매입임대" && /수요자\s*맞춤/.test(n.title);
+  const allTypes = noticeElig || isMingan || isCustomBuy ? [] : eligRules.types.filter((t) => t.housing_type === n.housing_type);
   // 제목이 대는 유형만 앞에 세운다 — 「청년 매입임대주택」 공고 한 장에 제도 전체 6종이 늘어서서
   // 정작 이 공고 유형이 묻혔다(사용자 지적 2026-09-21). 못 고르면 예전처럼 전부 그린다.
   // 고른 뒤에도 나머지를 지우지 않고 접어 둔다 — 제목으로 가른 것이라 틀렸을 때 길이 막히면 안 된다
@@ -347,7 +351,7 @@ export default async function NoticePage({ params }: Params) {
     ...(facts ? [{ id: "complex", label: "단지 정보" }] : []),
     { id: "schedule", label: "일정" },
     ...(noticeElig || minganFit ? [{ id: "fit", label: "내 조건" }] : []),
-    ...(noticeElig || ruleCards.length > 0 ? [{ id: "eligibility", label: "신청자격" }] : []),
+    ...(noticeElig || ruleCards.length > 0 || isCustomBuy ? [{ id: "eligibility", label: "신청자격" }] : []),
     ...(showAreaTable && areas.length > 0 ? [{ id: "areas", label: "지역별 호수" }] : []),
   ];
 
@@ -507,6 +511,16 @@ export default async function NoticePage({ params }: Params) {
 
           {noticeElig && (
             <NoticeEligibilitySection elig={noticeElig} incomeYear={eligRules.incomeYear} noticeYear={noticeYear} originalDoc={L.originalDoc} />
+          )}
+
+          {isCustomBuy && (
+            <section className="dsec" id="eligibility">
+              <h2>신청자격</h2>
+              <p className="ne-sum">
+                수요자 맞춤형 매입임대는 구청과 운영기관이 대상, 소득, 자산 기준을 공고마다 따로 정합니다.
+                매입임대 일반 기준과 달라 여기 옮기지 않았습니다. 자격은 {L.originalDoc}에서 확인하세요.
+              </p>
+            </section>
           )}
 
           {ruleCards.length > 0 && (

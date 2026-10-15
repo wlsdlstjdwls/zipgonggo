@@ -29,6 +29,7 @@ from ..parsers.sh_attach import merge_teukhwa, parse_attachment, teukhwa_facts
 from ..parsers.sh_eligibility import parse_eligibility, verify_income_table
 from ..parsers.sh_house_list import HouseList, parse_house_list, parse_house_xlsx
 from ..parsers.sh_location import HOUSE_DOC_RE, parse_filename_jibun, parse_house_docs, parse_locations
+from ..parsers.sh_overview import hwpx_lines, parse_overview, parse_overview_lines
 from ..parsers.sh_schedule import parse_schedule
 from ..repo import (
     income_base100, income_years, replace_notice_complexes, replace_notice_supply, replace_units, update_notice_attach_facts,
@@ -135,6 +136,25 @@ def _house_docs(client, atts, seq: str, cached: bool) -> list[tuple[str, list]]:
         root.mkdir(parents=True, exist_ok=True)
         index_file.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
     return out
+
+
+def _hwpx_text(client, html: str, att_name: str | None, seq: str, cached: bool) -> list[str]:
+    """Synap 미리보기가 hwpx를 못 열 때(311349 은빛주택) 원본을 받아 문단 글줄로. 받은 파일은 data/ish/{seq}/doc.hwpx.bin."""
+    path = CACHE_ROOT / seq / "doc.hwpx.bin"
+    if cached:
+        return hwpx_lines(path.read_bytes()) if path.is_file() else []
+    if not att_name or not att_name.lower().endswith(".hwpx"):
+        return []
+    dl = next((u for n, u in find_downloads(html) if n == att_name), None)
+    if dl is None:
+        return []
+    data = client.download(dl)
+    if not data.startswith(b"PK"):
+        log.warning("%s hwpx가 zip이 아니다(%d바이트) — 건너뛴다", seq, len(data))
+        return []
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return hwpx_lines(data)
 
 
 def _cached_doc_names(seq: str) -> list[str]:
@@ -407,10 +427,13 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                     continue
                 seq = seq_m.group(1)
                 try:
+                    hwpx: list[str] = []
                     if cached:
                         seq_dir = CACHE_ROOT / seq
                         pages = list(iter_cached_pages(seq_dir)) if seq_dir.is_dir() else []
                         if not pages:
+                            hwpx = _hwpx_text(client, "", None, seq, cached=True)
+                        if not pages and not hwpx:
                             stats.skip("no_cache")
                             continue
                         att_name = "(캐시)"
@@ -436,11 +459,14 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                             log.info("%s 첨부 없음", n["slug"])
                             continue
                         doc = client.resolve_preview(atts[0].preview_url)
-                        if doc is None:
+                        att_name = atts[0].name
+                        pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq)) if doc is not None else []
+                        if not pages:
+                            # 미리보기가 hwpx를 못 연다 — 원본을 받아 모집개요만 읽는다
+                            hwpx = _hwpx_text(client, html, att_name, seq, cached=False)
+                        if doc is None and not hwpx:
                             stats.skip("preview_unresolved")
                             continue
-                        att_name = atts[0].name
-                        pages = list(client.iter_pages(doc, cache_dir=CACHE_ROOT / seq))
                         extras = []
                     facts = parse_attachment(pages, ref_year=n["posted_at"].year if n["posted_at"] else None)
                     # 신청자격 묶음(장기전세·행복주택·매입임대 양식. 셋 다 아니면 None). 단지 표와 별개라
@@ -524,6 +550,13 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                     sup = facts.supply = None
                     facts.totals = {}
                 sch = _sane_schedule(sch, pages, n["posted_at"], n["slug"]) if facts.kind != "teukhwa" else sch
+                # 흐름도가 없는 구청 공고(수요자 맞춤형 도전숙, 은빛주택 — 2026-10-15)는 첫 쪽 「모집개요」 라벨 줄로 일정과 호수를 읽는다
+                if sch is None and n["housing_type"] == "매입임대":
+                    sch, count = (parse_overview_lines(hwpx, n["posted_at"]) if hwpx
+                                  else parse_overview(pages, n["posted_at"]))
+                    if count and not facts.totals.get("supply_count"):
+                        facts.totals = {**facts.totals, "supply_count": count}
+                        stats.skip("overview_count")
                 log.info(
                     "%s: %d쪽 · %s · 단지 %d건 · 호실 %d건 · 공급 %d건 · 자격 %s · 일정 %s · 전세금 %s (%s)",
                     n["slug"], len(pages), kind, len(rows), len(house.units) if house else len(units), len(supply_rows),
