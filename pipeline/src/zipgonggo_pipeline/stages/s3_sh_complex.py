@@ -26,7 +26,7 @@ from pathlib import Path
 from ..config import PIPELINE_ROOT, settings
 from ..db import connect
 from ..parsers.sh_attach import merge_teukhwa, parse_attachment, teukhwa_facts
-from ..parsers.sh_custom_table import parse_custom_pdf
+from ..parsers.sh_custom_table import from_manual, parse_custom_pdf
 from ..parsers.sh_eligibility import parse_eligibility, verify_income_table
 from ..parsers.sh_house_list import HouseList, parse_house_list, parse_house_xlsx
 from ..parsers.sh_location import HOUSE_DOC_RE, parse_filename_jibun, parse_house_docs, parse_locations
@@ -57,6 +57,8 @@ def steps_json(sch) -> str | None:
 STAGE = "S3"
 SOURCE = "sh_attach"
 CACHE_ROOT = PIPELINE_ROOT / "data" / "ish"
+# 손으로 옮긴 호실표(커밋한다 — data/와 달리 정답 자료다)
+MANUAL_ROOT = PIPELINE_ROOT / "manual" / "units"
 SEQ_RE = re.compile(r"[?&]seq=(\d+)")
 
 # source 제한은 「무더기로 훑을 때」만이다. 게시판 백필분(`ish_board`, 2003년까지 449건)까지
@@ -168,20 +170,25 @@ def _custom_table(client, html: str, att_name: str | None, seq: str, cached: boo
     if cached:
         data = path.read_bytes() if path.is_file() else b""
     else:
-        if not att_name or not att_name.lower().endswith(".pdf"):
-            return None
-        dl = next((u for n, u in find_downloads(html) if n == att_name), None)
-        if dl is None:
-            return None
-        data = client.download(dl)
-        if not data.startswith(b"%PDF"):
-            log.warning("%s 공고문 원본이 PDF가 아니다(%d바이트) — 건너뛴다", seq, len(data))
-            return None
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
-    if not data:
-        return None
-    got = parse_custom_pdf(data, title)
+        data = b""
+        is_pdf = bool(att_name) and att_name.lower().endswith(".pdf")
+        dl = next((u for n, u in find_downloads(html) if n == att_name), None) if is_pdf else None
+        if dl is not None:
+            data = client.download(dl)
+            if data.startswith(b"%PDF"):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            else:
+                log.warning("%s 공고문 원본이 PDF가 아니다(%d바이트) — 건너뛴다", seq, len(data))
+                data = b""
+    got = parse_custom_pdf(data, title) if data else None
+    if not (got and got["complexes"]):
+        # 표가 그림이거나 hwpx라 못 읽은 공고는 손으로 옮긴 표를 쓴다(311087, 311349)
+        manual = MANUAL_ROOT / f"{seq}.json"
+        if manual.is_file():
+            got = from_manual(json.loads(manual.read_text(encoding="utf-8")), title)
+            if got is None:
+                log.warning("%s 수동 호실표의 제목이 공고 제목과 달라 쓰지 않는다", seq)
     if not got or not got["complexes"]:
         return None
     return HouseList(complexes=got["complexes"], units=got["units"], totals=got["totals"], tiers=got["tiers"])

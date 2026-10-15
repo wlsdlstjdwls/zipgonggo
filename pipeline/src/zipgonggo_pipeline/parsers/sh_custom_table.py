@@ -181,3 +181,25 @@ def _rows_out(parsed: list[dict[str, Any]], tiers: list[str], gu: str) -> dict[s
                    "min_rent": min(rents, default=None), "max_rent": max(rents, default=None),
                    "supply_count": len(parsed)},
     }
+
+
+def from_manual(doc: dict[str, Any], title: str) -> dict[str, Any] | None:
+    """손으로 옮긴 호실표(pipeline/manual/units/{seq}.json) → parse_custom_pdf와 같은 꼴.
+
+    표가 그림이라 글자층이 없거나(311087 강동 「임대조건」), 원본이 hwpx라 읽을 파서가 없는(311349 은평) 공고용이다.
+    파일의 제목이 공고 제목과 다르면 쓰지 않는다 — seq가 어긋난 공고에 남의 호실이 붙지 않게.
+    """
+    gu_m = re.search(SEOUL_GU, title)
+    if not gu_m or _flat(doc.get("title")) != _flat(title):
+        return None
+    gu = gu_m.group(0)
+    cols = doc["columns"]
+    tiers = doc["tiers"]
+    parsed = []
+    for row in doc["rows"]:
+        v = dict(zip(cols, row))
+        prices = [(v.get(f"deposit{k}"), v.get(f"rent{k}")) for k in range(1, len(tiers) + 1)]
+        parsed.append({"name": v["name"], "road": f"{gu} {v['road']}", "ho": str(v["ho"]), "note": v.get("note"),
+                       "area": float(v["area"]) if v.get("area") is not None else None,
+                       "prices": prices, "page": doc.get("page", 1)})
+    return _rows_out(parsed, tiers, gu) if parsed else None
