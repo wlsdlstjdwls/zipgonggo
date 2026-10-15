@@ -614,7 +614,8 @@ export default async function NoticePage({ params }: Params) {
               단지 줄마다 붙고 조건을 넣어야 보인다. 여기는 유형 단위 그래프라 누구에게나 보인다 */}
           <NoticeNumbers
             housingType={n.housing_type} agency={n.agency} slug={n.canonical_slug ?? n.slug} supplyCount={n.supply_count}
-            windowDays={STATS_WINDOW_DAYS} supply={typeSupply} comp={typeComp}
+            // 구청 수요자 맞춤형 공고에 SH 매입임대 회차(청년, 신혼) 경쟁률을 붙이면 딴 사업 숫자다(사용자 지적 2026-10-15)
+            windowDays={STATS_WINDOW_DAYS} supply={typeSupply} comp={isCustomBuy ? null : typeComp}
           />
 
           <GlossaryList terms={terms} />

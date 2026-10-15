@@ -26,6 +26,7 @@ from pathlib import Path
 from ..config import PIPELINE_ROOT, settings
 from ..db import connect
 from ..parsers.sh_attach import merge_teukhwa, parse_attachment, teukhwa_facts
+from ..parsers.sh_custom_table import parse_custom_pdf
 from ..parsers.sh_eligibility import parse_eligibility, verify_income_table
 from ..parsers.sh_house_list import HouseList, parse_house_list, parse_house_xlsx
 from ..parsers.sh_location import HOUSE_DOC_RE, parse_filename_jibun, parse_house_docs, parse_locations
@@ -155,6 +156,35 @@ def _hwpx_text(client, html: str, att_name: str | None, seq: str, cached: bool) 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     return hwpx_lines(data)
+
+
+CUSTOM_TITLE_RE = re.compile(r"수요자\s*맞춤")
+
+
+def _custom_table(client, html: str, att_name: str | None, seq: str, cached: bool, title: str) -> HouseList | None:
+    """구청 수요자 맞춤형 공고의 호실표(311549 도전숙). 미리보기 XML은 글자를 떨어뜨려 금액을 못 되살리므로
+    원본 PDF를 받아 pdfplumber로 읽는다. 받은 파일은 data/ish/{seq}/doc.pdf.bin."""
+    path = CACHE_ROOT / seq / "doc.pdf.bin"
+    if cached:
+        data = path.read_bytes() if path.is_file() else b""
+    else:
+        if not att_name or not att_name.lower().endswith(".pdf"):
+            return None
+        dl = next((u for n, u in find_downloads(html) if n == att_name), None)
+        if dl is None:
+            return None
+        data = client.download(dl)
+        if not data.startswith(b"%PDF"):
+            log.warning("%s 공고문 원본이 PDF가 아니다(%d바이트) — 건너뛴다", seq, len(data))
+            return None
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    if not data:
+        return None
+    got = parse_custom_pdf(data, title)
+    if not got or not got["complexes"]:
+        return None
+    return HouseList(complexes=got["complexes"], units=got["units"], totals=got["totals"], tiers=got["tiers"])
 
 
 def _cached_doc_names(seq: str) -> list[str]:
@@ -516,6 +546,15 @@ def run(*, dry_run: bool, limit: int, slug: str | None, cached: bool = False) ->
                             facts.totals = {**facts.totals, **{k: v for k, v in house.totals.items() if v is not None}}
                         else:
                             house = None
+                        # 구청 수요자 맞춤형 공고(도전숙)는 공고문 안 호실표를 원본 PDF로 읽는다(2026-10-15)
+                        if not facts.complexes and n["housing_type"] == "매입임대" and CUSTOM_TITLE_RE.search(n["title"]):
+                            first = (atts[0].name if atts else None) if not cached else next(iter(_cached_doc_names(seq)), None)
+                            custom = _custom_table(client, html if not cached else "", first, seq, cached, n["title"])
+                            if custom is not None:
+                                house = custom
+                                facts.kind = "custom_table"
+                                facts.complexes = custom.complexes
+                                facts.totals = {**facts.totals, **{k: v for k, v in custom.totals.items() if v is not None}}
                         # 그래도 단지가 없으면 공고문 본문의 위치(대상주택 표, 단지/소재지 표, 「위치」 줄)를 읽는다.
                         # 잔여세대·협동조합·자립준비청년 공고의 지도가 여기서 생긴다(2026-10-12)
                         # 검증한 건 매입임대 공고 34건뿐이라 다른 유형엔 걸지 않는다
