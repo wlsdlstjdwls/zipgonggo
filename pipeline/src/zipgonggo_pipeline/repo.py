@@ -43,12 +43,21 @@ def _assign(col: str) -> str:
 # 지우고 다시 넣지 않고 **넣을 것은 upsert, 없어진 것만 삭제**한다 — 두 CTE가 건드리는 행이 겹치지 않아야
 # 한 문장 안에서 안전하다. 같은 문장 안에서 DELETE한 행을 곧바로 INSERT하면
 # UNIQUE(notice_id, sido, sigungu)가 삭제를 못 보고 걸릴 수 있다(CTE끼리 실행 순서가 정해져 있지 않다).
+#
+# `old`는 같은 문장의 스냅숏이라 **갱신 전** 행을 본다. 갱신 뒤 행과 견줘 지면에 보이는 값이 바뀌었는지 돌려준다.
+# 매시 목록 수집이 바뀐 게 없어도 수십 건을 「갱신」으로 세어 웹 캐시를 통째로 비웠고, 봇이 그 뒤로
+# 지면을 다시 그리느라 Neon이 한 시간도 못 잠들어 월 compute 한도를 넘겼다(2026-10-21).
+# raw는 원본 응답 통째라 조회수 같은 게 섞여 빼고 견준다.
+_CHANGE_COLS = [c for c in _UPDATE_COLS if c != "raw"]
+_CHANGE_ROW = f"ROW({', '.join(_CHANGE_COLS)})"
+
 UPSERT_SQL = (
-    "WITH up AS ("
+    f"WITH old AS (SELECT {_CHANGE_ROW} AS r FROM notice WHERE source_key = %(source_key)s"
+    "), up AS ("
     f"  INSERT INTO notice ({', '.join(NOTICE_COLS)}) VALUES ({', '.join('%(' + c + ')s' for c in NOTICE_COLS)})"
     "  ON CONFLICT (source_key) DO UPDATE SET "
     + ", ".join(_assign(c) for c in _UPDATE_COLS)
-    + ", updated_at = now() RETURNING id, (xmax = 0) AS inserted"
+    + f", updated_at = now() RETURNING id, (xmax = 0) AS inserted, {_CHANGE_ROW} AS r"
     "), src AS ("
     "  SELECT (SELECT id FROM up) AS notice_id, a.sido, a.sigungu, a.supply_count"
     "    FROM jsonb_to_recordset(%(areas)s::jsonb) AS a(sido text, sigungu text, supply_count int)"
@@ -59,12 +68,15 @@ UPSERT_SQL = (
     "  DELETE FROM notice_area x WHERE x.notice_id = (SELECT id FROM up)"
     "    AND NOT EXISTS (SELECT 1 FROM src s"
     "                     WHERE s.sido = x.sido AND s.sigungu IS NOT DISTINCT FROM x.sigungu)"
-    ") SELECT id, inserted FROM up"
+    ") SELECT id, inserted, (SELECT r FROM old) IS DISTINCT FROM up.r AS changed FROM up"
 )
 
 
-def upsert_notice(cur, notice: dict[str, Any], areas: list[dict[str, Any]]) -> bool:
-    """notice 1행 upsert + notice_area 교체를 **한 문장**으로. True면 신규."""
+def upsert_notice(cur, notice: dict[str, Any], areas: list[dict[str, Any]]) -> tuple[bool, bool]:
+    """notice 1행 upsert + notice_area 교체를 **한 문장**으로. (신규인가, 값이 바뀌었나)를 돌려준다.
+
+    notice_area만 바뀐 건 「바뀌었다」로 안 센다 — 지역 지면은 하루 주기 ISR이 따라잡는다.
+    """
     row = dict(notice)
     row["raw"] = json.dumps(row["raw"], ensure_ascii=False)
     # 사업 이름(0039)은 소스가 아니라 여기서 매긴다 — 소스마다 따로 부르면 한 곳이 빠진다
@@ -75,7 +87,7 @@ def upsert_notice(cur, notice: dict[str, Any], areas: list[dict[str, Any]]) -> b
     )
     cur.execute(UPSERT_SQL, row)
     result = cur.fetchone()
-    return bool(result["inserted"])
+    return bool(result["inserted"]), bool(result["changed"])
 
 
 def replace_notice_complexes(cur, notice_id: int, rows: list[dict[str, Any]]) -> int:

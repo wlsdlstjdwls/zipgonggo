@@ -19,8 +19,8 @@ import { AREA_TYPE_MIN_COUNT, listAreaTypePairs, listLandingNotices, type AreaTy
 import { areaPath, areaTypePath, ROUTES, typePath } from "@/lib/routes";
 import { sidoShort } from "@/lib/sido";
 
-// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
-export const revalidate = 3600;
+// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(86400)와 같은 값을 유지할 것
+export const revalidate = 86400;
 export const dynamicParams = true;
 // DB(us-east-1)와 리전을 맞춘다 — layout.tsx와 같은 값 유지
 export const preferredRegion = "iad1";

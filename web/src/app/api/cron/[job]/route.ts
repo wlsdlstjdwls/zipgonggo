@@ -17,8 +17,9 @@
 // 고를 수 없는 규격이라 그 문을 따로 연다. `x-cron-secret`은 콘솔·curl·바깥 모니터용으로 남긴다.
 //
 // 판단 로직 자체는 관리자 콘솔의 「지금 돌리기」와 같은 함수를 쓴다 — 두 벌로 갈라지면 한쪽만 고쳐진다.
+import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
-import { PROFILE_RETAIN_MONTHS } from "@/lib/constants";
+import { CACHE_TAG_NOTICE, PROFILE_RETAIN_MONTHS } from "@/lib/constants";
 import { dispatchJob } from "@/lib/jobs";
 import { purgeStaleProfiles } from "@/lib/users";
 
@@ -48,6 +49,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ job: string }> 
   if (name === "purge-profiles") {
     const removed = await purgeStaleProfiles(PROFILE_RETAIN_MONTHS);
     return NextResponse.json({ job: name, removed, months: PROFILE_RETAIN_MONTHS });
+  }
+
+  // 날짜가 넘어가면 D-day와 「접수 중/마감」이 바뀐다. 지면 캐시가 하루라 자정에 한 번 비워 준다.
+  // 비우기만 하고 다시 그리지는 않는다 — 다음 방문이 그릴 때 DB를 읽는다
+  if (name === "rollover") {
+    revalidateTag(CACHE_TAG_NOTICE);
+    revalidatePath("/", "layout");
+    return NextResponse.json({ job: name, at: new Date().toISOString() });
   }
 
   const { status, body } = await dispatchJob(name);

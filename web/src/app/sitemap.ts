@@ -11,8 +11,8 @@ import { absoluteUrl } from "@/lib/site-url";
 // 합이 40,000에 가까워지면 타입별로 generateSitemaps로 쪼갠다(docs/url-structure.md: 파일당 40,000 URL).
 // 단지는 「고유 필드 8개 이상 + 건물 좌표」를 채운 장만 싣는다 — 못 채운 장은 페이지도 noindex다.
 // lastModified는 DB updated_at — 매 생성마다 new Date()를 박으면 구글이 lastmod를 무시한다.
-// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
-export const revalidate = 3600;
+// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(86400)와 같은 값을 유지할 것
+export const revalidate = 86400;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [notices, options, complexes, hubs, pairs, programs, compTypes] = await Promise.all([

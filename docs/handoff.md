@@ -7,6 +7,28 @@
 
 ---
 
+## 지금 상태 (2026-10-21, 88차) — Neon compute 한도 초과
+
+운영 DB(us-east-1 `ep-cool-wave…`)가 `Your account or project has exceeded the quota`로 접속을 거절한다.
+GitHub 수집 기록은 10-19 22:30(UTC) 순찰을 끝으로 끊겼다. Neon은 **깨어 있던 시간**으로 세고, 5분 동안 조용해야 잠든다.
+DB를 못 깨운 원인은 셋이었다. 큰 것부터:
+
+1. **`/api/cron/{collect,patrol}`가 10분마다 `ingest_log`를 읽었다**(`lib/jobs.ts`). 거의 다 「아직 아님」인데
+   그 말을 하려고 DB를 깨웠다. 이것만으로 하루 절반이 깨어 있다. → GitHub 실행 목록을 먼저 보고,
+   부를 때가 됐을 때만 DB를 본다(collect 한 시간에 한 번, patrol 하루 한 번).
+2. **목록 수집이 매시 사이트 캐시를 통째로 비웠다.** 바뀐 게 없어도 upsert가 18/10/120건을 「갱신」으로 셌고,
+   `stage_main`이 성공할 때마다 `/api/revalidate`(`revalidatePath("/", "layout")`)를 불렀다. 그 뒤 봇이 오는 대로
+   지면을 다시 그리며 DB를 읽었다. → `UPSERT_SQL`이 같은 문장의 갱신 전 스냅숏(`old` CTE)과 견줘 `changed`를 돌려주고
+   (`raw`는 뺀다, notice_area만 바뀐 건 안 센다), `Stats.changed`가 0이면 웹훅과 IndexNow를 건너뛴다.
+3. **ISR 1시간.** → 공개 지면 전부 `revalidate = 86400`, `REVALIDATE_SEC` 86400. D-day가 날짜로 바뀌니
+   Vercel Cron `/api/cron/rollover`가 매일 KST 00:05(`5 15 * * *` UTC)에 한 번 비운다. `/api/notices` CDN은 1시간 그대로.
+
+방문자 화면은 봇을 걸러(`lib/analytics.ts`) 사람만 세니 「접속자 적은데 왜」의 답은 크론과 봇이다.
+
+**남은 것:** UPSERT_SQL은 DB가 잠겨 실 DB로 못 돌려 봤다(pytest 515 통과, tsc 통과). 한도가 풀리면 `s1_sh --max-pages 1`을
+한 번 돌려 `"updated"`는 그대로인데 웹 캐시 갱신 로그가 안 찍히는지 본다. web은 vercel CLI로 배포해야 반영된다.
+한 달 지나 Neon Usage 그래프로 하루 깨어 있는 시간을 확인한다.
+
 ## 지금 상태 (2026-10-15, 87차) — 구청 수요자 맞춤형 공고
 
 사용자 지적: `/notice/sh-2026-311549-maeip`(성북구 도전숙), 311349(은평구 은빛주택), 311087(강동구 청년창업가/예술인주택)이

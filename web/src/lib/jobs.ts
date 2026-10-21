@@ -89,18 +89,12 @@ export async function dispatchJob(name: string, opts: { force?: boolean } = {}):
     return { status: 200, body: { job: name, skipped: "just_dispatched" } };
   }
 
-  // 1) 마지막으로 돈 게 언제인가 — 파이프라인이 남긴 기록을 읽는다
-  const rows = await query<{ started_at: Date }>(
-    "SELECT started_at FROM ingest_log WHERE stage = $1 AND source = $2 ORDER BY started_at DESC LIMIT 1",
-    [job.stage, job.source],
-  );
-  const last = rows[0]?.started_at ? new Date(rows[0].started_at).getTime() : null;
-  const ageMin = last === null ? null : Math.floor((now - last) / 60_000);
-  if (!opts.force && ageMin !== null && ageMin < job.minIntervalMin) {
-    return { status: 200, body: { job: name, skipped: "fresh", ageMin, needMin: job.minIntervalMin } };
-  }
-
-  // 2) GitHub 쪽 실행 목록. 도는 중인지와 **마지막 회차가 언제 시작했는지**를 같이 본다.
+  // **GitHub를 먼저, DB는 나중에 본다**(2026-10-21). 이 라우트는 10분마다 두 번 불리는데 거의 다 「아직 아님」이다.
+  // 예전처럼 ingest_log부터 읽으면 그 「아직 아님」을 말하려고 10분마다 Neon을 깨웠고, Neon은 5분을 놀아야
+  // 잠드니 이것만으로 하루 절반을 깨어 있었다 — 월 compute 한도를 넘긴 주범이다.
+  // 지금은 GitHub 쪽에서 부를 때가 됐다고 나온 회차만 DB를 본다(collect 한 시간에 한 번, patrol 하루 한 번).
+  //
+  // 1) GitHub 쪽 실행 목록. 도는 중인지와 **마지막 회차가 언제 시작했는지**를 같이 본다.
   //
   // ingest_log만 보면 안 되는 이유: GitHub 자신의 schedule이 회차를 만든 직후엔 아직
   // ingest_log에 아무것도 없다. 그 틈에 이쪽이 dispatch를 쏘면 같은 잡이 두 벌 돈다 —
@@ -117,7 +111,7 @@ export async function dispatchJob(name: string, opts: { force?: boolean } = {}):
     workflow_runs?: { status: string; created_at: string }[];
   };
   if (runs.some((r) => r.status !== "completed")) {
-    return { status: 200, body: { job: name, skipped: "running", ageMin } };
+    return { status: 200, body: { job: name, skipped: "running" } };
   }
   const lastRun = runs.reduce<number | null>((max, r) => {
     const t = Date.parse(r.created_at);
@@ -128,6 +122,18 @@ export async function dispatchJob(name: string, opts: { force?: boolean } = {}):
     // 이름을 따로 둔다 — 「ingest_log가 최신이라」 건너뛴 것과 「방금 회차가 떠서」 건너뛴 것은
     // 다른 얘기다. 뒤엣것만 자꾸 뜨면 워크플로가 돌긴 도는데 기록을 못 남기고 있다는 뜻이다
     return { status: 200, body: { job: name, skipped: "run_just_started", ageMin: runAgeMin, needMin: job.minIntervalMin } };
+  }
+
+  // 2) 마지막으로 돈 게 언제인가 — 파이프라인이 남긴 기록을 읽는다. 손으로 돌린 회차처럼
+  //    GitHub 목록 10건 밖에서 돈 실행을 여기서 잡는다
+  const rows = await query<{ started_at: Date }>(
+    "SELECT started_at FROM ingest_log WHERE stage = $1 AND source = $2 ORDER BY started_at DESC LIMIT 1",
+    [job.stage, job.source],
+  );
+  const last = rows[0]?.started_at ? new Date(rows[0].started_at).getTime() : null;
+  const ageMin = last === null ? null : Math.floor((now - last) / 60_000);
+  if (!opts.force && ageMin !== null && ageMin < job.minIntervalMin) {
+    return { status: 200, body: { job: name, skipped: "fresh", ageMin, needMin: job.minIntervalMin } };
   }
 
   // 3) 부른다. GITHUB_TOKEN이든 PAT든 workflow_dispatch는 언제나 실행을 만든다

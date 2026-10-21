@@ -43,13 +43,16 @@ export const VISITOR_STORAGE_KEY = "zipgonggo.visitor.v1";
 // 그 뒤로는 콘솔을 몇 번 더 열어도 다시 안 켜진다 — 안 그러면 끄는 버튼이 한 번도 안 먹는다
 export const VISIT_OPT_OUT_KEY = "zipgonggo.notrack.v1";
 
-// ISR·unstable_cache 갱신 주기. 파이프라인이 DB를 갱신해도 이 시간 안엔 반영된다
-export const REVALIDATE_SEC = 3600;
+// ISR·unstable_cache 갱신 주기. 데이터가 바뀌면 파이프라인이 /api/revalidate로 바로 비우고,
+// D-day처럼 날짜만으로 바뀌는 값은 매일 KST 00:05 크론(/api/cron/rollover)이 비운다.
+// 1시간이던 때는 봇이 다녀갈 때마다 지면을 다시 그리느라 Neon이 못 잠들었다(2026-10-21)
+export const REVALIDATE_SEC = 86400;
 export const CACHE_TAG_NOTICE = "notice";
 // getEligibilityRules 전용 — 이전엔 태그가 없어 revalidateTag로 못 지웠다(2026-09-09, /api/revalidate 추가하며 같이 붙임)
 export const CACHE_TAG_ELIGIBILITY = "eligibility";
-// /api/notices 응답 캐시. s-maxage는 REVALIDATE_SEC와 맞춘다
-export const API_CACHE_CONTROL = `public, s-maxage=${REVALIDATE_SEC}, stale-while-revalidate=600`;
+// /api/notices 응답 캐시. CDN 캐시는 /api/revalidate가 못 비우니 한 시간으로 둔다 — 뒤의 unstable_cache가
+// 하루를 버티므로 이 한 시간이 지나도 DB까지는 안 간다
+export const API_CACHE_CONTROL = `public, s-maxage=3600, stale-while-revalidate=600`;
 // /api/search 응답 캐시. 목록보다 짧게 잡는다 — 타이핑 한 글자마다 URL이 갈려 한 장이 오래 살아 봐야 쓸모가 적고,
 // 새 공고가 올라온 직후 「없다」고 답한 장이 한 시간 남아 있는 편이 손해다
 export const SEARCH_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=600";

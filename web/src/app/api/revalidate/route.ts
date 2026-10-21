@@ -1,4 +1,4 @@
-// 파이프라인이 DB를 갱신한 직후 부르는 웹훅 — unstable_cache(REVALIDATE_SEC=1시간)를 즉시 비운다.
+// 파이프라인이 DB를 갱신한 직후 부르는 웹훅 — unstable_cache와 지면 캐시(REVALIDATE_SEC=하루)를 즉시 비운다.
 // 그 전엔 DB를 고쳐도 시간이 찰 때까지 화면에 안 보였다(사용자 지적 2026-09-09).
 // 비밀키(REVALIDATE_SECRET)로만 보호한다 — 공개 라우트라 아무나 못 두드리게.
 import { revalidatePath, revalidateTag } from "next/cache";

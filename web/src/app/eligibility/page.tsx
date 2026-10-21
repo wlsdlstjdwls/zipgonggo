@@ -3,8 +3,8 @@ import { EligibilityCheck } from "@/components/eligibility-check";
 import { getEligibilityRules, listOpenSoon, listResidenceAreas, listTypeHubs } from "@/lib/queries";
 import { ROUTES } from "@/lib/routes";
 
-// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
-export const revalidate = 3600;
+// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(86400)와 같은 값을 유지할 것
+export const revalidate = 86400;
 export const preferredRegion = "iad1";
 
 const TITLE = "공공임대 자격진단 — 내 조건으로 신청 가능한 공급유형";

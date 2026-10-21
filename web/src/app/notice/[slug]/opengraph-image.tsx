@@ -10,8 +10,8 @@ import { getNoticeBySlug } from "@/lib/queries";
 import { regionShort } from "@/lib/sido";
 import { SITE_NAME } from "@/lib/constants";
 
-// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
-export const revalidate = 3600;
+// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(86400)와 같은 값을 유지할 것
+export const revalidate = 86400;
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
 export const alt = "공고 요약 카드";

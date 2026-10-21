@@ -35,6 +35,12 @@ class Stats:
     errors: list[str] = field(default_factory=list)
     # 이번 실행에서 처음 들어온 공고 slug. 자동 수집이 「신규만 상세 파싱」을 고르는 근거다
     new_slugs: list[str] = field(default_factory=list)
+    # updated 가운데 지면에 보이는 값이 그대로였던 건수(upsert_guarded만 센다). 웹 캐시를 비울지 가르는 근거다
+    unchanged: int = 0
+
+    @property
+    def changed(self) -> int:
+        return self.inserted + self.updated - self.unchanged
 
     def skip(self, reason: str) -> None:
         self.skipped[reason] = self.skipped.get(reason, 0) + 1
@@ -65,13 +71,16 @@ def upsert_guarded(cur, stats: Stats, key: str, notice: dict[str, Any], areas: l
     """공고 1건 upsert. 실패해도 트랜잭션을 살려 다음 건으로 간다(SAVEPOINT)."""
     cur.execute("SAVEPOINT grp")
     try:
-        if upsert_notice(cur, notice, areas):
+        inserted, changed = upsert_notice(cur, notice, areas)
+        if inserted:
             stats.inserted += 1
             slug = notice.get("slug")
             if slug:
                 stats.new_slugs.append(slug)
         else:
             stats.updated += 1
+            if not changed:
+                stats.unchanged += 1
         cur.execute("RELEASE SAVEPOINT grp")
     except Exception as exc:  # noqa: BLE001
         cur.execute("ROLLBACK TO SAVEPOINT grp")
@@ -90,10 +99,10 @@ def utc_now() -> datetime:
 
 
 def notify_web_revalidate(tags: list[str] | None = None) -> None:
-    """DB를 갱신한 직후 web의 unstable_cache(REVALIDATE_SEC=1시간)를 즉시 비운다.
+    """DB를 갱신한 직후 web의 unstable_cache와 지면 캐시(REVALIDATE_SEC=하루)를 즉시 비운다.
 
     URL·SECRET 둘 다 없으면 조용히 건너뛴다(로컬엔 배포된 웹이 없을 수 있다).
-    실패해도 파이프라인을 막지 않는다 — 최악의 경우 예전처럼 1시간 안에 자연 반영된다(2026-09-09).
+    실패해도 파이프라인을 막지 않는다 — 최악의 경우 하루 안에(자정 rollover 크론) 반영된다(2026-09-09).
     """
     s = settings()
     if not s.web_revalidate_url or not s.revalidate_secret:
@@ -170,7 +179,8 @@ def stage_main(
         print(json.dumps({"crashed": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False, indent=1))
         return 1
     print(json.dumps(stats.__dict__, ensure_ascii=False, indent=1))
-    if not args.dry_run and stats.ok:
+    if not args.dry_run and stats.ok and stats.changed > 0:
+        # 바뀐 게 없으면 캐시를 그대로 둔다 — 비우면 봇이 전 지면을 다시 그리며 DB를 깨운다(2026-10-21)
         notify_web_revalidate()
         # 캐시를 비운 **뒤에** 알린다 — 먼저 알리면 크롤러가 옛 지면을 가져간다.
         # 실패해도 파이프라인을 막지 않는다(다음 회차가 같은 행을 다시 집는다 — 해시가 아직 옛것이라)

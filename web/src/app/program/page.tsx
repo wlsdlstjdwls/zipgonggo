@@ -14,8 +14,8 @@ import { listProgramHubs, listTypeHubs } from "@/lib/queries";
 import { programPath, ROUTES, typePath } from "@/lib/routes";
 import { absoluteUrl } from "@/lib/site-url";
 
-// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(3600)와 같은 값을 유지할 것
-export const revalidate = 3600;
+// Next 세그먼트 설정은 리터럴만 허용 — lib/constants REVALIDATE_SEC(86400)와 같은 값을 유지할 것
+export const revalidate = 86400;
 export const preferredRegion = "iad1";
 
 const TITLE = "임대 종류 한눈에 — 공공임대 유형과 정부 사업 정리";
